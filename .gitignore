@@ -133,12 +133,64 @@ context_cleaner_data/
 *.sqlite
 *.sqlite3
 
+# Application data and logs
+logs/
+data/
+temp/
+tmp/
+cache/
+analytics_data/
+tracking_data/
+metrics_data/
+profiles/
+user_data/
+
+# Configuration files with sensitive data
+config/local_config.py
+config/production_config.py
+.env.local
+.env.production
+
+# Backup and temporary files
+*.bak
+*.backup
+*.old
+*.tmp
+*.temp
+temp_*
+tmp_*
+
+# Security and certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+keys/
+certs/
+
+# Performance profiling
+*.prof
+*.profile
+profiling_data/
+
+# Local development database
+development.db
+test.db
+
 # IDE
 .vscode/
 .idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
+*.iml
+*.ipr
+*.iws
 
 # OS
 .DS_Store
@@ -146,5 +198,59 @@ context_cleaner_data/
 ._*
 .Spotlight-V100
 .Trashes
+.AppleDouble
+.LSOverride
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 ehthumbs.db
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+.directory
+.Trash-*
+.nfs*
+
+# Screenshots and debug images (except package assets)
+screenshots/
+debug_images/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+
+# But include static assets that are part of the package
+!static/**/*.png
+!static/**/*.jpg
+!static/**/*.jpeg
+!static/**/*.gif
+!static/**/*.svg
+!src/**/static/**/*.png
+!src/**/static/**/*.jpg
+!src/**/static/**/*.jpeg
+!src/**/static/**/*.gif
+!src/**/static/**/*.svg
+
+# Archive files (except package assets)
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+!static/**/*.zip
+!docs/**/*.zip

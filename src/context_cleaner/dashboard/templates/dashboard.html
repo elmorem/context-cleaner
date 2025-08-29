@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Plotly.js for advanced charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+    <!-- Socket.IO for real-time updates -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <!-- Custom styles -->
+    <style>
+        .dashboard-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        
+        .trend-up {
+            color: #10B981;
+        }
+        
+        .trend-down {
+            color: #EF4444;
+        }
+        
+        .trend-stable {
+            color: #6B7280;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .recommendation-card {
+            border-left: 4px solid;
+        }
+        
+        .priority-critical {
+            border-left-color: #DC2626;
+        }
+        
+        .priority-high {
+            border-left-color: #EA580C;
+        }
+        
+        .priority-medium {
+            border-left-color: #D97706;
+        }
+        
+        .priority-low {
+            border-left-color: #65A30D;
+        }
+        
+        .priority-informational {
+            border-left-color: #0369A1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">Context Cleaner Analytics</h1>
+                    <span id="connection-status" class="ml-4 px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Connected</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                    <button id="auto-refresh-toggle" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
+                        Auto-refresh: ON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Key Metrics Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Sessions -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Sessions</p>
+                        <p id="total-sessions" class="metric-value text-gray-900">0</p>
+                    </div>
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <span id="sessions-trend" class="text-sm text-gray-600">—</span>
+                </div>
+            </div>
+
+            <!-- Average Productivity -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Avg Productivity</p>
+                        <p id="avg-productivity" class="metric-value text-gray-900">0</p>
+                    </div>
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <span id="productivity-trend" class="text-sm text-gray-600">—</span>
+                </div>
+            </div>
+
+            <!-- Health Score -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Health Score</p>
+                        <p id="avg-health-score" class="metric-value text-gray-900">0</p>
+                    </div>
+                    <div class="p-3 bg-yellow-100 rounded-full">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <span id="health-trend" class="text-sm text-gray-600">—</span>
+                </div>
+            </div>
+
+            <!-- Active Recommendations -->
+            <div class="dashboard-card p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Recommendations</p>
+                        <p id="active-recommendations" class="metric-value text-gray-900">0</p>
+                    </div>
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <span class="text-sm text-gray-600">Optimization suggestions</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Productivity Trend Chart -->
+            <div class="dashboard-card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Productivity Trend</h3>
+                <div class="chart-container">
+                    <div id="productivity-chart"></div>
+                </div>
+            </div>
+
+            <!-- Health Score Chart -->
+            <div class="dashboard-card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Context Health</h3>
+                <div class="chart-container">
+                    <div id="health-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Recommendations Panel -->
+            <div class="lg:col-span-2">
+                <div class="dashboard-card p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Recommendations</h3>
+                        <span class="text-sm text-gray-500">Top suggestions for optimization</span>
+                    </div>
+                    <div id="recommendations-container" class="space-y-4">
+                        <!-- Recommendations will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights & Patterns Panel -->
+            <div class="space-y-6">
+                <!-- Key Insights -->
+                <div class="dashboard-card p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Key Insights</h3>
+                    <div id="insights-container" class="space-y-3">
+                        <!-- Insights will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Detected Patterns -->
+                <div class="dashboard-card p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Patterns</h3>
+                    <div id="patterns-container" class="space-y-3">
+                        <!-- Patterns will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Timeline -->
+        <div class="mt-8">
+            <div class="dashboard-card p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Session Timeline</h3>
+                <div class="chart-container" style="height: 400px;">
+                    <div id="timeline-chart"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 flex items-center space-x-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="text-gray-700">Loading dashboard data...</span>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Dashboard state
+        let socket;
+        let autoRefreshEnabled = true;
+        let dashboardData = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocketConnection();
+            setupEventListeners();
+            loadDashboardData();
+        });
+
+        // Socket connection
+        function initializeSocketConnection() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                updateConnectionStatus(true);
+                console.log('Connected to dashboard server');
+            });
+            
+            socket.on('disconnect', function() {
+                updateConnectionStatus(false);
+                console.log('Disconnected from dashboard server');
+            });
+            
+            socket.on('dashboard_update', function(data) {
+                dashboardData = data;
+                updateDashboard(data);
+            });
+        }
+
+        // Event listeners
+        function setupEventListeners() {
+            document.getElementById('refresh-btn').addEventListener('click', function() {
+                socket.emit('request_update');
+                showLoading();
+            });
+            
+            document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
+                autoRefreshEnabled = !autoRefreshEnabled;
+                socket.emit('toggle_auto_refresh', {enabled: autoRefreshEnabled});
+                updateAutoRefreshButton();
+            });
+        }
+
+        // Load initial dashboard data
+        function loadDashboardData() {
+            showLoading();
+            
+            fetch('/api/dashboard-data')
+                .then(response => response.json())
+                .then(data => {
+                    dashboardData = data;
+                    updateDashboard(data);
+                    hideLoading();
+                })
+                .catch(error => {
+                    console.error('Error loading dashboard data:', error);
+                    hideLoading();
+                    showError('Failed to load dashboard data');
+                });
+        }
+
+        // Update dashboard with new data
+        function updateDashboard(data) {
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            
+            updateMetrics(data.summary || {});
+            updateTrends(data.trends || {});
+            updateCharts(data.charts || {});
+            updateRecommendations(data.recommendations || []);
+            updateInsights(data.insights || []);
+            updatePatterns(data.patterns || []);
+            
+            console.log('Dashboard updated with new data');
+        }
+
+        // Update metrics
+        function updateMetrics(summary) {
+            document.getElementById('total-sessions').textContent = summary.total_sessions || 0;
+            document.getElementById('avg-productivity').textContent = (summary.avg_productivity || 0).toFixed(1);
+            document.getElementById('avg-health-score').textContent = (summary.avg_health_score || 0).toFixed(1);
+            document.getElementById('active-recommendations').textContent = summary.active_recommendations || 0;
+        }
+
+        // Update trends
+        function updateTrends(trends) {
+            updateTrendIndicator('sessions-trend', 'stable');
+            updateTrendIndicator('productivity-trend', trends.productivity?.direction || 'stable');
+            updateTrendIndicator('health-trend', trends.health_score?.direction || 'stable');
+        }
+
+        // Update trend indicator
+        function updateTrendIndicator(elementId, direction) {
+            const element = document.getElementById(elementId);
+            const icons = {
+                'improving': '↗ Improving',
+                'declining': '↘ Declining',
+                'stable': '→ Stable',
+                'volatile': '↕ Volatile'
+            };
+            
+            const colors = {
+                'improving': 'trend-up',
+                'declining': 'trend-down',
+                'stable': 'trend-stable',
+                'volatile': 'trend-stable'
+            };
+            
+            element.textContent = icons[direction] || '— No data';
+            element.className = `text-sm ${colors[direction] || 'text-gray-600'}`;
+        }
+
+        // Update charts
+        function updateCharts(charts) {
+            updateProductivityChart(charts.productivity_chart || {});
+            updateHealthChart(charts.health_score_chart || {});
+            loadTimelineChart();
+        }
+
+        // Update productivity chart
+        function updateProductivityChart(chartData) {
+            if (!chartData.labels || chartData.labels.length === 0) {
+                document.getElementById('productivity-chart').innerHTML = 
+                    '<div class="flex items-center justify-center h-full text-gray-500">No productivity data available</div>';
+                return;
+            }
+            
+            const trace = {
+                x: chartData.labels,
+                y: chartData.data,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: {color: '#2563EB', width: 3},
+                marker: {size: 6, color: '#2563EB'}
+            };
+            
+            const layout = {
+                title: false,
+                xaxis: {title: 'Time'},
+                yaxis: {title: 'Score', range: [0, 100]},
+                margin: {t: 20, r: 20, b: 40, l: 50},
+                plot_bgcolor: 'transparent',
+                paper_bgcolor: 'transparent'
+            };
+            
+            Plotly.newPlot('productivity-chart', [trace], layout, {responsive: true});
+        }
+
+        // Update health chart  
+        function updateHealthChart(chartData) {
+            if (!chartData.labels || chartData.labels.length === 0) {
+                document.getElementById('health-chart').innerHTML = 
+                    '<div class="flex items-center justify-center h-full text-gray-500">No health score data available</div>';
+                return;
+            }
+            
+            const trace = {
+                x: chartData.labels,
+                y: chartData.data,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: {color: '#059669', width: 3},
+                marker: {size: 6, color: '#059669'}
+            };
+            
+            const layout = {
+                title: false,
+                xaxis: {title: 'Time'},
+                yaxis: {title: 'Score', range: [0, 100]},
+                margin: {t: 20, r: 20, b: 40, l: 50},
+                plot_bgcolor: 'transparent',
+                paper_bgcolor: 'transparent',
+                shapes: [
+                    {type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 80, y1: 80, line: {color: 'green', width: 1, dash: 'dash'}},
+                    {type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 60, y1: 60, line: {color: 'orange', width: 1, dash: 'dash'}},
+                    {type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 40, y1: 40, line: {color: 'red', width: 1, dash: 'dash'}}
+                ]
+            };
+            
+            Plotly.newPlot('health-chart', [trace], layout, {responsive: true});
+        }
+
+        // Load timeline chart
+        function loadTimelineChart() {
+            fetch('/api/session-timeline?days=7')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('timeline-chart').innerHTML = 
+                            '<div class="flex items-center justify-center h-full text-gray-500">No session timeline data available</div>';
+                        return;
+                    }
+                    Plotly.newPlot('timeline-chart', data.data, data.layout, {responsive: true});
+                })
+                .catch(error => {
+                    console.error('Error loading timeline chart:', error);
+                    document.getElementById('timeline-chart').innerHTML = 
+                        '<div class="flex items-center justify-center h-full text-red-500">Failed to load timeline</div>';
+                });
+        }
+
+        // Update recommendations
+        function updateRecommendations(recommendations) {
+            const container = document.getElementById('recommendations-container');
+            
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-center py-4">No recommendations available</div>';
+                return;
+            }
+            
+            container.innerHTML = recommendations.map(rec => `
+                <div class="recommendation-card bg-white border rounded-lg p-4 priority-${rec.priority}">
+                    <div class="flex items-start justify-between mb-2">
+                        <h4 class="font-semibold text-gray-900">${rec.title}</h4>
+                        <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">${rec.priority}</span>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-2">${rec.description}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-500">
+                        <span>Impact: ${rec.impact_score}%</span>
+                        <span>Confidence: ${rec.confidence}%</span>
+                        ${rec.estimated_time_savings ? `<span>Saves: ${rec.estimated_time_savings}min/day</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update insights
+        function updateInsights(insights) {
+            const container = document.getElementById('insights-container');
+            
+            if (!insights || insights.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm">No insights available yet</div>';
+                return;
+            }
+            
+            container.innerHTML = insights.map(insight => `
+                <div class="flex items-start space-x-2">
+                    <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                    <p class="text-sm text-gray-700">${insight}</p>
+                </div>
+            `).join('');
+        }
+
+        // Update patterns
+        function updatePatterns(patterns) {
+            const container = document.getElementById('patterns-container');
+            
+            if (!patterns || patterns.length === 0) {
+                container.innerHTML = '<div class="text-gray-500 text-sm">No patterns detected yet</div>';
+                return;
+            }
+            
+            container.innerHTML = patterns.map(pattern => `
+                <div class="border border-gray-200 rounded-lg p-3">
+                    <h5 class="font-medium text-gray-900 text-sm mb-1">${pattern.name}</h5>
+                    <p class="text-gray-600 text-xs mb-2">${pattern.description}</p>
+                    <div class="w-full bg-gray-200 rounded-full h-1">
+                        <div class="bg-blue-600 h-1 rounded-full" style="width: ${pattern.strength}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Connection status
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connection-status');
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'ml-4 px-2 py-1 text-xs rounded-full bg-green-100 text-green-800';
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'ml-4 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800';
+            }
+        }
+
+        // Auto refresh button
+        function updateAutoRefreshButton() {
+            const button = document.getElementById('auto-refresh-toggle');
+            button.textContent = `Auto-refresh: ${autoRefreshEnabled ? 'ON' : 'OFF'}`;
+            button.className = autoRefreshEnabled ? 
+                'bg-green-200 hover:bg-green-300 text-green-700 px-4 py-2 rounded-lg transition-colors' :
+                'bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors';
+        }
+
+        // Loading functions
+        function showLoading() {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+
+        // Error handling
+        function showError(message) {
+            console.error('Dashboard error:', message);
+            // Could show toast notification or error banner
+        }
+    </script>
+</body>
+</html>

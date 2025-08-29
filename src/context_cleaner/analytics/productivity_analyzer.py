@@ -446,3 +446,272 @@ class ProductivityAnalyzer:
             
         except Exception:
             return 50.0  # Default score if calculation fails
+    
+    def predict_optimal_break_time(self, recent_scores: List[int]) -> Optional[int]:
+        """
+        Use simple ML to predict optimal break timing based on context health trends.
+        
+        Args:
+            recent_scores: Recent health scores (most recent first)
+            
+        Returns:
+            Predicted minutes until optimal break time, or None if not applicable
+        """
+        if len(recent_scores) < 3:
+            return None
+            
+        try:
+            # Simple trend analysis - detect declining pattern
+            recent_trend = []
+            for i in range(1, min(len(recent_scores), 6)):
+                trend = recent_scores[i-1] - recent_scores[i]  # Positive = declining
+                recent_trend.append(trend)
+            
+            avg_decline = statistics.mean(recent_trend)
+            
+            # If steadily declining, predict break timing
+            if avg_decline > 5:  # Declining by 5+ points per measurement
+                current_score = recent_scores[0]
+                # Predict when score will hit 60 (break threshold)
+                if current_score > 60:
+                    minutes_to_break = int((current_score - 60) / avg_decline * 10)
+                    return max(10, min(120, minutes_to_break))  # 10-120 minute range
+            
+            return None
+            
+        except Exception:
+            return None
+    
+    def detect_productivity_patterns(self, session_history: List[ProductivityMetrics]) -> Dict[str, Any]:
+        """
+        Detect patterns in productivity data using basic ML techniques.
+        
+        Args:
+            session_history: List of productivity metrics from past sessions
+            
+        Returns:
+            Dictionary with detected patterns and insights
+        """
+        if len(session_history) < 5:
+            return {"status": "insufficient_data", "message": "Need at least 5 sessions for pattern analysis"}
+        
+        try:
+            # Extract features
+            durations = [s.session_duration_minutes for s in session_history]
+            productivity_scores = [s.productivity_score for s in session_history]
+            optimization_events = [s.optimization_events for s in session_history]
+            
+            # Calculate statistics
+            patterns = {
+                "optimal_session_length": {
+                    "mean_duration": statistics.mean(durations),
+                    "median_duration": statistics.median(durations),
+                    "most_productive_duration_range": self._find_optimal_duration_range(durations, productivity_scores)
+                },
+                "productivity_trends": {
+                    "average_score": statistics.mean(productivity_scores),
+                    "score_variance": statistics.variance(productivity_scores) if len(productivity_scores) > 1 else 0,
+                    "trend_direction": self._calculate_trend_direction(productivity_scores)
+                },
+                "optimization_behavior": {
+                    "average_optimizations": statistics.mean(optimization_events),
+                    "optimization_correlation": self._calculate_correlation(optimization_events, productivity_scores)
+                },
+                "session_type_distribution": self._analyze_session_types(session_history),
+                "recommendations": self._generate_pattern_recommendations(session_history)
+            }
+            
+            return patterns
+            
+        except Exception as e:
+            return {"status": "error", "message": f"Pattern analysis failed: {e}"}
+    
+    def _find_optimal_duration_range(self, durations: List[float], scores: List[float]) -> Dict[str, Any]:
+        """Find the duration range with highest average productivity."""
+        try:
+            # Group sessions by duration ranges
+            ranges = {
+                "short": (0, 60),      # 0-1 hour
+                "medium": (60, 180),   # 1-3 hours  
+                "long": (180, 360),    # 3-6 hours
+                "extended": (360, 999) # 6+ hours
+            }
+            
+            range_scores = {}
+            
+            for range_name, (min_dur, max_dur) in ranges.items():
+                range_productivity = [
+                    scores[i] for i, dur in enumerate(durations)
+                    if min_dur <= dur < max_dur
+                ]
+                
+                if range_productivity:
+                    range_scores[range_name] = {
+                        "average_score": statistics.mean(range_productivity),
+                        "session_count": len(range_productivity),
+                        "score_range": (min(range_productivity), max(range_productivity))
+                    }
+            
+            # Find best performing range
+            if range_scores:
+                best_range = max(range_scores.keys(), key=lambda k: range_scores[k]["average_score"])
+                return {
+                    "optimal_range": best_range,
+                    "range_details": range_scores,
+                    "recommendation": f"Your most productive sessions are typically {best_range} duration"
+                }
+            
+            return {"status": "no_data"}
+            
+        except Exception:
+            return {"status": "calculation_error"}
+    
+    def _calculate_trend_direction(self, scores: List[float]) -> str:
+        """Calculate overall trend direction of productivity scores."""
+        try:
+            if len(scores) < 3:
+                return "unknown"
+            
+            # Simple linear trend calculation
+            recent_half = scores[:len(scores)//2]
+            earlier_half = scores[len(scores)//2:]
+            
+            recent_avg = statistics.mean(recent_half)
+            earlier_avg = statistics.mean(earlier_half)
+            
+            diff = recent_avg - earlier_avg
+            
+            if diff > 5:
+                return "improving"
+            elif diff < -5:
+                return "declining"
+            else:
+                return "stable"
+                
+        except Exception:
+            return "unknown"
+    
+    def _calculate_correlation(self, list1: List[float], list2: List[float]) -> float:
+        """Calculate simple correlation coefficient between two lists."""
+        try:
+            if len(list1) != len(list2) or len(list1) < 2:
+                return 0.0
+            
+            mean1 = statistics.mean(list1)
+            mean2 = statistics.mean(list2)
+            
+            numerator = sum((x - mean1) * (y - mean2) for x, y in zip(list1, list2))
+            
+            sum_sq1 = sum((x - mean1) ** 2 for x in list1)
+            sum_sq2 = sum((x - mean2) ** 2 for x in list2)
+            
+            denominator = (sum_sq1 * sum_sq2) ** 0.5
+            
+            if denominator == 0:
+                return 0.0
+            
+            correlation = numerator / denominator
+            return max(-1.0, min(1.0, correlation))  # Clamp to [-1, 1]
+            
+        except Exception:
+            return 0.0
+    
+    def _analyze_session_types(self, session_history: List[ProductivityMetrics]) -> Dict[str, Any]:
+        """Analyze distribution of session types."""
+        try:
+            type_counts = {}
+            type_scores = {}
+            
+            for session in session_history:
+                session_type = session.session_type
+                type_counts[session_type] = type_counts.get(session_type, 0) + 1
+                
+                if session_type not in type_scores:
+                    type_scores[session_type] = []
+                type_scores[session_type].append(session.productivity_score)
+            
+            # Calculate averages for each type
+            type_analysis = {}
+            for session_type, count in type_counts.items():
+                type_analysis[session_type] = {
+                    "count": count,
+                    "percentage": round((count / len(session_history)) * 100, 1),
+                    "avg_productivity": round(statistics.mean(type_scores[session_type]), 1),
+                    "productivity_range": (
+                        round(min(type_scores[session_type]), 1),
+                        round(max(type_scores[session_type]), 1)
+                    )
+                }
+            
+            # Find most common and most productive types
+            most_common = max(type_counts.keys(), key=lambda k: type_counts[k])
+            most_productive = max(type_analysis.keys(), key=lambda k: type_analysis[k]["avg_productivity"])
+            
+            return {
+                "type_breakdown": type_analysis,
+                "insights": {
+                    "most_common_type": most_common,
+                    "most_productive_type": most_productive,
+                    "diversity_score": len(type_counts) / 7.0  # Max 7 session types
+                }
+            }
+            
+        except Exception:
+            return {"status": "analysis_error"}
+    
+    def _generate_pattern_recommendations(self, session_history: List[ProductivityMetrics]) -> List[str]:
+        """Generate actionable recommendations based on detected patterns."""
+        try:
+            recommendations = []
+            
+            if len(session_history) < 5:
+                return ["Continue tracking sessions to generate personalized recommendations"]
+            
+            # Analyze recent performance
+            recent_scores = [s.productivity_score for s in session_history[:5]]  # Last 5 sessions
+            avg_recent = statistics.mean(recent_scores)
+            
+            # Duration analysis
+            durations = [s.session_duration_minutes for s in session_history]
+            avg_duration = statistics.mean(durations)
+            
+            # Optimization analysis
+            optimization_events = [s.optimization_events for s in session_history]
+            avg_optimizations = statistics.mean(optimization_events)
+            
+            # Generate specific recommendations
+            if avg_recent < 60:
+                recommendations.append("Your recent productivity is below average - consider taking breaks and optimizing context more frequently")
+            
+            if avg_duration > 240:  # > 4 hours
+                recommendations.append("Your sessions are quite long - consider breaking them into shorter, focused periods")
+            elif avg_duration < 45:
+                recommendations.append("Your sessions are quite short - longer focused sessions might improve productivity")
+            
+            if avg_optimizations < 1:
+                recommendations.append("Try using context optimization more frequently to maintain code quality and productivity")
+            elif avg_optimizations > 5:
+                recommendations.append("Great use of optimization tools! This correlates with higher productivity")
+            
+            # Session type recommendations
+            type_analysis = self._analyze_session_types(session_history)
+            if "type_breakdown" in type_analysis:
+                debugging_sessions = type_analysis["type_breakdown"].get("debugging_session", {}).get("count", 0)
+                total_sessions = len(session_history)
+                
+                if debugging_sessions / total_sessions > 0.4:
+                    recommendations.append("High frequency of debugging sessions detected - consider code review practices and testing")
+            
+            # Trend-based recommendations
+            scores = [s.productivity_score for s in session_history]
+            trend = self._calculate_trend_direction(scores)
+            
+            if trend == "declining":
+                recommendations.append("Productivity trend is declining - consider adjusting work patterns or taking a longer break")
+            elif trend == "improving":
+                recommendations.append("Great work! Your productivity trend is improving - keep up the current practices")
+            
+            return recommendations or ["Keep up the good work! Continue tracking sessions for more insights"]
+            
+        except Exception:
+            return ["Unable to generate recommendations - continue tracking for better insights"]

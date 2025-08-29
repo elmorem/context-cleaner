@@ -1,0 +1,60 @@
+# Context Cleaner - Package Manifest
+# Include all necessary files for distribution
+
+# Documentation and metadata files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include DEVELOPMENT_ROADMAP.md
+include pyproject.toml
+
+# Configuration files
+include pytest.ini
+
+# Package source code
+recursive-include src/context_cleaner *.py
+
+# Dashboard templates and static files
+recursive-include src/context_cleaner/dashboard/templates *.html *.css *.js
+recursive-include src/context_cleaner/dashboard/static *.css *.js *.png *.ico
+
+# Static visualization assets (now in package structure)
+recursive-include src/context_cleaner/static *.js *.css *.html *.png *.ico *.svg
+
+# Legacy static assets (keep for backward compatibility during transition)
+recursive-include static *.js *.css *.html *.png *.ico *.svg
+
+# Data and configuration files
+recursive-include src/context_cleaner *.json *.yaml *.yml *.txt *.md
+
+# Installation scripts
+include install_claude_integration.py
+
+# Exclude development and build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.egg-info/*
+global-exclude __pycache__/*
+global-exclude .pytest_cache/*
+global-exclude .DS_Store
+global-exclude .git/*
+global-exclude *.log
+global-exclude .env
+global-exclude build/*
+global-exclude dist/*
+global-exclude htmlcov/*
+global-exclude .coverage
+global-exclude .tox/*
+
+# Exclude IDE and editor files
+global-exclude .vscode/*
+global-exclude .idea/*
+global-exclude *.swp
+global-exclude *.swo
+global-exclude *~
+
+# Exclude temporary files
+global-exclude tmp/*
+global-exclude temp/*
+global-exclude *.tmp
+global-exclude *.temp
