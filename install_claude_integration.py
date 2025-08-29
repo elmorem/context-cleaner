@@ -64,58 +64,102 @@ class ClaudeIntegrationInstaller:
         utils_dir = self.hooks_dir / "utils"
         utils_dir.mkdir(exist_ok=True)
         
-        # Create session tracking hook
+        # Create advanced session tracking hook with circuit breaker protection
         session_hook = utils_dir / "context_cleaner_session_tracker.py"
         session_hook_content = '''#!/usr/bin/env python3
 """
-Context Cleaner Session Tracker Hook
+Context Cleaner Advanced Session Tracker Hook
 
-Integrates with Context Cleaner to track development sessions
-for productivity analysis and optimization insights.
+Integrates with Context Cleaner's HookIntegrationManager for comprehensive
+productivity tracking with circuit breaker protection and encrypted storage.
 """
 
 import sys
 import json
-import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
 
-def log_session_event(event_type: str, data: dict):
-    """Log session event to Context Cleaner."""
+def get_hook_manager():
+    """Get Context Cleaner hook manager with error handling."""
     try:
-        # Get session data
-        session_data = {
-            'event_type': event_type,
-            'timestamp': datetime.now().isoformat(),
-            'data': data
-        }
-        
-        # Call Context Cleaner to log the event
-        cmd = ['context-cleaner', 'track-session', '--event', json.dumps(session_data)]
-        subprocess.run(cmd, capture_output=True, timeout=1.0)
-        
-    except Exception as e:
-        # Silently fail - never interfere with Claude Code
+        # Import Context Cleaner components
+        from context_cleaner.hooks import get_hook_manager
+        return get_hook_manager()
+    except ImportError:
+        # Context Cleaner not installed or not in path
+        return None
+    except Exception:
+        # Other errors - fail silently to never block Claude Code
+        return None
+
+def handle_session_start(hook_data: dict):
+    """Handle session start event with circuit breaker protection."""
+    try:
+        hook_manager = get_hook_manager()
+        if hook_manager:
+            hook_manager.handle_session_start(hook_data)
+    except Exception:
+        # Never let hook failures affect Claude Code
         pass
 
-def main():
-    """Main hook execution."""
+def handle_session_end(hook_data: dict):
+    """Handle session end event with circuit breaker protection."""
     try:
+        hook_manager = get_hook_manager()
+        if hook_manager:
+            hook_manager.handle_session_end(hook_data)
+    except Exception:
+        # Never let hook failures affect Claude Code
+        pass
+
+def handle_context_change(hook_data: dict):
+    """Handle context change event with circuit breaker protection."""
+    try:
+        hook_manager = get_hook_manager()
+        if hook_manager:
+            hook_manager.handle_context_change(hook_data)
+    except Exception:
+        # Never let hook failures affect Claude Code
+        pass
+
+def parse_hook_data(args):
+    """Parse hook data from command line arguments."""
+    try:
+        # Hook data is typically passed as JSON in arguments
+        for arg in args:
+            if arg.startswith('{') and arg.endswith('}'):
+                return json.loads(arg)
+        
+        # Fallback: create basic hook data
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'args': args,
+            'hook_type': 'context_cleaner_session'
+        }
+    except Exception:
+        return {}
+
+def main():
+    """Main hook execution with advanced session tracking."""
+    try:
+        # Parse hook data from arguments
+        hook_data = parse_hook_data(sys.argv[1:])
+        
         # Determine hook type from script name or arguments
-        hook_type = "session_event"
+        if 'session_start' in str(sys.argv) or hook_data.get('event_type') == 'session_start':
+            handle_session_start(hook_data)
+        elif 'session_end' in str(sys.argv) or hook_data.get('event_type') == 'session_end':
+            handle_session_end(hook_data)
+        else:
+            # Default to context change tracking
+            handle_context_change(hook_data)
         
-        # Log the session event
-        log_session_event(hook_type, {
-            'context_size': len(json.dumps(sys.argv, default=str)),
-            'timestamp': time.time()
-        })
-        
-        # Always exit successfully
+        # Always exit successfully - never block Claude Code
         sys.exit(0)
         
     except Exception:
-        # Never fail - always exit successfully
+        # Never fail - always exit successfully to never interfere with Claude Code
         sys.exit(0)
 
 if __name__ == "__main__":

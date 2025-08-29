@@ -318,13 +318,367 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
 
 
 @main.command()
-@click.pass_context
+@click.pass_context  
 def config_show(ctx):
     """Show current configuration."""
     config = ctx.obj['config']
     
     config_dict = config.to_dict()
     click.echo(json.dumps(config_dict, indent=2))
+
+
+@main.group(name='session')
+def session_group():
+    """Session tracking and productivity analytics commands."""
+    pass
+
+
+@session_group.command('start')
+@click.option('--session-id', type=str, help='Custom session ID')
+@click.option('--project-path', type=str, help='Current project directory')
+@click.option('--model', type=str, help='Claude model name')  
+@click.option('--version', type=str, help='Claude version')
+@click.pass_context
+def start_session(ctx, session_id, project_path, model, version):
+    """Start a new productivity tracking session."""
+    config = ctx.obj['config']
+    verbose = ctx.obj['verbose']
+    
+    try:
+        from ..tracking.session_tracker import SessionTracker
+        
+        tracker = SessionTracker(config)
+        session = tracker.start_session(
+            session_id=session_id,
+            project_path=project_path,
+            model_name=model,
+            claude_version=version
+        )
+        
+        if verbose:
+            click.echo(f"🚀 Started session tracking: {session.session_id}")
+            click.echo(f"📊 Project: {session.project_path or 'Unknown'}")
+            click.echo(f"🤖 Model: {session.model_name or 'Unknown'}")
+        else:
+            click.echo(f"✅ Session started: {session.session_id}")
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to start session: {e}", err=True)
+        sys.exit(1)
+
+
+@session_group.command('end')
+@click.option('--session-id', type=str, help='Session ID to end (uses current if not specified)')
+@click.pass_context
+def end_session(ctx, session_id):
+    """End the current or specified tracking session."""
+    config = ctx.obj['config']
+    verbose = ctx.obj['verbose']
+    
+    try:
+        from ..tracking.session_tracker import SessionTracker
+        
+        tracker = SessionTracker(config)
+        success = tracker.end_session(session_id)
+        
+        if success:
+            if verbose:
+                click.echo("🏁 Session tracking completed")
+                click.echo("📊 Run 'context-cleaner session stats' to view analytics")
+            else:
+                click.echo("✅ Session ended")
+        else:
+            click.echo("⚠️ No active session to end")
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to end session: {e}", err=True)
+        sys.exit(1)
+
+
+@session_group.command('stats')
+@click.option('--days', '-d', default=7, type=int, help='Number of days to analyze')
+@click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text', help='Output format')
+@click.pass_context
+def session_stats(ctx, days, format):
+    """Show productivity statistics and session analytics."""
+    config = ctx.obj['config']
+    verbose = ctx.obj['verbose']
+    
+    try:
+        from ..tracking.session_tracker import SessionTracker
+        
+        tracker = SessionTracker(config)
+        summary = tracker.get_productivity_summary(days)
+        
+        if format == 'json':
+            click.echo(json.dumps(summary, indent=2, default=str))
+        else:
+            # Format as readable text
+            click.echo(f"\n📊 PRODUCTIVITY SUMMARY - Last {days} days")
+            click.echo("=" * 50)
+            
+            if summary.get('session_count', 0) == 0:
+                click.echo("No sessions found for the specified period")
+                return
+            
+            click.echo(f"🎯 Sessions: {summary.get('session_count', 0)}")
+            click.echo(f"⏱️ Total Time: {summary.get('total_time_hours', 0)}h")
+            click.echo(f"📈 Avg Productivity: {summary.get('average_productivity_score', 0)}/100")
+            click.echo(f"🔧 Optimizations: {summary.get('total_optimizations', 0)}")
+            click.echo(f"🛠️ Tools Used: {summary.get('total_tools_used', 0)}")
+            
+            # Show best session
+            if 'best_session' in summary:
+                best = summary['best_session']
+                click.echo(f"\n🌟 Best Session: {best['productivity_score']}/100 ({best['duration_minutes']}min)")
+            
+            # Show recommendations
+            recommendations = summary.get('recommendations', [])
+            if recommendations:
+                click.echo("\n💡 RECOMMENDATIONS:")
+                for i, rec in enumerate(recommendations, 1):
+                    click.echo(f"   {i}. {rec}")
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to get session stats: {e}", err=True)
+        sys.exit(1)
+
+
+@session_group.command('list')
+@click.option('--limit', '-l', default=10, type=int, help='Maximum number of sessions to show')
+@click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text', help='Output format')
+@click.pass_context
+def list_sessions(ctx, limit, format):
+    """List recent tracking sessions."""
+    config = ctx.obj['config']
+    
+    try:
+        from ..tracking.session_tracker import SessionTracker
+        
+        tracker = SessionTracker(config)
+        sessions = tracker.get_recent_sessions(limit=limit)
+        
+        if format == 'json':
+            session_data = [s.to_dict() for s in sessions]
+            click.echo(json.dumps(session_data, indent=2, default=str))
+        else:
+            if not sessions:
+                click.echo("No sessions found")
+                return
+            
+            click.echo(f"\n📋 RECENT SESSIONS (showing {len(sessions)})")
+            click.echo("=" * 50)
+            
+            for session in sessions:
+                duration_min = round(session.duration_seconds / 60, 1) if session.duration_seconds > 0 else 0
+                productivity = session.calculate_productivity_score()
+                status_icon = "✅" if session.status.value == "completed" else "🔄"
+                
+                click.echo(f"{status_icon} {session.session_id[:8]}... | {duration_min}min | {productivity}/100 | {session.start_time.strftime('%Y-%m-%d %H:%M')}")
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to list sessions: {e}", err=True)
+        sys.exit(1)
+
+
+@main.group(name='monitor')
+def monitor_group():
+    """Real-time monitoring and observation commands."""
+    pass
+
+
+@monitor_group.command('start')
+@click.option('--watch-dirs', multiple=True, help='Directories to watch for file changes')
+@click.option('--no-observer', is_flag=True, help='Disable automatic file system observation')
+@click.pass_context
+def start_monitoring(ctx, watch_dirs, no_observer):
+    """Start real-time session monitoring and observation."""
+    config = ctx.obj['config']
+    verbose = ctx.obj['verbose']
+    
+    try:
+        from ..monitoring.real_time_monitor import RealTimeMonitor
+        from ..monitoring.session_observer import SessionObserver
+        
+        # Create real-time monitor
+        monitor = RealTimeMonitor(config)
+        
+        # Add console event callback for verbose output
+        if verbose:
+            def console_callback(event_type: str, event_data: dict):
+                timestamp = datetime.now().strftime('%H:%M:%S')
+                click.echo(f"[{timestamp}] {event_type}: {event_data.get('message', 'Event triggered')}")
+            
+            monitor.add_event_callback(console_callback)
+        
+        # Start monitoring
+        asyncio.run(monitor.start_monitoring())
+        
+        # Setup file system observer if not disabled
+        if not no_observer:
+            observer = SessionObserver(config, monitor)
+            
+            # Use provided directories or default to current directory
+            directories = list(watch_dirs) if watch_dirs else ['.']
+            observer.start_observing(directories)
+            
+            if verbose:
+                click.echo(f"🔍 Watching directories: {', '.join(directories)}")
+        
+        if verbose:
+            click.echo("🚀 Real-time monitoring started")
+            click.echo("📊 Use 'context-cleaner monitor status' to check status")
+            click.echo("⏹️ Use Ctrl+C to stop monitoring")
+        else:
+            click.echo("✅ Monitoring started")
+        
+        # Keep running until interrupted
+        async def run_monitoring():
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except KeyboardInterrupt:
+                click.echo("\n🛑 Stopping monitoring...")
+                await monitor.stop_monitoring()
+                if not no_observer:
+                    observer.stop_observing()
+                click.echo("✅ Monitoring stopped")
+        
+        # Run the monitoring loop
+        asyncio.run(run_monitoring())
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to start monitoring: {e}", err=True)
+        sys.exit(1)
+
+
+@monitor_group.command('status')
+@click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text', help='Output format')
+@click.pass_context
+def monitor_status(ctx, format):
+    """Show monitoring status and statistics."""
+    config = ctx.obj['config']
+    
+    try:
+        from ..monitoring.real_time_monitor import RealTimeMonitor
+        
+        # Create monitor instance to get status (doesn't start monitoring)
+        monitor = RealTimeMonitor(config)
+        status = monitor.get_monitor_status()
+        
+        if format == 'json':
+            click.echo(json.dumps(status, indent=2, default=str))
+        else:
+            click.echo("\n🔍 MONITORING STATUS")
+            click.echo("=" * 30)
+            
+            monitoring = status.get('monitoring', {})
+            config_data = status.get('configuration', {})
+            
+            # Monitor status
+            is_active = monitoring.get('is_active', False)
+            status_icon = "🟢" if is_active else "🔴"
+            click.echo(f"{status_icon} Status: {'Active' if is_active else 'Stopped'}")
+            
+            if is_active:
+                uptime = monitoring.get('uptime_seconds', 0)
+                click.echo(f"⏱️ Uptime: {uptime:.1f}s")
+            
+            # Configuration
+            click.echo(f"\n⚙️ Configuration:")
+            click.echo(f"   Session updates: every {config_data.get('session_update_interval_s', 0)}s")
+            click.echo(f"   Health updates: every {config_data.get('health_update_interval_s', 0)}s")
+            click.echo(f"   Activity updates: every {config_data.get('activity_update_interval_s', 0)}s")
+            
+            # Cache status
+            cache = status.get('cache_status', {})
+            click.echo(f"\n💾 Cache Status:")
+            click.echo(f"   Session data: {'✅' if cache.get('session_data_cached') else '❌'}")
+            click.echo(f"   Health data: {'✅' if cache.get('health_data_cached') else '❌'}")
+            click.echo(f"   Activity data: {'✅' if cache.get('activity_data_cached') else '❌'}")
+        
+    except Exception as e:
+        click.echo(f"❌ Failed to get monitor status: {e}", err=True)
+        sys.exit(1)
+
+
+@monitor_group.command('live')
+@click.option('--refresh', '-r', default=5, type=int, help='Refresh interval in seconds')
+@click.pass_context
+def live_dashboard(ctx, refresh):
+    """Show live dashboard with real-time updates."""
+    config = ctx.obj['config']
+    
+    try:
+        import os
+        from ..monitoring.real_time_monitor import RealTimeMonitor
+        
+        monitor = RealTimeMonitor(config)
+        
+        click.echo("🎯 LIVE DASHBOARD - Press Ctrl+C to exit")
+        click.echo(f"🔄 Auto-refresh: {refresh}s")
+        click.echo("=" * 50)
+        
+        async def run_live_dashboard():
+            try:
+                while True:
+                    # Clear screen
+                    os.system('clear' if os.name == 'posix' else 'cls')
+                    
+                    # Get live data
+                    live_data = monitor.get_live_dashboard_data()
+                    
+                    # Display current time
+                    click.echo(f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+                    # Session info
+                    session_data = live_data.get('live_data', {}).get('session_metrics', {})
+                    current_session = session_data.get('current_session', {})
+                    
+                    if current_session:
+                        click.echo(f"📊 Session: {current_session.get('session_id', 'Unknown')[:8]}...")
+                        click.echo(f"⏱️ Duration: {current_session.get('duration_seconds', 0):.0f}s")
+                        click.echo(f"🎯 Productivity: {current_session.get('productivity_score', 0)}/100")
+                        click.echo(f"🔧 Optimizations: {current_session.get('optimizations_applied', 0)}")
+                        click.echo(f"🛠️ Tools: {current_session.get('tools_used', 0)}")
+                    else:
+                        click.echo("📊 No active session")
+                    
+                    # Health info
+                    health_data = live_data.get('live_data', {}).get('context_health', {})
+                    if health_data:
+                        health_score = health_data.get('health_score', 0)
+                        health_status = health_data.get('health_status', 'Unknown')
+                        
+                        # Health color coding
+                        if health_score >= 80:
+                            health_icon = "🟢"
+                        elif health_score >= 60:
+                            health_icon = "🟡"
+                        else:
+                            health_icon = "🔴"
+                        
+                        click.echo(f"{health_icon} Context Health: {health_score}/100 ({health_status})")
+                    
+                    # Monitor status
+                    monitor_status = live_data.get('monitor_status', {}).get('monitoring', {})
+                    is_active = monitor_status.get('is_active', False)
+                    click.echo(f"🔍 Monitoring: {'🟢 Active' if is_active else '🔴 Stopped'}")
+                    
+                    click.echo(f"\n🔄 Next refresh in {refresh}s... (Ctrl+C to exit)")
+                    
+                    # Wait for refresh interval
+                    await asyncio.sleep(refresh)
+                    
+            except KeyboardInterrupt:
+                click.echo("\n👋 Live dashboard stopped")
+        
+        # Run the live dashboard
+        asyncio.run(run_live_dashboard())
+        
+    except Exception as e:
+        click.echo(f"❌ Live dashboard error: {e}", err=True)
+        sys.exit(1)
 
 
 async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) -> dict:
