@@ -17,17 +17,17 @@ from .user_feedback_collector import (
     UserFeedbackCollector,
     FeedbackEvent,
     UserPreferences,
-    FeedbackStorage
+    FeedbackStorage,
 )
 from .performance_feedback_integration import PerformanceFeedbackIntegration
 from .feedback_analytics import FeedbackAnalytics
 
 __all__ = [
-    'FeedbackCollector',
-    'UserFeedbackCollector',
-    'FeedbackEvent', 
-    'UserPreferences',
-    'FeedbackStorage',
-    'PerformanceFeedbackIntegration',
-    'FeedbackAnalytics'
+    "FeedbackCollector",
+    "UserFeedbackCollector",
+    "FeedbackEvent",
+    "UserPreferences",
+    "FeedbackStorage",
+    "PerformanceFeedbackIntegration",
+    "FeedbackAnalytics",
 ]

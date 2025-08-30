@@ -4,8 +4,6 @@ Pytest configuration and fixtures for Context Cleaner tests.
 
 import pytest
 import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock
 from datetime import datetime, timedelta
 
 from context_cleaner.config.settings import ContextCleanerConfig
@@ -40,19 +38,21 @@ def productivity_analyzer(test_config):
 def mock_session_data():
     """Generate mock session data for testing."""
     base_time = datetime.now() - timedelta(days=7)
-    
+
     sessions = []
     for i in range(10):
         session_time = base_time + timedelta(hours=i * 8)
-        sessions.append({
-            "timestamp": session_time.isoformat(),
-            "session_duration": 120 + (i * 15),  # 2-4 hours
-            "context_health_score": 70 + (i * 3),  # Improving over time
-            "productivity_score": 65 + (i * 4),   # Improving productivity
-            "optimization_events": i % 3,          # Variable optimizations
-            "session_type": ["coding", "debugging", "testing"][i % 3]
-        })
-    
+        sessions.append(
+            {
+                "timestamp": session_time.isoformat(),
+                "session_duration": 120 + (i * 15),  # 2-4 hours
+                "context_health_score": 70 + (i * 3),  # Improving over time
+                "productivity_score": 65 + (i * 4),  # Improving productivity
+                "optimization_events": i % 3,  # Variable optimizations
+                "session_type": ["coding", "debugging", "testing"][i % 3],
+            }
+        )
+
     return sessions
 
 
@@ -65,5 +65,5 @@ def mock_context_data():
         "conversation_depth": 45,
         "last_optimization": "2024-12-20T10:30:00",
         "tools_used": ["Read", "Write", "Bash", "Edit"],
-        "session_start": "2024-12-20T09:00:00"
+        "session_start": "2024-12-20T09:00:00",
     }
