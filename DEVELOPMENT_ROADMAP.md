@@ -256,6 +256,7 @@ elif aggressive:
   - Integration with existing analysis results from PR15/16
   - Basic validation (full safety framework in PR18)
   - **Size**: 3-4 focused files, no CLI dependencies
+  - **Testing**: Unit tests (95% coverage), integration tests with PR15/16, performance tests for large contexts
 
 - **PR18: Safety & Validation Framework** (Days 4-6)
   - Comprehensive safety system for manipulation operations
@@ -266,6 +267,7 @@ elif aggressive:
   - Atomic operations with automatic rollback on failure
   - **Dependencies**: Requires PR17 manipulation engine
   - **Size**: 3 focused files, pure safety infrastructure
+  - **Testing**: Safety scenario tests (98% coverage), rollback validation, backup/restore integrity, change tracking audit
 
 #### **Week 17: User Experience & CLI Integration**
 - **PR19: Optimization Modes & Interactive Workflow** (Days 1-4)
@@ -279,6 +281,7 @@ elif aggressive:
   - Personalized mode adaptation based on PR15.3 usage patterns
   - **Dependencies**: Requires PR17 (manipulation) + PR18 (safety)
   - **Size**: 4-5 files, user experience focused
+  - **Testing**: User experience tests (90% coverage), mode behavior validation, interactive workflow tests, personalization accuracy validation
 
 - **PR20: Complete CLI Integration & Analytics** (Days 5-6 + Week 18 Days 1-2)
   - Replace ALL CLI TODO placeholders with actual implementations
@@ -291,6 +294,7 @@ elif aggressive:
   - Manipulation effectiveness tracking and historical analytics
   - **Dependencies**: Requires PR17 + PR18 + PR19 (complete foundation)
   - **Size**: CLI updates + analytics integration work
+  - **Testing**: CLI integration tests (92% coverage), command validation, analytics integration tests, effectiveness tracking validation
 
 #### **Week 18: Advanced Analytics & Reporting** (Days 3-5)
 - **PR21: Enhanced Cleanup Analytics and Historical Tracking**
