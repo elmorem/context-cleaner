@@ -183,24 +183,56 @@ elif aggressive:
 **🎯 Goal**: Implement the missing core context cleaning functionality that Context Cleaner was designed for
 
 #### **Week 13: Context Analysis Engine**
-- **PR15: Advanced Context Analysis Infrastructure**
+- **PR15: Advanced Context Analysis Infrastructure** ✅ COMPLETED
   - Context health analysis engine with sophisticated metrics
   - Redundancy detection (duplicates, obsolete content, redundant files)
   - Recency analysis (fresh/recent/aging/stale context categorization)
   - Focus scoring (relevance to current work, priority alignment)
   - Priority analysis (current work ratio, attention clarity)
   - Performance: <2s analysis for contexts up to 100k tokens
+  - **Status**: 5 core components implemented with 92.4% test pass rate (145/157 tests)
 
-#### **Week 14: Context Health Dashboard Enhancement**
-- **PR16: Comprehensive Health Dashboard**
+#### **Week 13.5: Claude Code Cache Integration Foundation**
+- **PR15.1: Cache Analysis Infrastructure** 🚀 IN PROGRESS
+  - Session cache parser for .jsonl conversation history analysis
+  - Cache data models for structured usage pattern storage
+  - Cache discovery service with cross-platform compatibility
+  - Token usage metrics extraction and efficiency calculation
+  - Foundation for usage-based context optimization
+  - **Testing**: Unit tests, performance tests, error handling validation
+  - **Estimated Time**: 2-3 days
+
+#### **Week 14: Advanced Cache-Based Analysis**
+- **PR15.2: Usage Pattern Intelligence**
+  - Usage pattern analyzer for file access frequency and workflow recognition
+  - Token efficiency analyzer for cache hit optimization and waste detection
+  - Temporal context analyzer for session boundaries and topic drift detection
+  - Enhanced context analyzer integration with cache-based weighting
+  - Cross-session correlation for long-term pattern recognition
+  - **Testing**: Integration tests, pattern recognition accuracy validation
+  - **Estimated Time**: 3-4 days
+
+#### **Week 14.5: Cache-Enhanced Dashboard & Optimization**
+- **PR15.3: Intelligent Cache-Based Optimization**
+  - Cache-enhanced dashboard with usage-based context health scoring
+  - Intelligent optimization recommendations based on actual usage patterns
+  - Cross-session analytics for multi-session pattern correlation
+  - Advanced reporting with usage-based insights and effectiveness tracking
+  - Personalized optimization strategies adapted to individual workflows
+  - **Testing**: End-to-end functionality, recommendation accuracy, report generation
+  - **Estimated Time**: 2-3 days
+
+#### **Week 15: Context Health Dashboard Enhancement**
+- **PR16: Comprehensive Health Dashboard** (Enhanced with Cache Intelligence)
   - Replace basic dashboard with detailed metrics matching CLEAN-CONTEXT-GUIDE.md
   - Focus Metrics: Focus Score, Priority Alignment, Current Work Ratio, Attention Clarity
   - Redundancy Analysis: Duplicate Content, Stale Context, Redundant Files, Obsolete Todos
-  - Recency Indicators: Fresh/Recent/Aging/Stale context percentages
+  - Recency Indicators: Fresh/Recent/Aging/Stale context percentages (usage-weighted)
   - Size Optimization: Total size, optimization potential, cleanup impact estimates
   - Professional formatting with color-coded health indicators
+  - **NEW**: Usage-based insights, file access heat maps, token efficiency trends
 
-#### **Week 15: Context Manipulation Engine**
+#### **Week 16: Context Manipulation Engine**
 - **PR17: Core Content Manipulation System**
   - Context manipulation engine with remove/consolidate/reorder/summarize operations
   - Duplicate remover for completed todos, resolved errors, redundant content
@@ -208,8 +240,9 @@ elif aggressive:
   - Priority reorderer for current work prioritization and recency-based organization
   - Content summarizer for verbose conversation sections and repeated explanations
   - Safe manipulation with comprehensive validation and rollback capabilities
+  - **ENHANCED**: Usage-based removal recommendations, workflow-aware optimization
 
-#### **Week 16: Optimization Modes & Interactive Workflow**
+#### **Week 17: Optimization Modes & Interactive Workflow**
 - **PR18: Multi-Mode Optimization with Interactive Preview**
   - Conservative Mode: Safe cleanup with confirmation for all changes
   - Balanced Mode: Standard cleanup rules with moderate consolidation
@@ -217,49 +250,55 @@ elif aggressive:
   - Interactive workflow with before/after analysis preview
   - Selective approval system (approve all, selective apply, reject changes, custom edit)
   - Comprehensive change impact analysis and user control
+  - **ENHANCED**: Personalized mode adaptation based on usage patterns
 
-#### **Week 17: CLI Integration & Command Implementation**
+#### **Week 18: CLI Integration & Command Implementation**
 - **PR19: Complete CLI Functionality**
   - Replace all CLI TODO placeholders with actual implementations
   - Full /clean-context command equivalence with --dashboard, --quick, --preview, --aggressive, --focus
   - Additional commands for --stats, --health-check, --export-analytics
   - Integration with existing analytics and monitoring systems
   - Comprehensive error handling and user feedback
+  - **ENHANCED**: Usage-based smart defaults and impact prediction
 
-#### **Week 18: Analytics & Reporting Enhancement**
+#### **Week 19: Analytics & Reporting Enhancement**
 - **PR20: Cleanup Analytics and Historical Tracking**
   - Cleanup session tracking with effectiveness measurement
   - Historical optimization trends and pattern analysis
   - User rating system for optimization effectiveness
   - Trend reporting with actionable insights
   - Integration with existing analytics infrastructure
+  - **ENHANCED**: Cross-session correlation, usage-based effectiveness measurement
 
-### **Phase 6: Advanced Intelligence (Weeks 19-21)**
+### **Phase 6: Advanced Intelligence (Weeks 20-22)**
 **🎯 Goal**: AI-powered productivity coaching
 
-#### **Week 19: AI-Powered Coaching**
+#### **Week 20: AI-Powered Coaching**
 - **PR21: Intelligent Productivity Coach**
   - Personalized productivity coaching recommendations
   - Workflow optimization suggestions based on patterns
   - Habit formation tracking and improvement guidance
   - Goal setting and achievement tracking
   - Context-aware productivity advice
+  - **ENHANCED**: Cache-based workflow learning and adaptive coaching
 
-#### **Week 20: Advanced Predictive Analytics**
+#### **Week 21: Advanced Predictive Analytics**
 - **PR22: Advanced Forecasting System**
   - Multi-variate productivity forecasting
   - Scenario-based modeling for optimization impact
   - Advanced statistical modeling for insights
   - Predictive context health degradation alerts
   - Resource usage and optimization timing predictions
+  - **ENHANCED**: Historical usage pattern prediction and context evolution forecasting
 
-#### **Week 21: Enterprise Features**
+#### **Week 22: Enterprise Features**
 - **PR23: Enterprise & Scale Features**
   - Team-level analytics (privacy-preserving)
   - Enterprise security and compliance features
   - Advanced reporting and export capabilities
   - API for third-party integrations
   - Scalability enhancements for large-scale usage
+  - **ENHANCED**: Multi-user usage pattern aggregation and team optimization insights
 
 ---
 
@@ -288,12 +327,14 @@ The original 12-PR plan has been accelerated due to exceptional progress:
 - **System Reliability**: 99.9% uptime, <0.1% error rate
 - **Feature Usage**: Track which features provide most value
 
-#### **Phase 5 Success Metrics (Core Context Cleaning)**
+#### **Phase 5 Success Metrics (Core Context Cleaning + Cache Integration)**
 - **Functional Completeness**: All CLEAN-CONTEXT-GUIDE.md features implemented and working
-- **Context Optimization Effectiveness**: Average 20-35% context size reduction
-- **Focus Improvement**: Average 15-25% increase in Focus Score after optimization
-- **User Workflow Integration**: >80% of users using context cleaning features daily
+- **Context Optimization Effectiveness**: Average 30-45% context size reduction (enhanced with usage data)
+- **Focus Improvement**: Average 25-35% increase in Focus Score after optimization (usage-weighted)
+- **User Workflow Integration**: >85% of users using context cleaning features daily
 - **Optimization Mode Adoption**: Balanced usage across Conservative/Balanced/Aggressive modes
+- **Cache Integration Success**: >90% of users benefiting from usage-based optimization recommendations
+- **Personalization Effectiveness**: >80% user satisfaction with personalized optimization strategies
 
 #### **Phase 6+ Success Metrics (Advanced Intelligence & Ecosystem Integration)**
 - **Integration Success**: Seamless operation with major IDEs and tools
