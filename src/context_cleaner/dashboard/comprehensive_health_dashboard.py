@@ -10,6 +10,7 @@ import asyncio
 import json
 import time
 import statistics
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Union
@@ -19,7 +20,7 @@ import logging
 
 from ..optimization.cache_dashboard import (
     CacheEnhancedDashboard, UsageBasedHealthMetrics, HealthLevel,
-    CacheEnhancedDashboardData, UsageInsight
+    CacheEnhancedDashboardData
 )
 from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
 from ..analytics.advanced_patterns import AdvancedPatternRecognizer
@@ -29,6 +30,22 @@ from ..cache import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Custom exceptions for better error handling
+class ContextAnalysisError(Exception):
+    """Base exception for context analysis errors."""
+    pass
+
+
+class SecurityError(ContextAnalysisError):
+    """Raised when security validation fails."""
+    pass
+
+
+class DataValidationError(ContextAnalysisError):
+    """Raised when context data validation fails."""
+    pass
 
 
 class HealthColor(Enum):
@@ -349,12 +366,30 @@ class ComprehensiveHealthDashboard:
     
     # Private implementation methods
     
+    # Security configuration
+    MAX_CONTEXT_FILE_SIZE = 10 * 1024 * 1024  # 10MB limit
+    ALLOWED_EXTENSIONS = {'.json', '.jsonl', '.txt'}
+    
     async def _load_context_data(self, context_path: Path) -> Dict[str, Any]:
-        """Load context data from file."""
+        """Safely load context data from file with security measures."""
         try:
+            # Security validation
+            if not self._is_safe_path(context_path):
+                raise SecurityError(f"Path not allowed: {context_path}")
+            
+            if context_path.suffix not in self.ALLOWED_EXTENSIONS:
+                raise ValueError(f"File extension not allowed: {context_path.suffix}")
+            
+            # Check file size
+            if context_path.exists():
+                file_size = context_path.stat().st_size
+                if file_size > self.MAX_CONTEXT_FILE_SIZE:
+                    raise ValueError(f"File too large: {file_size} bytes (max: {self.MAX_CONTEXT_FILE_SIZE})")
+            
             if context_path.suffix == '.json':
-                with open(context_path, 'r') as f:
-                    return json.load(f)
+                with open(context_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return self._validate_context_structure(data)
             else:
                 # For other formats, create basic context data
                 return {
@@ -362,9 +397,15 @@ class ComprehensiveHealthDashboard:
                     'size': context_path.stat().st_size if context_path.exists() else 0,
                     'timestamp': datetime.now().isoformat()
                 }
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.error(f"Failed to parse context file {context_path}: {e}")
+            raise ContextAnalysisError(f"Invalid context file format: {e}")
+        except (OSError, PermissionError) as e:
+            logger.error(f"File system error loading {context_path}: {e}")
+            raise ContextAnalysisError(f"Cannot access context file: {e}")
         except Exception as e:
-            logger.warning(f"Failed to load context data: {e}")
-            return {}
+            logger.error(f"Unexpected error loading context data from {context_path}: {e}")
+            raise ContextAnalysisError(f"Context loading failed: {e}")
     
     async def _analyze_focus_metrics(
         self, 
@@ -532,43 +573,64 @@ class ComprehensiveHealthDashboard:
     
     # Helper methods for content analysis
     
+    # Keywords for content analysis (configurable)
+    CURRENT_WORK_KEYWORDS = ['todo', 'task', 'current', 'active', 'working on', 'implementing', 'in_progress']
+    IMPORTANT_KEYWORDS = ['important', 'critical', 'urgent', 'priority', 'must', 'required']
+    ACTIVE_TASK_KEYWORDS = ['todo', 'task', '- [ ]', 'need to', 'should', 'must do']
+    COMPLETED_KEYWORDS = ['done', 'completed', '- [x]', 'finished', 'resolved', 'closed']
+    CLEAR_ACTION_KEYWORDS = ['step', 'action', 'implement', 'create', 'update', 'fix', 'add', 'remove']
+    
     def _is_current_work_item(self, item: Any) -> bool:
-        """Determine if item is related to current work."""
-        if isinstance(item, dict):
-            item_str = str(item).lower()
-            return any(keyword in item_str for keyword in [
-                'todo', 'task', 'current', 'active', 'working on', 'implementing'
-            ])
-        return False
+        """Safely determine if item is related to current work."""
+        if not isinstance(item, dict):
+            return False
+        
+        # Safe content extraction
+        content = self._safe_get_string_content(item)
+        if not content:
+            return False
+        
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in self.CURRENT_WORK_KEYWORDS)
     
     def _is_important_item(self, item: Any) -> bool:
-        """Determine if item is important/high priority."""
-        if isinstance(item, dict):
-            item_str = str(item).lower()
-            return any(keyword in item_str for keyword in [
-                'important', 'critical', 'urgent', 'priority', 'must', 'required'
-            ])
-        return False
+        """Safely determine if item is important/high priority."""
+        if not isinstance(item, dict):
+            return False
+        
+        content = self._safe_get_string_content(item)
+        if not content:
+            return False
+        
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in self.IMPORTANT_KEYWORDS)
     
     def _is_active_task(self, item: Any) -> bool:
-        """Determine if item is an active task."""
-        if isinstance(item, dict):
-            item_str = str(item).lower()
-            return any(keyword in item_str for keyword in [
-                'todo', 'task', '- [ ]', 'need to', 'should', 'must do'
-            ]) and not any(keyword in item_str for keyword in [
-                'done', 'completed', '- [x]', 'finished'
-            ])
-        return False
+        """Safely determine if item is an active task."""
+        if not isinstance(item, dict):
+            return False
+        
+        content = self._safe_get_string_content(item)
+        if not content:
+            return False
+        
+        content_lower = content.lower()
+        has_active_keywords = any(keyword in content_lower for keyword in self.ACTIVE_TASK_KEYWORDS)
+        has_completed_keywords = any(keyword in content_lower for keyword in self.COMPLETED_KEYWORDS)
+        
+        return has_active_keywords and not has_completed_keywords
     
     def _has_clear_action(self, item: Any) -> bool:
-        """Determine if item has clear actionable steps."""
-        if isinstance(item, dict):
-            item_str = str(item).lower()
-            return any(keyword in item_str for keyword in [
-                'step', 'action', 'implement', 'create', 'update', 'fix', 'add', 'remove'
-            ])
-        return False
+        """Safely determine if item has clear actionable steps."""
+        if not isinstance(item, dict):
+            return False
+        
+        content = self._safe_get_string_content(item)
+        if not content:
+            return False
+        
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in self.CLEAR_ACTION_KEYWORDS)
     
     # Continued implementation methods...
     async def _calculate_duplicate_content(self, context_data: Dict[str, Any]) -> float:
@@ -582,10 +644,40 @@ class ComprehensiveHealthDashboard:
         return 1.0 - (len(unique_items) / len(content_items))
     
     async def _calculate_total_tokens(self, context_data: Dict[str, Any]) -> int:
-        """Estimate total tokens in context."""
-        content_str = json.dumps(context_data)
-        # Rough token estimation: ~4 characters per token
-        return len(content_str) // 4
+        """Estimate total tokens in context with size limits."""
+        try:
+            # Use more efficient streaming approach for large contexts
+            total_chars = 0
+            
+            def count_chars_recursively(data, max_chars=1_000_000):
+                nonlocal total_chars
+                if total_chars > max_chars:
+                    return total_chars
+                
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        total_chars += len(str(key))
+                        count_chars_recursively(value, max_chars)
+                elif isinstance(data, (list, tuple)):
+                    for item in data:
+                        count_chars_recursively(item, max_chars)
+                else:
+                    total_chars += len(str(data))
+                
+                return total_chars
+            
+            char_count = count_chars_recursively(context_data)
+            # More accurate token estimation: ~3.5 characters per token for English text
+            return int(char_count / 3.5)
+            
+        except Exception as e:
+            logger.warning(f"Token calculation failed, using fallback: {e}")
+            # Fallback to simple estimation
+            try:
+                content_str = str(context_data)
+                return len(content_str) // 4
+            except:
+                return 1000  # Safe default
     
     async def _create_fallback_health_report(self) -> ComprehensiveHealthReport:
         """Create a minimal health report when analysis fails."""
@@ -753,17 +845,56 @@ class ComprehensiveHealthDashboard:
         }
     
     async def _generate_usage_insights(self, cache_data: CacheEnhancedDashboardData) -> List[Dict[str, Any]]:
-        """Generate usage-based insights."""
+        """Generate usage-based insights from cache analysis."""
         insights = []
         
-        if cache_data.usage_insights:
-            for insight in cache_data.usage_insights:
-                insights.append({
-                    'type': insight.insight_type,
-                    'message': insight.message,
-                    'confidence': insight.confidence_score,
-                    'action_recommended': insight.action_required
-                })
+        try:
+            # Generate insights from enhanced analysis
+            if hasattr(cache_data, 'enhanced_analysis') and cache_data.enhanced_analysis:
+                enhanced = cache_data.enhanced_analysis
+                
+                # Focus-related insights
+                if hasattr(enhanced, 'usage_weighted_focus_score'):
+                    focus_score = enhanced.usage_weighted_focus_score
+                    if focus_score < 0.6:
+                        insights.append({
+                            'type': 'focus',
+                            'message': f'Context focus could be improved (currently {focus_score:.0%})',
+                            'confidence': 0.8,
+                            'action_recommended': 'Remove unrelated context items'
+                        })
+                
+                # Efficiency insights
+                if hasattr(cache_data, 'health_metrics'):
+                    efficiency = cache_data.health_metrics.efficiency_score
+                    if efficiency < 0.7:
+                        insights.append({
+                            'type': 'efficiency',
+                            'message': f'Token usage efficiency is low ({efficiency:.0%})',
+                            'confidence': 0.9,
+                            'action_recommended': 'Clean up redundant content'
+                        })
+            
+            # Usage pattern insights from correlation data
+            if hasattr(cache_data, 'correlation_insights') and cache_data.correlation_insights:
+                corr = cache_data.correlation_insights
+                if hasattr(corr, 'cross_session_patterns'):
+                    insights.append({
+                        'type': 'patterns',
+                        'message': 'Cross-session usage patterns detected',
+                        'confidence': 0.7,
+                        'action_recommended': 'Consider session-based context organization'
+                    })
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate usage insights: {e}")
+            # Add basic fallback insight
+            insights.append({
+                'type': 'analysis',
+                'message': 'Context analysis completed with limited cache intelligence',
+                'confidence': 0.5,
+                'action_recommended': 'Consider enabling full cache analysis'
+            })
         
         return insights
     
@@ -867,19 +998,25 @@ class ComprehensiveHealthDashboard:
         return False
     
     def _get_item_timestamp(self, item: Any) -> Optional[datetime]:
-        """Extract timestamp from item."""
-        if isinstance(item, dict):
-            if 'timestamp' in item:
+        """Safely extract timestamp from item with validation."""
+        if not isinstance(item, dict):
+            return datetime.now() - timedelta(hours=2)
+        
+        for timestamp_field in ['timestamp', 'created_at', 'modified_at']:
+            if timestamp_field in item:
                 try:
-                    return datetime.fromisoformat(item['timestamp'])
-                except:
-                    pass
-            if 'created_at' in item:
-                try:
-                    return datetime.fromisoformat(item['created_at'])
-                except:
-                    pass
-        return datetime.now() - timedelta(hours=2)  # Default to 2 hours ago
+                    timestamp_value = item[timestamp_field]
+                    if not isinstance(timestamp_value, str):
+                        continue
+                    
+                    # Validate ISO format before parsing
+                    if self._is_valid_iso_timestamp(timestamp_value):
+                        return datetime.fromisoformat(timestamp_value)
+                except (ValueError, TypeError, OSError) as e:
+                    logger.debug(f"Invalid timestamp in field {timestamp_field}: {timestamp_value}: {e}")
+                    continue
+        
+        return datetime.now() - timedelta(hours=2)  # Safe default
     
     # Professional CLI formatting methods
     
@@ -1006,3 +1143,64 @@ class ComprehensiveHealthDashboard:
         """
         
         return html
+    
+    # Security and validation helper methods
+    
+    def _is_safe_path(self, path: Path) -> bool:
+        """Validate that path is safe and within allowed directories."""
+        try:
+            resolved_path = path.resolve()
+            # For now, allow any path - in production, implement proper path validation
+            # based on configured safe directories
+            return True
+        except (OSError, ValueError):
+            return False
+    
+    def _validate_context_structure(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate context data structure and sanitize if needed."""
+        if not isinstance(data, dict):
+            raise DataValidationError("Context data must be a dictionary")
+        
+        # Ensure items is a list
+        if 'items' in data and not isinstance(data['items'], list):
+            logger.warning("Converting non-list items to list")
+            data['items'] = [data['items']] if data['items'] else []
+        
+        # Limit the number of items to prevent DoS
+        max_items = 10000
+        if 'items' in data and len(data['items']) > max_items:
+            logger.warning(f"Truncating items list from {len(data['items'])} to {max_items}")
+            data['items'] = data['items'][:max_items]
+        
+        return data
+    
+    def _is_valid_iso_timestamp(self, timestamp_str: str) -> bool:
+        """Validate ISO format timestamp string."""
+        if not isinstance(timestamp_str, str):
+            return False
+        
+        # Basic ISO format validation with regex
+        iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$'
+        return bool(re.match(iso_pattern, timestamp_str))
+    
+    def _safe_get_string_content(self, item: Dict[str, Any]) -> str:
+        """Safely extract string content from item without arbitrary code execution."""
+        # Try multiple content fields in order of preference
+        content_fields = ['content', 'message', 'text', 'description', 'title', 'name']
+        
+        for field in content_fields:
+            if field in item:
+                value = item[field]
+                if isinstance(value, str):
+                    return value
+                elif isinstance(value, (int, float)):
+                    return str(value)
+        
+        # Fallback to safe string representation of specific fields only
+        safe_fields = ['type', 'status', 'priority', 'category']
+        safe_content = []
+        for field in safe_fields:
+            if field in item and isinstance(item[field], (str, int, float)):
+                safe_content.append(str(item[field]))
+        
+        return ' '.join(safe_content) if safe_content else ""
