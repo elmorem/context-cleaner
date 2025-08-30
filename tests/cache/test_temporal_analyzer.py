@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 from src.context_cleaner.cache.temporal_analyzer import (
     TemporalContextAnalyzer, TopicTransition, SessionBoundary, TemporalInsights
 )
-from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis
+from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
 
 
 class TestTemporalContextAnalyzer:
@@ -29,39 +29,57 @@ class TestTemporalContextAnalyzer:
         # Sample messages with different timestamps and topics
         self.sample_messages = [
             SessionMessage(
-                timestamp=now - timedelta(hours=2),
-                role="user",
+                uuid="msg_1",
+                parent_uuid=None,
+                message_type=MessageType.USER,
+                role=MessageRole.USER,
                 content="Help me debug this Python script",
-                tool_calls=[],
-                metadata={"topics": ["python", "debugging"]}
+                timestamp=now - timedelta(hours=2),
+                tool_usage=[]
             ),
             SessionMessage(
-                timestamp=now - timedelta(hours=2, minutes=5),
-                role="assistant", 
+                uuid="msg_2",
+                parent_uuid="msg_1",
+                message_type=MessageType.ASSISTANT,
+                role=MessageRole.ASSISTANT,
                 content="I'll help you debug the script. Let me read the file first.",
-                tool_calls=[ToolUsage(tool="Read", parameters={"file_path": "script.py"}, result="success")],
-                metadata={"topics": ["python", "debugging"]}
+                timestamp=now - timedelta(hours=2, minutes=5),
+                tool_usage=[ToolUsage(
+                    tool_name="Read", tool_id="read_1",
+                    parameters={"file_path": "script.py"}, 
+                    timestamp=now - timedelta(hours=2, minutes=5)
+                )]
             ),
             SessionMessage(
-                timestamp=now - timedelta(hours=1, minutes=45),  # 20 minute gap
-                role="user",
+                uuid="msg_3",
+                parent_uuid="msg_2",
+                message_type=MessageType.USER,
+                role=MessageRole.USER,
                 content="Actually, let's work on the React frontend instead",
-                tool_calls=[],
-                metadata={"topics": ["react", "frontend"]}
+                timestamp=now - timedelta(hours=1, minutes=45),  # 20 minute gap
+                tool_usage=[]
             ),
             SessionMessage(
-                timestamp=now - timedelta(hours=1, minutes=40),
-                role="assistant",
+                uuid="msg_4",
+                parent_uuid="msg_3",
+                message_type=MessageType.ASSISTANT,
+                role=MessageRole.ASSISTANT,
                 content="Sure! Let me look at your React components.",
-                tool_calls=[ToolUsage(tool="Read", parameters={"file_path": "App.js"}, result="success")],
-                metadata={"topics": ["react", "frontend"]}
+                timestamp=now - timedelta(hours=1, minutes=40),
+                tool_usage=[ToolUsage(
+                    tool_name="Read", tool_id="read_2",
+                    parameters={"file_path": "App.js"}, 
+                    timestamp=now - timedelta(hours=1, minutes=40)
+                )]
             ),
             SessionMessage(
-                timestamp=now - timedelta(minutes=30),  # 70 minute gap
-                role="user", 
+                uuid="msg_5",
+                parent_uuid="msg_4",
+                message_type=MessageType.USER,
+                role=MessageRole.USER,
                 content="Let's go back to the Python debugging issue",
-                tool_calls=[],
-                metadata={"topics": ["python", "debugging"]}
+                timestamp=now - timedelta(minutes=30),  # 70 minute gap
+                tool_usage=[]
             )
         ]
         

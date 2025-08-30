@@ -383,7 +383,8 @@ class CrossSessionCorrelationAnalyzer:
         files2 = set(op.file_path for op in session2.file_operations if op.file_path)
         
         if files1 or files2:
-            file_similarity = len(files1.intersection(files2)) / len(files1.union(files2))
+            union_size = len(files1.union(files2))
+            file_similarity = len(files1.intersection(files2)) / union_size if union_size > 0 else 0.0
             similarities.append(file_similarity)
         
         # Tool similarity
@@ -392,16 +393,19 @@ class CrossSessionCorrelationAnalyzer:
         
         all_tools = set(tools1.keys()) | set(tools2.keys())
         if all_tools:
-            tool_similarity = sum(min(tools1[t], tools2[t]) for t in all_tools) / sum(max(tools1[t], tools2[t]) for t in all_tools)
+            total_max = sum(max(tools1[t], tools2[t]) for t in all_tools)
+            tool_similarity = sum(min(tools1[t], tools2[t]) for t in all_tools) / total_max if total_max > 0 else 0.0
             similarities.append(tool_similarity)
         
         # Duration similarity (normalized)
-        duration_ratio = min(session1.duration_hours, session2.duration_hours) / max(session1.duration_hours, session2.duration_hours)
+        max_duration = max(session1.duration_hours, session2.duration_hours)
+        duration_ratio = min(session1.duration_hours, session2.duration_hours) / max_duration if max_duration > 0 else 0.0
         similarities.append(duration_ratio)
         
         # Token count similarity (normalized)
         if session1.total_tokens > 0 and session2.total_tokens > 0:
-            token_ratio = min(session1.total_tokens, session2.total_tokens) / max(session1.total_tokens, session2.total_tokens)
+            max_tokens = max(session1.total_tokens, session2.total_tokens)
+            token_ratio = min(session1.total_tokens, session2.total_tokens) / max_tokens if max_tokens > 0 else 0.0
             similarities.append(token_ratio)
         
         return sum(similarities) / len(similarities) if similarities else 0.0

@@ -141,7 +141,10 @@ class TokenAnalysisSummary:
     def overall_efficiency_score(self) -> float:
         """Calculate overall efficiency score (0-100)."""
         cache_score = self.cache_efficiency.overall_cache_hit_ratio * 40
-        usage_score = min(1000 / self.usage_insights.average_tokens_per_message, 1) * 30
+        if self.usage_insights.average_tokens_per_message > 0:
+            usage_score = min(1000 / self.usage_insights.average_tokens_per_message, 1) * 30
+        else:
+            usage_score = 0
         waste_score = max(0, 1 - sum(p.estimated_waste_tokens for p in self.waste_patterns) / 100000) * 30
         
         return min(100, cache_score + usage_score + waste_score)

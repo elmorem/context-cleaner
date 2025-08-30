@@ -15,7 +15,7 @@ from src.context_cleaner.cache.correlation_analyzer import (
     CrossSessionCorrelationAnalyzer, SessionCluster, CrossSessionPattern, 
     LongTermTrend, CorrelationInsights
 )
-from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis
+from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
 
 
 class TestCrossSessionCorrelationAnalyzer:
@@ -39,18 +39,26 @@ class TestCrossSessionCorrelationAnalyzer:
             end_time=base_time + timedelta(hours=2),
             messages=[
                 SessionMessage(
-                    timestamp=base_time,
-                    role="user",
+                    uuid="msg_1_1",
+                    parent_uuid=None,
+                    message_type=MessageType.USER,
+                    role=MessageRole.USER,
                     content="Help me debug this Python script",
-                    tool_calls=[],
-                    metadata={"topics": ["python", "debugging"]}
+                    timestamp=base_time,
+                    tool_usage=[]
                 ),
                 SessionMessage(
-                    timestamp=base_time + timedelta(minutes=5),
-                    role="assistant",
+                    uuid="msg_1_2",
+                    parent_uuid="msg_1_1",
+                    message_type=MessageType.ASSISTANT,
+                    role=MessageRole.ASSISTANT,
                     content="I'll help debug the script",
-                    tool_calls=[ToolUsage(tool="Read", parameters={"file_path": "app.py"}, result="success")],
-                    metadata={"topics": ["python", "debugging"]}
+                    timestamp=base_time + timedelta(minutes=5),
+                    tool_usage=[ToolUsage(
+                        tool_name="Read", tool_id="read_1", 
+                        parameters={"file_path": "app.py"}, 
+                        timestamp=base_time + timedelta(minutes=5)
+                    )]
                 )
             ],
             tool_usage_summary={"Read": 3, "Edit": 2, "Bash": 1},
@@ -68,11 +76,13 @@ class TestCrossSessionCorrelationAnalyzer:
             end_time=base_time + timedelta(days=1, hours=1.5),
             messages=[
                 SessionMessage(
-                    timestamp=base_time + timedelta(days=1),
-                    role="user",
+                    uuid="msg_2_1",
+                    parent_uuid=None,
+                    message_type=MessageType.USER,
+                    role=MessageRole.USER,
                     content="Continue working on the Python project",
-                    tool_calls=[],
-                    metadata={"topics": ["python", "development"]}
+                    timestamp=base_time + timedelta(days=1),
+                    tool_usage=[]
                 )
             ],
             tool_usage_summary={"Read": 2, "Edit": 3, "Bash": 2},
@@ -90,11 +100,13 @@ class TestCrossSessionCorrelationAnalyzer:
             end_time=base_time + timedelta(days=2, hours=1),
             messages=[
                 SessionMessage(
-                    timestamp=base_time + timedelta(days=2),
-                    role="user", 
+                    uuid="msg_3_1",
+                    parent_uuid=None,
+                    message_type=MessageType.USER,
+                    role=MessageRole.USER,
                     content="Let's work on the React frontend",
-                    tool_calls=[],
-                    metadata={"topics": ["react", "frontend"]}
+                    timestamp=base_time + timedelta(days=2),
+                    tool_usage=[]
                 )
             ],
             tool_usage_summary={"Read": 4, "Edit": 1, "Bash": 1},
@@ -112,11 +124,13 @@ class TestCrossSessionCorrelationAnalyzer:
             end_time=base_time + timedelta(days=3, hours=2.5),
             messages=[
                 SessionMessage(
-                    timestamp=base_time + timedelta(days=3),
-                    role="user",
+                    uuid="msg_4_1",
+                    parent_uuid=None,
+                    message_type=MessageType.USER,
+                    role=MessageRole.USER,
                     content="Back to the Python debugging issue",
-                    tool_calls=[],
-                    metadata={"topics": ["python", "debugging"]}
+                    timestamp=base_time + timedelta(days=3),
+                    tool_usage=[]
                 )
             ],
             tool_usage_summary={"Read": 3, "Edit": 4, "Bash": 3},
