@@ -12,7 +12,7 @@ from dataclasses import dataclass, asdict
 import logging
 
 from ..config.settings import ContextCleanerConfig
-from ..storage.encrypted_storage import EncryptedStorage
+from ..tracking.storage import EncryptedStorage
 
 logger = logging.getLogger(__name__)
 
