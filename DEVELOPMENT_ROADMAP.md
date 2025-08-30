@@ -307,6 +307,7 @@ elif aggressive:
   - **Dependencies**: Requires PR20 (CLI integration) for manipulation data collection
 
 #### DEVELOPMENT BREAK -- 
+- redo complete documentation and readme files 
 - new release preparation
 - uninstall old version and reinstall new version
 - test locally
