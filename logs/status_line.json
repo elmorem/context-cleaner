@@ -21313,5 +21313,991 @@
       "exceeds_200k_tokens": false
     },
     "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b18\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:31:56.785729",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 3.8326817000000006,
+        "total_duration_ms": 1509813,
+        "total_api_duration_ms": 987867,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b18\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:31:57.095815",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 3.8751300500000005,
+        "total_duration_ms": 1510132,
+        "total_api_duration_ms": 992006,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b18\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:32:08.514822",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 3.9211239000000004,
+        "total_duration_ms": 1521535,
+        "total_api_duration_ms": 1004265,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:32:11.927524",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 3.9660576000000005,
+        "total_duration_ms": 1524968,
+        "total_api_duration_ms": 1009259,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:32:54.187434",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.0308627,
+        "total_duration_ms": 1566849,
+        "total_api_duration_ms": 1050545,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:33:13.920894",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.0343331000000004,
+        "total_duration_ms": 1586968,
+        "total_api_duration_ms": 1052609,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:33:28.052577",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.090627850000001,
+        "total_duration_ms": 1601057,
+        "total_api_duration_ms": 1066247,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:34:00.504741",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.0908102500000005,
+        "total_duration_ms": 1633440,
+        "total_api_duration_ms": 1067305,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:34:08.789357",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.5544002500000005,
+        "total_duration_ms": 1641849,
+        "total_api_duration_ms": 1081722,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:34:32.706412",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.80320805,
+        "total_duration_ms": 1665735,
+        "total_api_duration_ms": 1101299,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:35:03.471483",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.8543316,
+        "total_duration_ms": 1696385,
+        "total_api_duration_ms": 1108554,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:35:48.603752",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 4.8607111000000005,
+        "total_duration_ms": 1741669,
+        "total_api_duration_ms": 1112515,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:36:37.689014",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.1626381499999985,
+        "total_duration_ms": 1790741,
+        "total_api_duration_ms": 1163211,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:02.112268",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.238608749999998,
+        "total_duration_ms": 1875035,
+        "total_api_duration_ms": 1242943,
+        "total_lines_added": 4208,
+        "total_lines_removed": 20
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b11\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:03.485573",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.298742099999998,
+        "total_duration_ms": 1876330,
+        "total_api_duration_ms": 1250499,
+        "total_lines_added": 4209,
+        "total_lines_removed": 22
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b12\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:08.081595",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.346278449999998,
+        "total_duration_ms": 1881135,
+        "total_api_duration_ms": 1255037,
+        "total_lines_added": 4211,
+        "total_lines_removed": 24
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:11.844411",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.346278449999998,
+        "total_duration_ms": 1884892,
+        "total_api_duration_ms": 1255037,
+        "total_lines_added": 4211,
+        "total_lines_removed": 24
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:17.079193",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.396875249999998,
+        "total_duration_ms": 1890132,
+        "total_api_duration_ms": 1263761,
+        "total_lines_added": 4230,
+        "total_lines_removed": 24
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:20.289635",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.396875249999998,
+        "total_duration_ms": 1893356,
+        "total_api_duration_ms": 1263761,
+        "total_lines_added": 4230,
+        "total_lines_removed": 24
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:26.796338",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.4517894999999985,
+        "total_duration_ms": 1899847,
+        "total_api_duration_ms": 1273188,
+        "total_lines_added": 4247,
+        "total_lines_removed": 39
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:30.015706",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.4517894999999985,
+        "total_duration_ms": 1903050,
+        "total_api_duration_ms": 1273188,
+        "total_lines_added": 4247,
+        "total_lines_removed": 39
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:31.169073",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.5021707499999986,
+        "total_duration_ms": 1904236,
+        "total_api_duration_ms": 1277308,
+        "total_lines_added": 4248,
+        "total_lines_removed": 40
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:34.890941",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.5021707499999986,
+        "total_duration_ms": 1907935,
+        "total_api_duration_ms": 1277308,
+        "total_lines_added": 4248,
+        "total_lines_removed": 40
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:55.853711",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.565916249999998,
+        "total_duration_ms": 1928803,
+        "total_api_duration_ms": 1301609,
+        "total_lines_added": 4305,
+        "total_lines_removed": 55
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:38:59.603439",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.565916249999998,
+        "total_duration_ms": 1932636,
+        "total_api_duration_ms": 1301609,
+        "total_lines_added": 4305,
+        "total_lines_removed": 55
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b13\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:01.449390",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.621305849999998,
+        "total_duration_ms": 1934513,
+        "total_api_duration_ms": 1307042,
+        "total_lines_added": 4306,
+        "total_lines_removed": 56
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:06.075173",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.6704339999999975,
+        "total_duration_ms": 1939135,
+        "total_api_duration_ms": 1311425,
+        "total_lines_added": 4307,
+        "total_lines_removed": 57
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:09.851915",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.6704339999999975,
+        "total_duration_ms": 1942895,
+        "total_api_duration_ms": 1311425,
+        "total_lines_added": 4307,
+        "total_lines_removed": 57
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:13.074804",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.720290099999998,
+        "total_duration_ms": 1946124,
+        "total_api_duration_ms": 1318162,
+        "total_lines_added": 4310,
+        "total_lines_removed": 57
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:16.988948",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.720290099999998,
+        "total_duration_ms": 1950022,
+        "total_api_duration_ms": 1318162,
+        "total_lines_added": 4310,
+        "total_lines_removed": 57
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:18.796509",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.770314049999998,
+        "total_duration_ms": 1951848,
+        "total_api_duration_ms": 1323613,
+        "total_lines_added": 4310,
+        "total_lines_removed": 58
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:21.841816",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.770314049999998,
+        "total_duration_ms": 1954875,
+        "total_api_duration_ms": 1323613,
+        "total_lines_added": 4310,
+        "total_lines_removed": 58
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:23.348474",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.818579399999998,
+        "total_duration_ms": 1956383,
+        "total_api_duration_ms": 1327899,
+        "total_lines_added": 4310,
+        "total_lines_removed": 58
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
+  },
+  {
+    "timestamp": "2025-08-29T17:39:27.337767",
+    "input_data": {
+      "session_id": "b10534e9-89f7-4757-888e-2d3fbafededc",
+      "transcript_path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner/b10534e9-89f7-4757-888e-2d3fbafededc.jsonl",
+      "cwd": "/Users/markelmore/_code/context-cleaner",
+      "model": {
+        "id": "claude-sonnet-4-20250514",
+        "display_name": "Sonnet 4"
+      },
+      "workspace": {
+        "current_dir": "/Users/markelmore/_code/context-cleaner",
+        "project_dir": "/Users/markelmore/_code/context-cleaner"
+      },
+      "version": "1.0.98",
+      "output_style": {
+        "name": "default"
+      },
+      "cost": {
+        "total_cost_usd": 5.818947399999998,
+        "total_duration_ms": 1960376,
+        "total_api_duration_ms": 1328946,
+        "total_lines_added": 4310,
+        "total_lines_removed": 58
+      },
+      "exceeds_200k_tokens": false
+    },
+    "status_line_output": "\u001b[36m[Sonnet 4]\u001b[0m | \u001b[34m\ud83d\udcc1 context-cleaner\u001b[0m | \u001b[32m\ud83c\udf3f phase3-user-feedback-system \u00b14\u001b[0m | \u001b[91m\ud83d\udd34\u001b[0m | \u001b[94m\u269b\ufe0f\u2705\u001b[0m | \u001b[92m\u2753\u001b[0m | \u001b[93m\ud83d\udfe2\u001b[0m | \u001b[90mv1.0.98\u001b[0m"
   }
 ]

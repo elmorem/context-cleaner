@@ -12,8 +12,7 @@ from collections import defaultdict, Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-import pandas as pd
-import numpy as np
+# Remove unused pandas/numpy imports that create unnecessary dependencies
 
 from .user_feedback_collector import UserFeedbackCollector
 from .feedback_collector import FeedbackCollector

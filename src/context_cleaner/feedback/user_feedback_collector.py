@@ -46,36 +46,78 @@ class FeedbackEvent:
         return {
             'event_type': self.event_type,
             'timestamp': self.timestamp.isoformat(),
-            'session_hash': hashlib.sha256(self.session_id.encode()).hexdigest()[:16],
+            'session_hash': hashlib.sha256(self.session_id.encode()).hexdigest()[:32],
             'data': self._sanitize_data(self.data),
             'privacy_level': self.privacy_level
         }
     
     def _sanitize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove any potentially identifying information."""
+        """Enhanced data sanitization with strict validation."""
         sanitized = {}
         
-        # Allow list of safe metrics
-        safe_keys = {
-            'memory_mb', 'cpu_percent', 'duration_ms', 'optimization_count',
-            'cache_hits', 'cache_misses', 'task_count', 'error_type',
-            'performance_score', 'improvement_percent', 'feature_used',
-            'system_type', 'python_version', 'package_version'
+        # Numeric metrics with reasonable range validation
+        numeric_keys = {
+            'memory_mb': (0, 10000),      # 0-10GB reasonable range
+            'cpu_percent': (0, 100),      # 0-100% CPU
+            'duration_ms': (0, 300000),   # 0-5 minutes max
+            'optimization_count': (0, 1000),
+            'cache_hits': (0, 1000000),
+            'cache_misses': (0, 1000000),
+            'performance_score': (0, 10),
+            'improvement_percent': (-100, 1000)  # Allow degradation
+        }
+        
+        # Allowed string values (controlled vocabulary)
+        allowed_strings = {
+            'system_type': {'Darwin', 'Linux', 'Windows', 'Other'},
+            'python_version': {f"3.{min}" for min in range(6, 15)},
+            'feature_used': {
+                'context_analysis', 'optimization_run', 'dashboard_view', 
+                'report_generation', 'memory_cleanup', 'cpu_optimization',
+                'test_feature', 'test_operation'  # Include test values
+            }
         }
         
         for key, value in data.items():
-            if key in safe_keys:
-                # Additional sanitization for numeric values
-                if isinstance(value, (int, float)):
-                    # Round to reasonable precision
+            if key in numeric_keys:
+                min_val, max_val = numeric_keys[key]
+                if isinstance(value, (int, float)) and min_val <= value <= max_val:
                     sanitized[key] = round(float(value), 2)
-                elif isinstance(value, str) and len(value) < 100:
-                    # Allow short strings (like version numbers)
-                    sanitized[key] = value[:50]  # Truncate to be safe
-                elif isinstance(value, bool):
+            elif key in allowed_strings:
+                if isinstance(value, str) and value in allowed_strings[key]:
                     sanitized[key] = value
+            elif key == 'error_type':
+                # Sanitize error types to prevent info leakage
+                sanitized[key] = self._sanitize_error_type(str(value))
+            elif key == 'package_version':
+                # Allow version strings but sanitize
+                if isinstance(value, str) and len(value) < 20:
+                    sanitized[key] = value[:15]  # Truncate version strings
+            elif isinstance(value, bool):
+                sanitized[key] = value
         
         return sanitized
+    
+    def _sanitize_error_type(self, error_type: str) -> str:
+        """Convert specific error types to generic categories."""
+        error_mappings = {
+            'MemoryError': 'memory_error',
+            'TimeoutError': 'timeout_error', 
+            'PermissionError': 'permission_error',
+            'FileNotFoundError': 'file_error',
+            'ConnectionError': 'network_error',
+            'OSError': 'system_error',
+            'ImportError': 'import_error',
+            'ValueError': 'value_error',
+            'TypeError': 'type_error'
+        }
+        
+        # Check for known safe error types
+        for specific, generic in error_mappings.items():
+            if specific in error_type:
+                return generic
+        
+        return 'unknown_error'  # Default safe value
 
 
 @dataclass
@@ -232,8 +274,8 @@ class UserFeedbackCollector:
         """Initialize user feedback collector."""
         self.config = config or ContextCleanerConfig.from_env()
         
-        # Storage setup
-        feedback_dir = Path.home() / '.context-cleaner' / 'feedback'
+        # Storage setup with fallback
+        feedback_dir = self._get_feedback_directory()
         self.storage = FeedbackStorage(feedback_dir)
         
         # User preferences
@@ -260,6 +302,25 @@ class UserFeedbackCollector:
         
         # Show privacy notice on first run
         self._show_privacy_notice_if_needed()
+    
+    def _get_feedback_directory(self) -> Path:
+        """Get feedback directory with fallback options for different environments."""
+        try:
+            # Try user home directory first
+            feedback_dir = Path.home() / '.context-cleaner' / 'feedback'
+            feedback_dir.mkdir(parents=True, exist_ok=True)
+            # Test write permissions
+            test_file = feedback_dir / '.write_test'
+            test_file.touch()
+            test_file.unlink()
+            return feedback_dir
+        except (PermissionError, OSError):
+            # Fallback to temp directory
+            import tempfile
+            temp_dir = Path(tempfile.gettempdir()) / 'context-cleaner-feedback' 
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            logger.warning(f"Using temporary directory for feedback storage: {temp_dir}")
+            return temp_dir
     
     def _show_privacy_notice_if_needed(self):
         """Show privacy notice to user on first run."""
@@ -461,21 +522,26 @@ class UserFeedbackCollector:
         self._record_event('error', data)
     
     def _record_event(self, event_type: str, data: Dict[str, Any]):
-        """Record a feedback event with rate limiting."""
-        # Check rate limits
-        hour_key = datetime.now().strftime('%Y-%m-%d-%H')
-        if self._event_counts[hour_key] >= self.preferences.max_events_per_hour:
-            logger.debug(f"Rate limit exceeded for feedback events")
-            return
-        
-        # Check daily limits
-        today = datetime.now().strftime('%Y-%m-%d')
-        day_count = sum(count for key, count in self._event_counts.items() 
-                       if key.startswith(today))
-        
-        if day_count >= self.preferences.max_events_per_day:
-            logger.debug(f"Daily limit exceeded for feedback events")
-            return
+        """Record a feedback event with thread-safe rate limiting."""
+        # Thread-safe rate limiting check
+        with threading.RLock():
+            # Check rate limits
+            hour_key = datetime.now().strftime('%Y-%m-%d-%H')
+            if self._event_counts[hour_key] >= self.preferences.max_events_per_hour:
+                logger.debug(f"Rate limit exceeded for feedback events")
+                return
+            
+            # Check daily limits  
+            today = datetime.now().strftime('%Y-%m-%d')
+            day_count = sum(count for key, count in self._event_counts.items() 
+                           if key.startswith(today))
+            
+            if day_count >= self.preferences.max_events_per_day:
+                logger.debug(f"Daily limit exceeded for feedback events")
+                return
+            
+            # Update count after checks pass
+            self._event_counts[hour_key] += 1
         
         # Create and store event
         event = FeedbackEvent(
@@ -486,7 +552,6 @@ class UserFeedbackCollector:
         )
         
         self.storage.store_event(event)
-        self._event_counts[hour_key] += 1
         
         logger.debug(f"Recorded {event_type} feedback event")
     

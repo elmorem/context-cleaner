@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Generator
 from contextlib import contextmanager
 
 from .user_feedback_collector import UserFeedbackCollector
@@ -285,7 +285,7 @@ class PerformanceFeedbackIntegration:
             logger.debug(f"Optimization effectiveness analysis failed: {e}")
     
     @contextmanager
-    def track_operation(self, operation_name: str, expected_improvement: str = None):
+    def track_operation(self, operation_name: str, expected_improvement: Optional[str] = None) -> Generator[None, None, None]:
         """
         Context manager to track performance of specific operations.
         
