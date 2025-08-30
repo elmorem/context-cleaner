@@ -7,10 +7,9 @@ and identifying optimization opportunities.
 """
 
 import pytest
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from src.context_cleaner.cache.token_analyzer import (
     TokenEfficiencyAnalyzer, TokenWastePattern, CacheEfficiencyMetrics, 
@@ -159,7 +158,7 @@ class TestTokenEfficiencyAnalyzer:
         assert all(isinstance(indicator, str) for indicator in indicators)
         
         # Should detect high token-to-message ratios
-        high_ratio_indicator = any("token-to-message" in indicator for indicator in indicators)
+        any("token-to-message" in indicator for indicator in indicators)
         # May or may not be present depending on thresholds
     
     def test_identify_optimization_opportunities(self):
@@ -170,7 +169,7 @@ class TestTokenEfficiencyAnalyzer:
         assert all(isinstance(opp, str) for opp in opportunities)
         
         # Should identify cache efficiency improvement opportunity
-        cache_opp = any("cache" in opp.lower() for opp in opportunities)
+        any("cache" in opp.lower() for opp in opportunities)
         # May be present if enough sessions have low cache efficiency
     
     def test_calculate_length_efficiency_correlation(self):

@@ -15,6 +15,6 @@ from .dashboard.web_server import ProductivityDashboard
 
 __all__ = [
     "ContextCleanerConfig",
-    "ProductivityAnalyzer", 
+    "ProductivityAnalyzer",
     "ProductivityDashboard",
 ]

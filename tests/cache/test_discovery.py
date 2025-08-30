@@ -11,7 +11,7 @@ import tempfile
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from src.context_cleaner.cache.discovery import CacheDiscoveryService, CacheLocation
 from src.context_cleaner.cache.models import CacheConfig

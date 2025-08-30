@@ -7,7 +7,7 @@ without getting into complex data model setup or detailed integration testing.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 
 def test_usage_analyzer_basic():
@@ -127,14 +127,9 @@ def test_token_analyzer_division_by_zero_fix():
 def test_all_data_models_can_instantiate():
     """Test that all data model classes can be instantiated."""
     from src.context_cleaner.cache import (
-        WorkflowPattern, FileUsageMetrics, UsagePatternSummary,
-        TokenWastePattern, CacheEfficiencyMetrics, TokenAnalysisSummary,
-        TopicTransition, SessionBoundary, TemporalInsights,
-        UsageWeightedScore, CacheEnhancedAnalysis,
-        SessionCluster, CrossSessionPattern, LongTermTrend, CorrelationInsights
+        WorkflowPattern, TopicTransition, UsageWeightedScore
     )
-    from datetime import datetime, timedelta
-    from unittest.mock import Mock
+    from datetime import datetime
     
     # Test key data models can be created with minimal parameters
     now = datetime.now()

@@ -6,12 +6,11 @@ platforms and configurations. Handles permissions, missing files, and
 provides a unified interface for cache access.
 """
 
-import os
 import logging
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Iterator
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from .models import CacheConfig
 

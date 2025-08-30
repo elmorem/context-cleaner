@@ -8,7 +8,6 @@ in Claude Code conversation analysis.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
 
 from src.context_cleaner.cache.temporal_analyzer import (
     TemporalContextAnalyzer, TopicTransition, SessionBoundary, TemporalInsights

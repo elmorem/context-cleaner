@@ -7,7 +7,7 @@ Tests that focus on core functionality without complex data model setup.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from src.context_cleaner.cache.temporal_analyzer import (
     TemporalContextAnalyzer, TopicTransition, SessionBoundary, TemporalInsights

@@ -6,13 +6,11 @@ long-term trends, recurring themes, and cross-session dependencies.
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Set, Any
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Tuple, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from collections import defaultdict, Counter
-import statistics
 from pathlib import Path
-import re
 
 from .models import SessionAnalysis, CacheConfig
 from .session_parser import SessionCacheParser

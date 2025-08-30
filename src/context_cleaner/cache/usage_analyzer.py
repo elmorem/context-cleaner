@@ -7,13 +7,13 @@ from Claude Code cache data to provide intelligent context optimization insights
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple, Any
+from typing import List, Dict, Set, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import defaultdict, Counter
 import re
 
-from .models import SessionAnalysis, ToolUsage, FileAccessPattern, CacheConfig
+from .models import SessionAnalysis, ToolUsage, CacheConfig
 from .session_parser import SessionCacheParser
 from .discovery import CacheDiscoveryService, CacheLocation
 

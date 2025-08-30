@@ -7,11 +7,9 @@ and user behavior patterns from Claude Code cache data.
 """
 
 import pytest
-import tempfile
-import json
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from src.context_cleaner.cache.usage_analyzer import (
     UsagePatternAnalyzer, WorkflowPattern, FileUsageMetrics, UsagePatternSummary
@@ -310,7 +308,7 @@ class TestWorkflowPattern:
     
     def test_workflow_pattern_properties(self):
         """Test WorkflowPattern property calculations."""
-        now = datetime.now()
+        datetime.now()
         
         # Frequent pattern
         frequent_pattern = WorkflowPattern(

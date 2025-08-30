@@ -9,13 +9,12 @@ including message extraction, token metrics, and error handling.
 import pytest
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 from src.context_cleaner.cache.session_parser import SessionCacheParser
 from src.context_cleaner.cache.models import (
-    SessionMessage, TokenMetrics, MessageRole, MessageType, CacheConfig
+    SessionMessage, MessageRole, MessageType, CacheConfig
 )
 
 

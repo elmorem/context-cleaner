@@ -6,14 +6,13 @@ topic drift detection, context transitions, and time-based usage patterns.
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Set, Any
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Tuple, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from collections import defaultdict, deque
-import re
+from collections import defaultdict
 import statistics
 
-from .models import SessionAnalysis, SessionMessage, ToolUsage, CacheConfig
+from .models import SessionAnalysis, CacheConfig
 from .session_parser import SessionCacheParser
 from .discovery import CacheDiscoveryService, CacheLocation
 

@@ -8,14 +8,14 @@ to provide usage-weighted context analysis and personalized optimization.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from src.context_cleaner.cache.enhanced_context_analyzer import (
     EnhancedContextAnalyzer, CacheEnhancedAnalysis, UsageWeightedScore
 )
 from src.context_cleaner.cache.usage_analyzer import UsagePatternSummary, WorkflowPattern, FileUsageMetrics
 from src.context_cleaner.cache.token_analyzer import TokenAnalysisSummary, CacheEfficiencyMetrics, TokenUsageInsights
-from src.context_cleaner.cache.temporal_analyzer import TemporalInsights, TopicTransition, SessionBoundary
+from src.context_cleaner.cache.temporal_analyzer import TemporalInsights
 from src.context_cleaner.core.context_analyzer import ContextAnalysisResult
 
 

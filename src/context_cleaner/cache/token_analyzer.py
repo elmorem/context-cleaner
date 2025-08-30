@@ -6,13 +6,13 @@ for optimization based on actual Claude Code token consumption data.
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from collections import defaultdict, Counter
+from datetime import datetime
+from collections import Counter
 import statistics
 
-from .models import SessionAnalysis, TokenMetrics, CacheConfig
+from .models import SessionAnalysis, CacheConfig
 from .session_parser import SessionCacheParser
 from .discovery import CacheDiscoveryService, CacheLocation
 
@@ -355,7 +355,7 @@ class TokenEfficiencyAnalyzer:
     def _analyze_usage_patterns(self, sessions: List[SessionAnalysis]) -> TokenUsageInsights:
         """Analyze token usage patterns."""
         session_tokens = [s.total_tokens for s in sessions if s.total_tokens > 0]
-        session_messages = [s.total_messages for s in sessions if s.total_messages > 0]
+        [s.total_messages for s in sessions if s.total_messages > 0]
         
         if not session_tokens:
             return TokenUsageInsights(
@@ -404,7 +404,7 @@ class TokenEfficiencyAnalyzer:
         opportunities = self._identify_optimization_opportunities(sessions)
         
         # Calculate token distribution
-        total_tokens = sum(session_tokens)
+        sum(session_tokens)
         distribution = {
             'input_ratio': 0.6,  # Estimated - would be more accurate with message-level data
             'output_ratio': 0.4,

@@ -8,8 +8,6 @@ across multiple Claude Code conversation sessions.
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
-import numpy as np
 
 from src.context_cleaner.cache.correlation_analyzer import (
     CrossSessionCorrelationAnalyzer, SessionCluster, CrossSessionPattern, 

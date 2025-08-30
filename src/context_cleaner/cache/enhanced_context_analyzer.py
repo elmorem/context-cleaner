@@ -6,16 +6,15 @@ to provide usage-weighted context analysis and personalized optimization.
 """
 
 import logging
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 
 from ..core.context_analyzer import ContextAnalyzer, ContextAnalysisResult
 from .usage_analyzer import UsagePatternAnalyzer, UsagePatternSummary
 from .token_analyzer import TokenEfficiencyAnalyzer, TokenAnalysisSummary  
 from .temporal_analyzer import TemporalContextAnalyzer, TemporalInsights
-from .discovery import CacheDiscoveryService, CacheLocation
+from .discovery import CacheDiscoveryService
 from .models import CacheConfig
 
 logger = logging.getLogger(__name__)
@@ -274,7 +273,7 @@ class EnhancedContextAnalyzer:
         
         if usage_patterns.file_usage_metrics:
             # Check if context files are heavily used
-            heavily_used_files = {f.file_path for f in usage_patterns.heavily_used_files}
+            {f.file_path for f in usage_patterns.heavily_used_files}
             
             context_file_usage = 0.0
             for file_path in context_files:
