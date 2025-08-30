@@ -245,43 +245,66 @@ elif aggressive:
   - ✅ **Example**: Complete working demonstration with realistic context data
   - **Status**: Ready for review and merge - https://github.com/elmorem/context-cleaner/pull/7
 
-#### **Week 16: Context Manipulation Engine**
-- **PR17: Core Content Manipulation System**
+#### **Week 16: Core Context Manipulation Implementation (Reorganized)**
+- **PR17: Core Manipulation Engine** (Days 1-3)
+  - Pure manipulation operations engine without CLI complexity
   - Context manipulation engine with remove/consolidate/reorder/summarize operations
   - Duplicate remover for completed todos, resolved errors, redundant content
   - Content consolidator for related todos, similar reminders, multiple file reads
-  - Priority reorderer for current work prioritization and recency-based organization
+  - Priority reorderer leveraging existing PriorityAnalyzer results
   - Content summarizer for verbose conversation sections and repeated explanations
-  - Safe manipulation with comprehensive validation and rollback capabilities
-  - **ENHANCED**: Usage-based removal recommendations, workflow-aware optimization
+  - Integration with existing analysis results from PR15/16
+  - Basic validation (full safety framework in PR18)
+  - **Size**: 3-4 focused files, no CLI dependencies
+  - **Testing**: Unit tests (95% coverage), integration tests with PR15/16, performance tests for large contexts
 
-#### **Week 17: Optimization Modes & Interactive Workflow**
-- **PR18: Multi-Mode Optimization with Interactive Preview**
+- **PR18: Safety & Validation Framework** (Days 4-6)
+  - Comprehensive safety system for manipulation operations
+  - ManipulationSafetyManager with validation, backup, and rollback capabilities
+  - ChangeTracker for complete manipulation audit trails
+  - BackupManager leveraging existing encrypted storage infrastructure
+  - ValidationEngine for pre/post manipulation integrity checks
+  - Atomic operations with automatic rollback on failure
+  - **Dependencies**: Requires PR17 manipulation engine
+  - **Size**: 3 focused files, pure safety infrastructure
+  - **Testing**: Safety scenario tests (98% coverage), rollback validation, backup/restore integrity, change tracking audit
+
+#### **Week 17: User Experience & CLI Integration**
+- **PR19: Optimization Modes & Interactive Workflow** (Days 1-4)
   - Conservative Mode: Safe cleanup with confirmation for all changes
   - Balanced Mode: Standard cleanup rules with moderate consolidation
   - Aggressive Mode: Maximum optimization with minimal confirmation
+  - Focus Mode: Prioritization without content removal
   - Interactive workflow with before/after analysis preview
   - Selective approval system (approve all, selective apply, reject changes, custom edit)
   - Comprehensive change impact analysis and user control
-  - **ENHANCED**: Personalized mode adaptation based on usage patterns
+  - Personalized mode adaptation based on PR15.3 usage patterns
+  - **Dependencies**: Requires PR17 (manipulation) + PR18 (safety)
+  - **Size**: 4-5 files, user experience focused
+  - **Testing**: User experience tests (90% coverage), mode behavior validation, interactive workflow tests, personalization accuracy validation
 
-#### **Week 18: CLI Integration & Command Implementation**
-- **PR19: Complete CLI Functionality**
-  - Replace all CLI TODO placeholders with actual implementations
+- **PR20: Complete CLI Integration & Analytics** (Days 5-6 + Week 18 Days 1-2)
+  - Replace ALL CLI TODO placeholders with actual implementations
   - Full /clean-context command equivalence with --dashboard, --quick, --preview, --aggressive, --focus
-  - Additional commands for --stats, --health-check, --export-analytics
+  - Enhanced --dashboard with manipulation operation controls
+  - Additional commands: --stats, --health-check, --export-analytics
   - Integration with existing analytics and monitoring systems
   - Comprehensive error handling and user feedback
-  - **ENHANCED**: Usage-based smart defaults and impact prediction
+  - Usage-based smart defaults and impact prediction from PR15.3
+  - Manipulation effectiveness tracking and historical analytics
+  - **Dependencies**: Requires PR17 + PR18 + PR19 (complete foundation)
+  - **Size**: CLI updates + analytics integration work
+  - **Testing**: CLI integration tests (92% coverage), command validation, analytics integration tests, effectiveness tracking validation
 
-#### **Week 19: Analytics & Reporting Enhancement**
-- **PR20: Cleanup Analytics and Historical Tracking**
+#### **Week 18: Advanced Analytics & Reporting** (Days 3-5)
+- **PR21: Enhanced Cleanup Analytics and Historical Tracking**
   - Cleanup session tracking with effectiveness measurement
   - Historical optimization trends and pattern analysis
   - User rating system for optimization effectiveness
   - Trend reporting with actionable insights
   - Integration with existing analytics infrastructure
-  - **ENHANCED**: Cross-session correlation, usage-based effectiveness measurement
+  - Cross-session correlation and usage-based effectiveness measurement
+  - **Dependencies**: Requires PR20 (CLI integration) for manipulation data collection
 
 ### **Phase 6: Advanced Intelligence (Weeks 20-22)**
 **🎯 Goal**: AI-powered productivity coaching
