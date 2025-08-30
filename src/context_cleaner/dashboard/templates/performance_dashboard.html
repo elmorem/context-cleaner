@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Cleaner - Real-Time Performance Dashboard</title>
+    
+    <!-- CSS Libraries -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for real-time charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .dashboard-container {
+            padding: 20px;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        .health-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        .health-excellent { background-color: #28a745; }
+        .health-good { background-color: #ffc107; }
+        .health-warning { background-color: #fd7e14; }
+        .health-critical { background-color: #dc3545; }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .alert-banner {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+        
+        .trend-arrow {
+            font-size: 1.2rem;
+            margin-left: 10px;
+        }
+        
+        .trend-increasing { color: #dc3545; }
+        .trend-decreasing { color: #28a745; }
+        .trend-stable { color: #6c757d; }
+        
+        .optimization-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .optimization-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .real-time-indicator {
+            width: 10px;
+            height: 10px;
+            background-color: #28a745;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            z-index: 1000;
+        }
+        
+        .settings-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        <i class="fas fa-wifi"></i> Connecting...
+    </div>
+    
+    <div class="alert-banner" id="alertContainer"></div>
+    
+    <div class="dashboard-container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-white text-center mb-4">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Context Cleaner Performance Dashboard
+                    <span class="real-time-indicator"></span>
+                    <small class="text-light">Real-Time Monitoring</small>
+                </h1>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="row">
+            <div class="col-12">
+                <div class="control-panel">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-2">
+                                <i class="fas fa-tools"></i> Optimization Controls
+                            </h5>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-success optimization-btn" onclick="forceOptimization('memory')">
+                                    <i class="fas fa-memory"></i> Optimize Memory
+                                </button>
+                                <button class="btn btn-warning optimization-btn" onclick="forceOptimization('cpu')">
+                                    <i class="fas fa-microchip"></i> Optimize CPU
+                                </button>
+                                <button class="btn btn-primary optimization-btn" onclick="forceOptimization('both')">
+                                    <i class="fas fa-sync"></i> Optimize All
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="toggleSettings()">
+                                <i class="fas fa-cog"></i> Settings
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="exportData()">
+                                <i class="fas fa-download"></i> Export Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Panel (Hidden by default) -->
+        <div class="row" id="settingsPanel" style="display: none;">
+            <div class="col-12">
+                <div class="settings-panel">
+                    <h5><i class="fas fa-cog"></i> Dashboard Settings</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="alertsEnabled" checked>
+                                <label class="form-check-label" for="alertsEnabled">
+                                    Enable Alerts
+                                </label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Memory Alert Threshold (MB)</label>
+                                <input type="number" class="form-control" id="memoryThreshold" value="50" min="10" max="200">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">CPU Alert Threshold (%)</label>
+                                <input type="number" class="form-control" id="cpuThreshold" value="5" min="1" max="50">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Alert Cooldown (minutes)</label>
+                                <input type="number" class="form-control" id="alertCooldown" value="5" min="1" max="60">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Performance Metrics -->
+        <div class="row">
+            <!-- Memory Metrics -->
+            <div class="col-lg-6">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-memory text-primary"></i> Memory Usage
+                        </h5>
+                        <span class="status-badge bg-light" id="memoryStatus">
+                            <span class="health-indicator" id="memoryHealth"></span>
+                            <span id="memoryTrend" class="trend-arrow"></span>
+                        </span>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="metric-label">Current Usage</div>
+                            <p class="metric-value text-primary" id="memoryUsage">0.0 MB</p>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-label">Target: 45 MB</div>
+                            <p class="metric-value text-muted" id="memoryPercent">0%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="metric-label">Cache Memory</div>
+                            <p class="h6" id="cacheMemory">0.0 MB</p>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-label">Cache Items</div>
+                            <p class="h6" id="cacheItems">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="progress mb-2">
+                        <div class="progress-bar" id="memoryProgressBar" style="width: 0%"></div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="memoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CPU Metrics -->
+            <div class="col-lg-6">
+                <div class="metric-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-microchip text-warning"></i> CPU Usage
+                        </h5>
+                        <span class="status-badge bg-light" id="cpuStatus">
+                            <span class="health-indicator" id="cpuHealth"></span>
+                            <span id="cpuTrend" class="trend-arrow"></span>
+                        </span>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="metric-label">Current Usage</div>
+                            <p class="metric-value text-warning" id="cpuUsage">0.0%</p>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-label">Target: 3.0%</div>
+                            <p class="metric-value text-muted" id="cpuAverage">0.0%</p>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="metric-label">Throttle Level</div>
+                            <p class="h6" id="throttleLevel">None</p>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-label">Pending Tasks</div>
+                            <p class="h6" id="pendingTasks">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="progress mb-2">
+                        <div class="progress-bar bg-warning" id="cpuProgressBar" style="width: 0%"></div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="cpuChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Overview -->
+        <div class="row">
+            <div class="col-12">
+                <div class="metric-card">
+                    <h5 class="mb-3">
+                        <i class="fas fa-server text-info"></i> System Overview
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <div class="metric-label">Overall Health</div>
+                            <p class="metric-value text-info" id="overallHealth">100</p>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" id="healthProgressBar" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="metric-label">System Memory</div>
+                            <p class="h6" id="systemMemory">0 GB total</p>
+                            <p class="small text-muted" id="availableMemory">0 GB available</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="metric-label">CPU Cores</div>
+                            <p class="h6" id="cpuCores">0 cores</p>
+                            <p class="small text-muted" id="activeThreads">0 threads</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <div class="metric-label">Last Updated</div>
+                            <p class="h6" id="lastUpdated">Never</p>
+                            <p class="small text-success">
+                                <span class="real-time-indicator"></span>Live
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Combined Chart -->
+                    <div class="chart-container mt-4">
+                        <canvas id="combinedChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables
+        let socket;
+        let memoryChart, cpuChart, combinedChart;
+        let performanceHistory = [];
+        let isConnected = false;
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSocketIO();
+            initializeCharts();
+            updateConnectionStatus('Connecting...');
+        });
+        
+        // Socket.IO initialization
+        function initializeSocketIO() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                isConnected = true;
+                updateConnectionStatus('Connected');
+                console.log('Connected to performance dashboard');
+            });
+            
+            socket.on('disconnect', function() {
+                isConnected = false;
+                updateConnectionStatus('Disconnected');
+                console.log('Disconnected from performance dashboard');
+            });
+            
+            socket.on('performance_update', function(data) {
+                updatePerformanceMetrics(data);
+                updateCharts(data);
+                
+                if (data.alerts && data.alerts.length > 0) {
+                    showAlerts(data.alerts);
+                }
+            });
+            
+            socket.on('optimization_scheduled', function(data) {
+                showNotification('Optimization scheduled: ' + data.type, 'success');
+            });
+            
+            socket.on('optimization_error', function(data) {
+                showNotification('Optimization error: ' + data.error, 'danger');
+            });
+            
+            socket.on('settings_updated', function(data) {
+                showNotification('Settings updated successfully', 'success');
+            });
+        }
+        
+        // Initialize charts
+        function initializeCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                elements: {
+                    point: {
+                        radius: 2
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            };
+            
+            // Memory chart
+            memoryChart = new Chart(document.getElementById('memoryChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Memory Usage (MB)',
+                        data: [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            max: 80,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' MB';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // CPU chart
+            cpuChart = new Chart(document.getElementById('cpuChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#ffc107',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            beginAtZero: true,
+                            max: 15,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Combined chart
+            combinedChart = new Chart(document.getElementById('combinedChart'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Memory Usage (MB)',
+                            data: [],
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'CPU Usage (%)',
+                            data: [],
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        x: chartOptions.scales.x,
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            beginAtZero: true,
+                            max: 80,
+                            title: {
+                                display: true,
+                                text: 'Memory (MB)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            beginAtZero: true,
+                            max: 15,
+                            title: {
+                                display: true,
+                                text: 'CPU (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update performance metrics
+        function updatePerformanceMetrics(data) {
+            if (data.error) {
+                console.error('Performance data error:', data.error);
+                return;
+            }
+            
+            const { memory, cpu, system, overall_health } = data;
+            
+            // Memory metrics
+            document.getElementById('memoryUsage').textContent = memory.current_mb.toFixed(1) + ' MB';
+            document.getElementById('memoryPercent').textContent = memory.usage_percent.toFixed(1) + '%';
+            document.getElementById('cacheMemory').textContent = memory.cache_memory_mb.toFixed(1) + ' MB';
+            document.getElementById('cacheItems').textContent = memory.cache_items;
+            
+            updateHealthIndicator('memoryHealth', memory.health_score);
+            updateTrendIndicator('memoryTrend', memory.trend);
+            updateProgressBar('memoryProgressBar', memory.usage_percent, 100);
+            
+            // CPU metrics
+            document.getElementById('cpuUsage').textContent = cpu.current_percent.toFixed(1) + '%';
+            document.getElementById('cpuAverage').textContent = cpu.avg_percent.toFixed(1) + '%';
+            document.getElementById('pendingTasks').textContent = cpu.pending_tasks;
+            
+            const throttleNames = ['None', 'Light', 'Moderate', 'Aggressive'];
+            document.getElementById('throttleLevel').textContent = throttleNames[cpu.throttle_level] || 'Unknown';
+            
+            updateHealthIndicator('cpuHealth', cpu.health_score);
+            updateTrendIndicator('cpuTrend', cpu.trend);
+            updateProgressBar('cpuProgressBar', (cpu.current_percent / cpu.target_percent) * 100, 100);
+            
+            // System overview
+            document.getElementById('overallHealth').textContent = overall_health;
+            document.getElementById('systemMemory').textContent = (system.total_memory_mb / 1024).toFixed(1) + ' GB total';
+            document.getElementById('availableMemory').textContent = (system.available_memory_mb / 1024).toFixed(1) + ' GB available';
+            document.getElementById('cpuCores').textContent = system.cpu_count + ' cores';
+            document.getElementById('activeThreads').textContent = system.active_threads + ' threads';
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+            
+            updateProgressBar('healthProgressBar', overall_health, 100);
+        }
+        
+        // Update charts with new data
+        function updateCharts(data) {
+            if (data.error) return;
+            
+            const timestamp = new Date(data.timestamp);
+            const { memory, cpu } = data;
+            
+            // Add data to history
+            performanceHistory.push({
+                timestamp: timestamp,
+                memory: memory.current_mb,
+                cpu: cpu.current_percent
+            });
+            
+            // Keep only last 100 points (5 minutes at 3-second intervals)
+            if (performanceHistory.length > 100) {
+                performanceHistory = performanceHistory.slice(-100);
+            }
+            
+            // Update memory chart
+            memoryChart.data.datasets[0].data = performanceHistory.map(p => ({
+                x: p.timestamp,
+                y: p.memory
+            }));
+            memoryChart.update('none');
+            
+            // Update CPU chart
+            cpuChart.data.datasets[0].data = performanceHistory.map(p => ({
+                x: p.timestamp,
+                y: p.cpu
+            }));
+            cpuChart.update('none');
+            
+            // Update combined chart
+            combinedChart.data.datasets[0].data = performanceHistory.map(p => ({
+                x: p.timestamp,
+                y: p.memory
+            }));
+            combinedChart.data.datasets[1].data = performanceHistory.map(p => ({
+                x: p.timestamp,
+                y: p.cpu
+            }));
+            combinedChart.update('none');
+        }
+        
+        // Update health indicators
+        function updateHealthIndicator(elementId, healthScore) {
+            const indicator = document.getElementById(elementId);
+            
+            if (healthScore >= 80) {
+                indicator.className = 'health-indicator health-excellent';
+            } else if (healthScore >= 60) {
+                indicator.className = 'health-indicator health-good';
+            } else if (healthScore >= 40) {
+                indicator.className = 'health-indicator health-warning';
+            } else {
+                indicator.className = 'health-indicator health-critical';
+            }
+        }
+        
+        // Update trend indicators
+        function updateTrendIndicator(elementId, trend) {
+            const indicator = document.getElementById(elementId);
+            
+            if (trend === 'increasing') {
+                indicator.innerHTML = '<i class="fas fa-arrow-up trend-increasing"></i>';
+            } else if (trend === 'decreasing') {
+                indicator.innerHTML = '<i class="fas fa-arrow-down trend-decreasing"></i>';
+            } else {
+                indicator.innerHTML = '<i class="fas fa-minus trend-stable"></i>';
+            }
+        }
+        
+        // Update progress bars
+        function updateProgressBar(elementId, value, max) {
+            const progressBar = document.getElementById(elementId);
+            const percentage = Math.min((value / max) * 100, 100);
+            progressBar.style.width = percentage + '%';
+            
+            // Update color based on percentage
+            if (percentage > 80) {
+                progressBar.className = 'progress-bar bg-danger';
+            } else if (percentage > 60) {
+                progressBar.className = 'progress-bar bg-warning';
+            } else {
+                progressBar.className = 'progress-bar bg-success';
+            }
+        }
+        
+        // Connection status
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            
+            if (status === 'Connected') {
+                statusElement.innerHTML = '<i class="fas fa-wifi"></i> Connected';
+                statusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
+            } else if (status === 'Disconnected') {
+                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> Disconnected';
+                statusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
+            } else {
+                statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + status;
+                statusElement.style.backgroundColor = 'rgba(108, 117, 125, 0.8)';
+            }
+        }
+        
+        // Show alerts
+        function showAlerts(alerts) {
+            const container = document.getElementById('alertContainer');
+            
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${alert.type === 'critical' ? 'danger' : 'warning'} alert-dismissible fade show`;
+                alertDiv.innerHTML = `
+                    <strong><i class="fas fa-exclamation-triangle"></i> ${alert.category.toUpperCase()} Alert:</strong>
+                    ${alert.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                
+                container.appendChild(alertDiv);
+                
+                // Auto-dismiss after 10 seconds
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 10000);
+            });
+        }
+        
+        // Show notifications
+        function showNotification(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            container.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+        
+        // Force optimization
+        function forceOptimization(type) {
+            if (!isConnected) {
+                showNotification('Not connected to dashboard', 'warning');
+                return;
+            }
+            
+            socket.emit('request_optimization', { type: type });
+            showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} optimization requested`, 'info');
+        }
+        
+        // Toggle settings panel
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Save settings
+        function saveSettings() {
+            const settings = {
+                alerts_enabled: document.getElementById('alertsEnabled').checked,
+                thresholds: {
+                    memory_mb: parseFloat(document.getElementById('memoryThreshold').value),
+                    cpu_percent: parseFloat(document.getElementById('cpuThreshold').value)
+                },
+                cooldown_minutes: parseInt(document.getElementById('alertCooldown').value)
+            };
+            
+            if (!isConnected) {
+                showNotification('Not connected to dashboard', 'warning');
+                return;
+            }
+            
+            socket.emit('update_settings', settings);
+        }
+        
+        // Export performance data
+        function exportData() {
+            if (performanceHistory.length === 0) {
+                showNotification('No performance data to export', 'warning');
+                return;
+            }
+            
+            const csv = 'Timestamp,Memory (MB),CPU (%)\n' + 
+                       performanceHistory.map(p => 
+                           `${p.timestamp.toISOString()},${p.memory},${p.cpu}`
+                       ).join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `context-cleaner-performance-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showNotification('Performance data exported', 'success');
+        }
+    </script>
+</body>
+</html>
