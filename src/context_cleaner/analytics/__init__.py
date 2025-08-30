@@ -5,4 +5,9 @@ from .context_health_scorer import ContextHealthScorer
 from .recommendation_engine import RecommendationEngine
 from .trend_analyzer import TrendAnalyzer
 
-__all__ = ["ProductivityAnalyzer", "ContextHealthScorer", "RecommendationEngine", "TrendAnalyzer"]
+__all__ = [
+    "ProductivityAnalyzer",
+    "ContextHealthScorer",
+    "RecommendationEngine",
+    "TrendAnalyzer",
+]

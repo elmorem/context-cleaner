@@ -8,7 +8,6 @@ token metrics, session messages, and analysis results.
 
 import pytest
 from datetime import datetime, timedelta
-from dataclasses import asdict
 
 from src.context_cleaner.cache.models import (
     TokenMetrics, ToolUsage, SessionMessage, SessionAnalysis,

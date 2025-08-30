@@ -9,8 +9,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Iterator, Tuple
-from dataclasses import asdict
+from typing import List, Dict, Any, Optional, Iterator
 
 from .models import (
     SessionMessage, ToolUsage, TokenMetrics, SessionAnalysis,

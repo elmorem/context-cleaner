@@ -4,14 +4,11 @@ Productivity Dashboard Web Server.
 FastAPI-based web server for Context Cleaner dashboard interface.
 """
 
-import json
 from datetime import datetime
-from typing import Dict, Any, Optional
-from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from ..config.settings import ContextCleanerConfig
@@ -20,30 +17,30 @@ from ..analytics.productivity_analyzer import ProductivityAnalyzer
 
 class ProductivityDashboard:
     """Web-based productivity dashboard for Context Cleaner."""
-    
+
     def __init__(self, config: Optional[ContextCleanerConfig] = None):
         self.config = config or ContextCleanerConfig.default()
         self.analyzer = ProductivityAnalyzer(self.config)
         self.app = FastAPI(
             title="Context Cleaner Dashboard",
             description="Advanced productivity tracking and context optimization",
-            version="0.1.0"
+            version="0.1.0",
         )
         self._setup_routes()
-    
+
     def _setup_routes(self):
         """Setup FastAPI routes."""
-        
+
         @self.app.get("/", response_class=HTMLResponse)
         async def dashboard_home():
             """Serve main dashboard page."""
             return self._generate_dashboard_html()
-        
+
         @self.app.get("/api/health")
         async def health_check():
             """API health check endpoint."""
             return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-        
+
         @self.app.get("/api/productivity-summary")
         async def get_productivity_summary(days: int = 7):
             """Get productivity summary for specified number of days."""
@@ -58,14 +55,14 @@ class ProductivityDashboard:
                     "recommendations": [
                         "Context health is excellent - keep up the good work!",
                         "Consider periodic cleanup to maintain performance",
-                        "Your afternoon sessions show highest productivity"
+                        "Your afternoon sessions show highest productivity",
                     ],
-                    "last_updated": datetime.now().isoformat()
+                    "last_updated": datetime.now().isoformat(),
                 }
                 return JSONResponse(content=summary)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         @self.app.get("/api/session-analytics")
         async def get_session_analytics():
             """Get detailed session analytics."""
@@ -75,26 +72,36 @@ class ProductivityDashboard:
                         "productive_coding": 45,
                         "debugging_session": 25,
                         "optimization_session": 20,
-                        "exploration": 10
+                        "exploration": 10,
                     },
                     "hourly_productivity": {
-                        "09": 78, "10": 85, "11": 92, "12": 88,
-                        "13": 75, "14": 88, "15": 95, "16": 90,
-                        "17": 85, "18": 70
+                        "09": 78,
+                        "10": 85,
+                        "11": 92,
+                        "12": 88,
+                        "13": 75,
+                        "14": 88,
+                        "15": 95,
+                        "16": 90,
+                        "17": 85,
+                        "18": 70,
                     },
                     "weekly_trends": {
-                        "Monday": 82, "Tuesday": 88, "Wednesday": 85,
-                        "Thursday": 90, "Friday": 78
+                        "Monday": 82,
+                        "Tuesday": 88,
+                        "Wednesday": 85,
+                        "Thursday": 90,
+                        "Friday": 78,
                     },
                     "optimization_impact": {
                         "avg_improvement": 15.3,
-                        "success_rate": 78.5
-                    }
+                        "success_rate": 78.5,
+                    },
                 }
                 return JSONResponse(content=analytics)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         @self.app.get("/api/recommendations")
         async def get_recommendations():
             """Get current optimization recommendations."""
@@ -105,27 +112,27 @@ class ProductivityDashboard:
                         "priority": "high",
                         "title": "Context Cleanup Recommended",
                         "description": "Your context size has grown to 45K tokens. Consider cleanup.",
-                        "action": "context-cleaner optimize"
+                        "action": "context-cleaner optimize",
                     },
                     {
                         "type": "productivity",
-                        "priority": "medium", 
+                        "priority": "medium",
                         "title": "Peak Performance Window",
                         "description": "Your productivity peaks at 3-4 PM. Schedule complex tasks then.",
-                        "action": "Schedule important work in the afternoon"
+                        "action": "Schedule important work in the afternoon",
                     },
                     {
                         "type": "health",
                         "priority": "low",
                         "title": "Excellent Context Health",
                         "description": "Your current context health is 87/100 - keep up the good work!",
-                        "action": "Continue current practices"
-                    }
+                        "action": "Continue current practices",
+                    },
                 ]
                 return JSONResponse(content=recommendations)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         @self.app.post("/api/privacy/export-data")
         async def export_user_data():
             """Export all user data for privacy compliance."""
@@ -134,21 +141,24 @@ class ProductivityDashboard:
                     "export_timestamp": datetime.now().isoformat(),
                     "version": "0.1.0",
                     "sessions": [],  # Would load actual session data
-                    "privacy_notice": "All data is processed locally on your machine"
+                    "privacy_notice": "All data is processed locally on your machine",
                 }
                 return JSONResponse(content=data)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         @self.app.delete("/api/privacy/delete-data")
         async def delete_all_data():
             """Delete all collected data for privacy compliance."""
             try:
                 # This would delete actual data files
-                return {"message": "All data deleted successfully", "timestamp": datetime.now().isoformat()}
+                return {
+                    "message": "All data deleted successfully",
+                    "timestamp": datetime.now().isoformat(),
+                }
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
-    
+
     def _generate_dashboard_html(self) -> str:
         """Generate HTML for the dashboard interface."""
         return """
@@ -389,7 +399,7 @@ class ProductivityDashboard:
 </body>
 </html>
         """
-    
+
     def start_server(self, host: str = "localhost", port: int = 8548):
         """Start the dashboard server."""
         uvicorn.run(self.app, host=host, port=port, log_level="info")
