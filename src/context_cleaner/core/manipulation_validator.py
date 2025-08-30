@@ -63,10 +63,10 @@ class ManipulationValidator:
     
     # Content type risk levels
     HIGH_RISK_PATTERNS = [
-        r"password|secret|key|token|credential",  # Security sensitive
-        r"critical|important|urgent|priority",  # Business critical
-        r"backup|restore|recovery",  # Data recovery
-        r"config|setting|parameter"  # Configuration
+        r"\bpassword\b|\bsecret\b|\bapi[_-]?key\b|\btoken\b|\bcredential\b",  # Security sensitive (word boundaries)
+        r"\bcritical\b|\bimportant\b|\burgent\b|\bpriority\b",  # Business critical
+        r"\bbackup\b|\brestore\b|\brecovery\b",  # Data recovery
+        r"\bconfig\b|\bsetting\b|\bparameter\b"  # Configuration
     ]
     
     MEDIUM_RISK_PATTERNS = [
