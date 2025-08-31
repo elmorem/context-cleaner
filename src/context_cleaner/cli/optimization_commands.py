@@ -31,6 +31,9 @@ from ..optimization.change_approval import (
 from ..core.preview_generator import PreviewFormat
 from ..core.confirmation_workflows import ConfirmationLevel, ConfirmationResult
 
+# Analytics imports for PR20
+from ..analytics.effectiveness_tracker import EffectivenessTracker, OptimizationOutcome
+
 
 class OptimizationCommandHandler:
     """
@@ -45,6 +48,9 @@ class OptimizationCommandHandler:
         self.config = config or {}
         self.verbose = verbose
         self.workflow_manager = InteractiveWorkflowManager()
+        
+        # PR20: Initialize effectiveness tracking
+        self.effectiveness_tracker = EffectivenessTracker()
     
     def handle_dashboard_command(self, format: str = "text") -> None:
         """
@@ -83,6 +89,10 @@ class OptimizationCommandHandler:
         
         Performs balanced optimization with auto-approval for safe operations.
         """
+        import time
+        session_start_time = time.time()
+        tracking_session_id = None
+        
         try:
             if self.verbose:
                 click.echo("🚀 Starting quick context optimization...")
@@ -95,6 +105,13 @@ class OptimizationCommandHandler:
                 click.echo("ℹ️  No context data found to optimize")
                 return
             
+            # PR20: Start effectiveness tracking
+            tracking_session_id = self.effectiveness_tracker.start_optimization_tracking(
+                context_data=context_data,
+                strategy_type="BALANCED",
+                context_source="cli_quick"
+            )
+            
             # Start interactive session with balanced strategy
             manager, session = start_interactive_optimization(
                 context_data, 
@@ -106,6 +123,20 @@ class OptimizationCommandHandler:
             
             if len(plan.operations) == 0:
                 click.echo("✅ Context already well-optimized - no changes needed")
+                
+                # PR20: Track no-changes-needed outcome
+                if tracking_session_id:
+                    session_time = time.time() - session_start_time
+                    self.effectiveness_tracker.complete_optimization_tracking(
+                        session_id=tracking_session_id,
+                        optimized_context=context_data,  # No changes made
+                        outcome=OptimizationOutcome.NO_CHANGES_NEEDED,
+                        operations_approved=0,
+                        operations_rejected=0,
+                        operations_modified=0,
+                        total_operations=0,
+                        session_time=session_time
+                    )
                 return
             
             # Auto-approve safe operations for quick mode
@@ -116,6 +147,22 @@ class OptimizationCommandHandler:
             
             if approved_ops:
                 result = manager.apply_selective_changes(session.session_id, approved_ops)
+                
+                # PR20: Complete effectiveness tracking with results
+                if tracking_session_id:
+                    session_time = time.time() - session_start_time
+                    optimized_data = result.optimized_context if hasattr(result, 'optimized_context') else context_data
+                    
+                    self.effectiveness_tracker.complete_optimization_tracking(
+                        session_id=tracking_session_id,
+                        optimized_context=optimized_data,
+                        outcome=OptimizationOutcome.SUCCESS,
+                        operations_approved=result.operations_executed,
+                        operations_rejected=result.operations_rejected,
+                        operations_modified=0,
+                        total_operations=len(plan.operations),
+                        session_time=session_time
+                    )
                 
                 click.echo(f"✅ Quick optimization completed:")
                 click.echo(f"   • {result.operations_executed} operations applied")
@@ -128,8 +175,40 @@ class OptimizationCommandHandler:
             else:
                 click.echo("✅ Quick optimization completed - no safe changes found")
                 
+                # PR20: Track case where no operations were approved
+                if tracking_session_id:
+                    session_time = time.time() - session_start_time
+                    self.effectiveness_tracker.complete_optimization_tracking(
+                        session_id=tracking_session_id,
+                        optimized_context=context_data,
+                        outcome=OptimizationOutcome.NO_CHANGES_NEEDED,
+                        operations_approved=0,
+                        operations_rejected=len(plan.operations),
+                        operations_modified=0,
+                        total_operations=len(plan.operations),
+                        session_time=session_time
+                    )
+                
         except Exception as e:
             click.echo(f"❌ Quick optimization failed: {e}", err=True)
+            
+            # PR20: Track failure in effectiveness system
+            if tracking_session_id:
+                try:
+                    session_time = time.time() - session_start_time
+                    self.effectiveness_tracker.complete_optimization_tracking(
+                        session_id=tracking_session_id,
+                        optimized_context=context_data or {},
+                        outcome=OptimizationOutcome.FAILURE,
+                        operations_approved=0,
+                        operations_rejected=0,
+                        operations_modified=0,
+                        total_operations=0,
+                        session_time=session_time
+                    )
+                except Exception:
+                    pass  # Don't fail on tracking errors
+            
             if self.verbose:
                 import traceback
                 click.echo(traceback.format_exc(), err=True)
