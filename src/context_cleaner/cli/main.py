@@ -310,44 +310,42 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         from ..visualization.basic_dashboard import BasicDashboard
 
         if dashboard:
-            # Show dashboard only (like /clean-context --dashboard)
-            dashboard_instance = BasicDashboard()
-            if format == "json":
-                import json
-
-                data = dashboard_instance.get_json_output()
-                click.echo(json.dumps(data, indent=2))
-            else:
-                output = dashboard_instance.get_formatted_output()
-                click.echo(output)
+            # Show enhanced dashboard using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            handler = OptimizationCommandHandler(verbose=verbose)
+            handler.handle_dashboard_command(format=format)
 
         elif quick:
-            click.echo("🚀 Quick context optimization...")
-            # TODO: Implement quick optimization
-            click.echo("✅ Quick optimization completed")
+            # Quick optimization using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            handler = OptimizationCommandHandler(verbose=verbose)
+            handler.handle_quick_optimization()
 
         elif preview:
-            click.echo("👁️ Previewing context optimization changes...")
-            # TODO: Implement preview mode
-            click.echo("📋 Preview completed - no changes applied")
+            # Preview mode using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            from ..optimization.personalized_strategies import StrategyType
+            handler = OptimizationCommandHandler(verbose=verbose)
+            # Use balanced strategy as default for preview
+            handler.handle_preview_mode(strategy=StrategyType.BALANCED, format=format)
 
         elif aggressive:
-            click.echo("⚡ Aggressive context optimization...")
-            # TODO: Implement aggressive optimization
-            click.echo("✅ Aggressive optimization completed")
+            # Aggressive optimization using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            handler = OptimizationCommandHandler(verbose=verbose)
+            handler.handle_aggressive_optimization()
 
         elif focus:
-            click.echo("🎯 Focusing context priorities...")
-            # TODO: Implement focus mode
-            click.echo("✅ Context refocused")
+            # Focus mode using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            handler = OptimizationCommandHandler(verbose=verbose)
+            handler.handle_focus_mode()
 
         else:
-            # Full context optimization workflow
-            click.echo("🔍 Analyzing context...")
-            SafeContextAnalyzer()
-
-            # TODO: Implement full optimization workflow
-            click.echo("✅ Context optimization completed")
+            # Full interactive optimization workflow using PR19 optimization commands
+            from .optimization_commands import OptimizationCommandHandler
+            handler = OptimizationCommandHandler(verbose=verbose)
+            handler.handle_full_optimization()
 
         if verbose:
             click.echo("📊 Run 'context-cleaner dashboard' to view updated metrics")

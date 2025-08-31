@@ -48,6 +48,27 @@ from .personalized_strategies import (
     StrategyRecommendation
 )
 
+# PR19: Interactive Optimization Workflows  
+from .interactive_workflow import (
+    InteractiveWorkflowManager,
+    InteractiveSession,
+    WorkflowStep,
+    WorkflowResult,
+    UserAction,
+    start_interactive_optimization,
+    quick_optimization_preview
+)
+from .change_approval import (
+    ChangeApprovalSystem,
+    ChangeSelection,
+    SelectiveApprovalResult,
+    ApprovalDecision,
+    ChangeCategory,
+    create_quick_approval,
+    approve_all_operations,
+    approve_safe_operations_only
+)
+
 __all__ = [
     # Core optimization
     "SafeContextAnalyzer",
@@ -87,5 +108,24 @@ __all__ = [
     "StrategyRule",
     "StrategyType",
     "OptimizationMode",
-    "StrategyRecommendation"
+    "StrategyRecommendation",
+    
+    # PR19: Interactive workflows
+    "InteractiveWorkflowManager",
+    "InteractiveSession",
+    "WorkflowStep",
+    "WorkflowResult",
+    "UserAction",
+    "start_interactive_optimization",
+    "quick_optimization_preview",
+    
+    # PR19: Change approval
+    "ChangeApprovalSystem",
+    "ChangeSelection", 
+    "SelectiveApprovalResult",
+    "ApprovalDecision",
+    "ChangeCategory",
+    "create_quick_approval",
+    "approve_all_operations",
+    "approve_safe_operations_only"
 ]

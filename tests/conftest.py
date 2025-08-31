@@ -542,6 +542,71 @@ def integrated_system_components(temp_storage_dir):
     }
 
 
+# PR19 Interactive Workflow Fixtures
+@pytest.fixture
+def mock_context_data():
+    """Mock context data for testing."""
+    return {
+        "current_task": "Testing optimization",
+        "file_1": "Main implementation file", 
+        "file_2": "Test file content",
+        "todo_1": "✅ Completed task",
+        "todo_2": "Pending task", 
+        "notes": "Implementation notes"
+    }
+
+
+@pytest.fixture
+def mock_interactive_session(mock_context_data):
+    """Mock interactive session."""
+    from unittest.mock import Mock
+    from context_cleaner.optimization.interactive_workflow import InteractiveSession
+    from context_cleaner.optimization.personalized_strategies import StrategyType
+    
+    session = Mock(spec=InteractiveSession)
+    session.session_id = "test-session-001"
+    session.context_data = mock_context_data
+    session.selected_strategy = StrategyType.BALANCED
+    return session
+
+
+@pytest.fixture
+def mock_manipulation_plan():
+    """Mock manipulation plan."""
+    from unittest.mock import Mock
+    from context_cleaner.core.manipulation_engine import ManipulationPlan, ManipulationOperation
+    
+    mock_op = Mock(spec=ManipulationOperation)
+    mock_op.operation_id = "op-001"
+    mock_op.operation_type = "remove"
+    mock_op.reasoning = "Remove obsolete content"
+    
+    plan = Mock(spec=ManipulationPlan)
+    plan.plan_id = "test-plan-001"
+    plan.operations = [mock_op]
+    plan.total_operations = 1
+    plan.estimated_total_reduction = 50
+    return plan
+
+
+@pytest.fixture
+def mock_plan_preview():
+    """Mock plan preview."""
+    from unittest.mock import Mock
+    from context_cleaner.core.preview_generator import PlanPreview, OperationPreview
+    
+    mock_op_preview = Mock(spec=OperationPreview)
+    mock_op_preview.operation_id = "op-001"
+    mock_op_preview.estimated_impact = {"token_reduction": 50}
+    mock_op_preview.preview_text = "Remove obsolete content: 'old data'"
+    
+    preview = Mock(spec=PlanPreview)
+    preview.operation_previews = [mock_op_preview]
+    preview.total_size_reduction = 50
+    preview.confidence_score = 0.85
+    return preview
+
+
 # Pytest markers and configuration
 pytestmark = pytest.mark.asyncio
 
