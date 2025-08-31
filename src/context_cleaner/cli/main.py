@@ -78,8 +78,10 @@ def start(ctx):
 @click.option("--port", "-p", type=int, help="Dashboard port (overrides config)")
 @click.option("--host", "-h", default=None, help="Dashboard host (overrides config)")
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
+@click.option("--interactive", is_flag=True, help="Enable interactive dashboard mode")
+@click.option("--operations", is_flag=True, help="Show available operations")
 @click.pass_context
-def dashboard(ctx, port, host, no_browser):
+def dashboard(ctx, port, host, no_browser, interactive, operations):
     """Launch the productivity dashboard web interface."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
@@ -96,26 +98,36 @@ def dashboard(ctx, port, host, no_browser):
         )
 
     try:
-        # Create and start dashboard
-        dashboard_server = ProductivityDashboard(config)
+        # Check if enhanced dashboard features are requested
+        if interactive or operations:
+            from .analytics_commands import AnalyticsCommandHandler
+            analytics_handler = AnalyticsCommandHandler(config, verbose)
+            analytics_handler.handle_enhanced_dashboard_command(
+                interactive=interactive,
+                operations=operations,
+                format="text"
+            )
+        else:
+            # Create and start dashboard
+            dashboard_server = ProductivityDashboard(config)
 
-        if not no_browser:
-            import webbrowser
+            if not no_browser:
+                import webbrowser
 
-            try:
-                webbrowser.open(
-                    f"http://{config.dashboard.host}:{config.dashboard.port}"
-                )
-            except Exception:
-                pass  # Browser opening is optional
+                try:
+                    webbrowser.open(
+                        f"http://{config.dashboard.host}:{config.dashboard.port}"
+                    )
+                except Exception:
+                    pass  # Browser opening is optional
 
-        click.echo(
-            f"📊 Dashboard running at: http://{config.dashboard.host}:{config.dashboard.port}"
-        )
-        click.echo("Press Ctrl+C to stop the server")
+            click.echo(
+                f"📊 Dashboard running at: http://{config.dashboard.host}:{config.dashboard.port}"
+            )
+            click.echo("Press Ctrl+C to stop the server")
 
-        # Start server (blocking)
-        dashboard_server.start_server(config.dashboard.host, config.dashboard.port)
+            # Start server (blocking)
+            dashboard_server.start_server(config.dashboard.host, config.dashboard.port)
 
     except KeyboardInterrupt:
         click.echo("\n👋 Dashboard server stopped")
@@ -846,6 +858,89 @@ def _export_all_data(config: ContextCleanerConfig) -> dict:
             "privacy_mode": config.privacy.local_only,
         },
     }
+
+
+# PR20: Enhanced CLI Commands for Analytics Integration
+@main.command("health-check")
+@click.option("--detailed", is_flag=True, help="Show detailed health information")
+@click.option("--fix-issues", is_flag=True, help="Attempt to fix identified issues automatically")
+@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.pass_context
+def health_check(ctx, detailed, fix_issues, format):
+    """Perform comprehensive system health check and validation."""
+    config = ctx.obj["config"]
+    verbose = ctx.obj["verbose"]
+    
+    try:
+        from .analytics_commands import AnalyticsCommandHandler
+        analytics_handler = AnalyticsCommandHandler(config, verbose)
+        analytics_handler.handle_health_check_command(
+            detailed=detailed,
+            fix_issues=fix_issues,
+            format=format
+        )
+    except Exception as e:
+        if verbose:
+            click.echo(f"❌ Health check failed: {e}", err=True)
+        else:
+            click.echo("❌ Health check failed", err=True)
+        sys.exit(1)
+
+
+@main.command("export-analytics")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--days", type=int, default=30, help="Number of days to include in export")
+@click.option("--include-sessions", is_flag=True, default=True, help="Include session details")
+@click.option("--format", type=click.Choice(["json"]), default="json", help="Export format")
+@click.pass_context
+def export_analytics(ctx, output, days, include_sessions, format):
+    """Export comprehensive analytics data for analysis or backup."""
+    config = ctx.obj["config"]
+    verbose = ctx.obj["verbose"]
+    
+    try:
+        from .analytics_commands import AnalyticsCommandHandler
+        analytics_handler = AnalyticsCommandHandler(config, verbose)
+        analytics_handler.handle_export_analytics_command(
+            output_path=output,
+            days=days,
+            include_sessions=include_sessions,
+            format=format
+        )
+    except Exception as e:
+        if verbose:
+            click.echo(f"❌ Analytics export failed: {e}", err=True)
+        else:
+            click.echo("❌ Analytics export failed", err=True)
+        sys.exit(1)
+
+
+@main.command("effectiveness")
+@click.option("--days", type=int, default=30, help="Number of days to analyze")
+@click.option("--strategy", type=str, help="Filter by specific optimization strategy")
+@click.option("--detailed", is_flag=True, help="Show detailed effectiveness breakdown")
+@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.pass_context
+def effectiveness(ctx, days, strategy, detailed, format):
+    """Display optimization effectiveness statistics and user impact metrics."""
+    config = ctx.obj["config"]
+    verbose = ctx.obj["verbose"]
+    
+    try:
+        from .analytics_commands import AnalyticsCommandHandler
+        analytics_handler = AnalyticsCommandHandler(config, verbose)
+        analytics_handler.handle_effectiveness_stats_command(
+            days=days,
+            strategy=strategy,
+            detailed=detailed,
+            format=format
+        )
+    except Exception as e:
+        if verbose:
+            click.echo(f"❌ Effectiveness analysis failed: {e}", err=True)
+        else:
+            click.echo("❌ Effectiveness analysis failed", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
