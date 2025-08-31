@@ -202,25 +202,21 @@ class InteractiveWorkflowManager:
         """
         session = self._get_session(session_id)
 
-        # Use personalization engine to recommend strategy
-        personalized_strategy = (
-            self.personalization_engine.create_personalized_strategy(
-                context_analysis=session.metadata, user_profile=user_preferences or {}
-            )
-        )
-
-        # Map personalized strategy to StrategyType
-        if personalized_strategy.strategy_type == StrategyType.CONSERVATIVE:
-            return StrategyType.CONSERVATIVE
-        elif personalized_strategy.strategy_type == StrategyType.BALANCED:
-            return StrategyType.BALANCED
-        elif personalized_strategy.strategy_type == StrategyType.AGGRESSIVE:
-            return StrategyType.AGGRESSIVE
-        elif personalized_strategy.strategy_type == StrategyType.FOCUS:
-            return StrategyType.FOCUS
-        else:
-            # Default to balanced for workflow-specific or learning-adaptive
-            return StrategyType.BALANCED
+        # Simple strategy recommendation based on user preferences
+        # TODO: Implement async personalized strategy when caller supports it
+        if user_preferences:
+            preferred_strategy = user_preferences.get('strategy', 'balanced').lower()
+            if preferred_strategy == 'conservative':
+                return StrategyType.CONSERVATIVE
+            elif preferred_strategy == 'aggressive':
+                return StrategyType.AGGRESSIVE
+            elif preferred_strategy == 'focus':
+                return StrategyType.FOCUS
+            elif preferred_strategy == 'balanced':
+                return StrategyType.BALANCED
+        
+        # Default to balanced strategy
+        return StrategyType.BALANCED
 
     def generate_optimization_plan(
         self, session_id: str, strategy: Optional[StrategyType] = None

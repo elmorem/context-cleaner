@@ -40,7 +40,7 @@ except ImportError:
 
     np = None
 
-from ..cache import (
+from ..analysis import (
     CorrelationInsights,
     CrossSessionPattern,
     SessionCluster,

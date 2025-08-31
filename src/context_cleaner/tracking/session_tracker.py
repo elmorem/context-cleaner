@@ -110,6 +110,13 @@ class SessionTracker:
                 session = self.storage.load_session(session_id)
             elif self.current_session:
                 session = self.current_session
+            else:
+                # Look for most recent active session in storage
+                recent_sessions = self.storage.get_recent_sessions(limit=10, days=1)
+                for s in recent_sessions:
+                    if s.status == SessionStatus.ACTIVE:
+                        session = s
+                        break
 
             if not session:
                 logger.warning("No session to end")
@@ -253,7 +260,16 @@ class SessionTracker:
 
     def get_current_session(self) -> Optional[SessionModel]:
         """Get the current active session."""
-        return self.current_session
+        if self.current_session:
+            return self.current_session
+            
+        # Look for most recent active session in storage
+        recent_sessions = self.storage.get_recent_sessions(limit=10, days=1)
+        for session in recent_sessions:
+            if session.status == SessionStatus.ACTIVE:
+                return session
+                
+        return None
 
     def load_session(self, session_id: str) -> Optional[SessionModel]:
         """Load a specific session by ID."""

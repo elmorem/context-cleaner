@@ -52,14 +52,19 @@ class CacheDiscoveryService:
     CACHE_LOCATION_PATTERNS = {
         'darwin': [
             '.claude/projects',
+            'Library/Application Support/claude/projects',
+            'Library/Caches/claude/projects',
         ],
         'linux': [
             '.claude/projects',
             '.config/claude/projects',
+            '.cache/claude/projects',
+            '.local/share/claude/projects',
         ],
         'win32': [
             'AppData/Roaming/claude/projects',
             'AppData/Local/claude/projects',
+            'AppData/LocalLow/claude/projects',
         ]
     }
     
@@ -120,26 +125,254 @@ class CacheDiscoveryService:
         if custom_paths:
             search_paths.extend(custom_paths)
         
-        # Add platform-specific default paths
+        # Method 1: Platform-specific default paths (user home directory)
         import sys
         platform_patterns = self.CACHE_LOCATION_PATTERNS.get(sys.platform, [])
         for pattern in platform_patterns:
             platform_path = Path.home() / pattern
             search_paths.append(platform_path)
         
-        # Add current working directory cache (if exists)
-        cwd_cache = Path.cwd() / '.claude' / 'projects'
-        if cwd_cache.exists():
-            search_paths.append(cwd_cache)
+        # Method 2: Environment variables (platform-specific)
+        import os
         
-        # Remove duplicates while preserving order
+        # Platform-specific environment variables
+        if sys.platform == 'win32':
+            # Windows environment variables
+            env_vars = ['CLAUDE_CACHE_DIR', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'TEMP', 'TMP']
+            for env_var in env_vars:
+                env_path = os.environ.get(env_var)
+                if env_path:
+                    if env_var in ['APPDATA', 'LOCALAPPDATA']:
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                    elif env_var == 'USERPROFILE':
+                        search_paths.extend([
+                            Path(env_path) / 'AppData' / 'Roaming' / 'claude' / 'projects',
+                            Path(env_path) / 'AppData' / 'Local' / 'claude' / 'projects',
+                            Path(env_path) / '.claude' / 'projects',
+                        ])
+                    elif env_var in ['TEMP', 'TMP']:
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                    else:  # CLAUDE_CACHE_DIR
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                        
+        elif sys.platform.startswith('linux'):
+            # Ubuntu/Linux environment variables
+            env_vars = ['CLAUDE_CACHE_DIR', 'XDG_CACHE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'HOME']
+            for env_var in env_vars:
+                env_path = os.environ.get(env_var)
+                if env_path:
+                    if env_var == 'XDG_CACHE_HOME':
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                    elif env_var == 'XDG_CONFIG_HOME':
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                    elif env_var == 'XDG_DATA_HOME':
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                    elif env_var == 'HOME':
+                        search_paths.extend([
+                            Path(env_path) / '.claude' / 'projects',
+                            Path(env_path) / '.config' / 'claude' / 'projects',
+                            Path(env_path) / '.cache' / 'claude' / 'projects',
+                            Path(env_path) / '.local' / 'share' / 'claude' / 'projects',
+                        ])
+                    else:  # CLAUDE_CACHE_DIR
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+                        
+        else:  # macOS or other platforms
+            env_vars = ['CLAUDE_CACHE_DIR', 'HOME']
+            for env_var in env_vars:
+                env_path = os.environ.get(env_var)
+                if env_path:
+                    if env_var == 'HOME':
+                        search_paths.extend([
+                            Path(env_path) / '.claude' / 'projects',
+                            Path(env_path) / 'Library' / 'Application Support' / 'claude' / 'projects',
+                            Path(env_path) / 'Library' / 'Caches' / 'claude' / 'projects',
+                        ])
+                    else:  # CLAUDE_CACHE_DIR
+                        search_paths.append(Path(env_path) / 'claude' / 'projects')
+        
+        # Method 3: System-wide cache locations (for system installs)
+        system_cache_locations = []
+        if sys.platform == 'darwin':  # macOS
+            system_cache_locations.extend([
+                Path('/Library/Caches/claude/projects'),
+                Path('/Library/Application Support/claude/projects'),
+                Path('/tmp/claude/projects'),
+                Path('/var/tmp/claude/projects'),
+                Path('/usr/local/share/claude/projects'),
+            ])
+        elif sys.platform.startswith('linux'):  # Ubuntu/Linux
+            system_cache_locations.extend([
+                # Standard Linux locations
+                Path('/var/cache/claude/projects'),
+                Path('/var/lib/claude/projects'),
+                Path('/usr/local/share/claude/projects'),
+                Path('/usr/share/claude/projects'),
+                Path('/opt/claude/projects'),
+                # Temporary locations
+                Path('/tmp/claude/projects'),
+                Path('/var/tmp/claude/projects'),
+                # Snap package locations (Ubuntu)
+                Path('/var/snap/claude/common/projects'),
+                Path('/snap/claude/common/projects'),
+                # Flatpak locations (Ubuntu/Linux)
+                Path('/var/lib/flatpak/app/claude/projects'),
+            ])
+            
+            # Add user-specific snap/flatpak locations if running as user
+            try:
+                if hasattr(os, 'getuid') and os.getuid() != 0:  # Not root
+                    system_cache_locations.extend([
+                        Path.home() / 'snap' / 'claude' / 'common' / 'projects',
+                        Path.home() / '.var' / 'app' / 'claude' / 'projects',
+                    ])
+            except (AttributeError, OSError):
+                pass
+                
+        elif sys.platform == 'win32':  # Windows  
+            system_cache_locations.extend([
+                # Standard Windows system locations
+                Path('C:/ProgramData/claude/projects'),
+                Path('C:/Program Files/claude/projects'),
+                Path('C:/Program Files (x86)/claude/projects'),
+                # Temporary locations
+                Path('C:/Windows/Temp/claude/projects'),
+                Path('C:/Temp/claude/projects'),
+                # Microsoft Store app locations
+                Path('C:/Program Files/WindowsApps/claude/projects'),
+            ])
+            
+            # Add Windows user-specific locations
+            try:
+                username = os.environ.get('USERNAME', 'User')
+                system_cache_locations.extend([
+                    Path(f'C:/Users/{username}/AppData/Roaming/claude/projects'),
+                    Path(f'C:/Users/{username}/AppData/Local/claude/projects'),
+                    Path(f'C:/Users/{username}/AppData/LocalLow/claude/projects'),
+                ])
+            except Exception:
+                pass
+        
+        search_paths.extend(system_cache_locations)
+        
+        # Method 4: Current working directory and parent directories (development/pip installs)
+        cwd = Path.cwd()
+        for i in range(3):  # Check current dir and 2 parent levels
+            cwd_cache = cwd / '.claude' / 'projects'
+            if cwd_cache.exists():
+                search_paths.append(cwd_cache)
+            # Also check without dot prefix (public cache)
+            cwd_cache_public = cwd / 'claude' / 'projects' 
+            if cwd_cache_public.exists():
+                search_paths.append(cwd_cache_public)
+            # Move up one level
+            cwd = cwd.parent
+            if cwd == cwd.parent:  # Reached filesystem root
+                break
+        
+        # Method 5: Package-relative paths (for pip-installed packages)
+        try:
+            import context_cleaner
+            package_path = Path(context_cleaner.__file__).parent
+            
+            # Check relative to package installation
+            package_cache_locations = [
+                package_path.parent / 'cache' / 'claude' / 'projects',  # site-packages level
+                package_path.parent.parent / 'cache' / 'claude' / 'projects',  # lib level  
+                package_path / '..' / '..' / '..' / '.claude' / 'projects',  # user level from pip install
+            ]
+            
+            for cache_path in package_cache_locations:
+                try:
+                    resolved_path = cache_path.resolve()
+                    search_paths.append(resolved_path)
+                except (OSError, RuntimeError):
+                    # Handle cases where path resolution fails
+                    pass
+                    
+        except (ImportError, AttributeError):
+            logger.debug("Could not determine package installation path")
+        
+        # Method 6: User-specific temporary directories (cross-platform)
+        temp_locations = []
+        
+        # Standard temp directory from Python's tempfile module
+        import tempfile
+        system_temp = Path(tempfile.gettempdir())
+        temp_locations.extend([
+            system_temp / 'claude' / 'projects',
+            system_temp / f'claude_user' / 'projects',
+        ])
+        
+        # Platform-specific temp locations
+        if sys.platform == 'win32':
+            # Windows temp directories
+            temp_locations.extend([
+                Path.home() / 'AppData' / 'Local' / 'Temp' / 'claude' / 'projects',
+                Path('C:/Windows/Temp/claude/projects'),
+                Path('C:/Temp/claude/projects'),
+            ])
+        elif sys.platform.startswith('linux'):
+            # Ubuntu/Linux temp directories  
+            temp_locations.extend([
+                Path.home() / 'tmp' / 'claude' / 'projects',
+                Path('/tmp') / 'claude' / 'projects',
+                Path('/var/tmp') / 'claude' / 'projects',
+            ])
+            
+            # User-specific temp with UID if available
+            try:
+                if hasattr(os, 'getuid'):
+                    uid = os.getuid()
+                    temp_locations.extend([
+                        Path('/tmp') / f'claude_{uid}' / 'projects',
+                        Path('/var/tmp') / f'claude_{uid}' / 'projects',
+                    ])
+            except (AttributeError, OSError):
+                pass
+        else:
+            # macOS and other platforms
+            temp_locations.extend([
+                Path.home() / 'tmp' / 'claude' / 'projects',
+                Path('/tmp') / 'claude' / 'projects',
+                Path('/var/tmp') / 'claude' / 'projects',
+            ])
+            
+        search_paths.extend(temp_locations)
+        
+        # Remove duplicates while preserving order and add safety checks
         unique_paths = []
-        for path in search_paths:
-            if path not in unique_paths:
-                unique_paths.append(path)
+        accessible_paths = []
         
+        for path in search_paths:
+            try:
+                # Resolve to handle symlinks and relative paths
+                resolved_path = path.resolve()
+                if resolved_path not in unique_paths:
+                    unique_paths.append(resolved_path)
+                    
+                    # Check if path is potentially accessible (exists or parent exists)
+                    if resolved_path.exists():
+                        accessible_paths.append(resolved_path)
+                    elif resolved_path.parent.exists():
+                        # Parent exists, so path could be created
+                        accessible_paths.append(resolved_path)
+                        
+            except (OSError, RuntimeError, PermissionError):
+                # If path resolution fails, try the original path
+                if path not in unique_paths:
+                    unique_paths.append(path)
+                    # For unresolved paths, add them but don't mark as accessible
+        
+        # Log discovery stats
         logger.debug(f"Searching {len(unique_paths)} potential cache locations")
-        return unique_paths
+        logger.debug(f"Found {len(accessible_paths)} potentially accessible paths")
+        logger.debug(f"Sample cache search paths: {[str(p) for p in unique_paths[:3]]}{'...' if len(unique_paths) > 3 else ''}")
+        
+        # Prioritize existing/accessible paths first
+        prioritized_paths = accessible_paths + [p for p in unique_paths if p not in accessible_paths]
+        
+        return prioritized_paths
     
     def _scan_cache_directory(self, base_path: Path) -> List[CacheLocation]:
         """

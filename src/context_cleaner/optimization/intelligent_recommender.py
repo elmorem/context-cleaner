@@ -14,7 +14,7 @@ from enum import Enum
 import json
 import math
 
-from ..cache import (
+from ..analysis import (
     UsagePatternSummary,
     TokenAnalysisSummary,
     TemporalInsights,

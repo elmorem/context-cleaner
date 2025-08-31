@@ -18,22 +18,78 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import logging
 
-from ..optimization.cache_dashboard import (
-    CacheEnhancedDashboard,
-    UsageBasedHealthMetrics,
-    HealthLevel,
-    CacheEnhancedDashboardData,
-)
+# Optional cache dashboard imports
+try:
+    from ..optimization.cache_dashboard import (
+        CacheEnhancedDashboard,
+        UsageBasedHealthMetrics,
+        HealthLevel,
+        CacheEnhancedDashboardData,
+    )
+    CACHE_DASHBOARD_AVAILABLE = True
+except ImportError:
+    CACHE_DASHBOARD_AVAILABLE = False
+    
+    # Create stub classes when cache dashboard is not available
+    class CacheEnhancedDashboardData:
+        def __init__(self, **kwargs):
+            pass
+    
+    class UsageBasedHealthMetrics:
+        def __init__(self, **kwargs):
+            pass
+    
+    class HealthLevel:
+        EXCELLENT = "excellent"
+        GOOD = "good"
+        FAIR = "fair"
+        POOR = "poor"
+    
+    class CacheEnhancedDashboard:
+        def __init__(self, **kwargs):
+            pass
+
 from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
 from ..analytics.advanced_patterns import AdvancedPatternRecognizer
-from ..cache import (
-    CacheDiscoveryService,
-    SessionCacheParser,
-    UsagePatternAnalyzer,
-    TokenEfficiencyAnalyzer,
-    TemporalContextAnalyzer,
-    EnhancedContextAnalyzer,
-)
+
+# Optional cache module imports  
+try:
+    from ..analysis import (
+        CacheDiscoveryService,
+        SessionCacheParser,
+        UsagePatternAnalyzer,
+        TokenEfficiencyAnalyzer,
+        TemporalContextAnalyzer,
+        EnhancedContextAnalyzer,
+    )
+    CACHE_MODULE_AVAILABLE = True
+except ImportError:
+    CACHE_MODULE_AVAILABLE = False
+    
+    # Create stub classes when cache module is not available
+    class CacheDiscoveryService:
+        def __init__(self, **kwargs):
+            pass
+            
+    class SessionCacheParser:
+        def __init__(self, **kwargs):
+            pass
+            
+    class UsagePatternAnalyzer:
+        def __init__(self, **kwargs):
+            pass
+            
+    class TokenEfficiencyAnalyzer:
+        def __init__(self, **kwargs):
+            pass
+            
+    class TemporalContextAnalyzer:
+        def __init__(self, **kwargs):
+            pass
+            
+    class EnhancedContextAnalyzer:
+        def __init__(self, **kwargs):
+            pass
 
 logger = logging.getLogger(__name__)
 

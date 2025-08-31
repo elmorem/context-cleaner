@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "context-cleaner"
-version = "0.2.0"
+version = "0.2.2"
 description = "Advanced productivity tracking and context optimization for AI-assisted development"
 readme = "README.md"
 authors = [{name = "Context Cleaner Team", email = "team@context-cleaner.dev"}]
@@ -66,6 +66,15 @@ path = "src/context_cleaner/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/context_cleaner"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/context_cleaner/**/*.py",
+    "README.md",
+    "LICENSE", 
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
 
 [tool.black]
 target-version = ["py39"]

@@ -45,23 +45,42 @@ class ProductivityDashboard:
         async def get_productivity_summary(days: int = 7):
             """Get productivity summary for specified number of days."""
             try:
-                # This would typically load real data
+                # Use the real-time analysis function we just fixed
+                from ..cli.main import _run_productivity_analysis
+                
+                analysis_data = await _run_productivity_analysis(self.config, days)
+                
+                # Convert CLI format to web dashboard format
                 summary = {
-                    "period_days": days,
-                    "avg_productivity_score": 85.3,
-                    "total_sessions": 23,
-                    "optimization_events": 12,
-                    "health_trend": "improving",
-                    "recommendations": [
-                        "Context health is excellent - keep up the good work!",
-                        "Consider periodic cleanup to maintain performance",
-                        "Your afternoon sessions show highest productivity",
-                    ],
+                    "period_days": analysis_data.get("period_days", days),
+                    "avg_productivity_score": analysis_data.get("avg_productivity_score", 50.0),
+                    "total_sessions": analysis_data.get("total_sessions", 0),
+                    "optimization_events": analysis_data.get("optimization_events", 0),
+                    "health_trend": "improving" if analysis_data.get("avg_productivity_score", 50) > 60 else "stable",
+                    "cache_locations_found": analysis_data.get("cache_locations_found", 0),
+                    "total_cache_size_mb": analysis_data.get("total_cache_size_mb", 0),
+                    "current_project": analysis_data.get("current_project"),
+                    "recommendations": analysis_data.get("recommendations", [
+                        "No cache data found",
+                        "Run from a directory with Claude Code activity",
+                        "Check cache accessibility"
+                    ]),
                     "last_updated": datetime.now().isoformat(),
                 }
                 return JSONResponse(content=summary)
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+                # Fallback to basic data if analysis fails
+                fallback_summary = {
+                    "period_days": days,
+                    "avg_productivity_score": 0.0,
+                    "total_sessions": 0,
+                    "optimization_events": 0,
+                    "health_trend": "unknown",
+                    "error": str(e),
+                    "recommendations": ["Real-time analysis failed", "Using fallback mode"],
+                    "last_updated": datetime.now().isoformat(),
+                }
+                return JSONResponse(content=fallback_summary)
 
         @self.app.get("/api/session-analytics")
         async def get_session_analytics():

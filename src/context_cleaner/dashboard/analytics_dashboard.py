@@ -606,19 +606,95 @@ class AnalyticsDashboard:
             return []
 
     def _get_recent_sessions(self, days: int) -> List[Dict[str, Any]]:
-        """Get recent session data."""
+        """Get recent session data using real-time cache discovery and JSONL parsing."""
         try:
-            # Get sessions from session tracker
-            sessions = self.session_tracker.get_recent_sessions(days)
-
-            # Convert to dictionaries
-            session_dicts = [self._session_to_dict(session) for session in sessions]
-
-            return session_dicts
+            # Use real-time cache discovery system to find JSONL session files
+            from ..analysis.discovery import CacheDiscoveryService
+            from ..analysis.session_parser import SessionCacheParser
+            import json
+            
+            discovery_service = CacheDiscoveryService()
+            
+            # Get current project cache location
+            current_project = discovery_service.get_current_project_cache()
+            if not current_project or not current_project.is_accessible:
+                logger.warning("No accessible current project cache found")
+                return []
+                
+            logger.info(f"Loading sessions from: {current_project.path}")
+            logger.info(f"Found {current_project.session_count} sessions ({current_project.size_mb:.1f}MB)")
+            
+            # Parse JSONL session files directly
+            session_parser = SessionCacheParser()
+            dashboard_sessions = []
+            
+            # Get all JSONL files from the current project
+            from pathlib import Path
+            project_path = Path(current_project.path)
+            jsonl_files = list(project_path.glob("*.jsonl"))
+            
+            # Get cutoff date for filtering recent sessions
+            cutoff_date = datetime.now() - timedelta(days=days)
+            
+            for jsonl_file in jsonl_files:
+                try:
+                    file_modified = datetime.fromtimestamp(jsonl_file.stat().st_mtime)
+                    if file_modified < cutoff_date:
+                        continue  # Skip old files
+                        
+                    with open(jsonl_file, 'r', encoding='utf-8') as f:
+                        session_data = []
+                        for line_num, line in enumerate(f):
+                            line = line.strip()
+                            if line:
+                                try:
+                                    entry = json.loads(line)
+                                    session_data.append(entry)
+                                except json.JSONDecodeError as e:
+                                    logger.debug(f"Skipping invalid JSON line {line_num} in {jsonl_file.name}: {e}")
+                                    continue
+                        
+                        if session_data:
+                            # Create dashboard session from JSONL data
+                            dashboard_session = {
+                                "session_id": jsonl_file.stem,
+                                "start_time": file_modified.isoformat(),
+                                "end_time": file_modified.isoformat(), 
+                                "duration_minutes": len(session_data) * 2,  # Estimate based on entries
+                                "productivity_score": min(100.0, 50.0 + (len(session_data) * 0.5)),  # Score based on activity
+                                "health_score": min(100.0, 60.0 + (len(session_data) * 0.3)),
+                                "context_size": sum(len(str(entry)) for entry in session_data),
+                                "optimization_applied": any('tool_result' in str(entry) for entry in session_data),
+                                "context_type": "development",
+                                "strategy_type": "INTERACTIVE", 
+                                "operations_approved": sum(1 for entry in session_data if 'tool_result' in str(entry)),
+                                "operations_rejected": 0,
+                                "size_reduction_percentage": min(50.0, len(session_data) * 0.1),
+                                "entry_count": len(session_data),
+                                "file_size_mb": jsonl_file.stat().st_size / (1024 * 1024),
+                            }
+                            dashboard_sessions.append(dashboard_session)
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to parse {jsonl_file.name}: {e}")
+                    continue
+                    
+            # Sort by start time (most recent first)
+            dashboard_sessions.sort(key=lambda x: x["start_time"], reverse=True)
+            
+            logger.info(f"Retrieved {len(dashboard_sessions)} sessions from JSONL files for dashboard")
+            return dashboard_sessions[:100]  # Limit to 100 most recent sessions
 
         except Exception as e:
-            logger.error(f"Recent sessions retrieval failed: {e}")
-            return []
+            logger.error(f"JSONL session retrieval failed: {e}")
+            # Fallback to session tracker
+            try:
+                sessions = self.session_tracker.get_recent_sessions(days)
+                session_dicts = [self._session_to_dict(session) for session in sessions]
+                return session_dicts
+            except Exception as fallback_e:
+                logger.error(f"Fallback session retrieval also failed: {fallback_e}")
+                return []
 
     def _session_to_dict(self, session) -> Dict[str, Any]:
         """Convert session object to dictionary."""

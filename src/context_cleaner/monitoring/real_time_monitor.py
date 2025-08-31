@@ -9,6 +9,7 @@ import asyncio
 import time
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Callable
+from pathlib import Path
 import logging
 
 from ..config.settings import ContextCleanerConfig
@@ -39,9 +40,13 @@ class RealTimeMonitor:
         """
         self.config = config or ContextCleanerConfig.from_env()
         self.session_tracker = SessionTracker(config)
+        
+        # Persistent monitoring state file
+        self.monitor_state_file = Path(self.config.data_directory) / ".monitor_state"
+        self.monitor_state_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Monitoring state
-        self.is_monitoring = False
+        self.is_monitoring = self._load_monitoring_state()
         self.monitor_task: Optional[asyncio.Task] = None
 
         # Update intervals (in seconds)
@@ -81,6 +86,27 @@ class RealTimeMonitor:
             except Exception as e:
                 logger.warning(f"Event callback failed: {e}")
 
+    def _load_monitoring_state(self) -> bool:
+        """Load persistent monitoring state from file."""
+        try:
+            if self.monitor_state_file.exists():
+                return self.monitor_state_file.read_text().strip() == "running"
+            return False
+        except Exception as e:
+            logger.warning(f"Failed to load monitoring state: {e}")
+            return False
+    
+    def _save_monitoring_state(self, is_running: bool):
+        """Save persistent monitoring state to file."""
+        try:
+            if is_running:
+                self.monitor_state_file.write_text("running")
+            else:
+                if self.monitor_state_file.exists():
+                    self.monitor_state_file.unlink()
+        except Exception as e:
+            logger.warning(f"Failed to save monitoring state: {e}")
+
     async def start_monitoring(self):
         """Start real-time monitoring."""
         if self.is_monitoring:
@@ -88,6 +114,7 @@ class RealTimeMonitor:
             return
 
         self.is_monitoring = True
+        self._save_monitoring_state(True)
         self.monitor_task = asyncio.create_task(self._monitoring_loop())
 
         logger.info("Started real-time session monitoring")
@@ -111,6 +138,7 @@ class RealTimeMonitor:
             return
 
         self.is_monitoring = False
+        self._save_monitoring_state(False)
 
         if self.monitor_task:
             self.monitor_task.cancel()

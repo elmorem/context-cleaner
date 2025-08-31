@@ -10,13 +10,20 @@ This module provides comprehensive context optimization capabilities including:
 """
 
 from .basic_analyzer import SafeContextAnalyzer
-from .cache_dashboard import (
-    CacheEnhancedDashboard,
-    CacheEnhancedDashboardData,
-    UsageBasedHealthMetrics,
-    HealthLevel,
-    UsageInsight,
-)
+
+# Optional cache dashboard import
+try:
+    from .cache_dashboard import (
+        CacheEnhancedDashboard,
+        CacheEnhancedDashboardData,
+        UsageBasedHealthMetrics,
+        HealthLevel,
+        UsageInsight,
+    )
+    CACHE_DASHBOARD_AVAILABLE = True
+except ImportError:
+    # Graceful fallback when cache module is not available
+    CACHE_DASHBOARD_AVAILABLE = False
 from .intelligent_recommender import (
     IntelligentRecommendationEngine,
     IntelligentRecommendation,
@@ -72,12 +79,6 @@ from .change_approval import (
 __all__ = [
     # Core optimization
     "SafeContextAnalyzer",
-    # Cache-enhanced dashboard
-    "CacheEnhancedDashboard",
-    "CacheEnhancedDashboardData",
-    "UsageBasedHealthMetrics",
-    "HealthLevel",
-    "UsageInsight",
     # Intelligent recommendations
     "IntelligentRecommendationEngine",
     "IntelligentRecommendation",

@@ -189,7 +189,7 @@ def mock_optimization_session_data():
 @pytest.fixture
 def mock_usage_pattern_summary():
     """Create mock usage pattern summary."""
-    from context_cleaner.cache import UsagePatternSummary, FileAccessPattern
+    from context_cleaner.analysis import UsagePatternSummary, FileAccessPattern
     
     file_patterns = []
     for i in range(10):
@@ -212,7 +212,7 @@ def mock_usage_pattern_summary():
 @pytest.fixture
 def mock_token_analysis_summary():
     """Create mock token analysis summary."""
-    from context_cleaner.cache import TokenAnalysisSummary, TokenWastePattern
+    from context_cleaner.analysis import TokenAnalysisSummary, TokenWastePattern
     
     waste_patterns = []
     for i in range(5):
@@ -236,7 +236,7 @@ def mock_token_analysis_summary():
 @pytest.fixture
 def mock_temporal_insights():
     """Create mock temporal insights."""
-    from context_cleaner.cache import TemporalInsights
+    from context_cleaner.analysis import TemporalInsights
     
     insights = Mock(spec=TemporalInsights)
     insights.coherence_score = 0.6
@@ -250,7 +250,7 @@ def mock_temporal_insights():
 @pytest.fixture
 def mock_enhanced_analysis():
     """Create mock enhanced analysis."""
-    from context_cleaner.cache import CacheEnhancedAnalysis
+    from context_cleaner.analysis import CacheEnhancedAnalysis
     
     analysis = Mock(spec=CacheEnhancedAnalysis)
     analysis.usage_weighted_focus_score = 0.72
@@ -265,7 +265,7 @@ def mock_enhanced_analysis():
 @pytest.fixture
 def mock_correlation_insights():
     """Create mock correlation insights."""
-    from context_cleaner.cache import CorrelationInsights, CrossSessionPattern
+    from context_cleaner.analysis import CorrelationInsights, CrossSessionPattern
     
     patterns = []
     for i in range(3):
