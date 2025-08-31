@@ -10,35 +10,40 @@ Context Cleaner is a comprehensive productivity tracking tool designed specifica
 
 ## 🎯 **Key Features**
 
-### **📊 Productivity Tracking**
-- **Development session monitoring** with automatic boundary detection
-- **Context health scoring** (0-100 scale) based on size, structure, and complexity
-- **Performance correlation analysis** between context optimization and productivity
-- **Git integration** for commit pattern analysis and productivity metrics
+### **📊 Effectiveness Tracking & Analytics** ⭐ NEW in v0.2.0
+- **Before/after metrics** with quantifiable productivity improvements
+- **User satisfaction tracking** with 1-5 rating system and feedback collection
+- **Strategy effectiveness analysis** across Conservative/Balanced/Aggressive/Focus modes
+- **ROI demonstration** with time-saved calculations and optimization impact
+- **Export capabilities** for comprehensive analytics data backup and analysis
 
-### **🔍 Advanced Analytics**
-- **Trend analysis** across days, weeks, and months
-- **Pattern recognition** for optimal work schedules and session lengths
-- **A/B testing framework** for different context optimization strategies
-- **Productivity forecasting** based on historical data and patterns
+### **🔍 Advanced Context Optimization**
+- **Multi-strategy optimization** with Conservative, Balanced, Aggressive, and Focus modes
+- **Context health scoring** (0-100 scale) based on size, structure, and complexity
+- **Interactive optimization** with operation approval/rejection workflow
+- **Performance correlation analysis** between context optimization and productivity
+- **Real-time context monitoring** with automatic boundary detection
 
 ### **📈 Interactive Dashboard**
 - **Web-based visualization** of productivity trends and session analytics
 - **Real-time metrics** with automatic refresh and live updates
-- **Actionable insights** with specific optimization recommendations
+- **Effectiveness insights** with specific optimization recommendations
 - **Mobile-responsive design** for monitoring on any device
+- **Enhanced controls** for manipulation operations and analytics review
 
 ### **🛡️ Privacy-First Architecture**
 - **Local-only processing** - all data stays on your machine
-- **No external requests** - zero network dependencies
+- **PII sanitization** - automatic removal of emails, SSNs, credentials, and sensitive data
+- **Secure file storage** with atomic operations and file locking
 - **Complete data ownership** with easy export and deletion
 - **Transparent operation** with open-source codebase
 
 ### **🔧 Developer-Friendly CLI**
-- **Simple installation** via pip with zero configuration required
-- **Flexible commands** for all productivity tracking and analysis needs
-- **Multiple output formats** (JSON, YAML, text) for integration
-- **Comprehensive help** and troubleshooting built-in
+- **Comprehensive command set** with 15+ commands for all productivity needs
+- **Multiple output formats** (JSON, text) for integration and automation
+- **Session management** with start/end tracking and detailed analytics
+- **System health monitoring** with diagnostics and issue resolution
+- **Flexible configuration** via files, environment variables, or CLI flags
 
 ## 🚀 **Quick Start**
 
@@ -61,240 +66,253 @@ context-cleaner start
 # Launch interactive dashboard
 context-cleaner dashboard
 
-# Analyze recent productivity
-context-cleaner analyze --days 7
+# Run system health check
+context-cleaner health-check
 
-# Export your data
-context-cleaner export --output my-data.json
+# View effectiveness statistics
+context-cleaner effectiveness --days 7
+
+# Export analytics data
+context-cleaner export-analytics --output my-analytics.json
 ```
 
 ### **Dashboard Access**
-After running `context-cleaner dashboard`, visit `http://localhost:8548` to access your productivity insights through an intuitive web interface.
+After running `context-cleaner dashboard`, visit `http://localhost:8548` to access your productivity insights through an intuitive web interface with enhanced analytics and effectiveness tracking.
 
-## 📊 **Usage Examples**
+## 📊 **New Analytics Features** ⭐
 
-### **Development Workflow Integration**
+### **Effectiveness Tracking**
 ```bash
-# Start tracking at beginning of work session
-context-cleaner start
-
-# View real-time productivity dashboard
-context-cleaner dashboard --port 8080
-
-# Get daily productivity summary
-context-cleaner analyze --days 1 --format text
-
-# Weekly productivity report in JSON
-context-cleaner analyze --days 7 --format json --output weekly-report.json
-```
-
-### **Productivity Analysis**
-```bash
-# Comprehensive 30-day analysis
-context-cleaner analyze --days 30
+# View optimization effectiveness stats
+context-cleaner effectiveness --days 30
 
 # Example output:
-# 📊 PRODUCTIVITY ANALYSIS REPORT
-# ================================
+# 📈 OPTIMIZATION EFFECTIVENESS REPORT
+# ====================================
 # 📅 Analysis Period: Last 30 days
-# 🎯 Average Productivity Score: 87.3/100
-# 📈 Total Sessions: 156
-# ⚡ Optimization Events: 45
-# 🌟 Most Productive Day: Tuesday
+# 🎯 Total Optimization Sessions: 45
+# ⚡ Success Rate: 89.3%
+# 💰 Estimated Time Saved: 12.5 hours
+# 📊 Average Productivity Improvement: +23.4%
+# 🌟 User Satisfaction: 4.2/5.0
 # 
-# 💡 RECOMMENDATIONS:
-#    1. Your productivity peaks at 3-4 PM - schedule complex tasks then
-#    2. Context optimization events correlate with 18% productivity increase
-#    3. Consider shorter sessions (< 90 minutes) for sustained performance
+# 💡 TOP STRATEGIES:
+#    1. Balanced Mode: 67% of sessions, 4.3/5 satisfaction
+#    2. Focus Mode: 22% of sessions, 4.5/5 satisfaction  
+#    3. Aggressive Mode: 11% of sessions, 3.8/5 satisfaction
 ```
 
-### **Data Management**
+### **Comprehensive Analytics Export**
 ```bash
-# Export all data for backup
-context-cleaner export --format json --output backup-$(date +%Y%m%d).json
+# Export all analytics data
+context-cleaner export-analytics --days 90 --output analytics-backup.json
 
-# Show privacy information
-context-cleaner privacy show-info
+# Export with session details
+context-cleaner export-analytics --include-sessions --output detailed-report.json
+```
 
-# Delete all collected data
-context-cleaner privacy delete-all
+### **System Health Monitoring**
+```bash
+# Basic health check
+context-cleaner health-check
+
+# Detailed diagnostics
+context-cleaner health-check --detailed
+
+# Auto-fix common issues
+context-cleaner health-check --fix-issues
+
+# JSON output for automation
+context-cleaner health-check --format json
+```
+
+## 📚 **Complete CLI Reference**
+
+### **Core Commands**
+```bash
+context-cleaner [OPTIONS] COMMAND [ARGS]...
+
+# Primary Commands:
+  start              Start productivity tracking
+  dashboard          Launch web dashboard  
+  optimize           Context optimization and health analysis
+  
+# New Analytics Commands (v0.2.0):
+  health-check       Perform system health check and validation
+  export-analytics   Export comprehensive analytics data  
+  effectiveness      Display optimization effectiveness statistics
+  
+# Session Management:
+  session-start      Start new tracking session
+  session-end        End current tracking session
+  session-stats      Show session statistics
+  session-list       List recent sessions
+  
+# Monitoring:  
+  monitor            Start real-time monitoring
+  monitor-status     Show monitoring status
+  live-dashboard     Live dashboard with real-time updates
+  
+# Data Management:
+  analyze            Analyze productivity trends
+  export             Export all data
+  privacy            Privacy and data management
+  config-show        Show current configuration
+```
+
+### **Session Management Examples**
+```bash
+# Start named session for specific project
+context-cleaner session-start --session-id "api-refactor" --project-path ./my-project
+
+# View session statistics
+context-cleaner session-stats --days 7
+
+# List recent sessions
+context-cleaner session-list --limit 10
+
+# End current session
+context-cleaner session-end
+```
+
+### **Advanced Monitoring**
+```bash
+# Start real-time monitoring
+context-cleaner monitor --watch-dirs ./src ./tests
+
+# Check monitoring status
+context-cleaner monitor-status
+
+# Launch live dashboard with 10-second refresh
+context-cleaner live-dashboard --refresh 10
 ```
 
 ## 📈 **Dashboard Features**
 
-### **Productivity Metrics Overview**
-- **Current productivity score** with 7-day trend
-- **Session statistics** including count, duration, and quality
-- **Optimization events** tracking context improvements
-- **Health trend indicators** showing improvement/decline patterns
+### **Enhanced Analytics Dashboard**
+- **Effectiveness Overview** - Success rates, time saved, and ROI metrics
+- **Strategy Performance** - Comparative analysis of optimization approaches
+- **User Satisfaction Trends** - Rating patterns and feedback analysis
+- **Before/After Comparisons** - Quantifiable productivity improvements
+- **Interactive Controls** - Operation triggers and real-time adjustments
 
-### **Advanced Visualizations**
-- **Time-series charts** showing productivity trends over time
-- **Heatmaps** indicating peak performance hours and days
-- **Session type analysis** (debugging, coding, exploration, optimization)
-- **Correlation charts** between context health and productivity
+### **Productivity Metrics**
+- **Current productivity score** with 7-day trend analysis
+- **Session statistics** including count, duration, and effectiveness
+- **Optimization events** with detailed success/failure tracking
+- **Health trend indicators** showing improvement/decline patterns
+- **Time-series charts** with productivity correlation analysis
 
 ### **Actionable Insights**
-- **Personalized recommendations** based on individual productivity patterns
-- **Optimal scheduling suggestions** for different types of development tasks
-- **Context optimization timing** recommendations for maximum impact
-- **Performance alerts** when productivity patterns change significantly
+- **Personalized recommendations** based on effectiveness data
+- **Optimal strategy suggestions** for different context types
+- **Performance alerts** when productivity patterns change
+- **ROI calculations** demonstrating Context Cleaner's value
 
 ## 🔧 **Configuration**
 
-### **Default Configuration**
-Context Cleaner works out-of-the-box with sensible defaults, but can be customized via configuration files.
-
-### **Configuration File** (Optional)
-Create `~/.context_cleaner/config.yaml`:
+### **Configuration File** (~/.context_cleaner/config.yaml)
 ```yaml
-dashboard:
-  port: 8548
-  host: localhost
-  auto_refresh: true
-  cache_duration: 300
-
-tracking:
-  enabled: true
-  sampling_rate: 1.0
-  session_timeout_minutes: 30
-  data_retention_days: 90
-
-privacy:
-  local_only: true
-  encrypt_storage: true
-  require_consent: true
-
+# Analysis Configuration
 analysis:
   health_thresholds:
     excellent: 90
     good: 70
     fair: 50
   max_context_size: 100000
+  token_estimation_factor: 0.25
+  circuit_breaker_threshold: 5
+
+# Dashboard Configuration  
+dashboard:
+  port: 8548
+  host: localhost
+  auto_refresh: true
+  cache_duration: 300
+  max_concurrent_users: 10
+
+# Effectiveness Tracking (NEW)
+tracking:
+  enabled: true
+  sampling_rate: 1.0
+  session_timeout_minutes: 30
+  data_retention_days: 90
+  anonymize_data: true
+
+# Privacy & Security (ENHANCED)
+privacy:
+  local_only: true
+  encrypt_storage: true
+  auto_cleanup_days: 90
+  require_consent: true
+
+# Data Directory
+data_directory: "~/.context_cleaner/data"
+log_level: "INFO"
 ```
 
 ### **Environment Variables**
 ```bash
 export CONTEXT_CLEANER_PORT=8080
-export CONTEXT_CLEANER_DATA_DIR=~/my-productivity-data
+export CONTEXT_CLEANER_HOST=localhost
+export CONTEXT_CLEANER_DATA_DIR=~/my-context-data
 export CONTEXT_CLEANER_LOG_LEVEL=DEBUG
+export CONTEXT_CLEANER_LOCAL_ONLY=true
 ```
-
-## 🧪 **Advanced Features**
-
-### **Custom Analytics**
-```python
-from context_cleaner import ProductivityAnalyzer, ContextCleanerConfig
-
-# Initialize with custom configuration
-config = ContextCleanerConfig.default()
-analyzer = ProductivityAnalyzer(config)
-
-# Analyze context health
-result = await analyzer.analyze_context_health(context_data)
-print(f"Health Score: {result.health_score}/100")
-
-# Analyze productivity session
-metrics = analyzer.analyze_productivity_session(session_data)
-print(f"Productivity Score: {metrics.productivity_score}/100")
-```
-
-### **Integration with Development Tools**
-```bash
-# Git hook integration (post-commit)
-#!/bin/bash
-context-cleaner analyze --days 1 --format json | jq '.avg_productivity_score'
-
-# CI/CD integration
-context-cleaner analyze --days 7 --format json > productivity-report.json
-```
-
-### **Custom Dashboard Themes**
-The dashboard supports custom CSS themes and can be extended with additional charts and metrics.
 
 ## 🔒 **Privacy & Security**
 
+### **Enhanced Security Features** ⭐ NEW
+- **PII Sanitization**: Automatic removal of emails, SSNs, credit cards, and credentials
+- **Content Hashing**: Secure data integrity without storing raw content
+- **Atomic File Operations**: Race-condition protection with file locking
+- **Secure Permissions**: All data files use 0o600 permissions (owner-only access)
+- **Input Validation**: Comprehensive sanitization and size limits
+
 ### **Data Protection**
-- **Local Storage**: All data is stored locally in `~/.context_cleaner/data/`
+- **Local Storage**: All data in `~/.context_cleaner/data/` with secure permissions
 - **No Telemetry**: Zero external network requests or data transmission
-- **Encryption**: Optional at-rest encryption for sensitive productivity data
+- **At-Rest Encryption**: Optional AES-256 encryption for sensitive data
 - **Data Retention**: Configurable automatic cleanup after specified period
+- **Resource Limits**: Built-in protection against resource exhaustion
 
 ### **Privacy Controls**
-- **Granular Tracking**: Choose exactly what metrics to collect
-- **Easy Deletion**: One-command complete data removal
-- **Data Export**: Full data portability in standard formats
-- **Transparent Operation**: Open-source code for complete auditability
+```bash
+# View privacy information
+context-cleaner privacy show-info
 
-### **Security Features**
-- **Input Validation**: Comprehensive sanitization of all data
-- **Resource Limits**: Built-in protection against resource exhaustion  
-- **Safe Defaults**: Conservative configuration prioritizing privacy
-- **Error Isolation**: System continues working even with component failures
+# Export all your data
+context-cleaner export --format json --output my-data.json
+
+# Permanently delete all data
+context-cleaner privacy delete-all
+```
 
 ## 🏗️ **Architecture**
 
 ### **Core Components**
 ```
-Context Cleaner Architecture
-├── 📊 Analytics Engine
-│   ├── ProductivityAnalyzer - Core analysis algorithms
-│   ├── TrendCalculator - Time-series analysis  
-│   └── ImpactEvaluator - Optimization effectiveness
-├── 📈 Dashboard System
+Context Cleaner v0.2.0 Architecture
+├── 📊 Analytics Engine (ENHANCED)
+│   ├── ProductivityAnalyzer - Core analysis algorithms  
+│   ├── EffectivenessTracker - Before/after metrics & ROI
+│   ├── TrendCalculator - Time-series analysis
+│   └── CrossSessionAnalytics - Multi-session insights
+├── 📈 Dashboard System (ENHANCED)
 │   ├── Web Server - FastAPI-based interface
-│   ├── Data Visualization - Interactive charts
-│   └── Real-time Updates - Live metric streaming
-├── 🗃️ Data Management
+│   ├── Data Visualization - Interactive charts & effectiveness
+│   ├── Real-time Updates - Live metric streaming
+│   └── Enhanced Controls - Operation triggers & analytics
+├── 🗃️ Data Management (SECURED)
 │   ├── Session Tracking - Development session boundaries
-│   ├── Storage System - Local SQLite database
-│   └── Privacy Controls - Data export/deletion
-└── 🔧 CLI Interface
-    ├── Command Processing - Argument parsing and validation
-    ├── Output Formatting - Text/JSON/YAML formats
-    └── Configuration - Settings and preferences
-```
-
-### **Data Flow**
-1. **Data Collection** - Monitor development sessions and context changes
-2. **Analysis Processing** - Calculate health scores and productivity metrics  
-3. **Pattern Recognition** - Identify trends and optimization opportunities
-4. **Insight Generation** - Create actionable recommendations
-5. **Visualization** - Present insights through dashboard or CLI
-
-## 📚 **API Reference**
-
-### **Command Line Interface**
-```bash
-context-cleaner [OPTIONS] COMMAND [ARGS]...
-
-Commands:
-  start              Start productivity tracking
-  dashboard          Launch web dashboard
-  analyze            Analyze productivity trends  
-  export             Export all data
-  privacy            Privacy and data management
-  config-show        Show current configuration
-```
-
-### **Python API**
-```python
-from context_cleaner import ContextCleanerConfig, ProductivityAnalyzer
-
-# Configuration
-config = ContextCleanerConfig.from_file('config.yaml')
-config = ContextCleanerConfig.from_env()  # Environment variables
-config = ContextCleanerConfig.default()   # Sensible defaults
-
-# Analytics
-analyzer = ProductivityAnalyzer(config)
-result = await analyzer.analyze_context_health(data)
-metrics = analyzer.analyze_productivity_session(session_data)
-
-# Dashboard
-from context_cleaner import ProductivityDashboard
-dashboard = ProductivityDashboard(config)
-dashboard.start_server(host="localhost", port=8548)
+│   ├── Secure Storage - Atomic operations & file locking
+│   ├── PII Sanitization - Automated sensitive data removal
+│   └── Privacy Controls - Data export/deletion with encryption
+└── 🔧 CLI Interface (EXPANDED)
+    ├── Command Processing - 15+ commands with validation
+    ├── Output Formatting - JSON/text formats for automation
+    ├── Session Management - Start/end/stats tracking
+    └── Health Monitoring - System diagnostics & auto-repair
 ```
 
 ## 🧪 **Development**
@@ -308,81 +326,88 @@ cd context-cleaner
 # Install development dependencies
 pip install -e .[dev]
 
-# Run tests
+# Run full test suite (146 tests)
 pytest
 
-# Code formatting
-black src/
-flake8 src/
+# Run specific test categories
+pytest -m unit           # Unit tests only
+pytest -m integration    # Integration tests only  
+pytest -m security       # Security tests (NEW)
 
-# Type checking
+# Code quality
+black src/ tests/
+flake8 src/ tests/
 mypy src/
 ```
 
 ### **Testing**
 ```bash
-# Run all tests
-pytest
-
-# Run specific test categories  
-pytest -m unit      # Unit tests only
-pytest -m integration  # Integration tests only
-
-# Coverage report
+# Full test suite with coverage
 pytest --cov=context_cleaner --cov-report=html
+
+# Test new analytics features
+pytest tests/cli/test_pr20_analytics_integration.py -v
+
+# Security and performance tests
+pytest tests/cli/test_pr20_analytics_integration.py::TestSecurityAndPerformanceFixes -v
 ```
 
-### **Contributing**
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+## 📄 **What's New in v0.2.0**
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/awesome-feature`
-3. Make changes and add tests
-4. Run test suite: `pytest`
-5. Submit a pull request
+### **🔥 Major Features**
+- **Effectiveness Tracking System**: Quantifiable before/after productivity metrics
+- **User Satisfaction Monitoring**: Rating system with feedback collection
+- **Strategy Analysis**: Performance comparison across optimization modes  
+- **ROI Demonstration**: Time-saved calculations and productivity improvements
+- **Enhanced CLI**: 3 new commands (`health-check`, `export-analytics`, `effectiveness`)
 
-## 📄 **License**
+### **🛡️ Security Improvements**  
+- **PII Sanitization**: Automatic sensitive data removal before storage
+- **Atomic File Operations**: Race-condition prevention with exclusive locking
+- **Secure Storage**: Enhanced file permissions and data integrity protection
+- **Content Hashing**: Secure data handling without raw content storage
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### **⚡ Performance Optimizations**
+- **Session Indexing**: O(1) lookups instead of O(n) file scans
+- **LRU Caching**: Optimized frequent data access patterns
+- **Optimized I/O**: Index-based filtering and reduced file operations
+- **Memory Management**: Efficient resource usage and cleanup
+
+### **🧪 Production Readiness**
+- **Enhanced Error Handling**: Consistent exception management without sys.exit()
+- **Comprehensive Testing**: 29 tests including security and performance validation
+- **Resource Management**: Proper cleanup and context manager usage
+- **Documentation**: Complete overhaul with accurate examples and guides
 
 ## 🤝 **Support**
 
 ### **Documentation**
-- [Installation Guide](docs/installation.md)
-- [Usage Examples](docs/usage.md)
-- [API Reference](docs/api_reference.md)
-- [Privacy Policy](docs/privacy_policy.md)
+- [Installation Guide](docs/user-guide/quickstart.md)
+- [CLI Reference](docs/cli-reference.md) 
+- [Analytics Guide](docs/analytics-guide.md)
+- [Configuration Reference](docs/configuration.md)
 
 ### **Community**
 - [GitHub Issues](https://github.com/context-cleaner/context-cleaner/issues) - Bug reports and feature requests
-- [GitHub Discussions](https://github.com/context-cleaner/context-cleaner/discussions) - Questions and community support
-- [Documentation](https://context-cleaner.readthedocs.io) - Comprehensive guides and tutorials
-
-### **Commercial Support**
-For enterprise support, custom integrations, and consulting services, please contact us at team@context-cleaner.dev.
+- [GitHub Discussions](https://github.com/context-cleaner/context-cleaner/discussions) - Questions and support
+- [Documentation](https://context-cleaner.readthedocs.io) - Comprehensive guides
 
 ## 🎯 **Roadmap**
 
-### **Version 0.2.0** (Next Release)
-- **Advanced ML Analytics**: Machine learning-powered productivity insights
-- **Team Features**: Aggregated (anonymized) team productivity metrics  
+### **Version 0.3.0** (Next Release)
+- **Machine Learning Analytics**: AI-powered productivity insights and forecasting
+- **Team Collaboration**: Aggregated (anonymized) team productivity metrics
 - **IDE Integration**: Direct integration with popular development environments
-- **Extended Git Integration**: Branch-based productivity tracking
+- **Advanced Visualizations**: Enhanced charts and productivity correlation analysis
 
-### **Version 0.3.0** (Future)
+### **Future Versions**
 - **Cross-Project Analytics**: Multi-repository productivity tracking
-- **Advanced Forecasting**: Predictive productivity modeling
-- **Custom Metrics**: User-defined productivity indicators
-- **API Integration**: Webhooks and external service integration
-
-### **Long-term Vision**
-- **AI-Powered Coaching**: Personalized productivity improvement recommendations
-- **Collaboration Analytics**: Pair programming and code review productivity
+- **Custom Metrics**: User-defined productivity indicators and thresholds
+- **API Integration**: Webhooks and external service connectivity
 - **Performance Benchmarking**: Industry-wide anonymous productivity comparisons
-- **Ecosystem Integration**: Seamless integration with development tool ecosystems
 
 ---
 
-**Context Cleaner** - Transforming AI-assisted development through intelligent productivity tracking and optimization.
+**Context Cleaner v0.2.0** - Transforming AI-assisted development through intelligent productivity tracking, effectiveness measurement, and optimization.
 
 *Built with ❤️ for developers who want to understand and improve their coding productivity.*

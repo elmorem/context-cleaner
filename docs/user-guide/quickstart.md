@@ -1,126 +1,165 @@
 # Quick Start Guide
 
-Get up and running with Context Cleaner in less than 5 minutes!
+Get up and running with Context Cleaner v0.2.0 in less than 5 minutes! This guide covers installation, initial setup, and your first analytics session.
 
 ## 🚀 Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- Claude Code installed (for integration features)
+- **Python 3.8 or higher** (Python 3.9+ recommended)
+- **Claude Code** (for optimal integration features)
+- **10MB+ disk space** for analytics data storage
 
 ### Install Context Cleaner
 ```bash
+# Install latest version from PyPI
 pip install context-cleaner
+
+# Or install development version from source
+git clone https://github.com/context-cleaner/context-cleaner.git
+cd context-cleaner
+pip install -e .
+
+# Verify installation
+context-cleaner --version
+# Output: Context Cleaner 0.2.0
 ```
 
-### Verify Installation
+### System Requirements Check
 ```bash
-context-cleaner --version
-# Output: Context Cleaner 0.1.0
+# Run initial health check to verify system compatibility
+context-cleaner health-check
+
+# Output should show:
+# ✅ Configuration: Valid
+# ✅ Data Directory: Accessible
+# ✅ Analytics Engine: Ready
+# ✅ Storage System: Operational
 ```
 
 ## 🔧 Initial Setup
 
-### 1. Claude Code Integration (Recommended)
+### 1. First-Time Configuration
+Context Cleaner works out-of-the-box with secure defaults. No configuration required!
+
 ```bash
-# Automatically set up Claude Code integration
-context-cleaner install --claude-integration
+# View default configuration
+context-cleaner config-show
+
+# Create data directory and initialize system
+context-cleaner start
 ```
 
-This creates:
-- `/clean-context` command in Claude Code
-- Productivity tracking hooks
-- Configuration files
+**What this creates:**
+- `~/.context_cleaner/` - Main application directory
+- `~/.context_cleaner/data/` - Analytics data storage (secure permissions)
+- `~/.context_cleaner/config.yaml` - Configuration file (if needed)
 
-### 2. Verify Integration
+### 2. Verify Setup
 ```bash
-# Test the Claude Code integration
-python ~/.claude/commands/clean-context.py --help
+# Comprehensive system verification
+context-cleaner health-check --detailed
+
+# Should report:
+# 📊 SYSTEM STATUS: HEALTHY
+# 🔧 Issues Found: 0
+# 💡 Recommendations: Ready for productivity tracking
 ```
 
 ## 📊 Basic Usage
 
-### 1. Context Optimization
+### 1. Context Optimization with Tracking ⭐ NEW
 ```bash
 # Preview context optimization (safe, no changes made)
 context-cleaner optimize --preview
 
-# Quick optimization with safe defaults
+# Quick optimization with effectiveness tracking
 context-cleaner optimize --quick
 
-# Show context health dashboard
-context-cleaner optimize --dashboard
+# Show enhanced dashboard with analytics
+context-cleaner dashboard --interactive --operations
 ```
 
-### 2. Productivity Analysis
+### 2. New Analytics Commands ⭐ v0.2.0
 ```bash
-# View recent productivity insights
-context-cleaner analyze --days 7
+# View optimization effectiveness statistics
+context-cleaner effectiveness --days 7
 
-# Export analysis as JSON
-context-cleaner analyze --days 7 --format json
+# Run comprehensive system health check
+context-cleaner health-check --detailed
+
+# Export comprehensive analytics data
+context-cleaner export-analytics --output my-analytics.json
 ```
 
-### 3. Web Dashboard
+### 3. Enhanced Web Dashboard
 ```bash
-# Launch interactive dashboard
-context-cleaner dashboard
+# Launch interactive dashboard with analytics
+context-cleaner dashboard --interactive
 
-# Dashboard opens at: http://localhost:8546
-# Use --no-browser to prevent auto-opening
+# Dashboard with enhanced features at: http://localhost:8548
+# Now includes effectiveness tracking and ROI metrics
 ```
 
-## 🎯 Your First Productivity Session
+## 🎯 Your First Analytics Session ⭐ NEW
 
-### Step 1: Start Tracking
+### Step 1: Start Tracked Session
 ```bash
-# Begin productivity tracking for current session
-context-cleaner start
+# Begin productivity tracking with session ID
+context-cleaner session-start --project-path ./my-project --session-id "first-session"
+
+# Verify tracking is active
+context-cleaner session-list
 ```
 
-### Step 2: Work on Your Project
-- Use Claude Code as normal
-- Context Cleaner automatically tracks your activity
-- Privacy-first: all data stays on your machine
-
-### Step 3: View Insights
+### Step 2: Perform Optimizations with Tracking
 ```bash
-# Check your productivity metrics
-context-cleaner analyze --days 1
+# Run optimization - this will be tracked for effectiveness
+context-cleaner optimize --quick
+
+# Rate the optimization (1-5 scale) when prompted
+# Context Cleaner now tracks before/after metrics automatically
+```
+
+### Step 3: View Effectiveness Insights
+```bash
+# Check your optimization effectiveness
+context-cleaner effectiveness --days 1
 
 # Example output:
-# 📊 PRODUCTIVITY ANALYSIS REPORT
-# ========================================
-# 📅 Analysis Period: Last 1 days
-# 🎯 Average Productivity Score: 85.3/100
-# 📈 Total Sessions: 23
-# ⚡ Optimization Events: 12
-# 🌟 Most Productive Day: Tuesday
+# 📈 OPTIMIZATION EFFECTIVENESS REPORT
+# ====================================
+# 📅 Analysis Period: Last 1 days  
+# 🎯 Total Optimization Sessions: 3
+# ⚡ Success Rate: 100.0%
+# 💰 Estimated Time Saved: 0.3 hours
+# 📊 Average Productivity Improvement: +18.5%
+# 🌟 User Satisfaction: 4.3/5.0
 ```
 
-### Step 4: Optimize Context
+### Step 4: Export Your Data
 ```bash
-# Use Claude Code integration
-/clean-context --quick
+# Export detailed analytics for review
+context-cleaner export-analytics --include-sessions --output first-session-report.json
 
-# Or use direct command
-context-cleaner optimize --quick
+# End your tracking session
+context-cleaner session-end
 ```
 
-## 📈 Dashboard Overview
+## 📈 Enhanced Dashboard Overview ⭐ NEW
 
-Launch the dashboard to see:
+Launch the enhanced dashboard with analytics:
 
 ```bash
-context-cleaner dashboard
+context-cleaner dashboard --interactive --operations
 ```
 
-### Dashboard Features:
-- **📊 Productivity Charts**: Real-time productivity trends
-- **🔥 Heatmaps**: Activity patterns and peak performance times  
-- **📈 Trend Analysis**: Historical data with forecasting
-- **⚡ Performance Metrics**: System performance and optimization impact
-- **🎯 Recommendations**: AI-powered productivity suggestions
+### New Dashboard Features v0.2.0:
+- **📈 Effectiveness Overview**: Success rates, time saved, and ROI metrics
+- **🎯 Strategy Performance**: Comparative analysis of optimization approaches  
+- **🌟 User Satisfaction Trends**: Rating patterns and feedback analysis
+- **📊 Before/After Comparisons**: Quantifiable productivity improvements
+- **🔄 Interactive Controls**: Operation triggers and real-time adjustments
+- **📉 Time-Series Charts**: Productivity correlation analysis with optimization events
 
 ## ⚙️ Configuration
 
