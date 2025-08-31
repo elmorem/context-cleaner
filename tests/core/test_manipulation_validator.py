@@ -18,6 +18,11 @@ from context_cleaner.core.manipulation_validator import (
     ManipulationValidator,
     ValidationResult,
     IntegrityCheck,
+    RiskLevel,
+    SafetyAction,
+    RiskAssessment,
+    SafetyConstraints,
+    OperationHistory,
     validate_operation,
     validate_plan,
     verify_manipulation_integrity
@@ -511,6 +516,318 @@ class TestManipulationValidator:
         
         integrity = verify_manipulation_integrity(original, modified, operations)
         assert isinstance(integrity, IntegrityCheck)
+
+class TestEnhancedManipulationValidator:
+    """Test suite for enhanced PR18 ManipulationValidator features."""
+
+    @pytest.fixture
+    def enhanced_validator(self):
+        """Enhanced ManipulationValidator with custom safety constraints."""
+        safety_constraints = SafetyConstraints(
+            max_single_operation_impact=0.4,
+            max_total_reduction=0.7,
+            min_confidence_threshold=0.8,
+            require_backup_threshold=0.3,
+            max_operations_per_batch=15
+        )
+        return ManipulationValidator(safety_constraints=safety_constraints)
+
+    @pytest.fixture
+    def high_risk_operation(self):
+        """High-risk operation for testing enhanced features."""
+        return ManipulationOperation(
+            operation_id="enhanced-test-001",
+            operation_type="remove",
+            target_keys=["password", "api_key", "critical_data"],
+            operation_data={"removal_type": "safe_delete"},
+            estimated_token_impact=-200,
+            confidence_score=0.5,  # Low confidence
+            reasoning="Removing sensitive data",
+            requires_confirmation=True
+        )
+
+    @pytest.fixture
+    def sensitive_context_data(self):
+        """Context data with sensitive content for testing."""
+        return {
+            "password": "secret_password_123",
+            "api_key": "sk-abc123def456",
+            "critical_data": "Critical business information",
+            "normal_data": "Regular content",
+            "config": {"setting1": "value1", "debug": True},
+            "user_message": "Help me with authentication"
+        }
+
+    def test_enhanced_validator_initialization(self, enhanced_validator):
+        """Test enhanced validator initialization with custom constraints."""
+        assert enhanced_validator.safety_constraints.max_single_operation_impact == 0.4
+        assert enhanced_validator.safety_constraints.max_total_reduction == 0.7
+        assert enhanced_validator.safety_constraints.min_confidence_threshold == 0.8
+        assert enhanced_validator.safety_constraints.require_backup_threshold == 0.3
+        assert enhanced_validator.safety_constraints.max_operations_per_batch == 15
+        assert len(enhanced_validator.operation_history) == 0
+
+    def test_assess_operation_risk(self, enhanced_validator, high_risk_operation, sensitive_context_data):
+        """Test comprehensive operation risk assessment."""
+        risk_assessment = enhanced_validator._assess_operation_risk(high_risk_operation, sensitive_context_data)
+        
+        assert isinstance(risk_assessment, RiskAssessment)
+        assert risk_assessment.risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]
+        assert risk_assessment.impact_severity > 0
+        assert risk_assessment.reversibility < 1.0
+        assert risk_assessment.data_sensitivity > 0.7  # Should detect sensitive content
+        assert risk_assessment.recommended_action != SafetyAction.PROCEED
+        assert len(risk_assessment.risk_factors) > 0
+        assert len(risk_assessment.mitigation_strategies) > 0
+
+    def test_validate_operation_enhanced(self, enhanced_validator, high_risk_operation, sensitive_context_data):
+        """Test enhanced operation validation with risk assessment."""
+        validation_result, risk_assessment = enhanced_validator.validate_operation_enhanced(
+            high_risk_operation, sensitive_context_data, enable_risk_assessment=True
+        )
+        
+        assert isinstance(validation_result, ValidationResult)
+        assert isinstance(risk_assessment, RiskAssessment)
+        
+        # High-risk operation should have validation concerns
+        assert not validation_result.is_valid or len(validation_result.warnings) > 0
+        assert risk_assessment.risk_level != RiskLevel.LOW
+        assert "backup" in " ".join(validation_result.safety_recommendations).lower()
+
+    def test_record_operation_history(self, enhanced_validator, high_risk_operation, sensitive_context_data):
+        """Test operation history recording."""
+        initial_count = len(enhanced_validator.operation_history)
+        
+        enhanced_validator.record_operation_history(
+            high_risk_operation, 
+            sensitive_context_data,
+            backup_id="test-backup-001"
+        )
+        
+        assert len(enhanced_validator.operation_history) == initial_count + 1
+        
+        history_entry = enhanced_validator.operation_history[-1]
+        assert history_entry.operation_id == high_risk_operation.operation_id
+        assert history_entry.operation_type == high_risk_operation.operation_type
+        assert set(history_entry.affected_keys) == set(high_risk_operation.target_keys)
+        assert history_entry.backup_id == "test-backup-001"
+        assert len(history_entry.original_values) == len(high_risk_operation.target_keys)
+
+    def test_get_rollback_data(self, enhanced_validator, high_risk_operation, sensitive_context_data):
+        """Test rollback data retrieval."""
+        # Record operation first
+        enhanced_validator.record_operation_history(
+            high_risk_operation, 
+            sensitive_context_data,
+            backup_id="rollback-test-001"
+        )
+        
+        # Retrieve rollback data
+        rollback_data = enhanced_validator.get_rollback_data(high_risk_operation.operation_id)
+        
+        assert rollback_data is not None
+        assert rollback_data.operation_id == high_risk_operation.operation_id
+        assert rollback_data.backup_id == "rollback-test-001"
+        assert "password" in rollback_data.original_values
+        assert rollback_data.original_values["password"] == "secret_password_123"
+
+    def test_generate_enhanced_safety_report(self, enhanced_validator, high_risk_operation, sensitive_context_data):
+        """Test enhanced safety report generation."""
+        # Validate operation with risk assessment
+        validation_result, risk_assessment = enhanced_validator.validate_operation_enhanced(
+            high_risk_operation, sensitive_context_data
+        )
+        
+        # Record operation history
+        enhanced_validator.record_operation_history(high_risk_operation, sensitive_context_data)
+        
+        # Generate enhanced safety report
+        report = enhanced_validator.generate_enhanced_safety_report(
+            validation_result=validation_result,
+            risk_assessment=risk_assessment,
+            operation_history=enhanced_validator.operation_history,
+            include_mitigation_plan=True
+        )
+        
+        # Verify report structure
+        assert "report_metadata" in report
+        assert "validation_summary" in report
+        assert "detailed_analysis" in report
+        assert "risk_assessment" in report
+        assert "operation_history" in report
+        assert "overall_assessment" in report
+        
+        # Verify metadata
+        assert report["report_metadata"]["report_version"] == "2.0"
+        assert report["report_metadata"]["validator_version"] == "PR18-Enhanced"
+        
+        # Verify enhanced assessment
+        assert "safety_score" in report["overall_assessment"]
+        assert "safety_level" in report["overall_assessment"]
+        assert "safety_factors" in report["overall_assessment"]
+        assert "mitigation_plan" in report["overall_assessment"]
+        
+        # High-risk operation should have low safety score
+        assert report["overall_assessment"]["safety_score"] < 0.7
+        assert not report["overall_assessment"]["safe_to_proceed"]
+        assert report["overall_assessment"]["requires_backup"]
+
+    def test_generate_plan_safety_report(self, enhanced_validator):
+        """Test comprehensive plan safety report generation."""
+        # Create test operations with varying risk levels
+        low_risk_op = ManipulationOperation(
+            operation_id="plan-test-001",
+            operation_type="reorder",
+            target_keys=["normal_data"],
+            operation_data={},
+            estimated_token_impact=0,
+            confidence_score=0.95,
+            reasoning="Safe reordering",
+            requires_confirmation=False
+        )
+        
+        high_risk_op = ManipulationOperation(
+            operation_id="plan-test-002",
+            operation_type="remove",
+            target_keys=["api_key"],
+            operation_data={},
+            estimated_token_impact=-50,
+            confidence_score=0.6,
+            reasoning="Removing API key",
+            requires_confirmation=True
+        )
+        
+        context_data = {
+            "normal_data": "Regular content",
+            "api_key": "secret_key_123",
+            "other_data": "More content"
+        }
+        
+        # Create plan
+        plan = ManipulationPlan(
+            plan_id="safety-report-test",
+            total_operations=2,
+            operations=[low_risk_op, high_risk_op],
+            estimated_total_reduction=50,
+            estimated_execution_time=0.5,
+            safety_level="balanced",
+            requires_user_approval=True,
+            created_timestamp=datetime.now().isoformat()
+        )
+        
+        # Validate plan and operations
+        plan_validation = enhanced_validator.validate_plan(plan, context_data)
+        operation_validations = []
+        
+        for operation in plan.operations:
+            val_result, risk_assessment = enhanced_validator.validate_operation_enhanced(
+                operation, context_data
+            )
+            operation_validations.append((operation, val_result, risk_assessment))
+        
+        # Generate plan safety report
+        report = enhanced_validator.generate_plan_safety_report(
+            plan_validation, operation_validations
+        )
+        
+        # Verify report structure
+        assert "report_metadata" in report
+        assert "plan_summary" in report
+        assert "aggregated_risk_assessment" in report
+        assert "operation_details" in report
+        assert "plan_safety_assessment" in report
+        
+        # Verify plan summary
+        assert report["plan_summary"]["total_operations"] == 2
+        assert report["plan_summary"]["high_risk_operations"] >= 1
+        
+        # Verify aggregated risk assessment
+        assert "risk_distribution" in report["aggregated_risk_assessment"]
+        assert report["aggregated_risk_assessment"]["overall_risk_level"] != "low"
+        
+        # Verify operation details
+        assert len(report["operation_details"]) == 2
+        for op_detail in report["operation_details"]:
+            assert "operation_id" in op_detail
+            assert "validation_status" in op_detail
+            assert "risk_level" in op_detail
+        
+        # Verify plan safety assessment
+        assert "plan_safety_score" in report["plan_safety_assessment"]
+        assert "recommended_approach" in report["plan_safety_assessment"]
+
+    def test_safety_constraints_validation(self):
+        """Test safety constraints validation."""
+        # Test default constraints
+        default_constraints = SafetyConstraints()
+        assert default_constraints.max_single_operation_impact == 0.3
+        assert default_constraints.max_total_reduction == 0.8
+        assert default_constraints.min_confidence_threshold == 0.7
+        assert default_constraints.enable_dry_run_mode is True
+        
+        # Test custom constraints
+        custom_constraints = SafetyConstraints(
+            max_single_operation_impact=0.5,
+            max_total_reduction=0.9,
+            min_confidence_threshold=0.6,
+            enable_dry_run_mode=False
+        )
+        assert custom_constraints.max_single_operation_impact == 0.5
+        assert custom_constraints.max_total_reduction == 0.9
+        assert custom_constraints.min_confidence_threshold == 0.6
+        assert custom_constraints.enable_dry_run_mode is False
+
+    def test_risk_level_enum(self):
+        """Test RiskLevel enum values."""
+        assert RiskLevel.LOW.value == "low"
+        assert RiskLevel.MEDIUM.value == "medium" 
+        assert RiskLevel.HIGH.value == "high"
+        assert RiskLevel.CRITICAL.value == "critical"
+
+    def test_safety_action_enum(self):
+        """Test SafetyAction enum values."""
+        assert SafetyAction.PROCEED.value == "proceed"
+        assert SafetyAction.CONFIRM.value == "confirm"
+        assert SafetyAction.BACKUP_FIRST.value == "backup_first"
+        assert SafetyAction.REJECT.value == "reject"
+        assert SafetyAction.MANUAL_REVIEW.value == "manual_review"
+
+    def test_operation_history_data_structure(self):
+        """Test OperationHistory data structure."""
+        history = OperationHistory(
+            operation_id="test-history-001",
+            timestamp=datetime.now().isoformat(),
+            operation_type="remove",
+            affected_keys=["key1", "key2"],
+            original_values={"key1": "value1", "key2": "value2"},
+            backup_id="backup-001"
+        )
+        
+        assert history.operation_id == "test-history-001"
+        assert history.operation_type == "remove"
+        assert len(history.affected_keys) == 2
+        assert "key1" in history.original_values
+        assert history.backup_id == "backup-001"
+
+    def test_backward_compatibility(self, enhanced_validator):
+        """Test that enhanced validator maintains backward compatibility."""
+        # Test legacy generate_safety_report method
+        validation_result = ValidationResult(
+            is_valid=True,
+            confidence_score=0.8,
+            validation_errors=[],
+            warnings=[],
+            safety_recommendations=[],
+            risk_assessment="low",
+            validation_timestamp=datetime.now().isoformat()
+        )
+        
+        # Legacy method should work
+        legacy_report = enhanced_validator.generate_safety_report(validation_result)
+        assert "report_metadata" in legacy_report  # Should use enhanced version
+        assert "validation_summary" in legacy_report
+        assert "overall_assessment" in legacy_report
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

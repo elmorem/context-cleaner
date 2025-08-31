@@ -6,7 +6,11 @@ This package contains the core functionality for Context Cleaner:
 - Context health assessment and scoring  
 - Content manipulation and optimization engines
 - Focus analysis and priority assessment
-- Manipulation validation and safety checks
+- Enhanced manipulation validation and safety checks
+- Backup and rollback system with operation history
+- Transaction-based atomic operations with rollback capabilities
+- Dry-run preview system with before/after visualization
+- Multi-layered risk assessment and safety validation
 """
 
 from .context_analyzer import ContextAnalyzer, ContextAnalysisResult
@@ -26,9 +30,54 @@ from .manipulation_validator import (
     ManipulationValidator,
     ValidationResult,
     IntegrityCheck,
+    RiskLevel,
+    SafetyAction,
+    RiskAssessment,
+    SafetyConstraints,
+    OperationHistory,
     validate_operation,
     validate_plan, 
     verify_manipulation_integrity
+)
+from .backup_manager import (
+    BackupManager,
+    BackupType,
+    BackupStatus,
+    BackupMetadata,
+    BackupEntry,
+    RestoreResult,
+    create_safety_backup,
+    restore_from_backup
+)
+from .transaction_manager import (
+    TransactionManager,
+    Transaction,
+    TransactionState,
+    TransactionIsolation,
+    TransactionResult,
+    TransactionMetadata,
+    execute_atomic_operations
+)
+from .preview_generator import (
+    PreviewGenerator,
+    PreviewFormat,
+    ChangeType,
+    ChangeDetail,
+    OperationPreview,
+    PlanPreview,
+    preview_single_operation,
+    preview_manipulation_plan
+)
+from .confirmation_workflows import (
+    ConfirmationWorkflowManager,
+    ConfirmationProvider,
+    ConsoleConfirmationProvider,
+    ConfirmationLevel,
+    ConfirmationResult,
+    ConfirmationRequest,
+    ConfirmationResponse,
+    confirm_operation,
+    confirm_plan
 )
 
 __all__ = [
@@ -52,11 +101,56 @@ __all__ = [
     "create_manipulation_plan",
     "execute_manipulation_plan",
     
-    # Validation system
+    # Enhanced validation system
     "ManipulationValidator", 
     "ValidationResult",
     "IntegrityCheck",
+    "RiskLevel",
+    "SafetyAction", 
+    "RiskAssessment",
+    "SafetyConstraints",
+    "OperationHistory",
     "validate_operation",
     "validate_plan",
     "verify_manipulation_integrity",
+    
+    # Backup and rollback system
+    "BackupManager",
+    "BackupType",
+    "BackupStatus", 
+    "BackupMetadata",
+    "BackupEntry",
+    "RestoreResult",
+    "create_safety_backup",
+    "restore_from_backup",
+    
+    # Transaction system
+    "TransactionManager",
+    "Transaction",
+    "TransactionState",
+    "TransactionIsolation",
+    "TransactionResult", 
+    "TransactionMetadata",
+    "execute_atomic_operations",
+    
+    # Preview system
+    "PreviewGenerator",
+    "PreviewFormat",
+    "ChangeType",
+    "ChangeDetail",
+    "OperationPreview", 
+    "PlanPreview",
+    "preview_single_operation",
+    "preview_manipulation_plan",
+    
+    # Confirmation workflows
+    "ConfirmationWorkflowManager",
+    "ConfirmationProvider",
+    "ConsoleConfirmationProvider",
+    "ConfirmationLevel",
+    "ConfirmationResult",
+    "ConfirmationRequest",
+    "ConfirmationResponse",
+    "confirm_operation",
+    "confirm_plan",
 ]
