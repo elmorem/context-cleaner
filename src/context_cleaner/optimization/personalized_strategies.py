@@ -25,6 +25,7 @@ class StrategyType(Enum):
     CONSERVATIVE = "conservative"
     BALANCED = "balanced" 
     AGGRESSIVE = "aggressive"
+    FOCUS = "focus"  # PR19: Priority-based reordering without content removal
     WORKFLOW_SPECIFIC = "workflow_specific"
     LEARNING_ADAPTIVE = "learning_adaptive"
 
@@ -109,8 +110,9 @@ class PersonalizedOptimizationEngine:
         self._strategy_templates: Dict[StrategyType, PersonalizedStrategy] = {}
         self._effectiveness_tracker: Dict[str, List[float]] = defaultdict(list)
         
-        # Initialize default strategy templates
-        asyncio.create_task(self._initialize_default_templates())
+        # Initialize default strategy templates (lazy initialization when needed)
+        self._templates_initialized = False
+        self._initialize_default_templates()
     
     async def create_personalized_strategy(
         self,
@@ -932,10 +934,12 @@ class PersonalizedOptimizationEngine:
         
         return workflow_performance
     
-    async def _initialize_default_templates(self) -> None:
+    def _initialize_default_templates(self) -> None:
         """Initialize default strategy templates."""
         # This would load/create default templates for each strategy type
-        pass
+        if self._templates_initialized:
+            return
+        self._templates_initialized = True
     
     async def _persist_strategy(self, strategy: PersonalizedStrategy) -> None:
         """Persist strategy to storage."""
