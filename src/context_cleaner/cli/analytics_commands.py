@@ -36,9 +36,7 @@ class AnalyticsCommandHandler:
         self.verbose = verbose
         
         # Initialize analytics components
-        self.effectiveness_tracker = EffectivenessTracker(
-            Path(self.config.data_directory) / "effectiveness"
-        )
+        self.effectiveness_tracker = EffectivenessTracker()
         self.productivity_analyzer = ProductivityAnalyzer()
         self.cache_dashboard = CacheEnhancedDashboard()
         self.cross_session_analyzer = CrossSessionAnalyticsEngine()

@@ -15,12 +15,21 @@ from ..analytics.productivity_analyzer import ProductivityAnalyzer
 from ..dashboard.web_server import ProductivityDashboard
 
 
+def version_callback(ctx, param, value):
+    """Callback for --version option."""
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo("Context Cleaner 0.2.0")
+    ctx.exit()
+
+
 @click.group()
 @click.option(
     "--config", "-c", type=click.Path(exists=True), help="Configuration file path"
 )
 @click.option("--data-dir", type=click.Path(), help="Data directory path")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
+@click.option("--version", is_flag=True, help="Show version and exit", expose_value=False, is_eager=True, callback=version_callback)
 @click.pass_context
 def main(ctx, config, data_dir, verbose):
     """
@@ -890,7 +899,7 @@ def health_check(ctx, detailed, fix_issues, format):
 @main.command("export-analytics")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option("--days", type=int, default=30, help="Number of days to include in export")
-@click.option("--include-sessions", is_flag=True, default=True, help="Include session details")
+@click.option("--include-sessions", is_flag=True, help="Include session details")
 @click.option("--format", type=click.Choice(["json"]), default="json", help="Export format")
 @click.pass_context
 def export_analytics(ctx, output, days, include_sessions, format):
