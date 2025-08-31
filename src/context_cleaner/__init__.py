@@ -5,7 +5,7 @@ This package provides comprehensive tools for monitoring and improving developme
 through intelligent context analysis, performance tracking, and optimization recommendations.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Context Cleaner Team"
 __email__ = "team@context-cleaner.dev"
 

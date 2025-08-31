@@ -3,7 +3,7 @@ Core Context Analysis and Manipulation Components
 
 This package contains the core functionality for Context Cleaner:
 - Advanced context analysis with sophisticated metrics
-- Context health assessment and scoring  
+- Context health assessment and scoring
 - Content manipulation and optimization engines
 - Focus analysis and priority assessment
 - Enhanced manipulation validation and safety checks
@@ -19,12 +19,12 @@ from .recency_analyzer import RecencyAnalyzer, RecencyReport
 from .focus_scorer import FocusScorer, FocusMetrics
 from .priority_analyzer import PriorityAnalyzer, PriorityReport
 from .manipulation_engine import (
-    ManipulationEngine, 
-    ManipulationOperation, 
-    ManipulationPlan, 
+    ManipulationEngine,
+    ManipulationOperation,
+    ManipulationPlan,
     ManipulationResult,
     create_manipulation_plan,
-    execute_manipulation_plan
+    execute_manipulation_plan,
 )
 from .manipulation_validator import (
     ManipulationValidator,
@@ -36,8 +36,8 @@ from .manipulation_validator import (
     SafetyConstraints,
     OperationHistory,
     validate_operation,
-    validate_plan, 
-    verify_manipulation_integrity
+    validate_plan,
+    verify_manipulation_integrity,
 )
 from .backup_manager import (
     BackupManager,
@@ -47,7 +47,7 @@ from .backup_manager import (
     BackupEntry,
     RestoreResult,
     create_safety_backup,
-    restore_from_backup
+    restore_from_backup,
 )
 from .transaction_manager import (
     TransactionManager,
@@ -56,7 +56,7 @@ from .transaction_manager import (
     TransactionIsolation,
     TransactionResult,
     TransactionMetadata,
-    execute_atomic_operations
+    execute_atomic_operations,
 )
 from .preview_generator import (
     PreviewGenerator,
@@ -66,7 +66,7 @@ from .preview_generator import (
     OperationPreview,
     PlanPreview,
     preview_single_operation,
-    preview_manipulation_plan
+    preview_manipulation_plan,
 )
 from .confirmation_workflows import (
     ConfirmationWorkflowManager,
@@ -77,22 +77,21 @@ from .confirmation_workflows import (
     ConfirmationRequest,
     ConfirmationResponse,
     confirm_operation,
-    confirm_plan
+    confirm_plan,
 )
 
 __all__ = [
     # Analysis components
     "ContextAnalyzer",
-    "ContextAnalysisResult", 
+    "ContextAnalysisResult",
     "RedundancyDetector",
     "RedundancyReport",
-    "RecencyAnalyzer", 
+    "RecencyAnalyzer",
     "RecencyReport",
     "FocusScorer",
     "FocusMetrics",
     "PriorityAnalyzer",
     "PriorityReport",
-    
     # Manipulation engine
     "ManipulationEngine",
     "ManipulationOperation",
@@ -100,49 +99,44 @@ __all__ = [
     "ManipulationResult",
     "create_manipulation_plan",
     "execute_manipulation_plan",
-    
     # Enhanced validation system
-    "ManipulationValidator", 
+    "ManipulationValidator",
     "ValidationResult",
     "IntegrityCheck",
     "RiskLevel",
-    "SafetyAction", 
+    "SafetyAction",
     "RiskAssessment",
     "SafetyConstraints",
     "OperationHistory",
     "validate_operation",
     "validate_plan",
     "verify_manipulation_integrity",
-    
     # Backup and rollback system
     "BackupManager",
     "BackupType",
-    "BackupStatus", 
+    "BackupStatus",
     "BackupMetadata",
     "BackupEntry",
     "RestoreResult",
     "create_safety_backup",
     "restore_from_backup",
-    
     # Transaction system
     "TransactionManager",
     "Transaction",
     "TransactionState",
     "TransactionIsolation",
-    "TransactionResult", 
+    "TransactionResult",
     "TransactionMetadata",
     "execute_atomic_operations",
-    
     # Preview system
     "PreviewGenerator",
     "PreviewFormat",
     "ChangeType",
     "ChangeDetail",
-    "OperationPreview", 
+    "OperationPreview",
     "PlanPreview",
     "preview_single_operation",
     "preview_manipulation_plan",
-    
     # Confirmation workflows
     "ConfirmationWorkflowManager",
     "ConfirmationProvider",

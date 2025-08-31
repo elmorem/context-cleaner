@@ -13,13 +13,14 @@ import click
 from ..config.settings import ContextCleanerConfig
 from ..analytics.productivity_analyzer import ProductivityAnalyzer
 from ..dashboard.web_server import ProductivityDashboard
+from .. import __version__
 
 
 def version_callback(ctx, param, value):
     """Callback for --version option."""
     if not value or ctx.resilient_parsing:
         return
-    click.echo("Context Cleaner 0.2.0")
+    click.echo(f"Context Cleaner {__version__}")
     ctx.exit()
 
 
@@ -29,7 +30,14 @@ def version_callback(ctx, param, value):
 )
 @click.option("--data-dir", type=click.Path(), help="Data directory path")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-@click.option("--version", is_flag=True, help="Show version and exit", expose_value=False, is_eager=True, callback=version_callback)
+@click.option(
+    "--version",
+    is_flag=True,
+    help="Show version and exit",
+    expose_value=False,
+    is_eager=True,
+    callback=version_callback,
+)
 @click.pass_context
 def main(ctx, config, data_dir, verbose):
     """
@@ -75,9 +83,8 @@ def start(ctx):
     # Initialize tracking
     if verbose:
         click.echo("✅ Productivity tracking started successfully!")
-        click.echo(
-            f"📊 Dashboard available at: http://{config.dashboard.host}:{config.dashboard.port}"
-        )
+        dashboard_url = f"http://{config.dashboard.host}:{config.dashboard.port}"
+        click.echo(f"📊 Dashboard available at: {dashboard_url}")
         click.echo("📈 Use 'context-cleaner dashboard' to view insights")
     else:
         click.echo("✅ Context Cleaner started")
@@ -102,19 +109,17 @@ def dashboard(ctx, port, host, no_browser, interactive, operations):
         config.dashboard.host = host
 
     if verbose:
-        click.echo(
-            f"🌐 Starting dashboard server on {config.dashboard.host}:{config.dashboard.port}"
-        )
+        server_addr = f"{config.dashboard.host}:{config.dashboard.port}"
+        click.echo(f"🌐 Starting dashboard server on {server_addr}")
 
     try:
         # Check if enhanced dashboard features are requested
         if interactive or operations:
             from .analytics_commands import AnalyticsCommandHandler
+
             analytics_handler = AnalyticsCommandHandler(config, verbose)
             analytics_handler.handle_enhanced_dashboard_command(
-                interactive=interactive,
-                operations=operations,
-                format="text"
+                interactive=interactive, operations=operations, format="text"
             )
         else:
             # Create and start dashboard
@@ -124,15 +129,13 @@ def dashboard(ctx, port, host, no_browser, interactive, operations):
                 import webbrowser
 
                 try:
-                    webbrowser.open(
-                        f"http://{config.dashboard.host}:{config.dashboard.port}"
-                    )
+                    url = f"http://{config.dashboard.host}:{config.dashboard.port}"
+                    webbrowser.open(url)
                 except Exception:
                     pass  # Browser opening is optional
 
-            click.echo(
-                f"📊 Dashboard running at: http://{config.dashboard.host}:{config.dashboard.port}"
-            )
+            dashboard_url = f"http://{config.dashboard.host}:{config.dashboard.port}"
+            click.echo(f"📊 Dashboard running at: {dashboard_url}")
             click.echo("Press Ctrl+C to stop the server")
 
             # Start server (blocking)
@@ -326,19 +329,19 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         click.echo("🧹 Starting context optimization...")
 
     try:
-        # Import optimization modules
-        from ..optimization.basic_analyzer import SafeContextAnalyzer
-        from ..visualization.basic_dashboard import BasicDashboard
+        # Import optimization modules (deferred imports for performance)
 
         if dashboard:
             # Show enhanced dashboard using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
+
             handler = OptimizationCommandHandler(verbose=verbose)
             handler.handle_dashboard_command(format=format)
 
         elif quick:
             # Quick optimization using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
+
             handler = OptimizationCommandHandler(verbose=verbose)
             handler.handle_quick_optimization()
 
@@ -346,6 +349,7 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
             # Preview mode using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
             from ..optimization.personalized_strategies import StrategyType
+
             handler = OptimizationCommandHandler(verbose=verbose)
             # Use balanced strategy as default for preview
             handler.handle_preview_mode(strategy=StrategyType.BALANCED, format=format)
@@ -353,18 +357,21 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         elif aggressive:
             # Aggressive optimization using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
+
             handler = OptimizationCommandHandler(verbose=verbose)
             handler.handle_aggressive_optimization()
 
         elif focus:
             # Focus mode using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
+
             handler = OptimizationCommandHandler(verbose=verbose)
             handler.handle_focus_mode()
 
         else:
             # Full interactive optimization workflow using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
+
             handler = OptimizationCommandHandler(verbose=verbose)
             handler.handle_full_optimization()
 
@@ -489,18 +496,17 @@ def session_stats(ctx, days, format):
 
             click.echo(f"🎯 Sessions: {summary.get('session_count', 0)}")
             click.echo(f"⏱️ Total Time: {summary.get('total_time_hours', 0)}h")
-            click.echo(
-                f"📈 Avg Productivity: {summary.get('average_productivity_score', 0)}/100"
-            )
+            avg_score = summary.get('average_productivity_score', 0)
+            click.echo(f"📈 Avg Productivity: {avg_score}/100")
             click.echo(f"🔧 Optimizations: {summary.get('total_optimizations', 0)}")
             click.echo(f"🛠️ Tools Used: {summary.get('total_tools_used', 0)}")
 
             # Show best session
             if "best_session" in summary:
                 best = summary["best_session"]
-                click.echo(
-                    f"\n🌟 Best Session: {best['productivity_score']}/100 ({best['duration_minutes']}min)"
-                )
+                score = best['productivity_score']
+                duration = best['duration_minutes']
+                click.echo(f"\n🌟 Best Session: {score}/100 ({duration}min)")
 
             # Show recommendations
             recommendations = summary.get("recommendations", [])
@@ -556,9 +562,13 @@ def list_sessions(ctx, limit, format):
                 productivity = session.calculate_productivity_score()
                 status_icon = "✅" if session.status.value == "completed" else "🔄"
 
-                click.echo(
-                    f"{status_icon} {session.session_id[:8]}... | {duration_min}min | {productivity}/100 | {session.start_time.strftime('%Y-%m-%d %H:%M')}"
+                session_short = session.session_id[:8]
+                timestamp = session.start_time.strftime('%Y-%m-%d %H:%M')
+                session_info = (
+                    f"{status_icon} {session_short}... | {duration_min}min | "
+                    f"{productivity}/100 | {timestamp}"
                 )
+                click.echo(session_info)
 
     except Exception as e:
         click.echo(f"❌ Failed to list sessions: {e}", err=True)
@@ -595,9 +605,8 @@ def start_monitoring(ctx, watch_dirs, no_observer):
 
             def console_callback(event_type: str, event_data: dict):
                 timestamp = datetime.now().strftime("%H:%M:%S")
-                click.echo(
-                    f"[{timestamp}] {event_type}: {event_data.get('message', 'Event triggered')}"
-                )
+                message = event_data.get('message', 'Event triggered')
+                click.echo(f"[{timestamp}] {event_type}: {message}")
 
             monitor.add_event_callback(console_callback)
 
@@ -681,20 +690,17 @@ def monitor_status(ctx, format):
                 click.echo(f"⏱️ Uptime: {uptime:.1f}s")
 
             # Configuration
-            click.echo(f"\n⚙️ Configuration:")
-            click.echo(
-                f"   Session updates: every {config_data.get('session_update_interval_s', 0)}s"
-            )
-            click.echo(
-                f"   Health updates: every {config_data.get('health_update_interval_s', 0)}s"
-            )
-            click.echo(
-                f"   Activity updates: every {config_data.get('activity_update_interval_s', 0)}s"
-            )
+            click.echo("\n⚙️ Configuration:")
+            session_interval = config_data.get('session_update_interval_s', 0)
+            click.echo(f"   Session updates: every {session_interval}s")
+            health_interval = config_data.get('health_update_interval_s', 0)
+            click.echo(f"   Health updates: every {health_interval}s")
+            activity_interval = config_data.get('activity_update_interval_s', 0)
+            click.echo(f"   Activity updates: every {activity_interval}s")
 
             # Cache status
             cache = status.get("cache_status", {})
-            click.echo(f"\n💾 Cache Status:")
+            click.echo("\n💾 Cache Status:")
             click.echo(
                 f"   Session data: {'✅' if cache.get('session_data_cached') else '❌'}"
             )
@@ -748,19 +754,16 @@ def live_dashboard(ctx, refresh):
                     current_session = session_data.get("current_session", {})
 
                     if current_session:
-                        click.echo(
-                            f"📊 Session: {current_session.get('session_id', 'Unknown')[:8]}..."
-                        )
-                        click.echo(
-                            f"⏱️ Duration: {current_session.get('duration_seconds', 0):.0f}s"
-                        )
-                        click.echo(
-                            f"🎯 Productivity: {current_session.get('productivity_score', 0)}/100"
-                        )
-                        click.echo(
-                            f"🔧 Optimizations: {current_session.get('optimizations_applied', 0)}"
-                        )
-                        click.echo(f"🛠️ Tools: {current_session.get('tools_used', 0)}")
+                        session_id = current_session.get('session_id', 'Unknown')[:8]
+                        click.echo(f"📊 Session: {session_id}...")
+                        duration = current_session.get('duration_seconds', 0)
+                        click.echo(f"⏱️ Duration: {duration:.0f}s")
+                        score = current_session.get('productivity_score', 0)
+                        click.echo(f"🎯 Productivity: {score}/100")
+                        opts = current_session.get('optimizations_applied', 0)
+                        click.echo(f"🔧 Optimizations: {opts}")
+                        tools = current_session.get('tools_used', 0)
+                        click.echo(f"🛠️ Tools: {tools}")
                     else:
                         click.echo("📊 No active session")
 
@@ -780,9 +783,11 @@ def live_dashboard(ctx, refresh):
                         else:
                             health_icon = "🔴"
 
-                        click.echo(
-                            f"{health_icon} Context Health: {health_score}/100 ({health_status})"
+                        health_info = (
+                            f"{health_icon} Context Health: {health_score}/100 "
+                            f"({health_status})"
                         )
+                        click.echo(health_info)
 
                     # Monitor status
                     monitor_status = live_data.get("monitor_status", {}).get(
@@ -822,7 +827,7 @@ async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) ->
         "optimization_events": 12,
         "most_productive_day": "Tuesday",
         "recommendations": [
-            "Your productivity peaks in the afternoon - consider scheduling complex tasks then",
+            "Productivity peaks in afternoon - schedule complex tasks then",
             "Context optimization events correlate with 15% productivity increase",
             "Consider shorter sessions (< 2 hours) for sustained high performance",
         ],
@@ -872,21 +877,27 @@ def _export_all_data(config: ContextCleanerConfig) -> dict:
 # PR20: Enhanced CLI Commands for Analytics Integration
 @main.command("health-check")
 @click.option("--detailed", is_flag=True, help="Show detailed health information")
-@click.option("--fix-issues", is_flag=True, help="Attempt to fix identified issues automatically")
-@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.option(
+    "--fix-issues", is_flag=True, help="Attempt to fix identified issues automatically"
+)
+@click.option(
+    "--format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
 @click.pass_context
 def health_check(ctx, detailed, fix_issues, format):
     """Perform comprehensive system health check and validation."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    
+
     try:
         from .analytics_commands import AnalyticsCommandHandler
+
         analytics_handler = AnalyticsCommandHandler(config, verbose)
         analytics_handler.handle_health_check_command(
-            detailed=detailed,
-            fix_issues=fix_issues,
-            format=format
+            detailed=detailed, fix_issues=fix_issues, format=format
         )
     except Exception as e:
         if verbose:
@@ -898,23 +909,28 @@ def health_check(ctx, detailed, fix_issues, format):
 
 @main.command("export-analytics")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
-@click.option("--days", type=int, default=30, help="Number of days to include in export")
+@click.option(
+    "--days", type=int, default=30, help="Number of days to include in export"
+)
 @click.option("--include-sessions", is_flag=True, help="Include session details")
-@click.option("--format", type=click.Choice(["json"]), default="json", help="Export format")
+@click.option(
+    "--format", type=click.Choice(["json"]), default="json", help="Export format"
+)
 @click.pass_context
 def export_analytics(ctx, output, days, include_sessions, format):
     """Export comprehensive analytics data for analysis or backup."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    
+
     try:
         from .analytics_commands import AnalyticsCommandHandler
+
         analytics_handler = AnalyticsCommandHandler(config, verbose)
         analytics_handler.handle_export_analytics_command(
             output_path=output,
             days=days,
             include_sessions=include_sessions,
-            format=format
+            format=format,
         )
     except Exception as e:
         if verbose:
@@ -928,21 +944,24 @@ def export_analytics(ctx, output, days, include_sessions, format):
 @click.option("--days", type=int, default=30, help="Number of days to analyze")
 @click.option("--strategy", type=str, help="Filter by specific optimization strategy")
 @click.option("--detailed", is_flag=True, help="Show detailed effectiveness breakdown")
-@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.option(
+    "--format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
 @click.pass_context
 def effectiveness(ctx, days, strategy, detailed, format):
     """Display optimization effectiveness statistics and user impact metrics."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    
+
     try:
         from .analytics_commands import AnalyticsCommandHandler
+
         analytics_handler = AnalyticsCommandHandler(config, verbose)
         analytics_handler.handle_effectiveness_stats_command(
-            days=days,
-            strategy=strategy,
-            detailed=detailed,
-            format=format
+            days=days, strategy=strategy, detailed=detailed, format=format
         )
     except Exception as e:
         if verbose:

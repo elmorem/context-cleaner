@@ -5,7 +5,7 @@ from .analytics_dashboard import AnalyticsDashboard
 from .comprehensive_health_dashboard import ComprehensiveHealthDashboard
 
 __all__ = [
-    "ProductivityDashboard", 
-    "AnalyticsDashboard", 
-    "ComprehensiveHealthDashboard"
+    "ProductivityDashboard",
+    "AnalyticsDashboard",
+    "ComprehensiveHealthDashboard",
 ]

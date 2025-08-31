@@ -3,7 +3,7 @@ Context Optimization Module - PR15.3: Intelligent Cache-Based Optimization
 
 This module provides comprehensive context optimization capabilities including:
 - Cache-enhanced dashboard with usage-based health scoring
-- Intelligent recommendations based on usage patterns  
+- Intelligent recommendations based on usage patterns
 - Cross-session analytics for pattern correlation
 - Advanced reporting with usage-based insights
 - Personalized optimization strategies
@@ -12,10 +12,10 @@ This module provides comprehensive context optimization capabilities including:
 from .basic_analyzer import SafeContextAnalyzer
 from .cache_dashboard import (
     CacheEnhancedDashboard,
-    CacheEnhancedDashboardData, 
+    CacheEnhancedDashboardData,
     UsageBasedHealthMetrics,
     HealthLevel,
-    UsageInsight
+    UsageInsight,
 )
 from .intelligent_recommender import (
     IntelligentRecommendationEngine,
@@ -23,21 +23,21 @@ from .intelligent_recommender import (
     PersonalizationProfile,
     OptimizationAction,
     RecommendationPriority,
-    OptimizationCategory
+    OptimizationCategory,
 )
 from .cross_session_analytics import (
     CrossSessionAnalyticsEngine,
     CrossSessionInsights,
     SessionMetrics,
     PatternEvolution,
-    WorkflowTemplate
+    WorkflowTemplate,
 )
 from .advanced_reports import (
     AdvancedReportingSystem,
     UsageReport,
     ReportSection,
     ReportType,
-    ReportFormat
+    ReportFormat,
 )
 from .personalized_strategies import (
     PersonalizedOptimizationEngine,
@@ -45,10 +45,10 @@ from .personalized_strategies import (
     StrategyRule,
     StrategyType,
     OptimizationMode,
-    StrategyRecommendation
+    StrategyRecommendation,
 )
 
-# PR19: Interactive Optimization Workflows  
+# PR19: Interactive Optimization Workflows
 from .interactive_workflow import (
     InteractiveWorkflowManager,
     InteractiveSession,
@@ -56,7 +56,7 @@ from .interactive_workflow import (
     WorkflowResult,
     UserAction,
     start_interactive_optimization,
-    quick_optimization_preview
+    quick_optimization_preview,
 )
 from .change_approval import (
     ChangeApprovalSystem,
@@ -66,20 +66,18 @@ from .change_approval import (
     ChangeCategory,
     create_quick_approval,
     approve_all_operations,
-    approve_safe_operations_only
+    approve_safe_operations_only,
 )
 
 __all__ = [
     # Core optimization
     "SafeContextAnalyzer",
-    
     # Cache-enhanced dashboard
     "CacheEnhancedDashboard",
     "CacheEnhancedDashboardData",
-    "UsageBasedHealthMetrics", 
+    "UsageBasedHealthMetrics",
     "HealthLevel",
     "UsageInsight",
-    
     # Intelligent recommendations
     "IntelligentRecommendationEngine",
     "IntelligentRecommendation",
@@ -87,21 +85,18 @@ __all__ = [
     "OptimizationAction",
     "RecommendationPriority",
     "OptimizationCategory",
-    
     # Cross-session analytics
     "CrossSessionAnalyticsEngine",
     "CrossSessionInsights",
     "SessionMetrics",
-    "PatternEvolution", 
+    "PatternEvolution",
     "WorkflowTemplate",
-    
     # Advanced reporting
     "AdvancedReportingSystem",
     "UsageReport",
     "ReportSection",
     "ReportType",
     "ReportFormat",
-    
     # Personalized strategies
     "PersonalizedOptimizationEngine",
     "PersonalizedStrategy",
@@ -109,7 +104,6 @@ __all__ = [
     "StrategyType",
     "OptimizationMode",
     "StrategyRecommendation",
-    
     # PR19: Interactive workflows
     "InteractiveWorkflowManager",
     "InteractiveSession",
@@ -118,14 +112,13 @@ __all__ = [
     "UserAction",
     "start_interactive_optimization",
     "quick_optimization_preview",
-    
     # PR19: Change approval
     "ChangeApprovalSystem",
-    "ChangeSelection", 
+    "ChangeSelection",
     "SelectiveApprovalResult",
     "ApprovalDecision",
     "ChangeCategory",
     "create_quick_approval",
     "approve_all_operations",
-    "approve_safe_operations_only"
+    "approve_safe_operations_only",
 ]

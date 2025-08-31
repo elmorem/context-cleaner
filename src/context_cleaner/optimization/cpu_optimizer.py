@@ -191,9 +191,7 @@ class AdaptiveScheduler:
                     )
                 else:
                     # Aggressive throttling - only critical tasks
-                    self._process_priority_tasks(
-                        [TaskPriority.CRITICAL]
-                    )
+                    self._process_priority_tasks([TaskPriority.CRITICAL])
 
                 # Adaptive delay based on CPU usage and throttling
                 delay = self._calculate_adaptive_delay()

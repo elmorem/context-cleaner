@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "context-cleaner"
-version = "0.1.0"
+version = "0.2.0"
 description = "Advanced productivity tracking and context optimization for AI-assisted development"
 readme = "README.md"
 authors = [{name = "Context Cleaner Team", email = "team@context-cleaner.dev"}]
 license = {text = "MIT"}
 requires-python = ">=3.9"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
