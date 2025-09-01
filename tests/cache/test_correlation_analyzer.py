@@ -9,11 +9,11 @@ across multiple Claude Code conversation sessions.
 import pytest
 from datetime import datetime, timedelta
 
-from src.context_cleaner.cache.correlation_analyzer import (
+from src.context_cleaner.analysis.correlation_analyzer import (
     CrossSessionCorrelationAnalyzer, SessionCluster, CrossSessionPattern, 
     LongTermTrend, CorrelationInsights
 )
-from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
+from src.context_cleaner.analysis.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
 
 
 class TestCrossSessionCorrelationAnalyzer:

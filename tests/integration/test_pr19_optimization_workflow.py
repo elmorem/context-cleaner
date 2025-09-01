@@ -30,7 +30,7 @@ from context_cleaner.optimization.change_approval import (
 from context_cleaner.optimization.personalized_strategies import StrategyType
 from context_cleaner.core.manipulation_engine import ManipulationEngine, ManipulationOperation
 from context_cleaner.core.preview_generator import PreviewGenerator
-from context_cleaner.core.safety.manipulation_validator import ManipulationValidator
+from context_cleaner.core.manipulation_validator import ManipulationValidator
 
 
 class TestCompleteOptimizationWorkflow:

@@ -13,8 +13,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.context_cleaner.cache.discovery import CacheDiscoveryService, CacheLocation
-from src.context_cleaner.cache.models import CacheConfig
+from src.context_cleaner.analysis.discovery import CacheDiscoveryService, CacheLocation
+from src.context_cleaner.analysis.models import CacheConfig
 
 
 class TestCacheDiscoveryService:

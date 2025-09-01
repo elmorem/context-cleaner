@@ -11,12 +11,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.context_cleaner.cache.token_analyzer import (
+from src.context_cleaner.analysis.token_analyzer import (
     TokenEfficiencyAnalyzer, TokenWastePattern, CacheEfficiencyMetrics, 
     TokenAnalysisSummary, TokenUsageInsights
 )
-from src.context_cleaner.cache.models import SessionAnalysis, ToolUsage, CacheConfig
-from src.context_cleaner.cache.discovery import CacheLocation
+from src.context_cleaner.analysis.models import SessionAnalysis, ToolUsage, CacheConfig
+from src.context_cleaner.analysis.discovery import CacheLocation
 
 
 class TestTokenEfficiencyAnalyzer:

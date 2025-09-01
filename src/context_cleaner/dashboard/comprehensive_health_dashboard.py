@@ -217,8 +217,20 @@ class ProductivityDataSource(DataSource):
 
                 current_date += timedelta(days=1)
 
-            # Analyze productivity
-            analysis = analyzer.analyze_productivity_patterns(mock_sessions)
+            # Generate analysis from mock sessions (simplified approach)
+            total_duration = sum(s["duration_minutes"] for s in mock_sessions)
+            total_active = sum(s["active_time_minutes"] for s in mock_sessions)
+            avg_productivity_score = min(100, (total_active / total_duration) * 100) if total_duration > 0 else 75
+            
+            analysis = {
+                "overall_productivity_score": avg_productivity_score,
+                "total_focus_time_hours": total_active / 60,
+                "daily_productivity_averages": {},
+                "productivity_trend": "stable",
+                "efficiency_ratio": total_active / total_duration if total_duration > 0 else 0.85,
+                "avg_context_switches_per_hour": sum(s["context_switches"] for s in mock_sessions) / len(mock_sessions),
+                "peak_productivity_hours": [9, 10, 14, 15],
+            }
 
             return {
                 "productivity_score": analysis.get("overall_productivity_score", 75),
@@ -306,7 +318,7 @@ class HealthDataSource(DataSource):
             ),
             "daily_data": daily_data,
             "sleep_quality_trend": (
-                "improving" if daily_data[-7:] > daily_data[:7] else "stable"
+                "improving" if sum(d["sleep_hours"] for d in daily_data[-7:]) > sum(d["sleep_hours"] for d in daily_data[:7]) else "stable"
             ),
             "wellness_score": min(
                 100, max(0, (avg_energy * 10) - (avg_stress * 5) + (avg_sleep * 5))

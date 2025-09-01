@@ -12,8 +12,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from src.context_cleaner.cache.session_parser import SessionCacheParser
-from src.context_cleaner.cache.models import (
+from src.context_cleaner.analysis.session_parser import SessionCacheParser
+from src.context_cleaner.analysis.models import (
     SessionMessage, MessageRole, MessageType, CacheConfig
 )
 
@@ -236,7 +236,7 @@ class TestSessionCacheParser:
     def test_analyze_file_access_patterns(self):
         """Test file access pattern analysis."""
         # Create mock session with file operations
-        from src.context_cleaner.cache.models import SessionAnalysis, ToolUsage
+        from src.context_cleaner.analysis.models import SessionAnalysis, ToolUsage
         
         now = datetime.now()
         tool1 = ToolUsage("Read", "t1", {"file_path": "/test/file.py"}, now)

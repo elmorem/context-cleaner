@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from src.context_cleaner.cache.temporal_analyzer import (
+from src.context_cleaner.analysis.temporal_analyzer import (
     TemporalContextAnalyzer, TopicTransition, SessionBoundary, TemporalInsights
 )
 
