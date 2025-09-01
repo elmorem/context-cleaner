@@ -735,6 +735,11 @@ class ComprehensiveHealthDashboard:
             "health": HealthDataSource("health", {}),
             "tasks": TaskDataSource("tasks", {}),
         }
+        
+        # Session analytics cache for performance optimization
+        self._session_analytics_cache: Optional[List[Dict[str, Any]]] = None
+        self._session_analytics_cache_time: Optional[datetime] = None
+        self._session_analytics_cache_ttl = 30  # Cache TTL in seconds
 
         # Setup Flask routes and SocketIO events
         self._setup_routes()
@@ -1322,6 +1327,14 @@ class ComprehensiveHealthDashboard:
 
     def get_recent_sessions_analytics(self, days: int = 30) -> List[Dict[str, Any]]:
         """Get recent session data using real-time cache discovery and JSONL parsing."""
+        # Check cache first for performance optimization
+        now = datetime.now()
+        if (self._session_analytics_cache is not None and 
+            self._session_analytics_cache_time is not None and 
+            (now - self._session_analytics_cache_time).total_seconds() < self._session_analytics_cache_ttl):
+            logger.debug(f"Returning cached session analytics ({len(self._session_analytics_cache)} sessions)")
+            return self._session_analytics_cache
+            
         logger.info(f"Retrieving recent sessions for analytics dashboard ({days} days)")
         try:
             # Use real-time cache discovery system to find JSONL session files
@@ -1433,11 +1446,19 @@ class ComprehensiveHealthDashboard:
             logger.info(
                 f"Retrieved {len(dashboard_sessions)} sessions from JSONL files"
             )
-            return dashboard_sessions[:100]  # Limit to 100 most recent sessions
+            # Cache the results for performance optimization
+            result = dashboard_sessions[:100]  # Limit to 100 most recent sessions
+            self._session_analytics_cache = result
+            self._session_analytics_cache_time = now
+            return result
 
         except Exception as e:
             logger.error(f"Session analytics retrieval failed: {e}")
-            return []
+            # Cache empty result to avoid repeated failures
+            result = []
+            self._session_analytics_cache = result
+            self._session_analytics_cache_time = now
+            return result
 
     def generate_analytics_charts(
         self, sessions: List[Dict[str, Any]], chart_type: str = "productivity_trend"
