@@ -5,19 +5,18 @@ This module provides personalized optimization strategies that adapt to
 individual user workflows, preferences, and effectiveness patterns.
 """
 
-import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Set
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 import json
 import statistics
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 from .intelligent_recommender import PersonalizationProfile, IntelligentRecommendation
-from .cross_session_analytics import CrossSessionInsights, WorkflowTemplate
-from .cache_dashboard import CacheEnhancedDashboardData, UsageBasedHealthMetrics
+from .cross_session_analytics import CrossSessionInsights
+from .cache_dashboard import CacheEnhancedDashboardData
 
 
 class StrategyType(Enum):

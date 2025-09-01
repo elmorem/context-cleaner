@@ -262,13 +262,13 @@ class SessionTracker:
         """Get the current active session."""
         if self.current_session:
             return self.current_session
-            
+
         # Look for most recent active session in storage
         recent_sessions = self.storage.get_recent_sessions(limit=10, days=1)
         for session in recent_sessions:
             if session.status == SessionStatus.ACTIVE:
                 return session
-                
+
         return None
 
     def load_session(self, session_id: str) -> Optional[SessionModel]:

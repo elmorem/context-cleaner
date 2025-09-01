@@ -9,10 +9,10 @@ in Claude Code conversation analysis.
 import pytest
 from datetime import datetime, timedelta
 
-from src.context_cleaner.cache.temporal_analyzer import (
+from src.context_cleaner.analysis.temporal_analyzer import (
     TemporalContextAnalyzer, TopicTransition, SessionBoundary, TemporalInsights
 )
-from src.context_cleaner.cache.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
+from src.context_cleaner.analysis.models import SessionMessage, ToolUsage, SessionAnalysis, MessageType, MessageRole
 
 
 class TestTemporalContextAnalyzer:

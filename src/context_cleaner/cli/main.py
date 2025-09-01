@@ -496,7 +496,7 @@ def session_stats(ctx, days, format):
 
             click.echo(f"🎯 Sessions: {summary.get('session_count', 0)}")
             click.echo(f"⏱️ Total Time: {summary.get('total_time_hours', 0)}h")
-            avg_score = summary.get('average_productivity_score', 0)
+            avg_score = summary.get("average_productivity_score", 0)
             click.echo(f"📈 Avg Productivity: {avg_score}/100")
             click.echo(f"🔧 Optimizations: {summary.get('total_optimizations', 0)}")
             click.echo(f"🛠️ Tools Used: {summary.get('total_tools_used', 0)}")
@@ -504,8 +504,8 @@ def session_stats(ctx, days, format):
             # Show best session
             if "best_session" in summary:
                 best = summary["best_session"]
-                score = best['productivity_score']
-                duration = best['duration_minutes']
+                score = best["productivity_score"]
+                duration = best["duration_minutes"]
                 click.echo(f"\n🌟 Best Session: {score}/100 ({duration}min)")
 
             # Show recommendations
@@ -563,7 +563,7 @@ def list_sessions(ctx, limit, format):
                 status_icon = "✅" if session.status.value == "completed" else "🔄"
 
                 session_short = session.session_id[:8]
-                timestamp = session.start_time.strftime('%Y-%m-%d %H:%M')
+                timestamp = session.start_time.strftime("%Y-%m-%d %H:%M")
                 session_info = (
                     f"{status_icon} {session_short}... | {duration_min}min | "
                     f"{productivity}/100 | {timestamp}"
@@ -605,7 +605,7 @@ def start_monitoring(ctx, watch_dirs, no_observer):
 
             def console_callback(event_type: str, event_data: dict):
                 timestamp = datetime.now().strftime("%H:%M:%S")
-                message = event_data.get('message', 'Event triggered')
+                message = event_data.get("message", "Event triggered")
                 click.echo(f"[{timestamp}] {event_type}: {message}")
 
             monitor.add_event_callback(console_callback)
@@ -691,11 +691,11 @@ def monitor_status(ctx, format):
 
             # Configuration
             click.echo("\n⚙️ Configuration:")
-            session_interval = config_data.get('session_update_interval_s', 0)
+            session_interval = config_data.get("session_update_interval_s", 0)
             click.echo(f"   Session updates: every {session_interval}s")
-            health_interval = config_data.get('health_update_interval_s', 0)
+            health_interval = config_data.get("health_update_interval_s", 0)
             click.echo(f"   Health updates: every {health_interval}s")
-            activity_interval = config_data.get('activity_update_interval_s', 0)
+            activity_interval = config_data.get("activity_update_interval_s", 0)
             click.echo(f"   Activity updates: every {activity_interval}s")
 
             # Cache status
@@ -754,15 +754,15 @@ def live_dashboard(ctx, refresh):
                     current_session = session_data.get("current_session", {})
 
                     if current_session:
-                        session_id = current_session.get('session_id', 'Unknown')[:8]
+                        session_id = current_session.get("session_id", "Unknown")[:8]
                         click.echo(f"📊 Session: {session_id}...")
-                        duration = current_session.get('duration_seconds', 0)
+                        duration = current_session.get("duration_seconds", 0)
                         click.echo(f"⏱️ Duration: {duration:.0f}s")
-                        score = current_session.get('productivity_score', 0)
+                        score = current_session.get("productivity_score", 0)
                         click.echo(f"🎯 Productivity: {score}/100")
-                        opts = current_session.get('optimizations_applied', 0)
+                        opts = current_session.get("optimizations_applied", 0)
                         click.echo(f"🔧 Optimizations: {opts}")
-                        tools = current_session.get('tools_used', 0)
+                        tools = current_session.get("tools_used", 0)
                         click.echo(f"🛠️ Tools: {tools}")
                     else:
                         click.echo("📊 No active session")
@@ -818,42 +818,48 @@ async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) ->
     """Run productivity analysis for specified number of days."""
     from datetime import datetime, timedelta
     from pathlib import Path
-    
+
     # Use enhanced cache discovery system
     from ..analysis.discovery import CacheDiscoveryService
     from ..analytics.effectiveness_tracker import EffectivenessTracker
-    
+
     try:
         # Discover cache locations using enhanced discovery
         discovery_service = CacheDiscoveryService()
         locations = discovery_service.discover_cache_locations()
-        
+
         # Get current project cache if running from a specific directory
         current_project = discovery_service.get_current_project_cache()
-        
+
         # Calculate totals across all discovered locations
-        total_sessions = sum(loc.session_count for loc in locations if loc.is_accessible)
+        total_sessions = sum(
+            loc.session_count for loc in locations if loc.is_accessible
+        )
         total_size_mb = sum(loc.size_mb for loc in locations if loc.is_accessible)
-        
+
         # Get effectiveness data
         effectiveness_tracker = EffectivenessTracker()
         effectiveness_data = effectiveness_tracker.get_effectiveness_summary(days=days)
-        
+
         # Calculate productivity metrics from real data
-        success_rate = effectiveness_data.get('success_rate_percentage', 0)
-        avg_improvement = effectiveness_data.get('average_metrics', {}).get('health_improvement', 0)
-        
+        success_rate = effectiveness_data.get("success_rate_percentage", 0)
+        avg_improvement = effectiveness_data.get("average_metrics", {}).get(
+            "health_improvement", 0
+        )
+
         # Convert success rate and improvements to productivity score
         productivity_score = min(100, (success_rate * 2) + (avg_improvement * 0.5))
-        
+
         # Get optimization events from effectiveness data
-        optimization_events = effectiveness_data.get('total_impact', {}).get('optimizations_applied', 0)
-        
+        optimization_events = effectiveness_data.get("total_impact", {}).get(
+            "optimizations_applied", 0
+        )
+
         # Project-specific info
         project_info = ""
         if current_project:
             project_info = f" (Current project: {current_project.project_name} - {current_project.session_count} sessions)"
-        
+
         return {
             "period_days": days,
             "avg_productivity_score": round(productivity_score, 1),
@@ -862,15 +868,21 @@ async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) ->
             "most_productive_day": "Tuesday",  # Could be calculated from session timestamps
             "cache_locations_found": len(locations),
             "total_cache_size_mb": round(total_size_mb, 1),
-            "current_project": current_project.project_name if current_project else None,
+            "current_project": (
+                current_project.project_name if current_project else None
+            ),
             "recommendations": [
                 f"Found {total_sessions} sessions across {len(locations)} cache locations{project_info}",
                 f"Cache analysis shows {optimization_events} optimization events in last {days} days",
-                "Context optimization correlates with productivity improvements" if success_rate > 20 else "Consider using context optimization more frequently",
+                (
+                    "Context optimization correlates with productivity improvements"
+                    if success_rate > 20
+                    else "Consider using context optimization more frequently"
+                ),
             ],
             "analysis_timestamp": datetime.now().isoformat(),
         }
-        
+
     except Exception as e:
         # Fallback to basic data if discovery fails
         return {
@@ -901,25 +913,27 @@ def _format_text_analysis(results: dict) -> str:
     output.append(f"📈 Total Sessions: {results['total_sessions']}")
     output.append(f"⚡ Optimization Events: {results['optimization_events']}")
     output.append(f"🌟 Most Productive Day: {results['most_productive_day']}")
-    
+
     # Add cache discovery info if available
-    if 'cache_locations_found' in results:
+    if "cache_locations_found" in results:
         output.append("")
         output.append("🔍 CACHE DISCOVERY:")
         output.append(f"   📁 Locations found: {results['cache_locations_found']}")
-        output.append(f"   💾 Total cache size: {results.get('total_cache_size_mb', 0):.1f} MB")
-        if results.get('current_project'):
+        output.append(
+            f"   💾 Total cache size: {results.get('total_cache_size_mb', 0):.1f} MB"
+        )
+        if results.get("current_project"):
             output.append(f"   📂 Current project: {results['current_project']}")
-    
+
     output.append("")
     output.append("💡 RECOMMENDATIONS:")
     for i, rec in enumerate(results["recommendations"], 1):
         output.append(f"   {i}. {rec}")
-    
-    if 'error' in results:
+
+    if "error" in results:
         output.append("")
         output.append(f"⚠️  Note: {results['error']}")
-    
+
     output.append("")
     output.append(f"⏰ Generated: {results['analysis_timestamp']}")
 

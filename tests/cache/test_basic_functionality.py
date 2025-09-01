@@ -10,7 +10,7 @@ import pytest
 
 def test_can_import_all_analyzers():
     """Test that all analyzer components can be imported."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         UsagePatternAnalyzer, TokenEfficiencyAnalyzer, 
         TemporalContextAnalyzer, EnhancedContextAnalyzer,
         CrossSessionCorrelationAnalyzer
@@ -23,7 +23,7 @@ def test_can_import_all_analyzers():
 
 def test_can_instantiate_analyzers():
     """Test that all analyzers can be instantiated."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
         TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
     )
@@ -40,7 +40,7 @@ def test_can_instantiate_analyzers():
 
 def test_can_import_data_models():
     """Test that all data models can be imported."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         WorkflowPattern, FileUsageMetrics, UsagePatternSummary,
         TokenWastePattern, CacheEfficiencyMetrics, TokenAnalysisSummary,
         TopicTransition, SessionBoundary, TemporalInsights,
@@ -67,7 +67,7 @@ def test_can_import_data_models():
 
 def test_basic_analyzer_methods_exist():
     """Test that analyzers have the expected main analysis methods."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
         TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
     )
@@ -92,7 +92,7 @@ def test_basic_analyzer_methods_exist():
 
 def test_empty_session_handling():
     """Test that analyzers can handle empty session lists gracefully."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
         TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
     )
@@ -132,7 +132,7 @@ def test_empty_session_handling():
 def test_enhanced_context_analyzer_integration():
     """Test that enhanced context analyzer can be instantiated with mock base analyzer."""
     from unittest.mock import Mock
-    from src.context_cleaner.cache import EnhancedContextAnalyzer
+    from src.context_cleaner.analysis.import EnhancedContextAnalyzer
     
     # Create mock base analyzer
     mock_base_analyzer = Mock()

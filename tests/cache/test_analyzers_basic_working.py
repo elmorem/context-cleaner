@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 def test_usage_analyzer_basic():
     """Test basic usage analyzer functionality."""
-    from src.context_cleaner.cache.usage_analyzer import UsagePatternAnalyzer
+    from src.context_cleaner.analysis.usage_analyzer import UsagePatternAnalyzer
     
     analyzer = UsagePatternAnalyzer()
     assert analyzer is not None
@@ -28,7 +28,7 @@ def test_usage_analyzer_basic():
 
 def test_token_analyzer_basic():
     """Test basic token analyzer functionality.""" 
-    from src.context_cleaner.cache.token_analyzer import TokenEfficiencyAnalyzer
+    from src.context_cleaner.analysis.token_analyzer import TokenEfficiencyAnalyzer
     
     analyzer = TokenEfficiencyAnalyzer()
     assert analyzer is not None
@@ -44,7 +44,7 @@ def test_token_analyzer_basic():
 
 def test_temporal_analyzer_basic():
     """Test basic temporal analyzer functionality."""
-    from src.context_cleaner.cache.temporal_analyzer import TemporalContextAnalyzer
+    from src.context_cleaner.analysis.temporal_analyzer import TemporalContextAnalyzer
     
     analyzer = TemporalContextAnalyzer()
     assert analyzer is not None
@@ -59,7 +59,7 @@ def test_temporal_analyzer_basic():
 
 def test_correlation_analyzer_basic():
     """Test basic correlation analyzer functionality."""
-    from src.context_cleaner.cache.correlation_analyzer import CrossSessionCorrelationAnalyzer
+    from src.context_cleaner.analysis.correlation_analyzer import CrossSessionCorrelationAnalyzer
     
     analyzer = CrossSessionCorrelationAnalyzer()
     assert analyzer is not None
@@ -75,7 +75,7 @@ def test_correlation_analyzer_basic():
 
 def test_enhanced_context_analyzer_basic():
     """Test basic enhanced context analyzer functionality."""
-    from src.context_cleaner.cache.enhanced_context_analyzer import EnhancedContextAnalyzer
+    from src.context_cleaner.analysis.enhanced_context_analyzer import EnhancedContextAnalyzer
     from unittest.mock import Mock
     
     mock_base_analyzer = Mock()
@@ -86,7 +86,7 @@ def test_enhanced_context_analyzer_basic():
 
 def test_token_analyzer_division_by_zero_fix():
     """Test that division by zero is fixed in token analyzer."""
-    from src.context_cleaner.cache.token_analyzer import TokenAnalysisSummary, CacheEfficiencyMetrics, TokenUsageInsights
+    from src.context_cleaner.analysis.token_analyzer import TokenAnalysisSummary, CacheEfficiencyMetrics, TokenUsageInsights
     from datetime import datetime, timedelta
     
     # Create a summary with zero average_tokens_per_message
@@ -126,7 +126,7 @@ def test_token_analyzer_division_by_zero_fix():
 
 def test_all_data_models_can_instantiate():
     """Test that all data model classes can be instantiated."""
-    from src.context_cleaner.cache import (
+    from src.context_cleaner.analysis.import (
         WorkflowPattern, TopicTransition, UsageWeightedScore
     )
     from datetime import datetime

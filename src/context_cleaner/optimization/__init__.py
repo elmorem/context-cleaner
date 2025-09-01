@@ -20,6 +20,7 @@ try:
         HealthLevel,
         UsageInsight,
     )
+
     CACHE_DASHBOARD_AVAILABLE = True
 except ImportError:
     # Graceful fallback when cache module is not available

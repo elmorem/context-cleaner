@@ -11,11 +11,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.context_cleaner.cache.usage_analyzer import (
+from src.context_cleaner.analysis.usage_analyzer import (
     UsagePatternAnalyzer, WorkflowPattern, FileUsageMetrics, UsagePatternSummary
 )
-from src.context_cleaner.cache.models import SessionAnalysis, ToolUsage, CacheConfig
-from src.context_cleaner.cache.discovery import CacheLocation
+from src.context_cleaner.analysis.models import SessionAnalysis, ToolUsage, CacheConfig
+from src.context_cleaner.analysis.discovery import CacheLocation
 
 
 class TestUsagePatternAnalyzer:

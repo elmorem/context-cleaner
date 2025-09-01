@@ -52,7 +52,13 @@ class OptimizationCommandHandler:
         # PR20: Initialize effectiveness tracking
         self.effectiveness_tracker = EffectivenessTracker()
 
-    def handle_dashboard_command(self, format: str = "web", host: str = "127.0.0.1", port: int = 8080, debug: bool = False) -> None:
+    def handle_dashboard_command(
+        self,
+        format: str = "web",
+        host: str = "127.0.0.1",
+        port: int = 8080,
+        debug: bool = False,
+    ) -> None:
         """
         Handle the dashboard optimization command.
 
@@ -62,14 +68,16 @@ class OptimizationCommandHandler:
         try:
             if format == "json":
                 # For JSON format, provide summary data
-                from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+                from ..dashboard.comprehensive_health_dashboard import (
+                    ComprehensiveHealthDashboard,
+                )
                 import asyncio
-                
+
                 dashboard = ComprehensiveHealthDashboard(config=self.config)
-                
+
                 if self.verbose:
                     click.echo("📊 Generating comprehensive health report JSON...")
-                
+
                 # Run async method in thread for CLI
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -77,20 +85,23 @@ class OptimizationCommandHandler:
                     dashboard.generate_comprehensive_health_report()
                 )
                 loop.close()
-                
+
                 from dataclasses import asdict
+
                 data = asdict(report)
                 click.echo(json.dumps(data, indent=2, default=str))
-                
+
             else:
                 # Launch comprehensive web dashboard
-                from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-                
+                from ..dashboard.comprehensive_health_dashboard import (
+                    ComprehensiveHealthDashboard,
+                )
+
                 if self.verbose:
                     click.echo("🚀 Starting Context Cleaner Comprehensive Dashboard...")
-                
+
                 dashboard = ComprehensiveHealthDashboard(config=self.config)
-                
+
                 click.echo("📊 Context Cleaner Comprehensive Health Dashboard")
                 click.echo("=" * 60)
                 click.echo(f"🌐 Dashboard URL: http://{host}:{port}")
@@ -102,20 +113,19 @@ class OptimizationCommandHandler:
                 click.echo("   • 🔄 WebSocket real-time updates")
                 click.echo("   • 📤 Data export capabilities")
                 click.echo()
-                click.echo("💡 All dashboard components now integrated into single interface!")
+                click.echo(
+                    "💡 All dashboard components now integrated into single interface!"
+                )
                 click.echo("💡 Press Ctrl+C to stop the server")
                 click.echo()
-                
+
                 try:
                     dashboard.start_server(
-                        host=host,
-                        port=port,
-                        debug=debug,
-                        open_browser=True
+                        host=host, port=port, debug=debug, open_browser=True
                     )
                 except KeyboardInterrupt:
                     click.echo("\n👋 Comprehensive dashboard stopped")
-                    
+
             if self.verbose:
                 click.echo("✅ Comprehensive dashboard command completed")
 
@@ -123,6 +133,7 @@ class OptimizationCommandHandler:
             click.echo(f"❌ Comprehensive dashboard failed to load: {e}", err=True)
             if self.verbose:
                 import traceback
+
                 click.echo(traceback.format_exc(), err=True)
 
     def handle_quick_optimization(

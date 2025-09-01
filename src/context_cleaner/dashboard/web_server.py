@@ -15,7 +15,7 @@ from .comprehensive_health_dashboard import ComprehensiveHealthDashboard
 class ProductivityDashboard:
     """
     Web-based productivity dashboard for Context Cleaner.
-    
+
     This class serves as a compatibility wrapper around the comprehensive
     health dashboard, maintaining existing API contracts while providing
     access to all integrated features from the unified dashboard system.
@@ -24,36 +24,42 @@ class ProductivityDashboard:
     def __init__(self, config: Optional[ContextCleanerConfig] = None):
         """Initialize with comprehensive health dashboard."""
         self.config = config or ContextCleanerConfig.default()
-        
+
         # Delegate to comprehensive dashboard - this provides all functionality
         self.comprehensive_dashboard = ComprehensiveHealthDashboard(config=self.config)
-        
+
         # Expose Flask app for compatibility
         self.app = self.comprehensive_dashboard.app
-        
+
         # Set up additional compatibility routes
         self._setup_compatibility_routes()
 
     def _setup_compatibility_routes(self):
         """Setup additional compatibility routes for legacy API support."""
-        
+
         # Add compatibility route for old productivity summary endpoint
         @self.app.route("/api/productivity-summary-legacy")
         def get_productivity_summary_legacy():
             """Legacy productivity summary endpoint - redirects to comprehensive dashboard."""
             from flask import jsonify, request
-            
+
             try:
                 days = request.args.get("days", 7, type=int)
-                
+
                 # Get recent sessions from comprehensive dashboard
-                sessions = self.comprehensive_dashboard.get_recent_sessions_analytics(days)
-                
+                sessions = self.comprehensive_dashboard.get_recent_sessions_analytics(
+                    days
+                )
+
                 # Calculate summary metrics in legacy format
-                avg_productivity = sum(s.get("productivity_score", 0) for s in sessions) / max(len(sessions), 1)
+                avg_productivity = sum(
+                    s.get("productivity_score", 0) for s in sessions
+                ) / max(len(sessions), 1)
                 total_sessions = len(sessions)
-                optimization_events = sum(1 for s in sessions if s.get("optimization_applied", False))
-                
+                optimization_events = sum(
+                    1 for s in sessions if s.get("optimization_applied", False)
+                )
+
                 summary = {
                     "period_days": days,
                     "avg_productivity_score": round(avg_productivity, 1),
@@ -61,20 +67,26 @@ class ProductivityDashboard:
                     "optimization_events": optimization_events,
                     "health_trend": "improving" if avg_productivity > 60 else "stable",
                     "cache_locations_found": 1 if sessions else 0,
-                    "total_cache_size_mb": sum(s.get("file_size_mb", 0) for s in sessions),
+                    "total_cache_size_mb": sum(
+                        s.get("file_size_mb", 0) for s in sessions
+                    ),
                     "current_project": "integrated_dashboard",
-                    "recommendations": [
-                        "Using comprehensive health dashboard",
-                        "All dashboard features now integrated",
-                        "Real-time monitoring available"
-                    ] if sessions else [
-                        "No session data found",
-                        "Use the comprehensive dashboard for full analytics"
-                    ],
+                    "recommendations": (
+                        [
+                            "Using comprehensive health dashboard",
+                            "All dashboard features now integrated",
+                            "Real-time monitoring available",
+                        ]
+                        if sessions
+                        else [
+                            "No session data found",
+                            "Use the comprehensive dashboard for full analytics",
+                        ]
+                    ),
                     "last_updated": datetime.now().isoformat(),
                 }
                 return jsonify(summary)
-                
+
             except Exception as e:
                 fallback_summary = {
                     "period_days": days,
@@ -93,17 +105,20 @@ class ProductivityDashboard:
         def get_session_analytics_legacy():
             """Legacy session analytics endpoint."""
             from flask import jsonify
-            
+
             try:
                 sessions = self.comprehensive_dashboard.get_recent_sessions_analytics(7)
-                
+
                 if not sessions:
                     analytics = {
                         "session_types": {"no_data": 100},
                         "hourly_productivity": {"12": 50},
                         "weekly_trends": {
-                            "Monday": 50, "Tuesday": 50, "Wednesday": 50,
-                            "Thursday": 50, "Friday": 50,
+                            "Monday": 50,
+                            "Tuesday": 50,
+                            "Wednesday": 50,
+                            "Thursday": 50,
+                            "Friday": 50,
                         },
                         "optimization_impact": {
                             "avg_improvement": 0.0,
@@ -111,7 +126,7 @@ class ProductivityDashboard:
                         },
                     }
                     return jsonify(analytics)
-                
+
                 # Calculate hourly productivity
                 hourly_data = {}
                 for session in sessions:
@@ -121,12 +136,12 @@ class ProductivityDashboard:
                     if hour not in hourly_data:
                         hourly_data[hour] = []
                     hourly_data[hour].append(productivity)
-                
+
                 hourly_productivity = {
                     hour: sum(scores) / len(scores)
                     for hour, scores in hourly_data.items()
                 }
-                
+
                 analytics = {
                     "session_types": {
                         "development": 70,
@@ -135,8 +150,11 @@ class ProductivityDashboard:
                     },
                     "hourly_productivity": hourly_productivity,
                     "weekly_trends": {
-                        "Monday": 85, "Tuesday": 88, "Wednesday": 85,
-                        "Thursday": 90, "Friday": 78,
+                        "Monday": 85,
+                        "Tuesday": 88,
+                        "Wednesday": 85,
+                        "Thursday": 90,
+                        "Friday": 78,
                     },
                     "optimization_impact": {
                         "avg_improvement": 15.3,
@@ -144,37 +162,42 @@ class ProductivityDashboard:
                     },
                 }
                 return jsonify(analytics)
-                
+
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
-    def start_server(self, host: str = "127.0.0.1", port: int = 8080, debug: bool = False, open_browser: bool = True):
+    def start_server(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8080,
+        debug: bool = False,
+        open_browser: bool = True,
+    ):
         """
         Start the comprehensive dashboard server.
-        
+
         This method delegates to the comprehensive health dashboard,
         providing all integrated features through a single interface.
         """
         print(f"🚀 Starting Context Cleaner Comprehensive Dashboard...")
         print(f"📊 Dashboard: http://{host}:{port}")
         print(f"🔧 WebSocket: Enabled for real-time updates")
-        print(f"💡 Features: Analytics, Performance, Cache Optimization, Session Analysis")
+        print(
+            f"💡 Features: Analytics, Performance, Cache Optimization, Session Analysis"
+        )
         print(f"📈 All dashboard components now integrated into single interface")
         print("\n💡 Press Ctrl+C to stop the server")
-        
+
         # Start the comprehensive dashboard server
         self.comprehensive_dashboard.start_server(
-            host=host,
-            port=port,
-            debug=debug,
-            open_browser=open_browser
+            host=host, port=port, debug=debug, open_browser=open_browser
         )
 
     # Legacy compatibility - kept for any existing code that references this
     def _generate_dashboard_html(self) -> str:
         """
         Legacy method - comprehensive dashboard now handles all HTML.
-        
+
         Returns a redirect notice pointing users to the comprehensive dashboard.
         """
         return """

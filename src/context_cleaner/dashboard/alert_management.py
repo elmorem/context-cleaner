@@ -957,17 +957,17 @@ class AlertManager:
             # This would typically connect to data sources
             # For now, we'll simulate data based on the data source type
             if rule.data_source == "productivity":
-                from ..dashboard.advanced_dashboard import ProductivityDataSource
+                from .comprehensive_health_dashboard import ProductivityDataSource
 
                 source = ProductivityDataSource("productivity", {})
                 return await source.get_data(rule.filters)
             elif rule.data_source == "health":
-                from ..dashboard.advanced_dashboard import HealthDataSource
+                from .comprehensive_health_dashboard import HealthDataSource
 
                 source = HealthDataSource("health", {})
                 return await source.get_data(rule.filters)
             elif rule.data_source == "tasks":
-                from ..dashboard.advanced_dashboard import TaskDataSource
+                from .comprehensive_health_dashboard import TaskDataSource
 
                 source = TaskDataSource("tasks", {})
                 return await source.get_data(rule.filters)

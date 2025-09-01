@@ -9,7 +9,7 @@ token metrics, session messages, and analysis results.
 import pytest
 from datetime import datetime, timedelta
 
-from src.context_cleaner.cache.models import (
+from src.context_cleaner.analysis.models import (
     TokenMetrics, ToolUsage, SessionMessage, SessionAnalysis,
     FileAccessPattern, CacheAnalysisResult, CacheConfig,
     MessageRole, MessageType
