@@ -12,7 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Plotly.js for advanced charts -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     
     <!-- Socket.IO for real-time updates -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
@@ -50,8 +50,9 @@
         
         .chart-container {
             position: relative;
-            height: 300px;
+            height: 250px;
             width: 100%;
+            overflow: hidden;
         }
         
         .loading {
@@ -242,9 +243,69 @@
         <!-- Session Timeline -->
         <div class="mt-8">
             <div class="dashboard-card p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Session Timeline</h3>
-                <div class="chart-container" style="height: 400px;">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Session Timeline</h3>
+                    <select id="timeline-chart-selector" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                        <option value="daily_summary">Daily Summary</option>
+                        <option value="session_volume">Work Intensity</option>
+                        <option value="productivity_focus">Focus & Efficiency</option>
+                        <option value="trend_comparison">Trend Analysis</option>
+                    </select>
+                </div>
+                <div id="timeline-explanation" class="text-sm text-gray-600 mb-3 p-2 bg-blue-50 rounded">
+                    Clean daily averages showing productivity vs health trends. Removes clutter of individual sessions to focus on patterns over time.
+                </div>
+                <div class="chart-container" style="height: 350px;">
                     <div id="timeline-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Token Analysis -->
+        <div class="mt-8">
+            <div class="dashboard-card p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Token Usage Analysis</h3>
+                    <button id="refresh-tokens" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors">
+                        Refresh
+                    </button>
+                </div>
+                <div class="text-sm text-gray-600 mb-4 p-2 bg-purple-50 rounded">
+                    Analysis of token usage across different context categories from your Claude Code sessions. Shows how your context budget is being allocated.
+                </div>
+                
+                <!-- Token Summary Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-500">Total Tokens Analyzed</div>
+                        <div id="total-tokens-analyzed" class="text-xl font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-500">Sessions Analyzed</div>
+                        <div id="sessions-analyzed" class="text-xl font-semibold text-gray-900">0</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-500">Top Category</div>
+                        <div id="top-category" class="text-xl font-semibold text-gray-900">-</div>
+                    </div>
+                </div>
+
+                <!-- Token Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="chart-container" style="height: 350px;">
+                        <div id="token-distribution-chart"></div>
+                    </div>
+                    <div class="chart-container" style="height: 350px;">
+                        <div id="token-breakdown-chart"></div>
+                    </div>
+                </div>
+
+                <!-- Category Details -->
+                <div class="mt-6">
+                    <h4 class="text-md font-semibold text-gray-900 mb-3">Category Breakdown</h4>
+                    <div id="token-categories" class="space-y-2">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -271,6 +332,7 @@
             initializeSocketConnection();
             setupEventListeners();
             loadDashboardData();
+            loadTokenAnalysis();
         });
 
         // Socket connection
@@ -296,14 +358,32 @@
         // Event listeners
         function setupEventListeners() {
             document.getElementById('refresh-btn').addEventListener('click', function() {
-                socket.emit('request_update');
-                showLoading();
+                loadDashboardData();
             });
             
             document.getElementById('auto-refresh-toggle').addEventListener('click', function() {
                 autoRefreshEnabled = !autoRefreshEnabled;
                 socket.emit('toggle_auto_refresh', {enabled: autoRefreshEnabled});
                 updateAutoRefreshButton();
+            });
+            
+            // Timeline chart type selector
+            document.getElementById('timeline-chart-selector').addEventListener('change', function() {
+                const selectedType = this.value;
+                const explanationEl = document.getElementById('timeline-explanation');
+                
+                // Update explanation immediately
+                if (chartExplanations[selectedType] && explanationEl) {
+                    explanationEl.textContent = chartExplanations[selectedType];
+                }
+                
+                // Load new chart
+                loadTimelineChart(selectedType);
+            });
+
+            // Token analysis refresh button
+            document.getElementById('refresh-tokens').addEventListener('click', function() {
+                loadTokenAnalysis();
             });
         }
 
@@ -408,10 +488,11 @@
                 yaxis: {title: 'Score', range: [0, 100]},
                 margin: {t: 20, r: 20, b: 40, l: 50},
                 plot_bgcolor: 'transparent',
-                paper_bgcolor: 'transparent'
+                paper_bgcolor: 'transparent',
+                height: 250
             };
             
-            Plotly.newPlot('productivity-chart', [trace], layout, {responsive: true});
+            Plotly.newPlot('productivity-chart', [trace], layout, {responsive: true, displayModeBar: false});
         }
 
         // Update health chart  
@@ -438,6 +519,7 @@
                 margin: {t: 20, r: 20, b: 40, l: 50},
                 plot_bgcolor: 'transparent',
                 paper_bgcolor: 'transparent',
+                height: 250,
                 shapes: [
                     {type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 80, y1: 80, line: {color: 'green', width: 1, dash: 'dash'}},
                     {type: 'line', x0: 0, x1: 1, xref: 'paper', y0: 60, y1: 60, line: {color: 'orange', width: 1, dash: 'dash'}},
@@ -445,12 +527,12 @@
                 ]
             };
             
-            Plotly.newPlot('health-chart', [trace], layout, {responsive: true});
+            Plotly.newPlot('health-chart', [trace], layout, {responsive: true, displayModeBar: false});
         }
 
         // Load timeline chart
-        function loadTimelineChart() {
-            fetch('/api/session-timeline?days=7')
+        function loadTimelineChart(chartType = 'daily_summary') {
+            fetch(`/api/session-timeline?days=14&type=${chartType}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -458,7 +540,14 @@
                             '<div class="flex items-center justify-center h-full text-gray-500">No session timeline data available</div>';
                         return;
                     }
-                    Plotly.newPlot('timeline-chart', data.data, data.layout, {responsive: true});
+                    
+                    // Update explanation text
+                    const explanationEl = document.getElementById('timeline-explanation');
+                    if (data.explanation && explanationEl) {
+                        explanationEl.textContent = data.explanation;
+                    }
+                    
+                    Plotly.newPlot('timeline-chart', data.data, data.layout, {responsive: true, displayModeBar: false});
                 })
                 .catch(error => {
                     console.error('Error loading timeline chart:', error);
@@ -466,6 +555,14 @@
                         '<div class="flex items-center justify-center h-full text-red-500">Failed to load timeline</div>';
                 });
         }
+        
+        // Chart type selector explanations
+        const chartExplanations = {
+            'daily_summary': 'Clean daily averages showing productivity vs health trends. Removes clutter of individual sessions to focus on patterns over time.',
+            'session_volume': 'Shows work intensity (session count) vs productivity. Helps identify if busy days lead to better or worse performance.',
+            'productivity_focus': 'Combines focus time with productivity to show efficiency. Efficiency score (red) shows when you\'re both productive AND focused.',
+            'trend_comparison': 'Shows daily fluctuations vs smoothed trends. Trend lines reveal if performance is genuinely improving or just having good/bad days.'
+        };
 
         // Update recommendations
         function updateRecommendations(recommendations) {
@@ -482,11 +579,35 @@
                         <h4 class="font-semibold text-gray-900">${rec.title}</h4>
                         <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">${rec.priority}</span>
                     </div>
-                    <p class="text-gray-600 text-sm mb-2">${rec.description}</p>
+                    <p class="text-gray-600 text-sm mb-3">${rec.description}</p>
+                    
+                    ${rec.command ? `
+                    <div class="bg-gray-50 rounded p-3 mb-3">
+                        <div class="flex items-center mb-1">
+                            <svg class="w-4 h-4 mr-1 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3"></path>
+                            </svg>
+                            <span class="text-xs font-medium text-gray-700">Command:</span>
+                        </div>
+                        <code class="text-sm bg-gray-800 text-green-400 px-2 py-1 rounded font-mono">${rec.command}</code>
+                    </div>
+                    ` : ''}
+                    
+                    ${rec.expected_outcome ? `
+                    <div class="flex items-start mb-3">
+                        <svg class="w-4 h-4 mr-1 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <span class="text-xs font-medium text-gray-700">Expected outcome:</span>
+                            <p class="text-xs text-gray-600 mt-1">${rec.expected_outcome}</p>
+                        </div>
+                    </div>
+                    ` : ''}
+                    
                     <div class="flex items-center justify-between text-xs text-gray-500">
-                        <span>Impact: ${rec.impact_score}%</span>
-                        <span>Confidence: ${rec.confidence}%</span>
-                        ${rec.estimated_time_savings ? `<span>Saves: ${rec.estimated_time_savings}min/day</span>` : ''}
+                        <span>Priority: ${rec.priority}</span>
+                        <span>Impact: ${rec.impact}</span>
                     </div>
                 </div>
             `).join('');
@@ -502,9 +623,21 @@
             }
             
             container.innerHTML = insights.map(insight => `
-                <div class="flex items-start space-x-2">
-                    <div class="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                    <p class="text-sm text-gray-700">${insight}</p>
+                <div class="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h5 class="font-medium text-gray-900 text-sm mb-1">${insight.title || 'Insight'}</h5>
+                        <p class="text-gray-600 text-sm">${insight.value || insight.description || 'No details available'}</p>
+                        ${insight.trend ? `<span class="inline-block px-2 py-1 text-xs rounded-full mt-2 ${
+                            insight.trend === 'upward' ? 'bg-green-100 text-green-800' :
+                            insight.trend === 'downward' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                        }">Trend: ${insight.trend}</span>` : ''}
+                    </div>
                 </div>
             `).join('');
         }
@@ -552,10 +685,12 @@
 
         // Loading functions
         function showLoading() {
+            console.log('showLoading called');
             document.getElementById('loading-overlay').classList.remove('hidden');
         }
 
         function hideLoading() {
+            console.log('hideLoading called');
             document.getElementById('loading-overlay').classList.add('hidden');
         }
 
@@ -563,6 +698,106 @@
         function showError(message) {
             console.error('Dashboard error:', message);
             // Could show toast notification or error banner
+        }
+
+        // Token Analysis Functions
+        function loadTokenAnalysis() {
+            fetch('/api/token-analysis')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showError('Token analysis error: ' + data.error);
+                        return;
+                    }
+                    updateTokenAnalysis(data);
+                })
+                .catch(error => {
+                    console.error('Error loading token analysis:', error);
+                    showError('Failed to load token analysis');
+                });
+        }
+
+        function updateTokenAnalysis(data) {
+            // Update summary stats
+            document.getElementById('total-tokens-analyzed').textContent = data.total_tokens.toLocaleString();
+            
+            const sessionCount = data.categories.reduce((sum, cat) => sum + cat.count, 0);
+            document.getElementById('sessions-analyzed').textContent = sessionCount.toString();
+            
+            if (data.categories.length > 0) {
+                document.getElementById('top-category').textContent = data.categories[0].name;
+            }
+
+            // Update charts
+            if (data.charts && data.charts.length > 0) {
+                data.charts.forEach(chart => {
+                    if (chart.type === 'distribution') {
+                        Plotly.newPlot('token-distribution-chart', 
+                            chart.chart.data, 
+                            chart.chart.layout,
+                            {responsive: true, displayModeBar: false}
+                        );
+                    } else if (chart.type === 'breakdown') {
+                        Plotly.newPlot('token-breakdown-chart', 
+                            chart.chart.data, 
+                            chart.chart.layout,
+                            {responsive: true, displayModeBar: false}
+                        );
+                    }
+                });
+            }
+
+            // Update category details
+            updateTokenCategories(data.categories);
+        }
+
+        function updateTokenCategories(categories) {
+            const container = document.getElementById('token-categories');
+            container.innerHTML = categories.map(category => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer" 
+                     onclick="showCategoryDetails('${category.name}', ${JSON.stringify(category).replace(/"/g, '&quot;')})">
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-medium text-gray-900">${category.name}</span>
+                            <span class="text-sm text-gray-500">${category.percentage}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${category.percentage}%"></div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>${category.tokens.toLocaleString()} tokens</span>
+                            <span>${category.count} occurrences</span>
+                        </div>
+                    </div>
+                    <div class="ml-3 text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCategoryDetails(categoryName, categoryData) {
+            // For now, log to console. Could expand to show modal or drill-down view
+            console.log('Category Details:', categoryName, categoryData);
+            
+            // Show breakdown in alert for now (would replace with proper modal)
+            const breakdown = categoryData.breakdown;
+            const details = [
+                `Category: ${categoryName}`,
+                `Total Tokens: ${categoryData.tokens.toLocaleString()}`,
+                `Percentage: ${categoryData.percentage}%`,
+                `Occurrences: ${categoryData.count}`,
+                '',
+                'Token Breakdown:',
+                `  Input: ${breakdown.input.toLocaleString()}`,
+                `  Cache Creation: ${breakdown.cache_creation.toLocaleString()}`,
+                `  Cache Read: ${breakdown.cache_read.toLocaleString()}`,
+                `  Output: ${breakdown.output.toLocaleString()}`
+            ].join('\\n');
+            
+            alert(details);
         }
     </script>
 </body>

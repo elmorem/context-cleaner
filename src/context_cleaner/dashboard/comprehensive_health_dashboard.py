@@ -967,6 +967,182 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Dashboard summary API failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
+        @self.app.route("/api/dashboard-data")
+        def get_dashboard_data():
+            """Get dashboard data for frontend (compatibility endpoint)."""
+            try:
+                # Use existing dashboard summary data
+                summary_response = get_dashboard_summary()
+                summary_data = summary_response.get_json()
+                
+                # Get recent sessions for chart data (30 days for better trends)
+                sessions = self.get_recent_sessions_analytics(30)
+                
+                # Create chart data for trends - group by date for cleaner visualization
+                dates = []
+                productivity_scores = []
+                health_scores = []
+                
+                # Group sessions by date and calculate daily averages
+                from collections import defaultdict
+                daily_data = defaultdict(list)
+                
+                for session in sessions:
+                    if session.get("start_time"):
+                        date = session["start_time"][:10]  # Just date part
+                        daily_data[date].append({
+                            'productivity': session.get("productivity_score", 0),
+                            'health': session.get("health_score", 0)
+                        })
+                
+                # Calculate daily averages and sort by date
+                for date in sorted(daily_data.keys()):
+                    daily_sessions = daily_data[date]
+                    avg_productivity = sum(s['productivity'] for s in daily_sessions) / len(daily_sessions)
+                    avg_health = sum(s['health'] for s in daily_sessions) / len(daily_sessions)
+                    
+                    dates.append(date)
+                    productivity_scores.append(round(avg_productivity, 1))
+                    health_scores.append(round(avg_health, 1))
+                
+                # Limit to last 14 days for readability
+                if len(dates) > 14:
+                    dates = dates[-14:]
+                    productivity_scores = productivity_scores[-14:]
+                    health_scores = health_scores[-14:]
+                
+                # Generate specific, actionable recommendations with CLI commands
+                recommendations = []
+                avg_prod = summary_data.get("avg_productivity", 0)
+                total_sessions = summary_data.get("total_sessions", 0)
+                
+                # Context optimization recommendation
+                if total_sessions > 30:
+                    recommendations.append({
+                        "title": "Run Context Optimization",
+                        "description": f"You have {total_sessions} sessions. Run optimization to improve performance.",
+                        "command": "context-cleaner optimize",
+                        "expected_outcome": "Reduce context size by ~60-80 tokens, improve AI response speed",
+                        "priority": "high",
+                        "impact": "high"
+                    })
+                
+                # Cache analysis for large session counts
+                if total_sessions > 50:
+                    recommendations.append({
+                        "title": "Analyze Cache Usage",
+                        "description": "Review cache distribution across projects for optimization opportunities.",
+                        "command": "context-cleaner analyze --detailed",
+                        "expected_outcome": "Identify which projects consume most context, productivity patterns",
+                        "priority": "medium",
+                        "impact": "medium"
+                    })
+                
+                # Productivity improvement suggestions
+                if avg_prod < 85:
+                    recommendations.append({
+                        "title": "Monitor Productivity Trends",
+                        "description": f"Your productivity is {avg_prod:.1f}%. Track real-time metrics to identify patterns.",
+                        "command": "context-cleaner monitor --real-time",
+                        "expected_outcome": "Real-time alerts on productivity drops, session insights",
+                        "priority": "medium", 
+                        "impact": "medium"
+                    })
+                
+                # Export data for deeper analysis
+                if len(dates) > 10:  # If we have substantial trend data
+                    recent_trend = productivity_scores[-3:] if len(productivity_scores) >= 3 else []
+                    if recent_trend and sum(recent_trend) / len(recent_trend) < avg_prod - 5:
+                        recommendations.append({
+                            "title": "Export Analytics for Review",
+                            "description": "Recent productivity decline detected. Export data for deeper analysis.",
+                            "command": "context-cleaner export-analytics --format json",
+                            "expected_outcome": "Detailed JSON report for external analysis, trend identification",
+                            "priority": "low",
+                            "impact": "high"
+                        })
+                
+                # Health check recommendation
+                if total_sessions > 40:
+                    recommendations.append({
+                        "title": "Run System Health Check",
+                        "description": "Verify context-cleaner is running optimally with comprehensive diagnostics.",
+                        "command": "context-cleaner health-check --comprehensive",
+                        "expected_outcome": "System status report, configuration validation, performance metrics",
+                        "priority": "low",
+                        "impact": "medium"
+                    })
+                
+                # Format for frontend expectations
+                dashboard_data = {
+                    "summary": {
+                        "total_sessions": total_sessions,
+                        "avg_productivity": avg_prod,
+                        "avg_health_score": summary_data.get("avg_health_score", 0),
+                        "active_recommendations": len(recommendations),
+                    },
+                    "trends": {
+                        "productivity": {"direction": "stable" if len(productivity_scores) < 2 else ("upward" if productivity_scores[-1] > productivity_scores[0] else "downward")},
+                        "health_score": {"direction": "stable" if len(health_scores) < 2 else ("upward" if health_scores[-1] > health_scores[0] else "downward")}
+                    },
+                    "charts": {
+                        "productivity_chart": {
+                            "labels": dates,
+                            "data": productivity_scores
+                        },
+                        "health_score_chart": {
+                            "labels": dates,
+                            "data": health_scores
+                        }
+                    },
+                    "recommendations": recommendations,
+                    "insights": self._generate_insights(dates, productivity_scores, health_scores, total_sessions, avg_prod),
+                    "patterns": self._generate_patterns(dates, productivity_scores, health_scores, total_sessions),
+                    "timestamp": summary_data.get("timestamp")
+                }
+                return jsonify(dashboard_data)
+            except Exception as e:
+                logger.error(f"Dashboard data API failed: {e}")
+                return jsonify({"sessions": 0, "productivity": 0, "health": 0, "recommendations": 0}), 500
+
+        @self.app.route("/api/session-timeline")
+        def get_session_timeline():
+            """Get session timeline data for frontend charts in Plotly format."""
+            try:
+                days = request.args.get('days', 7, type=int)
+                chart_type = request.args.get('type', 'daily_summary', type=str)
+                sessions = self.get_recent_sessions_analytics(days)
+                
+                if not sessions:
+                    return jsonify({"error": "No session data available"})
+                
+                # Generate different chart types based on request
+                if chart_type == 'daily_summary':
+                    plotly_data = self._create_daily_summary_chart(sessions, days)
+                elif chart_type == 'session_volume':
+                    plotly_data = self._create_session_volume_chart(sessions, days)
+                elif chart_type == 'productivity_focus':
+                    plotly_data = self._create_productivity_focus_chart(sessions, days)
+                elif chart_type == 'trend_comparison':
+                    plotly_data = self._create_trend_comparison_chart(sessions, days)
+                else:
+                    plotly_data = self._create_daily_summary_chart(sessions, days)  # Default
+                
+                return jsonify(plotly_data)
+            except Exception as e:
+                logger.error(f"Session timeline API failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/token-analysis")
+        def get_token_analysis():
+            """Get token count analysis by context categories."""
+            try:
+                analysis = self._analyze_token_usage()
+                return jsonify(analysis)
+            except Exception as e:
+                logging.error(f"Token analysis error: {e}")
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/export-data/<format>")
         def export_dashboard_data(format: str):
             """Export comprehensive dashboard data."""
@@ -1047,7 +1223,25 @@ class ComprehensiveHealthDashboard:
                     self.generate_comprehensive_health_report()
                 )
                 loop.close()
-                emit("health_update", asdict(report))
+                # Convert to JSON-safe format
+                try:
+                    report_dict = asdict(report)
+                    # Replace datetime objects with ISO strings
+                    def serialize_datetime(obj):
+                        if isinstance(obj, dict):
+                            return {k: serialize_datetime(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [serialize_datetime(item) for item in obj]
+                        elif isinstance(obj, datetime):
+                            return obj.isoformat()
+                        elif hasattr(obj, 'value'):  # Handle enums
+                            return obj.value
+                        return obj
+                    safe_report = serialize_datetime(report_dict)
+                    emit("health_update", safe_report)
+                except Exception as serialize_error:
+                    logger.warning(f"Serialization error: {serialize_error}")
+                    emit("health_update", {"status": "error", "message": "Failed to serialize health data"})
             except Exception as e:
                 logger.error(f"Initial health data failed: {e}")
                 emit("error", {"message": str(e)})
@@ -1067,7 +1261,25 @@ class ComprehensiveHealthDashboard:
                     self.generate_comprehensive_health_report()
                 )
                 loop.close()
-                emit("health_update", asdict(report))
+                # Convert to JSON-safe format
+                try:
+                    report_dict = asdict(report)
+                    # Replace datetime objects with ISO strings
+                    def serialize_datetime(obj):
+                        if isinstance(obj, dict):
+                            return {k: serialize_datetime(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [serialize_datetime(item) for item in obj]
+                        elif isinstance(obj, datetime):
+                            return obj.isoformat()
+                        elif hasattr(obj, 'value'):  # Handle enums
+                            return obj.value
+                        return obj
+                    safe_report = serialize_datetime(report_dict)
+                    emit("health_update", safe_report)
+                except Exception as serialize_error:
+                    logger.warning(f"Serialization error: {serialize_error}")
+                    emit("health_update", {"status": "error", "message": "Failed to serialize health data"})
             except Exception as e:
                 logger.error(f"Health update request failed: {e}")
                 emit("error", {"message": str(e)})
@@ -1129,6 +1341,7 @@ class ComprehensiveHealthDashboard:
                 port=port,
                 debug=debug,
                 use_reloader=False,  # Disable reloader to prevent threading issues
+                allow_unsafe_werkzeug=True,  # Allow development server for testing
             )
         except Exception as e:
             logger.error(f"Dashboard server error: {e}")
@@ -1180,7 +1393,18 @@ class ComprehensiveHealthDashboard:
                     ]
 
                 # Broadcast to all connected clients
-                self.socketio.emit("health_update", asdict(report))
+                # Replace datetime objects with ISO strings for JSON serialization
+                def serialize_datetime(obj):
+                    if isinstance(obj, dict):
+                        return {k: serialize_datetime(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [serialize_datetime(item) for item in obj]
+                    elif isinstance(obj, datetime):
+                        return obj.isoformat()
+                    return obj
+
+                safe_report = serialize_datetime(asdict(report))
+                self.socketio.emit("health_update", safe_report)
 
                 # Update every 30 seconds
                 self._stop_event.wait(timeout=30.0)
@@ -2800,6 +3024,368 @@ class ComprehensiveHealthDashboard:
         )
         return bool(re.match(iso_pattern, timestamp_str))
 
+    def _generate_insights(self, dates, productivity_scores, health_scores, total_sessions, avg_prod):
+        """Generate meaningful insights from productivity and health data."""
+        insights = []
+        
+        # Productivity insights
+        if len(productivity_scores) > 1:
+            recent_prod = productivity_scores[-3:] if len(productivity_scores) >= 3 else productivity_scores
+            avg_recent = sum(recent_prod) / len(recent_prod)
+            
+            if avg_recent > avg_prod + 5:
+                insights.append({
+                    "title": "Recent Productivity Surge",
+                    "value": f"Last 3 days averaged {avg_recent:.1f}%, up from {avg_prod:.1f}% overall",
+                    "trend": "upward"
+                })
+            elif avg_recent < avg_prod - 5:
+                insights.append({
+                    "title": "Recent Productivity Dip", 
+                    "value": f"Last 3 days averaged {avg_recent:.1f}%, down from {avg_prod:.1f}% overall",
+                    "trend": "downward"
+                })
+            
+        # Session volume insights
+        if total_sessions > 40:
+            sessions_per_day = total_sessions / len(dates) if dates else 0
+            insights.append({
+                "title": "High Activity Level",
+                "value": f"Averaging {sessions_per_day:.1f} sessions per day across {len(dates)} days",
+                "trend": "stable"
+            })
+        
+        # Health vs Productivity correlation
+        if len(health_scores) > 5 and len(productivity_scores) > 5:
+            # Simple correlation analysis
+            high_health_days = [i for i, h in enumerate(health_scores) if h > 90]
+            high_prod_days = [i for i, p in enumerate(productivity_scores) if p > 90]
+            correlation = len(set(high_health_days) & set(high_prod_days))
+            
+            if correlation >= len(high_health_days) * 0.7:
+                insights.append({
+                    "title": "Strong Health-Productivity Link",
+                    "value": f"High health days ({len(high_health_days)}) correlate with high productivity {correlation} times",
+                    "trend": "stable"
+                })
+        
+        # Trend analysis
+        if len(productivity_scores) >= 7:
+            first_half = productivity_scores[:len(productivity_scores)//2]
+            second_half = productivity_scores[len(productivity_scores)//2:]
+            first_avg = sum(first_half) / len(first_half)
+            second_avg = sum(second_half) / len(second_half)
+            
+            improvement = second_half[-1] - first_half[0]
+            if improvement > 10:
+                insights.append({
+                    "title": "Strong Improvement Trend",
+                    "value": f"Productivity improved {improvement:.1f} points from start to recent",
+                    "trend": "upward"
+                })
+        
+        # Default insight if no specific patterns found
+        if not insights:
+            insights.append({
+                "title": "Session Overview",
+                "value": f"Analyzed {total_sessions} sessions with {avg_prod:.1f}% average productivity",
+                "trend": "stable"
+            })
+        
+        return insights
+
+    def _generate_patterns(self, dates, productivity_scores, health_scores, total_sessions):
+        """Generate patterns from productivity and health data."""
+        patterns = []
+        
+        if len(productivity_scores) < 5:
+            return patterns
+        
+        # Weekly pattern analysis (if we have enough data)  
+        if len(dates) >= 7:
+            # Group by day of week
+            weekday_productivity = {}
+            for i, date in enumerate(dates):
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(date, "%Y-%m-%d")
+                    weekday = date_obj.strftime("%A")
+                    
+                    if weekday not in weekday_productivity:
+                        weekday_productivity[weekday] = []
+                    weekday_productivity[weekday].append(productivity_scores[i])
+                except:
+                    continue
+            
+            # Find best and worst days if we have multiple days
+            if len(weekday_productivity) >= 2:
+                day_avgs = {day: sum(scores)/len(scores) for day, scores in weekday_productivity.items() if scores}
+                if day_avgs:
+                    best_day = max(day_avgs.items(), key=lambda x: x[1])
+                    worst_day = min(day_avgs.items(), key=lambda x: x[1])
+                    
+                    if best_day[1] - worst_day[1] > 10:  # Significant difference
+                        patterns.append({
+                            "name": "Weekly Performance Pattern",
+                            "description": f"Highest productivity on {best_day[0]} ({best_day[1]:.1f}%), lowest on {worst_day[0]} ({worst_day[1]:.1f}%)",
+                            "confidence": 75,
+                            "type": "temporal"
+                        })
+        
+        # Productivity consistency pattern
+        if len(productivity_scores) >= 5:
+            avg = sum(productivity_scores) / len(productivity_scores)
+            std_dev = (sum((x - avg)**2 for x in productivity_scores) / len(productivity_scores)) ** 0.5
+            
+            if std_dev < 10:
+                patterns.append({
+                    "name": "Consistent Performance",
+                    "description": f"Productivity varies by only ±{std_dev:.1f} points, showing stable work patterns",
+                    "confidence": 85,
+                    "type": "stability"
+                })
+            elif std_dev > 25:
+                patterns.append({
+                    "name": "Variable Performance", 
+                    "description": f"Productivity varies by ±{std_dev:.1f} points, indicating workload or focus fluctuations",
+                    "confidence": 80,
+                    "type": "variability"
+                })
+        
+        # Session volume patterns
+        daily_sessions = {}
+        for date in dates:
+            daily_sessions[date] = daily_sessions.get(date, 0) + 1
+        
+        if daily_sessions:
+            avg_daily_sessions = sum(daily_sessions.values()) / len(daily_sessions)
+            if avg_daily_sessions > 3:
+                patterns.append({
+                    "name": "High Activity Pattern",
+                    "description": f"Average {avg_daily_sessions:.1f} sessions per day suggests intensive development periods",
+                    "confidence": 70,
+                    "type": "volume"
+                })
+        
+        return patterns
+
+    def _create_daily_summary_chart(self, sessions, days):
+        """Chart 1: Daily Summary - Clean daily averages with clear productivity vs health comparison"""
+        from collections import defaultdict
+        daily_data = defaultdict(list)
+        
+        for session in sessions:
+            if session.get("start_time"):
+                date = session["start_time"][:10]
+                daily_data[date].append({
+                    'productivity': session.get("productivity_score", 0),
+                    'health': session.get("health_score", 0)
+                })
+        
+        dates, productivity_scores, health_scores = [], [], []
+        for date in sorted(daily_data.keys()):
+            day_sessions = daily_data[date]
+            dates.append(date)
+            productivity_scores.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
+            health_scores.append(round(sum(s['health'] for s in day_sessions) / len(day_sessions), 1))
+        
+        return {
+            "data": [
+                {
+                    "x": dates, "y": productivity_scores,
+                    "type": "scatter", "mode": "lines+markers",
+                    "name": "Daily Avg Productivity", "line": {"color": "#10B981", "width": 3},
+                    "marker": {"size": 8}
+                },
+                {
+                    "x": dates, "y": health_scores,
+                    "type": "scatter", "mode": "lines+markers", 
+                    "name": "Daily Avg Health", "line": {"color": "#3B82F6", "width": 3},
+                    "marker": {"size": 8}, "yaxis": "y2"
+                }
+            ],
+            "layout": {
+                "title": "Daily Summary: Productivity vs Health Trends",
+                "xaxis": {"title": "Date"}, 
+                "yaxis": {"title": "Productivity %", "side": "left", "range": [0, 100]},
+                "yaxis2": {"title": "Health %", "side": "right", "overlaying": "y", "range": [0, 100]},
+                "showlegend": True, "height": 350,
+                "annotations": [{"text": "Shows daily averages to reveal overall trends", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+            },
+            "explanation": "Clean daily averages showing productivity vs health trends. Removes clutter of individual sessions to focus on patterns over time."
+        }
+
+    def _create_session_volume_chart(self, sessions, days):
+        """Chart 2: Session Volume & Activity - Shows work intensity patterns"""
+        from collections import defaultdict
+        daily_data = defaultdict(list)
+        
+        for session in sessions:
+            if session.get("start_time"):
+                date = session["start_time"][:10]
+                daily_data[date].append({
+                    'productivity': session.get("productivity_score", 0),
+                    'focus_time': session.get("focus_time_minutes", 0) / 60
+                })
+        
+        dates, session_counts, avg_productivity, total_focus = [], [], [], []
+        for date in sorted(daily_data.keys()):
+            day_sessions = daily_data[date]
+            dates.append(date)
+            session_counts.append(len(day_sessions))
+            avg_productivity.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
+            total_focus.append(round(sum(s['focus_time'] for s in day_sessions), 1))
+        
+        return {
+            "data": [
+                {
+                    "x": dates, "y": session_counts,
+                    "type": "bar", "name": "Sessions per Day",
+                    "marker": {"color": "#F59E0B"}, "yaxis": "y"
+                },
+                {
+                    "x": dates, "y": avg_productivity,
+                    "type": "scatter", "mode": "lines+markers",
+                    "name": "Avg Productivity", "line": {"color": "#10B981", "width": 3},
+                    "yaxis": "y2"
+                }
+            ],
+            "layout": {
+                "title": "Work Intensity: Session Volume vs Performance",
+                "xaxis": {"title": "Date"},
+                "yaxis": {"title": "Number of Sessions", "side": "left"},
+                "yaxis2": {"title": "Productivity %", "side": "right", "overlaying": "y"},
+                "showlegend": True, "height": 350,
+                "annotations": [{"text": "Higher bars = busier days. Shows if more sessions correlate with better/worse productivity", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+            },
+            "explanation": "Shows work intensity (session count) vs productivity. Helps identify if busy days lead to better or worse performance."
+        }
+
+    def _create_productivity_focus_chart(self, sessions, days):
+        """Chart 3: Productivity & Focus Time - Shows efficiency patterns"""
+        from collections import defaultdict
+        daily_data = defaultdict(list)
+        
+        for session in sessions:
+            if session.get("start_time"):
+                date = session["start_time"][:10]
+                daily_data[date].append({
+                    'productivity': session.get("productivity_score", 0),
+                    'focus_time': session.get("focus_time_minutes", 0) / 60
+                })
+        
+        dates, avg_productivity, total_focus, efficiency = [], [], [], []
+        for date in sorted(daily_data.keys()):
+            day_sessions = daily_data[date]
+            avg_prod = sum(s['productivity'] for s in day_sessions) / len(day_sessions)
+            focus_hrs = sum(s['focus_time'] for s in day_sessions)
+            
+            dates.append(date)
+            avg_productivity.append(round(avg_prod, 1))
+            total_focus.append(round(focus_hrs, 1))
+            efficiency.append(round((avg_prod * focus_hrs) / 100, 2) if focus_hrs > 0 else 0)  # Productivity * Focus Time
+        
+        return {
+            "data": [
+                {
+                    "x": dates, "y": total_focus,
+                    "type": "bar", "name": "Focus Hours",
+                    "marker": {"color": "#8B5CF6"}, "yaxis": "y"
+                },
+                {
+                    "x": dates, "y": avg_productivity,
+                    "type": "scatter", "mode": "lines+markers",
+                    "name": "Productivity %", "line": {"color": "#10B981", "width": 3},
+                    "yaxis": "y2"
+                },
+                {
+                    "x": dates, "y": efficiency,
+                    "type": "scatter", "mode": "lines+markers",
+                    "name": "Efficiency Score", "line": {"color": "#EF4444", "width": 2, "dash": "dash"},
+                    "yaxis": "y2"
+                }
+            ],
+            "layout": {
+                "title": "Focus & Efficiency: Time vs Quality",
+                "xaxis": {"title": "Date"},
+                "yaxis": {"title": "Focus Hours", "side": "left"},
+                "yaxis2": {"title": "Score", "side": "right", "overlaying": "y"},
+                "showlegend": True, "height": 350,
+                "annotations": [{"text": "Purple bars = focus time. Green line = productivity. Red line = efficiency (productivity × focus)", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+            },
+            "explanation": "Combines focus time with productivity to show efficiency. Efficiency score (red) shows when you're both productive AND focused."
+        }
+
+    def _create_trend_comparison_chart(self, sessions, days):
+        """Chart 4: Trend Comparison - Shows recent vs historical performance with insights"""
+        from collections import defaultdict
+        daily_data = defaultdict(list)
+        
+        for session in sessions:
+            if session.get("start_time"):
+                date = session["start_time"][:10]
+                daily_data[date].append({
+                    'productivity': session.get("productivity_score", 0),
+                    'health': session.get("health_score", 0)
+                })
+        
+        dates, productivity_scores, health_scores = [], [], []
+        for date in sorted(daily_data.keys()):
+            day_sessions = daily_data[date]
+            dates.append(date)
+            productivity_scores.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
+            health_scores.append(round(sum(s['health'] for s in day_sessions) / len(day_sessions), 1))
+        
+        # Calculate moving averages and trends
+        if len(productivity_scores) >= 3:
+            # Simple 3-day moving average
+            prod_ma = []
+            health_ma = []
+            for i in range(len(productivity_scores)):
+                if i >= 2:
+                    prod_ma.append(round(sum(productivity_scores[i-2:i+1]) / 3, 1))
+                    health_ma.append(round(sum(health_scores[i-2:i+1]) / 3, 1))
+                else:
+                    prod_ma.append(productivity_scores[i])
+                    health_ma.append(health_scores[i])
+        else:
+            prod_ma = productivity_scores
+            health_ma = health_scores
+        
+        return {
+            "data": [
+                {
+                    "x": dates, "y": productivity_scores,
+                    "type": "scatter", "mode": "markers", "name": "Daily Productivity",
+                    "marker": {"color": "#10B981", "size": 6, "opacity": 0.6}
+                },
+                {
+                    "x": dates, "y": prod_ma,
+                    "type": "scatter", "mode": "lines", "name": "Productivity Trend",
+                    "line": {"color": "#059669", "width": 4}
+                },
+                {
+                    "x": dates, "y": health_scores,
+                    "type": "scatter", "mode": "markers", "name": "Daily Health",
+                    "marker": {"color": "#3B82F6", "size": 6, "opacity": 0.6}, "yaxis": "y2"
+                },
+                {
+                    "x": dates, "y": health_ma,
+                    "type": "scatter", "mode": "lines", "name": "Health Trend",
+                    "line": {"color": "#1D4ED8", "width": 4}, "yaxis": "y2"
+                }
+            ],
+            "layout": {
+                "title": "Trend Analysis: Daily Points vs Moving Averages",
+                "xaxis": {"title": "Date"},
+                "yaxis": {"title": "Productivity %", "side": "left", "range": [0, 100]},
+                "yaxis2": {"title": "Health %", "side": "right", "overlaying": "y", "range": [0, 100]},
+                "showlegend": True, "height": 350,
+                "annotations": [{"text": "Dots = daily scores. Lines = 3-day trends. Shows if you're improving or declining", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+            },
+            "explanation": "Shows daily fluctuations vs smoothed trends. Trend lines reveal if performance is genuinely improving or just having good/bad days."
+        }
+
     def _safe_get_string_content(self, item: Dict[str, Any]) -> str:
         """Safely extract string content from item without arbitrary code execution."""
         # Try multiple content fields in order of preference
@@ -2821,3 +3407,197 @@ class ComprehensiveHealthDashboard:
                 safe_content.append(str(item[field]))
 
         return " ".join(safe_content) if safe_content else ""
+
+    def _analyze_token_usage(self):
+        """Analyze token usage across different context categories."""
+        try:
+            # Find Claude Code cache directory
+            cache_dir = Path.home() / ".claude" / "projects"
+            if not cache_dir.exists():
+                return {"error": "Claude Code cache not found", "categories": []}
+            
+            total_tokens = {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
+            categories = {
+                "claude_md": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
+                "custom_agents": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
+                "mcp_tools": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
+                "system_prompts": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
+                "system_tools": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
+                "messages": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0}
+            }
+            
+            # Analyze recent JSONL files (limit to prevent performance issues)
+            jsonl_files = list(cache_dir.glob("**/*.jsonl"))
+            recent_files = sorted(jsonl_files, key=lambda x: x.stat().st_mtime, reverse=True)[:10]
+            
+            for file_path in recent_files:
+                try:
+                    self._analyze_file_tokens(file_path, total_tokens, categories)
+                except Exception as e:
+                    logging.warning(f"Error analyzing {file_path}: {e}")
+                    continue
+            
+            # Calculate percentages and create charts
+            total_all = sum(total_tokens.values())
+            if total_all == 0:
+                return {"error": "No token data found", "categories": []}
+            
+            # Create category summary
+            category_data = []
+            for name, data in categories.items():
+                category_total = sum(data[k] for k in ['input', 'cache_creation', 'cache_read', 'output'])
+                if category_total > 0:
+                    category_data.append({
+                        "name": name.replace("_", " ").title(),
+                        "tokens": category_total,
+                        "percentage": round((category_total / total_all) * 100, 1),
+                        "breakdown": {
+                            "input": data["input"],
+                            "cache_creation": data["cache_creation"],
+                            "cache_read": data["cache_read"],
+                            "output": data["output"]
+                        },
+                        "count": data["count"]
+                    })
+            
+            # Sort by token count
+            category_data.sort(key=lambda x: x["tokens"], reverse=True)
+            
+            return {
+                "total_tokens": total_all,
+                "categories": category_data,
+                "charts": self._create_token_charts(category_data, total_tokens)
+            }
+            
+        except Exception as e:
+            logging.error(f"Token analysis error: {e}")
+            return {"error": str(e), "categories": []}
+    
+    def _analyze_file_tokens(self, file_path, total_tokens, categories):
+        """Analyze tokens from a single JSONL file."""
+        import json
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f):
+                try:
+                    if line_num > 1000:  # Limit lines per file for performance
+                        break
+                        
+                    entry = json.loads(line.strip())
+                    
+                    if entry.get("type") == "assistant":
+                        usage = entry.get("message", {}).get("usage", {})
+                        if usage:
+                            # Update totals
+                            total_tokens["input"] += usage.get("input_tokens", 0)
+                            total_tokens["cache_creation"] += usage.get("cache_creation_input_tokens", 0)
+                            total_tokens["cache_read"] += usage.get("cache_read_input_tokens", 0)
+                            total_tokens["output"] += usage.get("output_tokens", 0)
+                            
+                            # Categorize based on context content
+                            content = str(entry.get("message", {}).get("content", [{}])[0].get("text", "")).lower()
+                            
+                            # Categorize the tokens
+                            category = self._categorize_tokens(entry, content)
+                            if category in categories:
+                                categories[category]["input"] += usage.get("input_tokens", 0)
+                                categories[category]["cache_creation"] += usage.get("cache_creation_input_tokens", 0)
+                                categories[category]["cache_read"] += usage.get("cache_read_input_tokens", 0)
+                                categories[category]["output"] += usage.get("output_tokens", 0)
+                                categories[category]["count"] += 1
+                            
+                except json.JSONDecodeError:
+                    continue
+                except Exception as e:
+                    logging.warning(f"Error processing line {line_num} in {file_path}: {e}")
+                    continue
+    
+    def _categorize_tokens(self, entry, content):
+        """Categorize tokens based on content analysis."""
+        # Check for Claude.md references
+        if "claude.md" in content or "claude code" in content:
+            return "claude_md"
+        
+        # Check for custom agent references  
+        agent_patterns = [
+            "task-orchestrator", "frontend-typescript", "backend-typescript", 
+            "django-migration", "ui-engineer", "test-engineer", "senior-code-reviewer"
+        ]
+        if any(pattern in content for pattern in agent_patterns):
+            return "custom_agents"
+        
+        # Check for MCP tools
+        if "mcp__" in content or "mcp_" in content:
+            return "mcp_tools"
+        
+        # Check for system prompts/instructions
+        if any(term in content for term in ["system-reminder", "instructions", "guidelines"]):
+            return "system_prompts"
+        
+        # Check for system tools
+        tool_patterns = ["bash", "read", "write", "edit", "grep", "glob"]
+        if any(f'"{tool}"' in content or f"tool: {tool}" in content for tool in tool_patterns):
+            return "system_tools"
+        
+        # Default to messages category
+        return "messages"
+    
+    def _create_token_charts(self, category_data, total_tokens):
+        """Create charts for token analysis."""
+        if not category_data:
+            return []
+        
+        charts = []
+        
+        # 1. Token Distribution Pie Chart
+        labels = [cat["name"] for cat in category_data]
+        values = [cat["tokens"] for cat in category_data]
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+        
+        pie_chart = {
+            "data": [{
+                "type": "pie",
+                "labels": labels,
+                "values": values,
+                "marker": {"colors": colors[:len(labels)]},
+                "textinfo": "label+percent",
+                "textposition": "outside",
+                "hovertemplate": "%{label}: %{value:,} tokens (%{percent})<extra></extra>"
+            }],
+            "layout": {
+                "title": "Token Distribution by Category",
+                "height": 350,
+                "showlegend": True
+            }
+        }
+        charts.append({"type": "distribution", "chart": pie_chart})
+        
+        # 2. Token Type Breakdown Bar Chart
+        token_types = ["input", "cache_creation", "cache_read", "output"]
+        type_colors = {"input": "#FF6B6B", "cache_creation": "#4ECDC4", "cache_read": "#45B7D1", "output": "#96CEB4"}
+        
+        bar_data = []
+        for token_type in token_types:
+            bar_data.append({
+                "type": "bar",
+                "name": token_type.replace("_", " ").title(),
+                "x": labels,
+                "y": [cat["breakdown"][token_type] for cat in category_data],
+                "marker": {"color": type_colors[token_type]},
+                "hovertemplate": "%{y:,} tokens<extra></extra>"
+            })
+        
+        bar_chart = {
+            "data": bar_data,
+            "layout": {
+                "title": "Token Types by Category",
+                "xaxis": {"title": "Category"},
+                "yaxis": {"title": "Token Count"},
+                "barmode": "stack",
+                "height": 350,
+                "showlegend": True
+            }
+        }
+        charts.append({"type": "breakdown", "chart": bar_chart})
+        
+        return charts
