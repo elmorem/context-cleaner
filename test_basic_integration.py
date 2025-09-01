@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from context_cleaner.optimization.memory_optimizer import MemoryOptimizer
 from context_cleaner.optimization.cpu_optimizer import CPUOptimizer, TaskPriority
-from context_cleaner.dashboard.real_time_performance_dashboard import RealTimePerformanceDashboard
+from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard as RealTimePerformanceDashboard
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

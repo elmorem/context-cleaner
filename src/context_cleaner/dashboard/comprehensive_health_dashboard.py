@@ -706,7 +706,9 @@ class ComprehensiveHealthDashboard:
         )
 
         # Dashboard configuration
-        self.config = config
+        # Create default config if None provided (backwards compatibility)
+        from ..config.settings import ContextCleanerConfig
+        self.config = config or ContextCleanerConfig.default()
         self.host = "127.0.0.1"
         self.port = 8080
         self.debug = False
@@ -760,7 +762,7 @@ class ComprehensiveHealthDashboard:
         def dashboard_home():
             """Main comprehensive dashboard page."""
             return render_template(
-                "comprehensive_dashboard.html",
+                "dashboard.html",
                 title="Context Cleaner Comprehensive Health Dashboard",
                 refresh_interval=30000,  # 30 seconds
             )

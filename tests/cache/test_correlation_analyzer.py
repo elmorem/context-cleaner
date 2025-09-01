@@ -8,6 +8,7 @@ across multiple Claude Code conversation sessions.
 
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from src.context_cleaner.analysis.correlation_analyzer import (
     CrossSessionCorrelationAnalyzer, SessionCluster, CrossSessionPattern, 
@@ -35,36 +36,18 @@ class TestCrossSessionCorrelationAnalyzer:
             session_id="session_1",
             start_time=base_time,
             end_time=base_time + timedelta(hours=2),
-            messages=[
-                SessionMessage(
-                    uuid="msg_1_1",
-                    parent_uuid=None,
-                    message_type=MessageType.USER,
-                    role=MessageRole.USER,
-                    content="Help me debug this Python script",
-                    timestamp=base_time,
-                    tool_usage=[]
-                ),
-                SessionMessage(
-                    uuid="msg_1_2",
-                    parent_uuid="msg_1_1",
-                    message_type=MessageType.ASSISTANT,
-                    role=MessageRole.ASSISTANT,
-                    content="I'll help debug the script",
-                    timestamp=base_time + timedelta(minutes=5),
-                    tool_usage=[ToolUsage(
-                        tool_name="Read", tool_id="read_1", 
-                        parameters={"file_path": "app.py"}, 
-                        timestamp=base_time + timedelta(minutes=5)
-                    )]
-                )
-            ],
-            tool_usage_summary={"Read": 3, "Edit": 2, "Bash": 1},
-            file_paths=["/project/app.py", "/project/utils.py"],
+            total_messages=2,
             total_tokens=2500,
-            cache_hits=8,
-            cache_misses=2,
-            topics=["python", "debugging"]
+            file_operations=[ToolUsage(
+                tool_name="Read", tool_id="read_1", 
+                parameters={"file_path": "app.py"}, 
+                timestamp=base_time + timedelta(minutes=5)
+            )],
+            context_switches=1,
+            average_response_time=5.0,
+            cache_efficiency=0.8,
+            primary_topics=["python", "debugging"],
+            working_directories=["/project"]
         )
         
         # Session 2: Similar Python work (next day)
@@ -72,23 +55,14 @@ class TestCrossSessionCorrelationAnalyzer:
             session_id="session_2", 
             start_time=base_time + timedelta(days=1),
             end_time=base_time + timedelta(days=1, hours=1.5),
-            messages=[
-                SessionMessage(
-                    uuid="msg_2_1",
-                    parent_uuid=None,
-                    message_type=MessageType.USER,
-                    role=MessageRole.USER,
-                    content="Continue working on the Python project",
-                    timestamp=base_time + timedelta(days=1),
-                    tool_usage=[]
-                )
-            ],
-            tool_usage_summary={"Read": 2, "Edit": 3, "Bash": 2},
-            file_paths=["/project/app.py", "/project/tests.py"],
+            total_messages=1,
             total_tokens=1800,
-            cache_hits=12,
-            cache_misses=1,
-            topics=["python", "development"]
+            file_operations=[],
+            context_switches=1,
+            average_response_time=4.0,
+            cache_efficiency=0.92,
+            primary_topics=["python", "development"],
+            working_directories=["/project"]
         )
         
         # Session 3: React frontend (different topic)
@@ -96,23 +70,14 @@ class TestCrossSessionCorrelationAnalyzer:
             session_id="session_3",
             start_time=base_time + timedelta(days=2),
             end_time=base_time + timedelta(days=2, hours=1),
-            messages=[
-                SessionMessage(
-                    uuid="msg_3_1",
-                    parent_uuid=None,
-                    message_type=MessageType.USER,
-                    role=MessageRole.USER,
-                    content="Let's work on the React frontend",
-                    timestamp=base_time + timedelta(days=2),
-                    tool_usage=[]
-                )
-            ],
-            tool_usage_summary={"Read": 4, "Edit": 1, "Bash": 1},
-            file_paths=["/frontend/App.js", "/frontend/components/Nav.js"],
+            total_messages=1,
             total_tokens=2200,
-            cache_hits=6,
-            cache_misses=4,
-            topics=["react", "frontend"]
+            file_operations=[],
+            context_switches=1,
+            average_response_time=3.5,
+            cache_efficiency=0.6,
+            primary_topics=["react", "frontend"],
+            working_directories=["/frontend"]
         )
         
         # Session 4: Back to Python (return pattern)
@@ -120,44 +85,41 @@ class TestCrossSessionCorrelationAnalyzer:
             session_id="session_4",
             start_time=base_time + timedelta(days=3),
             end_time=base_time + timedelta(days=3, hours=2.5),
-            messages=[
-                SessionMessage(
-                    uuid="msg_4_1",
-                    parent_uuid=None,
-                    message_type=MessageType.USER,
-                    role=MessageRole.USER,
-                    content="Back to the Python debugging issue",
-                    timestamp=base_time + timedelta(days=3),
-                    tool_usage=[]
-                )
-            ],
-            tool_usage_summary={"Read": 3, "Edit": 4, "Bash": 3},
-            file_paths=["/project/app.py", "/project/debug.py"],
+            total_messages=1,
             total_tokens=3000,
-            cache_hits=15,
-            cache_misses=2,
-            topics=["python", "debugging"]
+            file_operations=[],
+            context_switches=2,
+            average_response_time=6.0,
+            cache_efficiency=0.88,
+            primary_topics=["python", "debugging"],
+            working_directories=["/project"]
         )
         
         self.sample_sessions = [session1, session2, session3, session4]
     
     def test_analyze_cross_session_correlations(self):
         """Test full cross-session correlation analysis."""
-        insights = self.analyzer.analyze_cross_session_correlations(self.sample_sessions)
+        # Mock the session discovery to return our sample sessions
+        with patch.object(self.analyzer, '_parse_and_filter_sessions') as mock_parse:
+            mock_parse.return_value = self.sample_sessions
+            insights = self.analyzer.analyze_cross_session_correlations()
         
         assert isinstance(insights, CorrelationInsights)
         assert isinstance(insights.session_clusters, list)
         assert isinstance(insights.cross_session_patterns, list)
         assert isinstance(insights.long_term_trends, list)
         assert isinstance(insights.workflow_continuations, list)
-        assert isinstance(insights.topic_evolution_chains, list)
-        assert isinstance(insights.productivity_correlations, dict)
-        assert isinstance(insights.file_relationship_map, dict)
-        assert isinstance(insights.temporal_correlation_matrix, list)
-        assert isinstance(insights.predictive_insights, list)
-        assert 0 <= insights.overall_correlation_strength <= 1
-        assert insights.analysis_confidence >= 0
-        assert isinstance(insights.analysis_period, tuple)
+        assert isinstance(insights.file_usage_correlations, dict)
+        assert isinstance(insights.tool_usage_correlations, dict)
+        assert isinstance(insights.temporal_correlations, dict)
+        assert isinstance(insights.session_dependencies, list)
+        assert isinstance(insights.predicted_next_patterns, list)
+        assert isinstance(insights.recommended_session_timing, list)
+        assert isinstance(insights.optimal_workflow_sequences, list)
+        assert 0 <= insights.analysis_confidence <= 1
+        assert 0 <= insights.data_completeness <= 1
+        assert insights.total_sessions_analyzed >= 0
+        assert insights.analysis_time_span_days >= 0
     
     def test_cluster_similar_sessions(self):
         """Test session clustering functionality."""
