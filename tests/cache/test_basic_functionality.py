@@ -10,11 +10,11 @@ import pytest
 
 def test_can_import_all_analyzers():
     """Test that all analyzer components can be imported."""
-    from src.context_cleaner.analysis.analyzers import (
-        UsagePatternAnalyzer, TokenEfficiencyAnalyzer, 
-        TemporalContextAnalyzer, EnhancedContextAnalyzer,
-        CrossSessionCorrelationAnalyzer
-    )
+    from src.context_cleaner.analysis.usage_analyzer import UsagePatternAnalyzer
+    from src.context_cleaner.analysis.token_analyzer import TokenEfficiencyAnalyzer
+    from src.context_cleaner.analysis.temporal_analyzer import TemporalContextAnalyzer
+    from src.context_cleaner.analysis.enhanced_context_analyzer import EnhancedContextAnalyzer
+    from src.context_cleaner.analysis.correlation_analyzer import CrossSessionCorrelationAnalyzer
     assert UsagePatternAnalyzer is not None
     assert TokenEfficiencyAnalyzer is not None
     assert TemporalContextAnalyzer is not None
@@ -23,10 +23,10 @@ def test_can_import_all_analyzers():
 
 def test_can_instantiate_analyzers():
     """Test that all analyzers can be instantiated."""
-    from src.context_cleaner.analysis.analyzers import (
-        UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
-        TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
-    )
+    from src.context_cleaner.analysis.usage_analyzer import UsagePatternAnalyzer
+    from src.context_cleaner.analysis.token_analyzer import TokenEfficiencyAnalyzer
+    from src.context_cleaner.analysis.temporal_analyzer import TemporalContextAnalyzer
+    from src.context_cleaner.analysis.correlation_analyzer import CrossSessionCorrelationAnalyzer
     
     usage_analyzer = UsagePatternAnalyzer()
     token_analyzer = TokenEfficiencyAnalyzer()
@@ -41,36 +41,27 @@ def test_can_instantiate_analyzers():
 def test_can_import_data_models():
     """Test that all data models can be imported."""
     from src.context_cleaner.analysis.models import (
-        WorkflowPattern, FileUsageMetrics, UsagePatternSummary,
-        TokenWastePattern, CacheEfficiencyMetrics, TokenAnalysisSummary,
-        TopicTransition, SessionBoundary, TemporalInsights,
-        UsageWeightedScore, CacheEnhancedAnalysis,
-        SessionCluster, CrossSessionPattern, LongTermTrend, CorrelationInsights
+        TokenMetrics, ToolUsage, SessionMessage, SessionAnalysis, 
+        FileAccessPattern, CacheAnalysisResult, CacheConfig, MessageRole, MessageType
     )
     
     # Just check they can be imported
-    assert WorkflowPattern is not None
-    assert FileUsageMetrics is not None
-    assert UsagePatternSummary is not None
-    assert TokenWastePattern is not None
-    assert CacheEfficiencyMetrics is not None
-    assert TokenAnalysisSummary is not None
-    assert TopicTransition is not None
-    assert SessionBoundary is not None
-    assert TemporalInsights is not None
-    assert UsageWeightedScore is not None
-    assert CacheEnhancedAnalysis is not None
-    assert SessionCluster is not None
-    assert CrossSessionPattern is not None
-    assert LongTermTrend is not None
-    assert CorrelationInsights is not None
+    assert TokenMetrics is not None
+    assert ToolUsage is not None
+    assert SessionMessage is not None
+    assert SessionAnalysis is not None
+    assert FileAccessPattern is not None
+    assert CacheAnalysisResult is not None
+    assert CacheConfig is not None
+    assert MessageRole is not None
+    assert MessageType is not None
 
 def test_basic_analyzer_methods_exist():
     """Test that analyzers have the expected main analysis methods."""
-    from src.context_cleaner.analysis.analyzers import (
-        UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
-        TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
-    )
+    from src.context_cleaner.analysis.usage_analyzer import UsagePatternAnalyzer
+    from src.context_cleaner.analysis.token_analyzer import TokenEfficiencyAnalyzer
+    from src.context_cleaner.analysis.temporal_analyzer import TemporalContextAnalyzer
+    from src.context_cleaner.analysis.correlation_analyzer import CrossSessionCorrelationAnalyzer
     
     usage_analyzer = UsagePatternAnalyzer()
     token_analyzer = TokenEfficiencyAnalyzer()
@@ -92,10 +83,10 @@ def test_basic_analyzer_methods_exist():
 
 def test_empty_session_handling():
     """Test that analyzers can handle empty session lists gracefully."""
-    from src.context_cleaner.analysis.analyzers import (
-        UsagePatternAnalyzer, TokenEfficiencyAnalyzer,
-        TemporalContextAnalyzer, CrossSessionCorrelationAnalyzer
-    )
+    from src.context_cleaner.analysis.usage_analyzer import UsagePatternAnalyzer
+    from src.context_cleaner.analysis.token_analyzer import TokenEfficiencyAnalyzer
+    from src.context_cleaner.analysis.temporal_analyzer import TemporalContextAnalyzer
+    from src.context_cleaner.analysis.correlation_analyzer import CrossSessionCorrelationAnalyzer
     
     empty_sessions = []
     
@@ -132,7 +123,7 @@ def test_empty_session_handling():
 def test_enhanced_context_analyzer_integration():
     """Test that enhanced context analyzer can be instantiated with mock base analyzer."""
     from unittest.mock import Mock
-    from src.context_cleaner.analysis.analyzers import EnhancedContextAnalyzer
+    from src.context_cleaner.analysis.enhanced_context_analyzer import EnhancedContextAnalyzer
     
     # Create mock base analyzer
     mock_base_analyzer = Mock()

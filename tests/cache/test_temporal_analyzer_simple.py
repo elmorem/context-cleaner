@@ -42,7 +42,7 @@ class TestTemporalContextAnalyzerSimple:
         topics1 = {"python", "debugging"}
         topics2 = {"python", "scripting"}
         
-        similarity = self.analyzer._calculate_topic_similarity(topics1, topics2)
+        similarity = self.analyzer._calculate_context_similarity(topics1, topics2)
         
         assert isinstance(similarity, float)
         assert 0 <= similarity <= 1

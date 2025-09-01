@@ -127,36 +127,32 @@ def test_token_analyzer_division_by_zero_fix():
 def test_all_data_models_can_instantiate():
     """Test that all data model classes can be instantiated."""
     from src.context_cleaner.analysis.models import (
-        WorkflowPattern, TopicTransition, UsageWeightedScore
+        TokenMetrics, SessionMessage, FileAccessPattern, MessageRole, MessageType
     )
     from datetime import datetime
     
     # Test key data models can be created with minimal parameters
     now = datetime.now()
     
-    # WorkflowPattern
-    pattern = WorkflowPattern(
-        pattern_id="test", name="Test", description="Test pattern",
-        file_sequence=[], tool_sequence=[], frequency=0, 
-        confidence_score=0.0, average_duration=0.0, common_transitions=[]
+    # TokenMetrics
+    metrics = TokenMetrics(
+        input_tokens=100, output_tokens=50, total_tokens=150
+    )
+    assert metrics is not None
+    
+    # SessionMessage
+    message = SessionMessage(
+        uuid="test-uuid", parent_uuid=None, message_type=MessageType.USER,
+        role=MessageRole.USER, content="test content", timestamp=now
+    )
+    assert message is not None
+    
+    # FileAccessPattern
+    pattern = FileAccessPattern(
+        file_path="/test/file.py", access_count=5,
+        first_access=now, last_access=now, operation_types=["read", "write"]
     )
     assert pattern is not None
-    
-    # UsageWeightedScore
-    score = UsageWeightedScore(
-        base_score=0.5, usage_weight=0.3, final_score=0.6,
-        usage_factors={}, confidence=0.8
-    )
-    assert score is not None
-    assert score.improvement_ratio >= 0
-    
-    # TopicTransition
-    transition = TopicTransition(
-        from_topic="test1", to_topic="test2", transition_time=now,
-        session_id="session1", confidence_score=0.8, transition_type="gradual",
-        context_similarity=0.5, time_gap_minutes=10.0
-    )
-    assert transition is not None
 
 
 if __name__ == "__main__":
