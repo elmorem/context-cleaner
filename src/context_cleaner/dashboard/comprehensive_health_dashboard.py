@@ -34,33 +34,35 @@ try:
         HealthLevel,
         CacheEnhancedDashboardData,
     )
+
     CACHE_DASHBOARD_AVAILABLE = True
 except ImportError:
     CACHE_DASHBOARD_AVAILABLE = False
-    
+
     # Create stub classes when cache dashboard is not available
     class CacheEnhancedDashboardData:
         def __init__(self, **kwargs):
             pass
-    
+
     class UsageBasedHealthMetrics:
         def __init__(self, **kwargs):
             pass
-    
+
     class HealthLevel:
         EXCELLENT = "excellent"
         GOOD = "good"
         FAIR = "fair"
         POOR = "poor"
-    
+
     class CacheEnhancedDashboard:
         def __init__(self, **kwargs):
             pass
 
+
 from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
 from ..analytics.advanced_patterns import AdvancedPatternRecognizer
 
-# Optional cache module imports  
+# Optional cache module imports
 try:
     from ..analysis import (
         CacheDiscoveryService,
@@ -70,34 +72,36 @@ try:
         TemporalContextAnalyzer,
         EnhancedContextAnalyzer,
     )
+
     CACHE_MODULE_AVAILABLE = True
 except ImportError:
     CACHE_MODULE_AVAILABLE = False
-    
+
     # Create stub classes when cache module is not available
     class CacheDiscoveryService:
         def __init__(self, **kwargs):
             pass
-            
+
     class SessionCacheParser:
         def __init__(self, **kwargs):
             pass
-            
+
     class UsagePatternAnalyzer:
         def __init__(self, **kwargs):
             pass
-            
+
     class TokenEfficiencyAnalyzer:
         def __init__(self, **kwargs):
             pass
-            
+
     class TemporalContextAnalyzer:
         def __init__(self, **kwargs):
             pass
-            
+
     class EnhancedContextAnalyzer:
         def __init__(self, **kwargs):
             pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +109,7 @@ logger = logging.getLogger(__name__)
 # Advanced Dashboard Integration - DataSource Classes
 class WidgetType(Enum):
     """Types of dashboard widgets"""
+
     METRIC_CARD = "metric_card"
     CHART = "chart"
     TABLE = "table"
@@ -117,6 +122,7 @@ class WidgetType(Enum):
 
 class UpdateFrequency(Enum):
     """Widget update frequencies"""
+
     REALTIME = "realtime"  # Updates immediately when data changes
     FAST = "fast"  # Every 5 seconds
     NORMAL = "normal"  # Every 30 seconds
@@ -127,6 +133,7 @@ class UpdateFrequency(Enum):
 @dataclass
 class WidgetConfig:
     """Configuration for a dashboard widget"""
+
     widget_id: str
     widget_type: WidgetType
     title: str
@@ -142,6 +149,7 @@ class WidgetConfig:
 
 class DataSource:
     """Base class for dashboard data sources"""
+
     def __init__(self, source_id: str, config: Dict[str, Any]):
         self.source_id = source_id
         self.config = config
@@ -164,10 +172,12 @@ class DataSource:
 
 class ProductivityDataSource(DataSource):
     """Data source for productivity metrics"""
+
     async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get productivity data"""
         try:
             from ..analytics.productivity_analyzer import ProductivityAnalyzer
+
             analyzer = ProductivityAnalyzer()
 
             # Apply date range filter if provided
@@ -184,20 +194,26 @@ class ProductivityDataSource(DataSource):
             mock_sessions = []
             current_date = start_date
             while current_date <= end_date:
-                sessions_per_day = 3 + int((current_date.weekday() < 5) * 2)  # More sessions on weekdays
+                sessions_per_day = 3 + int(
+                    (current_date.weekday() < 5) * 2
+                )  # More sessions on weekdays
 
                 for session_num in range(sessions_per_day):
                     session_start = current_date.replace(
                         hour=9 + session_num * 3, minute=0, second=0, microsecond=0
                     )
 
-                    mock_sessions.append({
-                        "timestamp": session_start,
-                        "duration_minutes": 45 + (session_num * 15),
-                        "active_time_minutes": 35 + (session_num * 12),
-                        "context_switches": 5 + session_num,
-                        "applications": ["code_editor", "browser", "terminal"][:session_num + 1],
-                    })
+                    mock_sessions.append(
+                        {
+                            "timestamp": session_start,
+                            "duration_minutes": 45 + (session_num * 15),
+                            "active_time_minutes": 35 + (session_num * 12),
+                            "context_switches": 5 + session_num,
+                            "applications": ["code_editor", "browser", "terminal"][
+                                : session_num + 1
+                            ],
+                        }
+                    )
 
                 current_date += timedelta(days=1)
 
@@ -210,10 +226,16 @@ class ProductivityDataSource(DataSource):
                 "daily_averages": analysis.get("daily_productivity_averages", {}),
                 "trend_direction": analysis.get("productivity_trend", "stable"),
                 "efficiency_ratio": analysis.get("efficiency_ratio", 0.85),
-                "context_switches_avg": analysis.get("avg_context_switches_per_hour", 12),
-                "most_productive_hours": analysis.get("peak_productivity_hours", [9, 10, 14, 15]),
+                "context_switches_avg": analysis.get(
+                    "avg_context_switches_per_hour", 12
+                ),
+                "most_productive_hours": analysis.get(
+                    "peak_productivity_hours", [9, 10, 14, 15]
+                ),
                 "total_sessions": len(mock_sessions),
-                "active_days": len(set(session["timestamp"].date() for session in mock_sessions)),
+                "active_days": len(
+                    set(session["timestamp"].date() for session in mock_sessions)
+                ),
             }
         except ImportError:
             # Fallback if productivity analyzer is not available
@@ -235,7 +257,10 @@ class ProductivityDataSource(DataSource):
             "productivity_score": {"type": "number", "min": 0, "max": 100, "unit": "%"},
             "focus_time_hours": {"type": "number", "min": 0, "unit": "hours"},
             "daily_averages": {"type": "object"},
-            "trend_direction": {"type": "string", "enum": ["upward", "downward", "stable"]},
+            "trend_direction": {
+                "type": "string",
+                "enum": ["upward", "downward", "stable"],
+            },
             "efficiency_ratio": {"type": "number", "min": 0, "max": 1},
             "context_switches_avg": {"type": "number", "min": 0},
             "most_productive_hours": {"type": "array", "items": {"type": "number"}},
@@ -246,6 +271,7 @@ class ProductivityDataSource(DataSource):
 
 class HealthDataSource(DataSource):
     """Data source for health and wellness metrics"""
+
     async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get health data"""
         import random
@@ -255,14 +281,16 @@ class HealthDataSource(DataSource):
 
         for i in range(30):
             date = base_date + timedelta(days=i)
-            daily_data.append({
-                "date": date.date().isoformat(),
-                "sleep_hours": 6.5 + random.uniform(-1.5, 1.5),
-                "stress_level": random.randint(1, 10),
-                "energy_level": random.randint(1, 10),
-                "exercise_minutes": random.randint(0, 90),
-                "screen_time_hours": 8 + random.uniform(-2, 4),
-            })
+            daily_data.append(
+                {
+                    "date": date.date().isoformat(),
+                    "sleep_hours": 6.5 + random.uniform(-1.5, 1.5),
+                    "stress_level": random.randint(1, 10),
+                    "energy_level": random.randint(1, 10),
+                    "exercise_minutes": random.randint(0, 90),
+                    "screen_time_hours": 8 + random.uniform(-2, 4),
+                }
+            )
 
         avg_sleep = sum(d["sleep_hours"] for d in daily_data) / len(daily_data)
         avg_stress = sum(d["stress_level"] for d in daily_data) / len(daily_data)
@@ -273,28 +301,53 @@ class HealthDataSource(DataSource):
             "average_stress_level": round(avg_stress, 1),
             "average_energy_level": round(avg_energy, 1),
             "total_exercise_minutes": sum(d["exercise_minutes"] for d in daily_data),
-            "average_screen_time": round(sum(d["screen_time_hours"] for d in daily_data) / len(daily_data), 1),
+            "average_screen_time": round(
+                sum(d["screen_time_hours"] for d in daily_data) / len(daily_data), 1
+            ),
             "daily_data": daily_data,
-            "sleep_quality_trend": ("improving" if daily_data[-7:] > daily_data[:7] else "stable"),
-            "wellness_score": min(100, max(0, (avg_energy * 10) - (avg_stress * 5) + (avg_sleep * 5))),
+            "sleep_quality_trend": (
+                "improving" if daily_data[-7:] > daily_data[:7] else "stable"
+            ),
+            "wellness_score": min(
+                100, max(0, (avg_energy * 10) - (avg_stress * 5) + (avg_sleep * 5))
+            ),
         }
 
     async def get_schema(self) -> Dict[str, Any]:
         """Get schema for health data"""
         return {
-            "average_sleep_hours": {"type": "number", "min": 0, "max": 12, "unit": "hours"},
-            "average_stress_level": {"type": "number", "min": 1, "max": 10, "unit": "scale"},
-            "average_energy_level": {"type": "number", "min": 1, "max": 10, "unit": "scale"},
+            "average_sleep_hours": {
+                "type": "number",
+                "min": 0,
+                "max": 12,
+                "unit": "hours",
+            },
+            "average_stress_level": {
+                "type": "number",
+                "min": 1,
+                "max": 10,
+                "unit": "scale",
+            },
+            "average_energy_level": {
+                "type": "number",
+                "min": 1,
+                "max": 10,
+                "unit": "scale",
+            },
             "total_exercise_minutes": {"type": "number", "min": 0, "unit": "minutes"},
             "average_screen_time": {"type": "number", "min": 0, "unit": "hours"},
             "daily_data": {"type": "array"},
-            "sleep_quality_trend": {"type": "string", "enum": ["improving", "declining", "stable"]},
+            "sleep_quality_trend": {
+                "type": "string",
+                "enum": ["improving", "declining", "stable"],
+            },
             "wellness_score": {"type": "number", "min": 0, "max": 100, "unit": "%"},
         }
 
 
 class TaskDataSource(DataSource):
     """Data source for task and project management data"""
+
     async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get task management data"""
         import random
@@ -302,7 +355,13 @@ class TaskDataSource(DataSource):
 
         task_statuses = ["todo", "in_progress", "review", "completed"]
         priorities = ["low", "medium", "high", "urgent"]
-        categories = ["development", "research", "documentation", "meetings", "planning"]
+        categories = [
+            "development",
+            "research",
+            "documentation",
+            "meetings",
+            "planning",
+        ]
 
         tasks = []
         task_counts = defaultdict(int)
@@ -334,8 +393,10 @@ class TaskDataSource(DataSource):
         completion_rate = len(completed_tasks) / len(tasks) * 100
 
         recent_completions = [
-            t for t in completed_tasks
-            if datetime.fromisoformat(t["created_date"]) > datetime.now() - timedelta(days=7)
+            t
+            for t in completed_tasks
+            if datetime.fromisoformat(t["created_date"])
+            > datetime.now() - timedelta(days=7)
         ]
 
         return {
@@ -345,13 +406,21 @@ class TaskDataSource(DataSource):
             "completion_rate": round(completion_rate, 1),
             "weekly_velocity": len(recent_completions),
             "average_task_duration": round(
-                sum(t["actual_hours"] for t in completed_tasks) / max(len(completed_tasks), 1), 1
+                sum(t["actual_hours"] for t in completed_tasks)
+                / max(len(completed_tasks), 1),
+                1,
             ),
             "overdue_tasks": random.randint(2, 8),
             "upcoming_deadlines": random.randint(5, 15),
-            "tasks_by_category": dict(defaultdict(int, {
-                cat: len([t for t in tasks if t["category"] == cat]) for cat in categories
-            })),
+            "tasks_by_category": dict(
+                defaultdict(
+                    int,
+                    {
+                        cat: len([t for t in tasks if t["category"] == cat])
+                        for cat in categories
+                    },
+                )
+            ),
         }
 
     async def get_schema(self) -> Dict[str, Any]:
@@ -618,23 +687,25 @@ class ComprehensiveHealthDashboard:
         # Flask application setup for web dashboard
         self.app = Flask(__name__, template_folder=self._get_templates_dir())
         self.app.config["SECRET_KEY"] = "context-cleaner-comprehensive-dashboard"
-        
+
         # SocketIO for real-time updates
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*", async_mode="threading")
-        
+        self.socketio = SocketIO(
+            self.app, cors_allowed_origins="*", async_mode="threading"
+        )
+
         # Dashboard configuration
         self.config = config
         self.host = "127.0.0.1"
         self.port = 8080
         self.debug = False
-        
+
         # Real-time dashboard state
         self._is_running = False
         self._update_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._performance_history: List[Dict[str, Any]] = []
         self._max_history_points = 200  # 10 minutes at 3-second intervals
-        
+
         # Alert system (from real-time performance dashboard)
         self._alerts_enabled = True
         self._alert_thresholds = {
@@ -657,7 +728,9 @@ class ComprehensiveHealthDashboard:
         self._setup_routes()
         self._setup_socketio_events()
 
-        logger.info("Comprehensive health dashboard initialized with integrated features")
+        logger.info(
+            "Comprehensive health dashboard initialized with integrated features"
+        )
 
     def _get_templates_dir(self) -> str:
         """Get templates directory path."""
@@ -665,7 +738,7 @@ class ComprehensiveHealthDashboard:
 
     def _setup_routes(self):
         """Setup Flask routes for the comprehensive dashboard."""
-        
+
         @self.app.route("/")
         def dashboard_home():
             """Main comprehensive dashboard page."""
@@ -681,13 +754,14 @@ class ComprehensiveHealthDashboard:
             try:
                 # Run async method in thread
                 import asyncio
+
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 report = loop.run_until_complete(
                     self.generate_comprehensive_health_report()
                 )
                 loop.close()
-                
+
                 return jsonify(asdict(report))
             except Exception as e:
                 logger.error(f"Health report generation failed: {e}")
@@ -731,7 +805,7 @@ class ComprehensiveHealthDashboard:
                     )
                 )
                 loop.close()
-                
+
                 if cache_data:
                     # Convert dataclass to dict for JSON serialization
                     cache_dict = {
@@ -761,14 +835,15 @@ class ComprehensiveHealthDashboard:
                                 "recommendation": insight.recommendation,
                                 "file_patterns": insight.file_patterns,
                                 "session_correlation": insight.session_correlation,
-                            } for insight in cache_data.insights
+                            }
+                            for insight in cache_data.insights
                         ],
                         "optimization_recommendations": cache_data.optimization_recommendations,
                     }
                     return jsonify(cache_dict)
                 else:
                     return jsonify({"message": "No cache intelligence data available"})
-                    
+
             except Exception as e:
                 logger.error(f"Cache intelligence failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -800,12 +875,14 @@ class ComprehensiveHealthDashboard:
             """Get recent session data for analytics."""
             try:
                 sessions = self.get_recent_sessions_analytics(days)
-                return jsonify({
-                    "sessions": sessions,
-                    "total_count": len(sessions),
-                    "period_days": days,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                return jsonify(
+                    {
+                        "sessions": sessions,
+                        "total_count": len(sessions),
+                        "period_days": days,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Recent sessions API failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -837,25 +914,36 @@ class ComprehensiveHealthDashboard:
             """Get comprehensive dashboard summary data."""
             try:
                 sessions = self.get_recent_sessions_analytics(30)
-                
+
                 # Calculate summary metrics
-                avg_productivity = sum(s.get("productivity_score", 0) for s in sessions) / max(len(sessions), 1)
-                avg_health_score = sum(s.get("health_score", 0) for s in sessions) / max(len(sessions), 1)
+                avg_productivity = sum(
+                    s.get("productivity_score", 0) for s in sessions
+                ) / max(len(sessions), 1)
+                avg_health_score = sum(
+                    s.get("health_score", 0) for s in sessions
+                ) / max(len(sessions), 1)
                 total_focus_time = sum(s.get("focus_time_minutes", 0) for s in sessions)
-                
-                return jsonify({
-                    "total_sessions": len(sessions),
-                    "avg_productivity": round(avg_productivity, 1),
-                    "avg_health_score": round(avg_health_score, 1),
-                    "total_focus_time_hours": round(total_focus_time / 60, 1),
-                    "active_days": len(set(
-                        datetime.fromisoformat(s["start_time"]).date().isoformat() 
-                        for s in sessions if s.get("start_time")
-                    )),
-                    "performance_history_points": len(self._performance_history),
-                    "alerts_enabled": self._alerts_enabled,
-                    "timestamp": datetime.now().isoformat(),
-                })
+
+                return jsonify(
+                    {
+                        "total_sessions": len(sessions),
+                        "avg_productivity": round(avg_productivity, 1),
+                        "avg_health_score": round(avg_health_score, 1),
+                        "total_focus_time_hours": round(total_focus_time / 60, 1),
+                        "active_days": len(
+                            set(
+                                datetime.fromisoformat(s["start_time"])
+                                .date()
+                                .isoformat()
+                                for s in sessions
+                                if s.get("start_time")
+                            )
+                        ),
+                        "performance_history_points": len(self._performance_history),
+                        "alerts_enabled": self._alerts_enabled,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Dashboard summary API failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -866,16 +954,17 @@ class ComprehensiveHealthDashboard:
             try:
                 if format == "json":
                     sessions = self.get_recent_sessions_analytics(90)  # Last 3 months
-                    
+
                     # Run async health report in thread
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     health_report = loop.run_until_complete(
                         self.generate_comprehensive_health_report()
                     )
                     loop.close()
-                    
+
                     export_data = {
                         "export_timestamp": datetime.now().isoformat(),
                         "export_version": "2.0.0",
@@ -884,24 +973,24 @@ class ComprehensiveHealthDashboard:
                         "performance_history": self._performance_history,
                         "dashboard_features": [
                             "comprehensive_health_analysis",
-                            "real_time_monitoring", 
+                            "real_time_monitoring",
                             "advanced_analytics",
                             "session_timeline",
                             "cache_intelligence",
-                            "productivity_tracking"
+                            "productivity_tracking",
                         ],
                         "metadata": {
                             "total_sessions": len(sessions),
                             "data_sources": list(self.data_sources.keys()),
-                        }
+                        },
                     }
                     return jsonify(export_data)
-                    
+
                 elif format == "csv":
                     return jsonify({"error": "CSV export not yet implemented"}), 501
                 else:
                     return jsonify({"error": "Unsupported export format"}), 400
-                    
+
             except Exception as e:
                 logger.error(f"Data export failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -909,22 +998,24 @@ class ComprehensiveHealthDashboard:
         @self.app.route("/health")
         def health_check():
             """Dashboard health check endpoint."""
-            return jsonify({
-                "status": "healthy",
-                "timestamp": datetime.now().isoformat(),
-                "version": "2.0.0",
-                "features": [
-                    "comprehensive_health_analysis",
-                    "real_time_monitoring",
-                    "advanced_data_sources",
-                    "cache_intelligence",
-                    "websocket_updates"
-                ],
-            })
+            return jsonify(
+                {
+                    "status": "healthy",
+                    "timestamp": datetime.now().isoformat(),
+                    "version": "2.0.0",
+                    "features": [
+                        "comprehensive_health_analysis",
+                        "real_time_monitoring",
+                        "advanced_data_sources",
+                        "cache_intelligence",
+                        "websocket_updates",
+                    ],
+                }
+            )
 
     def _setup_socketio_events(self):
         """Setup SocketIO events for real-time updates."""
-        
+
         @self.socketio.on("connect")
         def handle_connect():
             """Handle client connection."""
@@ -972,40 +1063,46 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Performance update request failed: {e}")
                 emit("error", {"message": str(e)})
 
-    def start_server(self, host: str = "127.0.0.1", port: int = 8080, debug: bool = False, open_browser: bool = True):
+    def start_server(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8080,
+        debug: bool = False,
+        open_browser: bool = True,
+    ):
         """
         Start the comprehensive dashboard server.
-        
+
         Args:
             host: Host to bind to
-            port: Port to bind to  
+            port: Port to bind to
             debug: Enable debug mode
             open_browser: Whether to open browser automatically
         """
         self.host = host
         self.port = port
         self.debug = debug
-        
+
         # Start real-time update thread
         if not self._is_running:
             self._is_running = True
             self._stop_event.clear()
-            
+
             self._update_thread = threading.Thread(
                 target=self._real_time_update_loop,
                 daemon=True,
-                name="ComprehensiveDashboard"
+                name="ComprehensiveDashboard",
             )
             self._update_thread.start()
-        
+
         logger.info(f"Starting comprehensive dashboard on http://{host}:{port}")
-        
+
         if open_browser:
             # Open browser after a short delay
             threading.Timer(
                 1.0, lambda: webbrowser.open(f"http://{host}:{port}")
             ).start()
-        
+
         try:
             self.socketio.run(
                 self.app,
@@ -1025,10 +1122,10 @@ class ComprehensiveHealthDashboard:
         if self._is_running:
             self._is_running = False
             self._stop_event.set()
-            
+
             if self._update_thread and self._update_thread.is_alive():
                 self._update_thread.join(timeout=5.0)
-            
+
             logger.info("Comprehensive dashboard stopped")
 
     def _real_time_update_loop(self):
@@ -1042,29 +1139,33 @@ class ComprehensiveHealthDashboard:
                     self.generate_comprehensive_health_report()
                 )
                 loop.close()
-                
+
                 # Store in history
                 health_data = {
                     "timestamp": datetime.now().isoformat(),
                     "overall_health_score": report.overall_health_score,
                     "focus_score": report.focus_metrics.focus_score,
-                    "redundancy_score": 1.0 - report.redundancy_analysis.duplicate_content_percentage,
+                    "redundancy_score": 1.0
+                    - report.redundancy_analysis.duplicate_content_percentage,
                     "recency_score": report.recency_indicators.fresh_context_percentage,
-                    "size_score": 1.0 - report.size_optimization.optimization_potential_percentage,
+                    "size_score": 1.0
+                    - report.size_optimization.optimization_potential_percentage,
                 }
-                
+
                 self._performance_history.append(health_data)
-                
+
                 # Trim history to max size
                 if len(self._performance_history) > self._max_history_points:
-                    self._performance_history = self._performance_history[-self._max_history_points:]
-                
+                    self._performance_history = self._performance_history[
+                        -self._max_history_points :
+                    ]
+
                 # Broadcast to all connected clients
                 self.socketio.emit("health_update", asdict(report))
-                
+
                 # Update every 30 seconds
                 self._stop_event.wait(timeout=30.0)
-                
+
             except Exception as e:
                 logger.warning(f"Real-time update loop error: {e}")
                 self._stop_event.wait(timeout=10.0)
@@ -1087,8 +1188,11 @@ class ComprehensiveHealthDashboard:
                     "system": {
                         "alerts_enabled": self._alerts_enabled,
                         "history_points": len(self._performance_history),
-                        "uptime_minutes": (datetime.now() - datetime.now()).total_seconds() / 60,
-                    }
+                        "uptime_minutes": (
+                            datetime.now() - datetime.now()
+                        ).total_seconds()
+                        / 60,
+                    },
                 }
             else:
                 return {
@@ -1104,14 +1208,11 @@ class ComprehensiveHealthDashboard:
                         "alerts_enabled": self._alerts_enabled,
                         "history_points": 0,
                         "message": "No health data available yet",
-                    }
+                    },
                 }
         except Exception as e:
             logger.error(f"Performance metrics error: {e}")
-            return {
-                "timestamp": datetime.now().isoformat(),
-                "error": str(e)
-            }
+            return {"timestamp": datetime.now().isoformat(), "error": str(e)}
 
     def _generate_plotly_chart(self, chart_type: str) -> Dict[str, Any]:
         """Generate Plotly chart data for various chart types."""
@@ -1119,30 +1220,39 @@ class ComprehensiveHealthDashboard:
             if chart_type == "health_trends":
                 if not self._performance_history:
                     return {"error": "No health data available"}
-                
+
                 # Extract trend data
                 timestamps = [h["timestamp"] for h in self._performance_history[-50:]]
-                overall_scores = [h.get("overall_health_score", 0.5) for h in self._performance_history[-50:]]
-                focus_scores = [h.get("focus_score", 0.5) for h in self._performance_history[-50:]]
-                
+                overall_scores = [
+                    h.get("overall_health_score", 0.5)
+                    for h in self._performance_history[-50:]
+                ]
+                focus_scores = [
+                    h.get("focus_score", 0.5) for h in self._performance_history[-50:]
+                ]
+
                 fig = go.Figure()
-                
-                fig.add_trace(go.Scatter(
-                    x=timestamps,
-                    y=overall_scores,
-                    mode="lines+markers",
-                    name="Overall Health",
-                    line=dict(color="#27AE60", width=3),
-                ))
-                
-                fig.add_trace(go.Scatter(
-                    x=timestamps,
-                    y=focus_scores,
-                    mode="lines",
-                    name="Focus Score",
-                    line=dict(color="#3498DB", width=2, dash="dash"),
-                ))
-                
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=timestamps,
+                        y=overall_scores,
+                        mode="lines+markers",
+                        name="Overall Health",
+                        line=dict(color="#27AE60", width=3),
+                    )
+                )
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=timestamps,
+                        y=focus_scores,
+                        mode="lines",
+                        name="Focus Score",
+                        line=dict(color="#3498DB", width=2, dash="dash"),
+                    )
+                )
+
                 fig.update_layout(
                     title="Context Health Trends Over Time",
                     xaxis_title="Time",
@@ -1151,9 +1261,9 @@ class ComprehensiveHealthDashboard:
                     hovermode="x unified",
                     template="plotly_white",
                 )
-                
+
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
-                
+
             elif chart_type == "productivity_overview":
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -1161,33 +1271,39 @@ class ComprehensiveHealthDashboard:
                     self.data_sources["productivity"].get_data()
                 )
                 loop.close()
-                
+
                 # Create productivity overview chart
                 categories = ["Focus Time", "Efficiency", "Sessions", "Active Days"]
                 values = [
-                    productivity_data.get("focus_time_hours", 0) / 8 * 100,  # Normalize to 8 hours
+                    productivity_data.get("focus_time_hours", 0)
+                    / 8
+                    * 100,  # Normalize to 8 hours
                     productivity_data.get("efficiency_ratio", 0) * 100,
-                    min(100, productivity_data.get("total_sessions", 0) * 5),  # Scale sessions
+                    min(
+                        100, productivity_data.get("total_sessions", 0) * 5
+                    ),  # Scale sessions
                     min(100, productivity_data.get("active_days", 0) * 7),  # Scale days
                 ]
-                
-                fig = go.Figure(data=go.Bar(
-                    x=categories,
-                    y=values,
-                    marker_color=["#3498DB", "#27AE60", "#F39C12", "#E74C3C"]
-                ))
-                
+
+                fig = go.Figure(
+                    data=go.Bar(
+                        x=categories,
+                        y=values,
+                        marker_color=["#3498DB", "#27AE60", "#F39C12", "#E74C3C"],
+                    )
+                )
+
                 fig.update_layout(
                     title="Productivity Overview",
                     yaxis_title="Score (%)",
                     template="plotly_white",
                 )
-                
+
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
-                
+
             else:
                 return {"error": f"Chart type '{chart_type}' not supported"}
-                
+
         except Exception as e:
             logger.error(f"Chart generation failed: {e}")
             return {"error": str(e)}
@@ -1200,40 +1316,45 @@ class ComprehensiveHealthDashboard:
             from ..analysis.discovery import CacheDiscoveryService
             from ..analysis.session_parser import SessionCacheParser
             import json
-            
+
             discovery_service = CacheDiscoveryService()
-            
+
             # Discover cache locations first
             locations = discovery_service.discover_cache_locations()
             logger.info(f"Discovered {len(locations)} cache locations")
-            
+
             # Get current project cache location
             current_project = discovery_service.get_current_project_cache()
             if not current_project or not current_project.is_accessible:
-                logger.warning("No accessible current project cache found - returning empty session data")
+                logger.warning(
+                    "No accessible current project cache found - returning empty session data"
+                )
                 return []
-                
+
             logger.info(f"Loading sessions from: {current_project.path}")
-            logger.info(f"Found {current_project.session_count} sessions ({current_project.size_mb:.1f}MB)")
-            
+            logger.info(
+                f"Found {current_project.session_count} sessions ({current_project.size_mb:.1f}MB)"
+            )
+
             # Parse JSONL session files directly
             dashboard_sessions = []
-            
+
             # Get all JSONL files from the current project
             from pathlib import Path
+
             project_path = Path(current_project.path)
             jsonl_files = list(project_path.glob("*.jsonl"))
-            
+
             # Get cutoff date for filtering recent sessions
             cutoff_date = datetime.now() - timedelta(days=days)
-            
+
             for jsonl_file in jsonl_files:
                 try:
                     file_modified = datetime.fromtimestamp(jsonl_file.stat().st_mtime)
                     if file_modified < cutoff_date:
                         continue  # Skip old files
-                        
-                    with open(jsonl_file, 'r', encoding='utf-8') as f:
+
+                    with open(jsonl_file, "r", encoding="utf-8") as f:
                         session_data = []
                         for line_num, line in enumerate(f):
                             line = line.strip()
@@ -1242,47 +1363,73 @@ class ComprehensiveHealthDashboard:
                                     entry = json.loads(line)
                                     session_data.append(entry)
                                 except json.JSONDecodeError as e:
-                                    logger.debug(f"Skipping invalid JSON line {line_num} in {jsonl_file.name}: {e}")
+                                    logger.debug(
+                                        f"Skipping invalid JSON line {line_num} in {jsonl_file.name}: {e}"
+                                    )
                                     continue
-                        
+
                         if session_data:
                             # Create dashboard session from JSONL data
                             dashboard_session = {
                                 "session_id": jsonl_file.stem,
                                 "start_time": file_modified.isoformat(),
-                                "end_time": file_modified.isoformat(), 
-                                "duration_minutes": len(session_data) * 2,  # Estimate based on entries
-                                "productivity_score": min(100.0, 50.0 + (len(session_data) * 0.5)),  # Score based on activity
-                                "health_score": min(100.0, 60.0 + (len(session_data) * 0.3)),
-                                "context_size": sum(len(str(entry)) for entry in session_data),
-                                "optimization_applied": any('tool_result' in str(entry) for entry in session_data),
+                                "end_time": file_modified.isoformat(),
+                                "duration_minutes": len(session_data)
+                                * 2,  # Estimate based on entries
+                                "productivity_score": min(
+                                    100.0, 50.0 + (len(session_data) * 0.5)
+                                ),  # Score based on activity
+                                "health_score": min(
+                                    100.0, 60.0 + (len(session_data) * 0.3)
+                                ),
+                                "context_size": sum(
+                                    len(str(entry)) for entry in session_data
+                                ),
+                                "optimization_applied": any(
+                                    "tool_result" in str(entry)
+                                    for entry in session_data
+                                ),
                                 "context_type": "development",
-                                "strategy_type": "INTERACTIVE", 
-                                "operations_approved": sum(1 for entry in session_data if 'tool_result' in str(entry)),
+                                "strategy_type": "INTERACTIVE",
+                                "operations_approved": sum(
+                                    1
+                                    for entry in session_data
+                                    if "tool_result" in str(entry)
+                                ),
                                 "operations_rejected": 0,
-                                "size_reduction_percentage": min(50.0, len(session_data) * 0.1),
+                                "size_reduction_percentage": min(
+                                    50.0, len(session_data) * 0.1
+                                ),
                                 "entry_count": len(session_data),
-                                "file_size_mb": jsonl_file.stat().st_size / (1024 * 1024),
-                                "focus_time_minutes": len(session_data) * 1.5,  # Estimate focus time
-                                "complexity_score": min(100, len(session_data) * 2),  # Complexity based on entries
+                                "file_size_mb": jsonl_file.stat().st_size
+                                / (1024 * 1024),
+                                "focus_time_minutes": len(session_data)
+                                * 1.5,  # Estimate focus time
+                                "complexity_score": min(
+                                    100, len(session_data) * 2
+                                ),  # Complexity based on entries
                             }
                             dashboard_sessions.append(dashboard_session)
-                            
+
                 except Exception as e:
                     logger.warning(f"Failed to parse {jsonl_file.name}: {e}")
                     continue
-                    
+
             # Sort by start time (most recent first)
             dashboard_sessions.sort(key=lambda x: x["start_time"], reverse=True)
-            
-            logger.info(f"Retrieved {len(dashboard_sessions)} sessions from JSONL files")
+
+            logger.info(
+                f"Retrieved {len(dashboard_sessions)} sessions from JSONL files"
+            )
             return dashboard_sessions[:100]  # Limit to 100 most recent sessions
 
         except Exception as e:
             logger.error(f"Session analytics retrieval failed: {e}")
             return []
 
-    def generate_analytics_charts(self, sessions: List[Dict[str, Any]], chart_type: str = "productivity_trend") -> Dict[str, Any]:
+    def generate_analytics_charts(
+        self, sessions: List[Dict[str, Any]], chart_type: str = "productivity_trend"
+    ) -> Dict[str, Any]:
         """Generate advanced analytics charts using Plotly."""
         try:
             if not sessions:
@@ -1304,14 +1451,16 @@ class ComprehensiveHealthDashboard:
                 # Create Plotly chart
                 fig = go.Figure()
 
-                fig.add_trace(go.Scatter(
-                    x=dates,
-                    y=productivity_scores,
-                    mode="lines+markers",
-                    name="Productivity Score",
-                    line=dict(color="#2E86C1", width=3),
-                    marker=dict(size=6),
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=dates,
+                        y=productivity_scores,
+                        mode="lines+markers",
+                        name="Productivity Score",
+                        line=dict(color="#2E86C1", width=3),
+                        marker=dict(size=6),
+                    )
+                )
 
                 # Add trend line if enough data
                 if len(productivity_scores) > 3:
@@ -1320,18 +1469,23 @@ class ComprehensiveHealthDashboard:
                     moving_avg = []
                     for i in range(len(productivity_scores)):
                         start_idx = max(0, i - window_size // 2)
-                        end_idx = min(len(productivity_scores), i + window_size // 2 + 1)
+                        end_idx = min(
+                            len(productivity_scores), i + window_size // 2 + 1
+                        )
                         moving_avg.append(
-                            sum(productivity_scores[start_idx:end_idx]) / (end_idx - start_idx)
+                            sum(productivity_scores[start_idx:end_idx])
+                            / (end_idx - start_idx)
                         )
 
-                    fig.add_trace(go.Scatter(
-                        x=dates,
-                        y=moving_avg,
-                        mode="lines",
-                        name="Trend",
-                        line=dict(color="#E74C3C", width=2, dash="dash"),
-                    ))
+                    fig.add_trace(
+                        go.Scatter(
+                            x=dates,
+                            y=moving_avg,
+                            mode="lines",
+                            name="Trend",
+                            line=dict(color="#E74C3C", width=2, dash="dash"),
+                        )
+                    )
 
                 fig.update_layout(
                     title="Productivity Trend Over Time",
@@ -1347,7 +1501,8 @@ class ComprehensiveHealthDashboard:
             elif chart_type == "session_distribution":
                 # Session duration distribution
                 durations = [
-                    s.get("duration_minutes", 0) for s in sessions
+                    s.get("duration_minutes", 0)
+                    for s in sessions
                     if s.get("duration_minutes", 0) > 0
                 ]
 
@@ -1356,11 +1511,17 @@ class ComprehensiveHealthDashboard:
                 medium = sum(1 for d in durations if 30 <= d <= 120)
                 long = sum(1 for d in durations if d > 120)
 
-                fig = go.Figure(data=go.Pie(
-                    labels=["Short (<30min)", "Medium (30-120min)", "Long (>120min)"],
-                    values=[short, medium, long],
-                    marker_colors=["#3498DB", "#27AE60", "#E74C3C"]
-                ))
+                fig = go.Figure(
+                    data=go.Pie(
+                        labels=[
+                            "Short (<30min)",
+                            "Medium (30-120min)",
+                            "Long (>120min)",
+                        ],
+                        values=[short, medium, long],
+                        marker_colors=["#3498DB", "#27AE60", "#E74C3C"],
+                    )
+                )
 
                 fig.update_layout(
                     title="Session Duration Distribution",
@@ -1390,12 +1551,14 @@ class ComprehensiveHealthDashboard:
 
                 fig = go.Figure()
 
-                fig.add_trace(go.Bar(
-                    x=[f"{h:02d}:00" for h in hours],
-                    y=avg_productivity,
-                    name="Average Productivity by Hour",
-                    marker_color="#3498DB",
-                ))
+                fig.add_trace(
+                    go.Bar(
+                        x=[f"{h:02d}:00" for h in hours],
+                        y=avg_productivity,
+                        name="Average Productivity by Hour",
+                        marker_color="#3498DB",
+                    )
+                )
 
                 fig.update_layout(
                     title="Daily Productivity Pattern",
@@ -1429,35 +1592,39 @@ class ComprehensiveHealthDashboard:
                 duration = session.get("duration_minutes", 0)
                 end_time = start_time + timedelta(minutes=duration)
 
-                timeline_data.append({
-                    "session_id": session.get("session_id", "unknown"),
-                    "start": start_time.isoformat(),
-                    "end": end_time.isoformat(),
-                    "duration_minutes": duration,
-                    "productivity_score": session.get("productivity_score", 0),
-                    "context_size": session.get("context_size", 0),
-                    "focus_time_minutes": session.get("focus_time_minutes", 0),
-                })
+                timeline_data.append(
+                    {
+                        "session_id": session.get("session_id", "unknown"),
+                        "start": start_time.isoformat(),
+                        "end": end_time.isoformat(),
+                        "duration_minutes": duration,
+                        "productivity_score": session.get("productivity_score", 0),
+                        "context_size": session.get("context_size", 0),
+                        "focus_time_minutes": session.get("focus_time_minutes", 0),
+                    }
+                )
 
             # Create Gantt-style chart
             fig = go.Figure()
 
             for i, session in enumerate(timeline_data):
-                fig.add_trace(go.Scatter(
-                    x=[session["start"], session["end"]],
-                    y=[i, i],
-                    mode="lines",
-                    line=dict(
-                        width=10,
-                        color=f'rgb({min(255, session["productivity_score"]*2.55)}, {255-min(255, session["productivity_score"]*2.55)}, 100)',
-                    ),
-                    name=f"Session {i+1}",
-                    hovertemplate=f"<b>Session {i+1}</b><br>" +
-                                  f'Duration: {session["duration_minutes"]} min<br>' +
-                                  f'Productivity: {session["productivity_score"]}<br>' +
-                                  f'Context Size: {session["context_size"]} tokens<br>' +
-                                  "<extra></extra>",
-                ))
+                fig.add_trace(
+                    go.Scatter(
+                        x=[session["start"], session["end"]],
+                        y=[i, i],
+                        mode="lines",
+                        line=dict(
+                            width=10,
+                            color=f'rgb({min(255, session["productivity_score"]*2.55)}, {255-min(255, session["productivity_score"]*2.55)}, 100)',
+                        ),
+                        name=f"Session {i+1}",
+                        hovertemplate=f"<b>Session {i+1}</b><br>"
+                        + f'Duration: {session["duration_minutes"]} min<br>'
+                        + f'Productivity: {session["productivity_score"]}<br>'
+                        + f'Context Size: {session["context_size"]} tokens<br>'
+                        + "<extra></extra>",
+                    )
+                )
 
             fig.update_layout(
                 title="Session Timeline",

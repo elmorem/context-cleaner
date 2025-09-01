@@ -150,7 +150,12 @@ class AnalyticsCommandHandler:
             sys.exit(1)
 
     def handle_enhanced_dashboard_command(
-        self, interactive: bool = False, operations: bool = False, format: str = "web", host: str = "127.0.0.1", port: int = 8080
+        self,
+        interactive: bool = False,
+        operations: bool = False,
+        format: str = "web",
+        host: str = "127.0.0.1",
+        port: int = 8080,
     ) -> None:
         """
         Enhanced dashboard with comprehensive health monitoring and analytics.
@@ -160,52 +165,64 @@ class AnalyticsCommandHandler:
         """
         if format == "json":
             # For JSON format, provide comprehensive dashboard summary
-            from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+            from ..dashboard.comprehensive_health_dashboard import (
+                ComprehensiveHealthDashboard,
+            )
             import asyncio
-            
+
             if self.verbose:
                 click.echo("📊 Generating comprehensive dashboard data (JSON)...")
-            
+
             dashboard = ComprehensiveHealthDashboard(config=self.config)
-            
+
             # Run async method in thread for CLI
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            report = loop.run_until_complete(dashboard.generate_comprehensive_health_report())
+            report = loop.run_until_complete(
+                dashboard.generate_comprehensive_health_report()
+            )
             loop.close()
-            
+
             # Get recent sessions analytics
             sessions = dashboard.get_recent_sessions_analytics(30)
-            
+
             # Combine data
             comprehensive_data = {
-                "comprehensive_health_report": report.__dict__ if hasattr(report, '__dict__') else str(report),
+                "comprehensive_health_report": (
+                    report.__dict__ if hasattr(report, "__dict__") else str(report)
+                ),
                 "recent_sessions_count": len(sessions),
                 "dashboard_features": [
                     "advanced_analytics",
-                    "real_time_monitoring", 
+                    "real_time_monitoring",
                     "cache_intelligence",
                     "session_timeline",
-                    "websocket_updates"
+                    "websocket_updates",
                 ],
                 "analytics_summary": {
                     "total_sessions": len(sessions),
-                    "avg_productivity": sum(s.get("productivity_score", 0) for s in sessions) / max(len(sessions), 1),
-                    "avg_health_score": sum(s.get("health_score", 0) for s in sessions) / max(len(sessions), 1),
-                }
+                    "avg_productivity": sum(
+                        s.get("productivity_score", 0) for s in sessions
+                    )
+                    / max(len(sessions), 1),
+                    "avg_health_score": sum(s.get("health_score", 0) for s in sessions)
+                    / max(len(sessions), 1),
+                },
             }
-            
+
             click.echo(json.dumps(comprehensive_data, indent=2, default=str))
             return
 
         # Launch comprehensive web dashboard
-        from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-        
+        from ..dashboard.comprehensive_health_dashboard import (
+            ComprehensiveHealthDashboard,
+        )
+
         if self.verbose:
             click.echo("🚀 Starting Comprehensive Health Dashboard with Analytics...")
-        
+
         dashboard = ComprehensiveHealthDashboard(config=self.config)
-        
+
         click.echo("🎯 Context Cleaner Comprehensive Analytics Dashboard")
         click.echo("=" * 60)
         click.echo(f"🌐 Dashboard URL: http://{host}:{port}")
@@ -219,17 +236,14 @@ class AnalyticsCommandHandler:
         click.echo("   • 🎛️  Advanced data sources (productivity, health, tasks)")
         click.echo()
         click.echo("🎯 All dashboard features now unified in comprehensive interface!")
-        click.echo("💡 This replaces all separate dashboard commands with single integrated system")
+        click.echo(
+            "💡 This replaces all separate dashboard commands with single integrated system"
+        )
         click.echo("💡 Press Ctrl+C to stop the server")
         click.echo()
-        
+
         try:
-            dashboard.start_server(
-                host=host,
-                port=port,
-                debug=False,
-                open_browser=True
-            )
+            dashboard.start_server(host=host, port=port, debug=False, open_browser=True)
         except KeyboardInterrupt:
             click.echo("\n👋 Comprehensive analytics dashboard stopped")
 

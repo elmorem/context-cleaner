@@ -40,7 +40,7 @@ class RealTimeMonitor:
         """
         self.config = config or ContextCleanerConfig.from_env()
         self.session_tracker = SessionTracker(config)
-        
+
         # Persistent monitoring state file
         self.monitor_state_file = Path(self.config.data_directory) / ".monitor_state"
         self.monitor_state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -95,7 +95,7 @@ class RealTimeMonitor:
         except Exception as e:
             logger.warning(f"Failed to load monitoring state: {e}")
             return False
-    
+
     def _save_monitoring_state(self, is_running: bool):
         """Save persistent monitoring state to file."""
         try:

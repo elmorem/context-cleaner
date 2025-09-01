@@ -6,13 +6,10 @@ change previews, and selective application. Integrates with PR17 manipulation en
 and PR18 safety framework for comprehensive optimization with user control.
 """
 
-import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple, Set, Union
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass
 from enum import Enum
-import json
 
 # Core imports
 from ..core.manipulation_engine import (
@@ -22,7 +19,6 @@ from ..core.manipulation_engine import (
 )
 from ..core.preview_generator import (
     PreviewGenerator,
-    OperationPreview,
     PlanPreview,
     PreviewFormat,
 )
@@ -37,7 +33,6 @@ from ..core.transaction_manager import TransactionManager
 from .personalized_strategies import (
     StrategyType,
     PersonalizedOptimizationEngine,
-    PersonalizedStrategy,
 )
 
 
@@ -200,21 +195,21 @@ class InteractiveWorkflowManager:
         Returns:
             StrategyType: Recommended optimization strategy
         """
-        session = self._get_session(session_id)
+        self._get_session(session_id)
 
         # Simple strategy recommendation based on user preferences
         # TODO: Implement async personalized strategy when caller supports it
         if user_preferences:
-            preferred_strategy = user_preferences.get('strategy', 'balanced').lower()
-            if preferred_strategy == 'conservative':
+            preferred_strategy = user_preferences.get("strategy", "balanced").lower()
+            if preferred_strategy == "conservative":
                 return StrategyType.CONSERVATIVE
-            elif preferred_strategy == 'aggressive':
+            elif preferred_strategy == "aggressive":
                 return StrategyType.AGGRESSIVE
-            elif preferred_strategy == 'focus':
+            elif preferred_strategy == "focus":
                 return StrategyType.FOCUS
-            elif preferred_strategy == 'balanced':
+            elif preferred_strategy == "balanced":
                 return StrategyType.BALANCED
-        
+
         # Default to balanced strategy
         return StrategyType.BALANCED
 
@@ -821,7 +816,7 @@ def quick_optimization_preview(
     session = manager.start_interactive_optimization(context_data, strategy)
 
     # Generate plan and preview
-    plan = manager.generate_optimization_plan(session.session_id, strategy)
+    manager.generate_optimization_plan(session.session_id, strategy)
     preview = manager.generate_preview(session.session_id)
 
     # Cleanup session
