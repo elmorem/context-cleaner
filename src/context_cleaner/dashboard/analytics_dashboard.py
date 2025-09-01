@@ -246,8 +246,13 @@ class AnalyticsDashboard:
             if not sessions:
                 return self._generate_empty_dashboard()
 
-            # Generate analytics data
-            trend_analysis = self.trend_analyzer.analyze_trends(sessions)
+            # Generate analytics data with error handling
+            try:
+                trend_analysis = self.trend_analyzer.analyze_trends(sessions)
+            except Exception as e:
+                logger.warning(f"Trend analysis failed: {e}")
+                trend_analysis = {"productivity": {"trend": "stable", "data": []}, "health_score": {"trend": "stable", "data": []}}
+            
             recommendations = self._get_current_recommendations()
 
             # Current metrics
@@ -470,7 +475,12 @@ class AnalyticsDashboard:
             if not sessions:
                 return {"error": "No session data available"}
 
-            self.trend_analyzer.analyze_trends(sessions)
+            # Safe trend analysis with error handling
+            try:
+                self.trend_analyzer.analyze_trends(sessions)
+            except Exception as e:
+                logger.warning(f"Trend analysis for patterns failed: {e}")
+                # Continue without trend analysis
 
             # Create pattern visualization based on type
             if pattern_type == "daily" or pattern_type == "all":
@@ -607,19 +617,33 @@ class AnalyticsDashboard:
 
     def _get_recent_sessions(self, days: int) -> List[Dict[str, Any]]:
         """Get recent session data using real-time cache discovery and JSONL parsing."""
+        print(f"DEBUG: _get_recent_sessions called for {days} days")
+        logger.info(f"_get_recent_sessions called for {days} days")
         try:
+            print("DEBUG: Starting JSONL parsing attempt")
             # Use real-time cache discovery system to find JSONL session files
             from ..analysis.discovery import CacheDiscoveryService
+            print("DEBUG: Successfully imported CacheDiscoveryService")
             from ..analysis.session_parser import SessionCacheParser
+            print("DEBUG: Successfully imported SessionCacheParser")
             import json
             
             discovery_service = CacheDiscoveryService()
             
+            # Discover cache locations first
+            locations = discovery_service.discover_cache_locations()
+            logger.info(f"Discovered {len(locations)} cache locations")
+            
             # Get current project cache location
             current_project = discovery_service.get_current_project_cache()
             if not current_project or not current_project.is_accessible:
-                logger.warning("No accessible current project cache found")
-                return []
+                logger.warning("No accessible current project cache found - falling back to session tracker")
+                logger.info(f"Current project result: {current_project}")
+                # Fallback to session tracker immediately
+                sessions = self.session_tracker.get_recent_sessions(days)
+                session_dicts = [self._session_to_dict(session) for session in sessions]
+                logger.info(f"Fallback returned {len(session_dicts)} sessions from session tracker")
+                return session_dicts
                 
             logger.info(f"Loading sessions from: {current_project.path}")
             logger.info(f"Found {current_project.session_count} sessions ({current_project.size_mb:.1f}MB)")
@@ -683,16 +707,21 @@ class AnalyticsDashboard:
             dashboard_sessions.sort(key=lambda x: x["start_time"], reverse=True)
             
             logger.info(f"Retrieved {len(dashboard_sessions)} sessions from JSONL files for dashboard")
+            logger.info(f"Sample session data: {dashboard_sessions[0] if dashboard_sessions else 'None'}")
             return dashboard_sessions[:100]  # Limit to 100 most recent sessions
 
         except Exception as e:
+            print(f"DEBUG: JSONL session retrieval failed: {e}")
             logger.error(f"JSONL session retrieval failed: {e}")
             # Fallback to session tracker
             try:
+                print("DEBUG: Falling back to session tracker")
                 sessions = self.session_tracker.get_recent_sessions(days)
                 session_dicts = [self._session_to_dict(session) for session in sessions]
+                print(f"DEBUG: Session tracker returned {len(session_dicts)} sessions")
                 return session_dicts
             except Exception as fallback_e:
+                print(f"DEBUG: Fallback session retrieval also failed: {fallback_e}")
                 logger.error(f"Fallback session retrieval also failed: {fallback_e}")
                 return []
 
