@@ -1,0 +1,46 @@
+services:
+  # ClickHouse database for storing OpenTelemetry data
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-otel
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native interface
+    environment:
+      CLICKHOUSE_DB: otel
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./otel-clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./clickhouse-users.xml:/etc/clickhouse-server/users.d/users.xml
+    networks:
+      - otel-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    ports:
+      - "4317:4317"  # OTLP gRPC receiver
+      - "4318:4318"  # OTLP HTTP receiver  
+      - "55679:55679" # ZPages extension
+    volumes:
+      - ./otel-simple.yaml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - otel-network
+    restart: unless-stopped
+
+volumes:
+  clickhouse_data:
+
+networks:
+  otel-network:
+    driver: bridge
