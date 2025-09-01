@@ -14,7 +14,21 @@ from .comprehensive_health_dashboard import ComprehensiveHealthDashboard
 
 # Legacy compatibility dashboards - these now delegate to comprehensive dashboard
 from .web_server import ProductivityDashboard
-from .analytics_dashboard import AnalyticsDashboard
+
+# AnalyticsDashboard compatibility wrapper
+class AnalyticsDashboard:
+    """Compatibility wrapper that delegates to ComprehensiveHealthDashboard."""
+    
+    def __init__(self, config=None):
+        self.comprehensive_dashboard = ComprehensiveHealthDashboard(config=config)
+        self.app = self.comprehensive_dashboard.app
+        self.config = config
+    
+    def start_server(self, host="127.0.0.1", port=8080, debug=False, open_browser=True):
+        """Start comprehensive dashboard server."""
+        return self.comprehensive_dashboard.start_server(
+            host=host, port=port, debug=debug, open_browser=open_browser
+        )
 
 # Export comprehensive dashboard as the primary interface
 __all__ = [
