@@ -126,7 +126,7 @@ def test_token_analyzer_division_by_zero_fix():
 
 def test_all_data_models_can_instantiate():
     """Test that all data model classes can be instantiated."""
-    from src.context_cleaner.analysis.import (
+    from src.context_cleaner.analysis.models import (
         WorkflowPattern, TopicTransition, UsageWeightedScore
     )
     from datetime import datetime

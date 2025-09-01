@@ -319,6 +319,10 @@ class TestCrossSessionAnalyticsEngine:
             session.efficiency_score = 0.7 + i * 0.05
             session.duration_minutes = 90 + i * 10
             session.timestamp = datetime.now() - timedelta(days=i)
+            # Add missing attributes that _extract_session_metrics expects
+            session.files_accessed = ["file1.py", "file2.js", "file3.py"]
+            session.total_tokens = 1000 + i * 100
+            session.focus_score = 0.8 + i * 0.02
             template_sessions.append(session)
         
         # Convert to session metrics
