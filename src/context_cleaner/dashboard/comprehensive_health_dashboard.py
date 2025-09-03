@@ -55,6 +55,11 @@ try:
     from ..telemetry.error_recovery.manager import ErrorRecoveryManager
     from ..telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
     from ..telemetry.cost_optimization.models import BudgetConfig
+    
+    # Phase 3: Orchestration components
+    from ..telemetry.orchestration.task_orchestrator import TaskOrchestrator
+    from ..telemetry.orchestration.workflow_learner import WorkflowLearner
+    from ..telemetry.orchestration.agent_selector import AgentSelector
 
     TELEMETRY_DASHBOARD_AVAILABLE = True
 except ImportError:
@@ -85,6 +90,19 @@ except ImportError:
     
     class BudgetConfig:
         pass
+    
+    # Phase 3: Orchestration component stubs
+    class TaskOrchestrator:
+        def __init__(self, **kwargs):
+            pass
+    
+    class WorkflowLearner:
+        def __init__(self, **kwargs):
+            pass
+    
+    class AgentSelector:
+        def __init__(self, **kwargs):
+            pass
 
     class HealthLevel:
         EXCELLENT = "excellent"
@@ -798,11 +816,26 @@ class ComprehensiveHealthDashboard:
                 self.cost_engine = CostOptimizationEngine(self.telemetry_client, budget_config)
                 self.recovery_manager = ErrorRecoveryManager(self.telemetry_client)
                 
-                # Initialize telemetry widget manager
+                # Phase 3: Initialize orchestration components
+                try:
+                    self.task_orchestrator = TaskOrchestrator(self.telemetry_client)
+                    self.workflow_learner = WorkflowLearner(self.telemetry_client)
+                    self.agent_selector = AgentSelector(self.telemetry_client)
+                    logger.info("Phase 3 orchestration components initialized")
+                except Exception as e:
+                    logger.warning(f"Orchestration components failed to initialize: {e}")
+                    self.task_orchestrator = None
+                    self.workflow_learner = None
+                    self.agent_selector = None
+                
+                # Initialize telemetry widget manager with orchestration support
                 self.telemetry_widgets = TelemetryWidgetManager(
                     self.telemetry_client,
                     self.cost_engine, 
-                    self.recovery_manager
+                    self.recovery_manager,
+                    self.task_orchestrator,
+                    self.workflow_learner,
+                    self.agent_selector
                 )
                 logger.info("Telemetry dashboard integration enabled")
             except Exception as e:
