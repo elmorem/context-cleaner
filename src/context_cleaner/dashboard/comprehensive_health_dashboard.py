@@ -48,6 +48,44 @@ except ImportError:
         def __init__(self, **kwargs):
             pass
 
+# Telemetry dashboard imports  
+try:
+    from ..telemetry.clients.clickhouse_client import ClickHouseClient
+    from ..telemetry.cost_optimization.engine import CostOptimizationEngine
+    from ..telemetry.error_recovery.manager import ErrorRecoveryManager
+    from ..telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
+    from ..telemetry.cost_optimization.models import BudgetConfig
+
+    TELEMETRY_DASHBOARD_AVAILABLE = True
+except ImportError:
+    TELEMETRY_DASHBOARD_AVAILABLE = False
+
+    # Create stub classes when telemetry dashboard is not available
+    class ClickHouseClient:
+        def __init__(self, **kwargs):
+            pass
+    
+    class CostOptimizationEngine:
+        def __init__(self, **kwargs):
+            pass
+    
+    class ErrorRecoveryManager:
+        def __init__(self, **kwargs):
+            pass
+    
+    class TelemetryWidgetManager:
+        def __init__(self, **kwargs):
+            pass
+        
+        async def get_all_widget_data(self, **kwargs):
+            return {}
+    
+    class TelemetryWidgetType:
+        pass
+    
+    class BudgetConfig:
+        pass
+
     class HealthLevel:
         EXCELLENT = "excellent"
         GOOD = "good"
@@ -743,12 +781,43 @@ class ComprehensiveHealthDashboard:
         self._session_analytics_cache_time: Optional[datetime] = None
         self._session_analytics_cache_ttl = 30  # Cache TTL in seconds
 
+        # Telemetry integration (Phase 2 enhancement)
+        self.telemetry_enabled = TELEMETRY_DASHBOARD_AVAILABLE
+        if self.telemetry_enabled:
+            try:
+                # Initialize telemetry components
+                self.telemetry_client = ClickHouseClient()
+                
+                # Initialize cost optimization with default budget
+                budget_config = BudgetConfig(
+                    session_limit=5.0,  # $5 per session
+                    daily_limit=25.0,   # $25 per day
+                    auto_switch_haiku=True,
+                    auto_context_optimization=True
+                )
+                self.cost_engine = CostOptimizationEngine(self.telemetry_client, budget_config)
+                self.recovery_manager = ErrorRecoveryManager(self.telemetry_client)
+                
+                # Initialize telemetry widget manager
+                self.telemetry_widgets = TelemetryWidgetManager(
+                    self.telemetry_client,
+                    self.cost_engine, 
+                    self.recovery_manager
+                )
+                logger.info("Telemetry dashboard integration enabled")
+            except Exception as e:
+                logger.warning(f"Telemetry integration failed: {e}")
+                self.telemetry_enabled = False
+        else:
+            logger.info("Telemetry dashboard not available - running in basic mode")
+        
         # Setup Flask routes and SocketIO events
         self._setup_routes()
         self._setup_socketio_events()
 
         logger.info(
-            "Comprehensive health dashboard initialized with integrated features"
+            f"Comprehensive health dashboard initialized with integrated features "
+            f"(telemetry: {'enabled' if self.telemetry_enabled else 'disabled'})"
         )
 
     def _get_templates_dir(self) -> str:
@@ -809,6 +878,89 @@ class ComprehensiveHealthDashboard:
                 return jsonify(metrics)
             except Exception as e:
                 logger.error(f"Performance metrics failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry-widgets")
+        def get_telemetry_widgets():
+            """Get all telemetry widget data for Phase 2 dashboard."""
+            if not self.telemetry_enabled:
+                return jsonify({"error": "Telemetry not available"}), 404
+                
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                widgets = loop.run_until_complete(
+                    self.telemetry_widgets.get_all_widget_data()
+                )
+                loop.close()
+                
+                # Convert widgets to JSON-serializable format
+                widgets_dict = {}
+                for widget_type, widget_data in widgets.items():
+                    widgets_dict[widget_type] = {
+                        'widget_type': widget_data.widget_type.value,
+                        'title': widget_data.title,
+                        'status': widget_data.status,
+                        'data': widget_data.data,
+                        'last_updated': widget_data.last_updated.isoformat(),
+                        'alerts': widget_data.alerts
+                    }
+                
+                return jsonify(widgets_dict)
+            except Exception as e:
+                logger.error(f"Telemetry widgets failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/cost-burnrate")
+        def get_cost_burnrate():
+            """Get real-time cost burn rate data."""
+            if not self.telemetry_enabled:
+                return jsonify({"error": "Telemetry not available"}), 404
+                
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                cost_widget = loop.run_until_complete(
+                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.COST_TRACKER)
+                )
+                loop.close()
+                
+                return jsonify({
+                    'current_cost': cost_widget.data.get('current_session_cost', 0),
+                    'burn_rate': cost_widget.data.get('burn_rate_per_hour', 0),
+                    'budget_remaining': cost_widget.data.get('budget_remaining', 0),
+                    'projection': cost_widget.data.get('cost_projection', 0),
+                    'status': cost_widget.status,
+                    'alerts': cost_widget.alerts
+                })
+            except Exception as e:
+                logger.error(f"Cost burn rate failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/error-monitor")  
+        def get_error_monitor():
+            """Get error monitoring data."""
+            if not self.telemetry_enabled:
+                return jsonify({"error": "Telemetry not available"}), 404
+                
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                error_widget = loop.run_until_complete(
+                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.ERROR_MONITOR)
+                )
+                loop.close()
+                
+                return jsonify({
+                    'error_rate': error_widget.data.get('current_error_rate', 0),
+                    'trend': error_widget.data.get('error_trend', 'stable'),
+                    'recent_errors': error_widget.data.get('recent_errors', []),
+                    'recovery_rate': error_widget.data.get('recovery_success_rate', 0),
+                    'status': error_widget.status,
+                    'alerts': error_widget.alerts
+                })
+            except Exception as e:
+                logger.error(f"Error monitor failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/api/cache-intelligence")
