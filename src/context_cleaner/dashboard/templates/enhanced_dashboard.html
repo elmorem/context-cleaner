@@ -515,35 +515,10 @@
                 if (sectionId === 'analytics') {
                     setTimeout(function() {
                         try {
-                            console.log('Direct analytics fix triggered by click');
-                            // Fix Context Health widget
-                            var contextElement = document.getElementById('context-health-widget');
-                            if (contextElement) {
-                                contextElement.innerHTML = 
-                                    '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Context Health Metrics - Healthy</div>' +
-                                    '<div style="font-size: 0.875rem; color: #374151;">' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Context Size:</strong> 45.2KB average</div>' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Compression Rate:</strong> 73%</div>' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Relevance Score:</strong> 87%</div>' +
-                                    '</div>' +
-                                    '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                            }
-
-                            // Fix Performance Trends widget  
-                            var perfElement = document.getElementById('performance-trends-widget');
-                            if (perfElement) {
-                                perfElement.innerHTML =
-                                    '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Performance Trends - Improving</div>' +
-                                    '<div style="font-size: 0.875rem; color: #374151;">' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Response Time:</strong> 1.2s average</div>' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Throughput:</strong> +15% this week</div>' +
-                                    '<div style="margin-bottom: 0.75rem;"><strong>Cache Hit Rate:</strong> 92%</div>' +
-                                    '</div>' +
-                                    '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                            }
-                            console.log('Direct analytics fix completed');
+                            console.log('Analytics tab clicked - loading dynamic data');
+                            loadAnalyticsWidgets();
                         } catch (error) {
-                            console.error('Error in direct analytics fix:', error);
+                            console.error('Error loading analytics on click:', error);
                         }
                     }, 100);
                 }
@@ -634,32 +609,71 @@
         function loadAnalyticsWidgets() {
             console.log('Loading analytics widgets...');
             try {
-                // Fix Context Health widget
+                // Load dynamic Context Health widget data
                 var contextElement = document.getElementById('context-health-widget');
                 if (contextElement) {
-                    contextElement.innerHTML = 
-                        '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Context Health Metrics - Healthy</div>' +
-                        '<div style="font-size: 0.875rem; color: #374151;">' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Context Size:</strong> 45.2KB average</div>' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Compression Rate:</strong> 73%</div>' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Relevance Score:</strong> 87%</div>' +
-                        '</div>' +
-                        '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                    console.log('Context widget updated');
+                    // Show loading state
+                    contextElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading context health data...</div>';
+                    
+                    // Fetch real data from API
+                    fetch('/api/analytics/context-health')
+                        .then(response => response.json())
+                        .then(data => {
+                            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+                            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+                            const statusText = data.status === 'healthy' ? 'Healthy' : 'Warning';
+                            
+                            contextElement.innerHTML = 
+                                `<div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">${statusIcon} Context Health Metrics - ${statusText}</div>` +
+                                '<div style="font-size: 0.875rem; color: #374151;">' +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Context Size:</strong> ${data.context_size_kb}KB average <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ Average amount of context data processed per request</span></div>` +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Compression Rate:</strong> ${data.compression_rate}% <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ How efficiently context is compressed to save memory</span></div>` +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Relevance Score:</strong> ${data.relevance_score}% <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ How well context matches the current task (higher is better)</span></div>` +
+                                '</div>' +
+                                '<div style="margin-top: 1rem; padding: 0.5rem; background: #f9fafb; border-radius: 4px; font-size: 0.75rem; color: #6b7280;">' +
+                                '<strong>💡 Legend:</strong> Context Size measures data volume, Compression Rate shows memory efficiency (70-80% is optimal), Relevance Score indicates how well context matches current tasks (80%+ is good)' +
+                                '</div>' +
+                                '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
+                            console.log('Context widget loaded with real data:', data);
+                        })
+                        .catch(error => {
+                            console.error('Error loading context health data:', error);
+                            contextElement.innerHTML = '<div style="color: #dc2626;">❌ Failed to load context health data</div>';
+                        });
                 }
 
-                // Fix Performance Trends widget  
+                // Load dynamic Performance Trends widget data
                 var perfElement = document.getElementById('performance-trends-widget');
                 if (perfElement) {
-                    perfElement.innerHTML =
-                        '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Performance Trends - Improving</div>' +
-                        '<div style="font-size: 0.875rem; color: #374151;">' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Response Time:</strong> 1.2s average</div>' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Throughput:</strong> +15% this week</div>' +
-                        '<div style="margin-bottom: 0.75rem;"><strong>Cache Hit Rate:</strong> 92%</div>' +
-                        '</div>' +
-                        '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                    console.log('Performance widget updated');
+                    // Show loading state
+                    perfElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading performance trends...</div>';
+                    
+                    // Fetch real data from API
+                    fetch('/api/analytics/performance-trends')
+                        .then(response => response.json())
+                        .then(data => {
+                            const statusColor = data.status === 'improving' ? '#059669' : '#d97706';
+                            const statusIcon = data.status === 'improving' ? '✅' : '⚠️';
+                            const statusText = data.status === 'improving' ? 'Improving' : 'Warning';
+                            const throughputSign = data.throughput_change_percent >= 0 ? '+' : '';
+                            
+                            perfElement.innerHTML =
+                                `<div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">${statusIcon} Performance Trends - ${statusText}</div>` +
+                                '<div style="font-size: 0.875rem; color: #374151;">' +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Response Time:</strong> ${data.response_time_seconds}s average <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ Average time to complete requests</span></div>` +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Throughput:</strong> ${throughputSign}${data.throughput_change_percent}% this week <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ Number of requests processed per unit time</span></div>` +
+                                `<div style="margin-bottom: 0.75rem;"><strong>Cache Hit Rate:</strong> ${data.cache_hit_rate}% <span style="color: #6b7280; font-size: 0.75rem;">ℹ️ Percentage of requests served from cache vs. computed fresh</span></div>` +
+                                '</div>' +
+                                '<div style="margin-top: 1rem; padding: 0.5rem; background: #f9fafb; border-radius: 4px; font-size: 0.75rem; color: #6b7280;">' +
+                                '<strong>💡 Legend:</strong> Response Time should be <2s for good UX, Throughput increases show system scaling well, Cache Hit Rate >90% indicates efficient caching (reduces compute costs)' +
+                                '</div>' +
+                                '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
+                            console.log('Performance widget loaded with real data:', data);
+                        })
+                        .catch(error => {
+                            console.error('Error loading performance trends data:', error);
+                            perfElement.innerHTML = '<div style="color: #dc2626;">❌ Failed to load performance trends</div>';
+                        });
                 }
                 
                 console.log('Analytics widgets loaded successfully');
@@ -1052,6 +1066,23 @@
                 `;
             } else if (widgetType === 'workflow-performance') {
                 const perfData = data.data || {};
+                let optimizationHtml = '';
+                
+                // Display optimization opportunities
+                if (perfData.optimization_opportunities && perfData.optimization_opportunities.length > 0) {
+                    optimizationHtml = '<div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e5e7eb;"><strong>🎯 Optimization Opportunities:</strong>';
+                    perfData.optimization_opportunities.slice(0, 3).forEach(opt => {
+                        const priorityColor = opt.priority === 'high' ? '#dc2626' : opt.priority === 'medium' ? '#d97706' : '#059669';
+                        optimizationHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #f8fafc; border-left: 3px solid ${priorityColor}; font-size: 0.875rem;">
+                                <div style="font-weight: 500;">${opt.opportunity}</div>
+                                <div style="color: #059669; font-size: 0.8rem;">${opt.potential_improvement}</div>
+                            </div>
+                        `;
+                    });
+                    optimizationHtml += '</div>';
+                }
+                
                 contentHtml = `
                     <div style="margin-bottom: 0.75rem;">
                         <strong>Completed Today:</strong> ${perfData.completed_today || 0}
@@ -1062,6 +1093,7 @@
                     <div style="margin-bottom: 0.75rem;">
                         <strong>Efficiency Score:</strong> ${(perfData.efficiency_score || 0) * 100}%
                     </div>
+                    ${optimizationHtml}
                 `;
             } else {
                 // Fallback for unknown widget types
@@ -1129,34 +1161,8 @@
             console.log('Setting up Analytics tab observer...');
             function fixAnalyticsWidgets() {
                 try {
-                    console.log('=== Analytics Auto-Fix Triggered ===');
-                    // Fix Context Health widget
-                    var contextElement = document.getElementById('context-health-widget');
-                    if (contextElement && contextElement.innerHTML.includes('Loading')) {
-                        contextElement.innerHTML = 
-                            '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Context Health Metrics - Healthy</div>' +
-                            '<div style="font-size: 0.875rem; color: #374151;">' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Context Size:</strong> 45.2KB average</div>' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Compression Rate:</strong> 73%</div>' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Relevance Score:</strong> 87%</div>' +
-                            '</div>' +
-                            '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                        console.log('Context widget fixed automatically');
-                    }
-
-                    // Fix Performance Trends widget  
-                    var perfElement = document.getElementById('performance-trends-widget');
-                    if (perfElement && perfElement.innerHTML.includes('Loading')) {
-                        perfElement.innerHTML =
-                            '<div style="color: #059669; font-weight: 600; margin-bottom: 1rem;">✅ Performance Trends - Improving</div>' +
-                            '<div style="font-size: 0.875rem; color: #374151;">' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Response Time:</strong> 1.2s average</div>' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Throughput:</strong> +15% this week</div>' +
-                            '<div style="margin-bottom: 0.75rem;"><strong>Cache Hit Rate:</strong> 92%</div>' +
-                            '</div>' +
-                            '<div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ' + new Date().toLocaleTimeString() + '</div>';
-                        console.log('Performance widget fixed automatically');
-                    }
+                    console.log('=== Analytics Auto-Fix Triggered - Loading Dynamic Data ===');
+                    loadAnalyticsWidgets();
                 } catch (error) {
                     console.error('Error in analytics auto-fix:', error);
                 }
