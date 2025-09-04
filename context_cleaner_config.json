@@ -1,0 +1,58 @@
+{
+  "context_cleaner": {
+    "version": "3.0.0-phase3",
+    "features_enabled": {
+      "telemetry_infrastructure": true,
+      "enhanced_analytics": true,
+      "advanced_orchestration": true,
+      "comprehensive_dashboard": true,
+      "ml_learning_engine": true,
+      "intelligent_agent_selection": true
+    },
+    "telemetry": {
+      "clickhouse_enabled": false,
+      "session_tracking": true,
+      "cost_optimization": true,
+      "error_recovery": true,
+      "orchestration_monitoring": true
+    },
+    "orchestration": {
+      "max_concurrent_workflows": 3,
+      "agent_selection_strategy": "balanced",
+      "learning_engine_enabled": true,
+      "workflow_templates_enabled": true,
+      "performance_optimization": true
+    },
+    "dashboard": {
+      "web_interface": true,
+      "real_time_updates": true,
+      "telemetry_widgets": true,
+      "orchestration_widgets": true,
+      "port": 8080,
+      "host": "localhost"
+    },
+    "directories": {
+      "monitored_paths": [
+        "/Users/markelmore/_code/context-cleaner",
+        "/Users/markelmore/_code/fowldata",
+        "/Users/markelmore/_code/deep_homework",
+        "/Users/markelmore/_code/deep_homework_ios",
+        "/Users/markelmore/_code/claude-code-hooks-mastery",
+        "/Users/markelmore/_code/advanced_rag"
+      ],
+      "exclude_patterns": [
+        "node_modules/**",
+        ".git/**",
+        "__pycache__/**",
+        "*.pyc",
+        ".DS_Store"
+      ]
+    },
+    "performance": {
+      "cache_size_mb": 100,
+      "analysis_threads": 4,
+      "dashboard_refresh_seconds": 30,
+      "telemetry_batch_size": 50
+    }
+  }
+}
