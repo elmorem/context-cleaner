@@ -48,6 +48,28 @@ except ImportError:
         def __init__(self, **kwargs):
             pass
 
+# Context Window Analysis imports
+try:
+    from ..analysis.context_window_analyzer import ContextWindowAnalyzer
+    CONTEXT_ANALYZER_AVAILABLE = True
+except ImportError:
+    CONTEXT_ANALYZER_AVAILABLE = False
+    
+    class ContextWindowAnalyzer:
+        def __init__(self, **kwargs):
+            pass
+        
+        def get_directory_context_stats(self):
+            return {}
+        
+        def get_total_context_usage(self):
+            return {
+                'total_size_mb': 0,
+                'estimated_total_tokens': 0,
+                'active_directories': 0,
+                'directory_breakdown': {}
+            }
+
 # Telemetry dashboard imports  
 try:
     from ..telemetry.clients.clickhouse_client import ClickHouseClient
@@ -751,6 +773,9 @@ class ComprehensiveHealthDashboard:
         self.token_analyzer = TokenEfficiencyAnalyzer()
         self.temporal_analyzer = TemporalContextAnalyzer()
         self.enhanced_analyzer = EnhancedContextAnalyzer()
+        
+        # Context Window Analysis
+        self.context_analyzer = ContextWindowAnalyzer() if CONTEXT_ANALYZER_AVAILABLE else None
 
         # Flask application setup for web dashboard
         self.app = Flask(__name__, template_folder=self._get_templates_dir())
@@ -1578,6 +1603,116 @@ class ComprehensiveHealthDashboard:
 
             except Exception as e:
                 logger.error(f"Data export failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/context-window-usage")
+        def get_context_window_usage():
+            """Get context window usage for active directories."""
+            try:
+                if self.context_analyzer:
+                    context_stats = self.context_analyzer.get_total_context_usage()
+                    directory_stats = context_stats.get('directory_breakdown', {})
+                    
+                    # Format for display
+                    formatted_directories = []
+                    for directory, stats in directory_stats.items():
+                        formatted_directories.append({
+                            'directory': directory,
+                            'size_mb': stats['file_size_mb'],
+                            'estimated_tokens': f"{stats['estimated_tokens']:,}",
+                            'last_activity': stats['last_activity'].strftime("%Y-%m-%d %H:%M:%S") if stats['last_activity'] else 'Never',
+                            'entry_count': stats['entry_count'],
+                            'tool_calls': stats['tool_calls'],
+                            'file_reads': stats['file_reads'],
+                            'session_file': stats['session_file']
+                        })
+                    
+                    # Sort by size descending
+                    formatted_directories.sort(key=lambda x: x['size_mb'], reverse=True)
+                    
+                    return jsonify({
+                        'success': True,
+                        'total_size_mb': context_stats['total_size_mb'],
+                        'estimated_total_tokens': f"{context_stats['estimated_total_tokens']:,}",
+                        'active_directories': context_stats['active_directories'],
+                        'directories': formatted_directories[:10]  # Top 10 by size
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Context analyzer not available',
+                        'directories': []
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Context window analysis failed: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': str(e),
+                    'directories': []
+                })
+
+        @self.app.route("/api/data-explorer/query", methods=['POST'])
+        def execute_custom_query():
+            """Execute custom SQL query for data exploration."""
+            try:
+                if not request.is_json:
+                    return jsonify({"error": "Request must be JSON"}), 400
+                
+                data = request.get_json()
+                query = data.get('query', '').strip()
+                
+                if not query:
+                    return jsonify({"error": "Query cannot be empty"}), 400
+                
+                # Basic security checks
+                forbidden_keywords = ['DELETE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'CREATE', 'TRUNCATE']
+                query_upper = query.upper()
+                for keyword in forbidden_keywords:
+                    if keyword in query_upper:
+                        return jsonify({"error": f"Forbidden SQL keyword: {keyword}"}), 400
+                
+                # Limit query length
+                if len(query) > 5000:
+                    return jsonify({"error": "Query too long (max 5000 characters)"}), 400
+                
+                # Execute query against ClickHouse
+                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    try:
+                        # Add LIMIT if not present
+                        if 'LIMIT' not in query_upper:
+                            query = query.rstrip(';') + ' LIMIT 1000'
+                        
+                        # Execute async query using asyncio
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        data_rows = loop.run_until_complete(
+                            self.telemetry_client.execute_query(query)
+                        )
+                        loop.close()
+                        
+                        # Get column names from first row if data exists
+                        columns = []
+                        if data_rows and len(data_rows) > 0:
+                            columns = list(data_rows[0].keys())
+                        
+                        return jsonify({
+                            "success": True,
+                            "data": data_rows,
+                            "row_count": len(data_rows),
+                            "columns": columns,
+                            "query_executed": query
+                        })
+                        
+                    except Exception as ch_error:
+                        logger.error(f"ClickHouse query error: {ch_error}")
+                        return jsonify({"error": f"Database query failed: {str(ch_error)}"}), 500
+                else:
+                    return jsonify({"error": "Database connection not available"}), 503
+                    
+            except Exception as e:
+                logger.error(f"Data explorer query error: {e}")
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/health")
