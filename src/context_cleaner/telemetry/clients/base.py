@@ -74,3 +74,8 @@ class TelemetryClient(ABC):
     async def get_model_usage_stats(self, days: int = 7) -> Dict[str, Dict[str, Any]]:
         """Get model usage statistics over specified period."""
         pass
+    
+    @abstractmethod
+    async def get_total_aggregated_stats(self) -> Dict[str, Any]:
+        """Get total aggregated statistics across all sessions."""
+        pass

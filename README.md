@@ -24,12 +24,12 @@ Context Cleaner is a comprehensive productivity tracking tool designed specifica
 - **Performance correlation analysis** between context optimization and productivity
 - **Real-time context monitoring** with automatic boundary detection
 
-### **📈 Interactive Dashboard**
-- **Web-based visualization** of productivity trends and session analytics
-- **Real-time metrics** with automatic refresh and live updates
-- **Effectiveness insights** with specific optimization recommendations
-- **Mobile-responsive design** for monitoring on any device
-- **Enhanced controls** for manipulation operations and analytics review
+### **📈 Unified Dashboard Hub**
+- **Comprehensive web interface** with integrated telemetry, orchestration, analytics, and performance monitoring
+- **Tabbed navigation** providing Overview, Telemetry, Orchestration, Analytics, and Performance views in one place
+- **Real-time dynamic data** from live telemetry systems with comprehensive legends explaining all metrics
+- **ML-powered insights** with optimization recommendations and workflow performance analysis
+- **Single entry point** - all features accessible through one dashboard interface
 
 ### **🛡️ Privacy-First Architecture**
 - **Local-only processing** - all data stays on your machine
@@ -58,26 +58,31 @@ cd context-cleaner
 pip install -e .
 ```
 
-### **Basic Usage**
+### **Unified Dashboard Access** 🎯
 ```bash
-# Start productivity tracking
-context-cleaner start
-
-# Launch interactive dashboard
+# Launch the comprehensive dashboard (recommended)
 context-cleaner dashboard
 
-# Run system health check
-context-cleaner health-check
-
-# View effectiveness statistics
-context-cleaner effectiveness --days 7
-
-# Export analytics data
-context-cleaner export-analytics --output my-analytics.json
+# Alternative: Direct launch script
+python start_context_cleaner.py
 ```
 
-### **Dashboard Access**
-After running `context-cleaner dashboard`, visit `http://localhost:8548` to access your productivity insights through an intuitive web interface with enhanced analytics and effectiveness tracking.
+The unified dashboard provides **everything in one place**:
+- **📊 Overview**: Key metrics and system summary
+- **📈 Telemetry**: Real-time monitoring with Phase 1-3 widgets  
+- **🤖 Orchestration**: ML-powered workflow coordination and agent utilization
+- **🔍 Analytics**: Context health and performance trends with detailed legends
+- **⚡ Performance**: Real-time system resources, database, and cache metrics
+
+**Dashboard URL**: `http://localhost:8081`
+
+### **Command Line Tools** (Optional)
+```bash
+# Traditional CLI commands still available
+context-cleaner start          # Start tracking
+context-cleaner health-check   # System diagnostics  
+context-cleaner effectiveness  # View stats
+```
 
 ## 📊 **New Analytics Features** ⭐
 

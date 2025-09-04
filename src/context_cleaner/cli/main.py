@@ -1054,5 +1054,19 @@ def effectiveness(ctx, days, strategy, detailed, format):
         sys.exit(1)
 
 
+# Add telemetry and JSONL command groups to main CLI
+try:
+    from .commands.telemetry import add_telemetry_commands
+    add_telemetry_commands(main)
+except ImportError:
+    pass  # Telemetry commands optional
+
+try:
+    from .commands.jsonl import add_jsonl_commands
+    add_jsonl_commands(main)
+except ImportError:
+    pass  # JSONL commands optional
+
+
 if __name__ == "__main__":
     main()
