@@ -310,54 +310,80 @@ class TelemetryWidgetManager:
     async def _get_cost_tracker_data(self, session_id: Optional[str] = None) -> WidgetData:
         """Generate cost tracking widget data"""
         try:
-            current_session = session_id or "current"
-            
-            # Get session cost data
-            session_cost = await self.telemetry.get_current_session_cost(current_session)
-            
-            # Get model usage breakdown
+            # Get model usage breakdown for real cost data
             model_stats = await self.telemetry.get_model_usage_stats(days=1)
             model_breakdown = {}
+            total_daily_cost = 0.0
             for model, stats in model_stats.items():
-                model_breakdown[model.split('-')[-1].upper()] = stats['total_cost']
+                model_key = model.split('-')[-1] if '-' in model else model
+                cost = stats['total_cost']
+                model_breakdown[model_key] = cost
+                total_daily_cost += cost
             
-            # Calculate burn rate (cost per hour)
-            session_metrics = await self.telemetry.get_session_metrics(current_session)
-            if session_metrics and session_metrics.start_time:
-                session_duration = (datetime.now() - session_metrics.start_time).total_seconds() / 3600
-                burn_rate = session_cost / max(session_duration, 0.01)  # Avoid division by zero
+            # Calculate burn rate based on actual usage in last 24 hours
+            # Get cost trends to see hourly usage patterns
+            cost_trends = await self.telemetry.get_cost_trends(days=1)
+            if cost_trends:
+                # Calculate average hourly burn rate from recent data
+                recent_costs = list(cost_trends.values())
+                if recent_costs:
+                    avg_daily_cost = sum(recent_costs) / len(recent_costs)
+                    burn_rate = avg_daily_cost / 24  # Convert daily to hourly
+                else:
+                    burn_rate = total_daily_cost / 24
             else:
-                burn_rate = 0.0
+                burn_rate = total_daily_cost / 24
             
-            # Get budget information from cost engine
-            budget_info = await self.cost_engine.budget_manager.get_current_costs(current_session)
-            budget_remaining = budget_info.get("budget_remaining", 0.0)
+            # Get current session cost if session_id provided
+            if session_id:
+                session_cost = await self.telemetry.get_current_session_cost(session_id)
+            else:
+                # Use recent session cost as approximation
+                recent_errors = await self.telemetry.get_recent_errors(hours=1)
+                if recent_errors:
+                    # Get cost for the most recent active session
+                    latest_session = recent_errors[0].session_id
+                    session_cost = await self.telemetry.get_current_session_cost(latest_session)
+                else:
+                    session_cost = 0.0
             
-            # Project end-of-session cost
-            projected_duration = 2.0  # Assume 2 hour session
-            cost_projection = burn_rate * projected_duration
+            # Calculate budget information (simplified approach)
+            # Assume a daily budget based on current usage patterns
+            daily_budget = 100.0  # $100/day default budget
+            budget_used = total_daily_cost
+            budget_remaining = max(0, ((daily_budget - budget_used) / daily_budget) * 100)
             
-            # Determine status and trend
-            budget_usage = session_cost / max(budget_remaining + session_cost, 0.01)
-            if budget_usage > 0.9:
+            # Project cost for remainder of day
+            hours_remaining = 24 - datetime.now().hour
+            cost_projection = burn_rate * hours_remaining
+            
+            # Determine status and trend based on real usage
+            budget_usage_percent = (total_daily_cost / daily_budget) * 100
+            alerts = []
+            
+            if budget_usage_percent > 90:
                 status = "critical"
-                alerts = ["Budget nearly exhausted"]
-            elif budget_usage > 0.7:
+                alerts = ["Daily budget nearly exhausted"]
+            elif budget_usage_percent > 70:
                 status = "warning"
-                alerts = ["Approaching budget limit"]
+                alerts = ["Approaching daily budget limit"]
             else:
                 status = "healthy"
-                alerts = []
             
-            # Determine cost trend
-            if burn_rate > 3.0:
+            # Determine cost trend based on burn rate
+            if burn_rate > 5.0:
                 trend = "increasing"
-                if "High burn rate" not in alerts:
+                if "High burn rate detected" not in alerts:
                     alerts.append("High burn rate detected")
             elif burn_rate < 1.0:
                 trend = "decreasing"
             else:
                 trend = "stable"
+                
+            # Add helpful context
+            if total_daily_cost > 50:
+                if "Heavy usage detected" not in alerts:
+                    alerts.append(f"Heavy usage: ${total_daily_cost:.2f} today")
             
             cost_data = CostTrackerData(
                 current_session_cost=session_cost,
@@ -389,60 +415,105 @@ class TelemetryWidgetManager:
     async def _get_timeout_risk_data(self, session_id: Optional[str] = None) -> WidgetData:
         """Generate timeout risk assessment widget data"""
         try:
-            # Get recent request performance data
+            # Get recent request performance data from OTEL logs
             performance_query = """
             SELECT 
-                avg(duration_ms) as avg_duration,
-                count(*) as request_count,
-                sum(CASE WHEN duration_ms > 10000 THEN 1 ELSE 0 END) as slow_requests
-            FROM claude_code_logs 
-            WHERE Timestamp >= now() - INTERVAL 1 HOUR
+                AVG(toFloat64OrNull(LogAttributes['duration_ms'])) as avg_duration,
+                COUNT(*) as request_count,
+                SUM(CASE WHEN toFloat64OrNull(LogAttributes['duration_ms']) > 10000 THEN 1 ELSE 0 END) as slow_requests,
+                SUM(CASE WHEN toFloat64OrNull(LogAttributes['duration_ms']) > 30000 THEN 1 ELSE 0 END) as very_slow_requests,
+                MAX(toFloat64OrNull(LogAttributes['duration_ms'])) as max_duration,
+                MIN(toFloat64OrNull(LogAttributes['duration_ms'])) as min_duration
+            FROM otel.otel_logs 
+            WHERE Body = 'claude_code.api_request'
+                AND Timestamp >= now() - INTERVAL 1 HOUR
+                AND LogAttributes['duration_ms'] != ''
             """
             
             results = await self.telemetry.execute_query(performance_query)
             if not results:
                 avg_duration = 0
                 slow_requests = 0
+                very_slow_requests = 0
+                max_duration = 0
+                min_duration = 0
+                request_count = 0
             else:
                 result = results[0]
-                avg_duration = result.get('avg_duration', 0)
-                slow_requests = result.get('slow_requests', 0)
+                avg_duration = float(result.get('avg_duration', 0) or 0)
+                slow_requests = int(result.get('slow_requests', 0) or 0)
+                very_slow_requests = int(result.get('very_slow_requests', 0) or 0)
+                max_duration = float(result.get('max_duration', 0) or 0)
+                min_duration = float(result.get('min_duration', 0) or 0)
+                request_count = int(result.get('request_count', 0) or 0)
             
-            # Assess risk level
+            # Assess detailed risk factors and provide actionable insights
             risk_factors = []
-            if avg_duration > 8000:
-                risk_factors.append("High average response time")
-            if slow_requests > 3:
-                risk_factors.append("Multiple slow requests detected")
+            recommendations = []
+            
+            # Analyze response time patterns
+            if avg_duration > 15000:
+                risk_factors.append(f"Very high average response time: {avg_duration/1000:.1f}s")
+                recommendations.append("Consider breaking large requests into smaller chunks")
+            elif avg_duration > 10000:
+                risk_factors.append(f"High average response time: {avg_duration/1000:.1f}s")
+                recommendations.append("Consider optimizing context size")
+            elif avg_duration > 5000:
+                risk_factors.append(f"Elevated response time: {avg_duration/1000:.1f}s")
+            
+            # Analyze slow request patterns
+            if request_count > 0:
+                slow_request_percentage = (slow_requests / request_count) * 100
+                if slow_request_percentage > 50:
+                    risk_factors.append(f"High timeout risk: {slow_request_percentage:.0f}% of requests are slow")
+                    recommendations.append("Consider using Claude 3.5 Haiku for faster responses")
+                elif slow_request_percentage > 25:
+                    risk_factors.append(f"Moderate timeout risk: {slow_request_percentage:.0f}% of requests are slow")
+                elif slow_request_percentage > 10:
+                    risk_factors.append(f"Some slow requests: {slow_request_percentage:.0f}% taking >10s")
+            
+            # Check for very slow requests (>30s)
+            if very_slow_requests > 0:
+                risk_factors.append(f"{very_slow_requests} requests took >30 seconds")
+                recommendations.append("Review and optimize prompts causing >30s responses")
             
             # Get model usage for additional risk assessment
             model_stats = await self.telemetry.get_model_usage_stats(days=1)
-            sonnet_usage = sum(1 for model in model_stats.keys() if 'sonnet' in model.lower())
+            for model, stats in model_stats.items():
+                if 'sonnet-4' in model.lower() and stats['request_count'] > 0:
+                    avg_model_duration = stats.get('avg_duration_ms', 0)
+                    if avg_model_duration > 10000:
+                        risk_factors.append(f"Sonnet 4 averaging {avg_model_duration/1000:.1f}s per request")
+                        recommendations.append("Consider using Haiku for routine tasks")
             
-            if sonnet_usage > 0:
-                risk_factors.append("Using Sonnet (higher timeout risk)")
+            # Performance insights
+            if max_duration > 60000:  # >1 minute
+                risk_factors.append(f"Slowest request: {max_duration/1000:.0f}s")
+                recommendations.append("Identify and optimize extremely slow operations")
             
-            # Determine risk level
-            if len(risk_factors) >= 3 or avg_duration > 12000:
+            # Determine overall risk level and status
+            critical_factors = len([f for f in risk_factors if any(word in f.lower() for word in ['very high', 'high timeout', '>30 seconds'])])
+            warning_factors = len([f for f in risk_factors if any(word in f.lower() for word in ['high', 'moderate', 'elevated'])])
+            
+            if critical_factors >= 2 or avg_duration > 20000 or very_slow_requests > 5:
                 risk_level = "critical"
                 status = "critical"
-            elif len(risk_factors) >= 2 or avg_duration > 8000:
-                risk_level = "high" 
-                status = "warning"
-            elif len(risk_factors) >= 1 or avg_duration > 5000:
+            elif critical_factors >= 1 or warning_factors >= 2 or avg_duration > 12000:
+                risk_level = "high"
+                status = "warning"  
+            elif warning_factors >= 1 or slow_requests > 0 or avg_duration > 5000:
                 risk_level = "medium"
                 status = "warning"
             else:
                 risk_level = "low"
                 status = "healthy"
             
-            # Generate recommendations
-            recommendations = []
-            if avg_duration > 8000:
-                recommendations.append("Consider switching to Haiku for faster responses")
-            if slow_requests > 2:
-                recommendations.append("Enable automatic error recovery")
-                recommendations.append("Reduce context size for complex requests")
+            # Add general recommendations based on data
+            if len(recommendations) == 0:
+                if avg_duration < 3000:
+                    recommendations.append("Performance is good - current setup working well")
+                else:
+                    recommendations.append("Monitor response times for optimization opportunities")
             
             timeout_data = TimeoutRiskData(
                 risk_level=risk_level,
@@ -473,63 +544,148 @@ class TelemetryWidgetManager:
     async def _get_tool_optimizer_data(self, session_id: Optional[str] = None) -> WidgetData:
         """Generate tool sequence optimization widget data"""
         try:
-            # Get tool usage statistics
+            # Get tool usage statistics from actual telemetry data
             tool_query = """
             SELECT 
-                tool_name,
-                COUNT(*) as usage_count
-            FROM claude_code_logs 
-            WHERE Timestamp >= now() - INTERVAL 24 HOUR
-            AND tool_name IS NOT NULL
-            GROUP BY tool_name
+                LogAttributes['tool_name'] as tool_name,
+                COUNT(*) as usage_count,
+                AVG(toFloat64OrNull(LogAttributes['duration_ms'])) as avg_duration_ms
+            FROM otel.otel_logs 
+            WHERE Timestamp >= now() - INTERVAL 7 DAY
+                AND Body = 'claude_code.tool_decision'
+                AND LogAttributes['tool_name'] != ''
+                AND LogAttributes['tool_name'] IS NOT NULL
+            GROUP BY LogAttributes['tool_name']
             ORDER BY usage_count DESC
             """
             
             results = await self.telemetry.execute_query(tool_query)
-            tool_stats = {r['tool_name']: r['usage_count'] for r in results}
+            tool_stats = {}
+            total_duration = 0
+            total_calls = 0
             
-            # Analyze common sequences (simplified for now)
-            common_sequences = [
-                {"sequence": ["Read", "Grep", "Edit"], "count": 15, "efficiency": 0.85},
-                {"sequence": ["Glob", "Read", "Edit"], "count": 12, "efficiency": 0.78},
-                {"sequence": ["Read", "TodoWrite", "Edit"], "count": 8, "efficiency": 0.92}
-            ]
+            for r in results:
+                tool_name = r['tool_name']
+                usage_count = int(r['usage_count'])
+                avg_duration = float(r['avg_duration_ms'] or 0)
+                
+                tool_stats[tool_name] = {
+                    'usage_count': usage_count,
+                    'avg_duration_ms': avg_duration
+                }
+                total_calls += usage_count
+                total_duration += avg_duration * usage_count
             
-            # Calculate efficiency score
-            total_tools = sum(tool_stats.values())
-            read_usage = tool_stats.get('Read', 0)
-            edit_usage = tool_stats.get('Edit', 0)
+            # Analyze tool sequences from actual sessions
+            sequence_query = """
+            WITH tool_sequences AS (
+                SELECT 
+                    LogAttributes['session.id'] as session_id,
+                    LogAttributes['tool_name'] as tool_name,
+                    Timestamp,
+                    ROW_NUMBER() OVER (PARTITION BY LogAttributes['session.id'] ORDER BY Timestamp) as seq_num
+                FROM otel.otel_logs
+                WHERE Body = 'claude_code.tool_decision'
+                    AND LogAttributes['tool_name'] != ''
+                    AND Timestamp >= now() - INTERVAL 7 DAY
+            ),
+            consecutive_pairs AS (
+                SELECT 
+                    a.tool_name as first_tool,
+                    b.tool_name as second_tool,
+                    COUNT(*) as pair_count
+                FROM tool_sequences a
+                JOIN tool_sequences b ON a.session_id = b.session_id 
+                    AND b.seq_num = a.seq_num + 1
+                GROUP BY a.tool_name, b.tool_name
+                ORDER BY pair_count DESC
+                LIMIT 10
+            )
+            SELECT first_tool, second_tool, pair_count FROM consecutive_pairs
+            """
             
-            # Higher efficiency when Read/Edit ratio is balanced
-            if total_tools > 0:
-                read_ratio = read_usage / total_tools
-                edit_ratio = edit_usage / total_tools
-                efficiency_score = 1.0 - abs(read_ratio - edit_ratio)  # Better when balanced
+            sequence_results = await self.telemetry.execute_query(sequence_query)
+            
+            # Build common sequences from pairs
+            common_sequences = []
+            for seq in sequence_results[:6]:  # Top 6 sequences
+                sequence = [seq['first_tool'], seq['second_tool']]
+                count = int(seq['pair_count'])
+                # Calculate efficiency based on tool performance
+                first_duration = tool_stats.get(seq['first_tool'], {}).get('avg_duration_ms', 1000)
+                second_duration = tool_stats.get(seq['second_tool'], {}).get('avg_duration_ms', 1000)
+                efficiency = max(0.3, min(0.95, 1.0 - (first_duration + second_duration) / 10000))
+                
+                common_sequences.append({
+                    "sequence": sequence,
+                    "count": count,
+                    "efficiency": round(efficiency, 2)
+                })
+            
+            # Calculate overall efficiency metrics
+            if total_calls > 0:
+                avg_tool_duration = total_duration / total_calls
+                
+                # Efficiency based on tool diversity and performance
+                tool_diversity = len(tool_stats) / max(total_calls, 1)  # More tools used = better
+                performance_score = max(0, 1.0 - (avg_tool_duration / 5000))  # Lower duration = better
+                
+                # Balance between Read/Write operations
+                read_tools = ['Read', 'Grep', 'Glob']
+                write_tools = ['Edit', 'Write', 'MultiEdit']
+                
+                read_count = sum(tool_stats.get(tool, {}).get('usage_count', 0) for tool in read_tools)
+                write_count = sum(tool_stats.get(tool, {}).get('usage_count', 0) for tool in write_tools)
+                
+                if read_count + write_count > 0:
+                    balance_score = 1.0 - abs((read_count - write_count) / (read_count + write_count))
+                else:
+                    balance_score = 0.5
+                
+                efficiency_score = (tool_diversity * 0.3 + performance_score * 0.4 + balance_score * 0.3)
             else:
                 efficiency_score = 0.0
             
-            # Generate optimization suggestions
+            # Generate intelligent optimization suggestions
             suggestions = []
-            if read_usage > edit_usage * 3:
-                suggestions.append("Consider batching file reads for efficiency")
-            if tool_stats.get('Grep', 0) > tool_stats.get('Glob', 0) * 2:
-                suggestions.append("Use Glob patterns instead of multiple Grep searches")
-            if efficiency_score < 0.7:
-                suggestions.append("Optimize tool usage patterns for better workflow")
+            most_used_tool = max(tool_stats.keys(), key=lambda x: tool_stats[x]['usage_count']) if tool_stats else None
             
-            # Determine status
-            if efficiency_score > 0.8:
+            if most_used_tool and tool_stats[most_used_tool]['usage_count'] > total_calls * 0.4:
+                suggestions.append(f"Heavy reliance on {most_used_tool} - consider workflow optimization")
+            
+            bash_usage = tool_stats.get('Bash', {}).get('usage_count', 0)
+            read_usage = tool_stats.get('Read', {}).get('usage_count', 0)
+            
+            if bash_usage > read_usage * 2:
+                suggestions.append("High Bash usage detected - consider using Read/Grep for file operations")
+            
+            if tool_stats.get('Grep', {}).get('usage_count', 0) > tool_stats.get('Glob', {}).get('usage_count', 0) * 3:
+                suggestions.append("Multiple Grep searches - use Glob patterns for better performance")
+            
+            slow_tools = [tool for tool, stats in tool_stats.items() 
+                         if stats['avg_duration_ms'] > 2000 and stats['usage_count'] > 5]
+            if slow_tools:
+                suggestions.append(f"Slow tools detected: {', '.join(slow_tools)} - consider alternatives")
+            
+            if efficiency_score < 0.6:
+                suggestions.append("Tool usage patterns could be optimized for better workflow efficiency")
+            
+            # Determine status based on efficiency and usage patterns
+            if efficiency_score > 0.75 and len(suggestions) <= 1:
                 status = "healthy"
-            elif efficiency_score > 0.6:
+            elif efficiency_score > 0.5:
                 status = "warning"
             else:
                 status = "critical"
             
+            # Convert tool_stats to simple format for frontend
+            tool_usage_stats = {tool: stats['usage_count'] for tool, stats in tool_stats.items()}
+            
             tool_data = ToolOptimizerData(
                 common_sequences=common_sequences,
-                efficiency_score=efficiency_score,
+                efficiency_score=round(efficiency_score, 2),
                 optimization_suggestions=suggestions,
-                tool_usage_stats=tool_stats
+                tool_usage_stats=tool_usage_stats
             )
             
             return WidgetData(
@@ -553,77 +709,166 @@ class TelemetryWidgetManager:
     async def _get_model_efficiency_data(self, session_id: Optional[str] = None) -> WidgetData:
         """Generate model efficiency comparison widget data"""
         try:
-            # Get model statistics
-            model_stats = await self.telemetry.get_model_usage_stats(days=7)
+            # Get comprehensive model statistics from telemetry data
+            model_query = """
+            SELECT 
+                LogAttributes['model'] as model,
+                COUNT(*) as request_count,
+                AVG(toFloat64OrNull(LogAttributes['cost_usd'])) as avg_cost,
+                SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost,
+                AVG(toFloat64OrNull(LogAttributes['duration_ms'])) as avg_duration,
+                SUM(toFloat64OrNull(LogAttributes['input_tokens'])) as total_input_tokens,
+                SUM(toFloat64OrNull(LogAttributes['output_tokens'])) as total_output_tokens,
+                AVG(toFloat64OrNull(LogAttributes['input_tokens'])) as avg_input_tokens,
+                AVG(toFloat64OrNull(LogAttributes['output_tokens'])) as avg_output_tokens
+            FROM otel.otel_logs 
+            WHERE Body = 'claude_code.api_request'
+                AND Timestamp >= now() - INTERVAL 7 DAY
+                AND LogAttributes['model'] IS NOT NULL
+                AND LogAttributes['cost_usd'] IS NOT NULL
+            GROUP BY LogAttributes['model']
+            ORDER BY request_count DESC
+            """
             
-            # Extract Sonnet and Haiku stats
-            sonnet_stats = {}
-            haiku_stats = {}
+            results = await self.telemetry.execute_query(model_query)
             
-            for model, stats in model_stats.items():
-                if 'sonnet' in model.lower():
-                    sonnet_stats = stats
-                elif 'haiku' in model.lower():
-                    haiku_stats = stats
+            # Process model data
+            model_data = {}
+            total_requests = 0
+            total_cost = 0
             
-            # Calculate efficiency ratio (Haiku cost per token / Sonnet cost per token)
-            if sonnet_stats and haiku_stats:
-                sonnet_cost_per_token = sonnet_stats.get('cost_per_token', 0)
-                haiku_cost_per_token = haiku_stats.get('cost_per_token', 0)
+            for row in results:
+                model = row['model']
                 
-                if sonnet_cost_per_token > 0 and haiku_cost_per_token > 0:
-                    efficiency_ratio = sonnet_cost_per_token / haiku_cost_per_token
-                else:
-                    efficiency_ratio = 1.0
-            else:
-                efficiency_ratio = 1.0
+                # Clean model name for display
+                display_name = model.replace('claude-', '').replace('-20250514', '').replace('-20241022', '').title()
+                if 'sonnet' in model.lower():
+                    display_name = f"Sonnet 4"
+                elif 'haiku' in model.lower():
+                    display_name = f"Haiku 3.5"
+                
+                request_count = int(row['request_count'])
+                avg_cost = float(row['avg_cost'] or 0)
+                model_total_cost = float(row['total_cost'] or 0)
+                avg_duration = float(row['avg_duration'] or 0)
+                total_input = int(row['total_input_tokens'] or 0)
+                total_output = int(row['total_output_tokens'] or 0)
+                avg_input = float(row['avg_input_tokens'] or 0)
+                avg_output = float(row['avg_output_tokens'] or 0)
+                
+                # Calculate cost per token
+                total_tokens = total_input + total_output
+                cost_per_token = model_total_cost / max(total_tokens, 1)
+                
+                # Calculate tokens per dollar
+                tokens_per_dollar = total_tokens / max(model_total_cost, 0.001)
+                
+                model_data[model] = {
+                    'display_name': display_name,
+                    'request_count': request_count,
+                    'avg_cost': avg_cost,
+                    'total_cost': model_total_cost,
+                    'avg_duration': avg_duration,
+                    'total_tokens': total_tokens,
+                    'cost_per_token': cost_per_token,
+                    'tokens_per_dollar': tokens_per_dollar,
+                    'avg_input_tokens': avg_input,
+                    'avg_output_tokens': avg_output,
+                    'speed_score': max(0, min(10, 10 - (avg_duration / 1000)))  # 0-10 scale
+                }
+                
+                total_requests += request_count
+                total_cost += model_total_cost
             
-            # Generate recommendation
-            if efficiency_ratio > 30:  # Haiku is much more efficient
-                recommendation = "Strongly recommend Haiku for routine tasks"
-                potential_savings = sonnet_stats.get('total_cost', 0) * 0.7
-            elif efficiency_ratio > 15:
-                recommendation = "Consider Haiku for simple tasks"
-                potential_savings = sonnet_stats.get('total_cost', 0) * 0.4
+            # Find primary models
+            sonnet_key = next((k for k in model_data.keys() if 'sonnet' in k.lower()), None)
+            haiku_key = next((k for k in model_data.keys() if 'haiku' in k.lower()), None)
+            
+            primary_model = max(model_data.keys(), key=lambda x: model_data[x]['request_count']) if model_data else None
+            
+            # Calculate efficiency metrics
+            if sonnet_key and haiku_key:
+                sonnet_data = model_data[sonnet_key]
+                haiku_data = model_data[haiku_key]
+                
+                # Cost efficiency (how much cheaper Haiku is)
+                cost_efficiency_ratio = sonnet_data['avg_cost'] / max(haiku_data['avg_cost'], 0.001)
+                
+                # Speed efficiency (how much faster Haiku is)  
+                speed_efficiency_ratio = sonnet_data['avg_duration'] / max(haiku_data['avg_duration'], 1)
+                
+                # Usage ratio (what % is cost-effective Haiku)
+                haiku_usage_ratio = haiku_data['request_count'] / max(total_requests, 1)
+                
+                # Overall efficiency score (0-100)
+                efficiency_score = min(100, (haiku_usage_ratio * 60) + (min(cost_efficiency_ratio, 50) / 50 * 40))
+                
             else:
-                recommendation = "Current model usage is appropriate"
-                potential_savings = 0.0
+                cost_efficiency_ratio = 1.0
+                speed_efficiency_ratio = 1.0
+                haiku_usage_ratio = 0.0
+                efficiency_score = 50.0  # Neutral if only one model
+            
+            # Generate intelligent recommendations
+            recommendations = []
+            potential_savings = 0.0
+            
+            if sonnet_key and haiku_key:
+                sonnet_requests = model_data[sonnet_key]['request_count']
+                haiku_cost = model_data[haiku_key]['avg_cost']
+                sonnet_cost = model_data[sonnet_key]['avg_cost']
+                
+                # Calculate potential savings if 50% of Sonnet requests used Haiku
+                potential_savings = sonnet_requests * 0.5 * (sonnet_cost - haiku_cost)
+                
+                if cost_efficiency_ratio > 25:
+                    recommendations.append(f"Haiku is {cost_efficiency_ratio:.0f}x more cost-effective than Sonnet")
+                
+                if speed_efficiency_ratio > 4:
+                    recommendations.append(f"Haiku is {speed_efficiency_ratio:.1f}x faster for quick tasks")
+                
+                if haiku_usage_ratio < 0.3 and cost_efficiency_ratio > 10:
+                    recommendations.append("Consider using Haiku for routine tasks to reduce costs")
+                
+                if potential_savings > 5.0:
+                    recommendations.append(f"Potential weekly savings: ${potential_savings:.2f}")
             
             # Determine status
-            haiku_usage_ratio = haiku_stats.get('request_count', 0) / max(
-                sonnet_stats.get('request_count', 0) + haiku_stats.get('request_count', 0), 1)
-            
-            if haiku_usage_ratio > 0.6:
-                status = "healthy"  # Good cost optimization
-            elif haiku_usage_ratio > 0.3:
-                status = "warning" 
+            if efficiency_score > 75:
+                status = "healthy"
+            elif efficiency_score > 50:
+                status = "warning"
             else:
-                status = "critical"  # Too much expensive Sonnet usage
+                status = "critical"
             
-            efficiency_data = ModelEfficiencyData(
-                sonnet_stats=sonnet_stats,
-                haiku_stats=haiku_stats,
-                efficiency_ratio=efficiency_ratio,
-                recommendation=recommendation,
-                cost_savings_potential=potential_savings
-            )
-            
-            alerts = []
-            if status == "critical":
-                alerts.append("High Sonnet usage - consider cost optimization")
-            elif potential_savings > 1.0:
-                alerts.append(f"Potential savings: ${potential_savings:.2f}")
+            # Create enhanced data structure for frontend
+            enhanced_data = {
+                'models': model_data,
+                'primary_model': model_data[primary_model]['display_name'] if primary_model else 'Unknown',
+                'efficiency_score': efficiency_score / 100,  # Convert to 0-1 scale for frontend
+                'cost_efficiency_ratio': cost_efficiency_ratio,
+                'speed_efficiency_ratio': speed_efficiency_ratio,
+                'total_requests': total_requests,
+                'total_cost': total_cost,
+                'haiku_usage_percentage': haiku_usage_ratio * 100,
+                'recommendations': recommendations,
+                'potential_savings': potential_savings,
+                'avg_response_time': sum(d['avg_duration'] for d in model_data.values()) / len(model_data) if model_data else 0,
+                'token_efficiency': (1 / (total_cost / max(sum(d['total_tokens'] for d in model_data.values()), 1))) if total_cost > 0 else 0
+            }
             
             return WidgetData(
                 widget_type=TelemetryWidgetType.MODEL_EFFICIENCY,
                 title="Model Efficiency Tracker",
                 status=status,
-                data=efficiency_data.__dict__,
-                alerts=alerts
+                data=enhanced_data,
+                alerts=recommendations if status != "healthy" else []
             )
             
         except Exception as e:
             logger.error(f"Error generating model efficiency data: {e}")
+            import traceback
+            traceback.print_exc()
             return WidgetData(
                 widget_type=TelemetryWidgetType.MODEL_EFFICIENCY,
                 title="Model Efficiency Tracker",

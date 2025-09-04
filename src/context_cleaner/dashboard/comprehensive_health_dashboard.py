@@ -996,6 +996,211 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error monitor failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
+        @self.app.route("/api/telemetry/error-details")
+        def get_error_details():
+            """Get detailed error information for analysis."""
+            if not self.telemetry_enabled:
+                return jsonify({"error": "Telemetry not available"}), 404
+                
+            try:
+                hours = request.args.get('hours', 24, type=int)
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    # Get detailed error events
+                    recent_errors = loop.run_until_complete(
+                        self.telemetry_client.get_recent_errors(hours=hours)
+                    )
+                    
+                    # Get error type breakdown
+                    error_breakdown_query = f"""
+                    SELECT 
+                        LogAttributes['error'] as error_type,
+                        LogAttributes['status_code'] as status_code,
+                        COUNT(*) as count,
+                        AVG(toFloat64OrNull(LogAttributes['duration_ms'])) as avg_duration,
+                        MIN(Timestamp) as first_occurrence,
+                        MAX(Timestamp) as last_occurrence
+                    FROM otel.otel_logs
+                    WHERE Body = 'claude_code.api_error'
+                        AND Timestamp >= now() - INTERVAL {hours} HOUR
+                    GROUP BY error_type, status_code
+                    ORDER BY count DESC
+                    LIMIT 20
+                    """
+                    
+                    error_breakdown = loop.run_until_complete(
+                        self.telemetry_client.execute_query(error_breakdown_query)
+                    )
+                    
+                    # Process error types for categorization
+                    categorized_errors = {}
+                    for error in error_breakdown:
+                        error_type = error['error_type'] or 'Unknown'
+                        
+                        # Categorize error types
+                        if '429' in error_type or 'rate_limit' in error_type.lower():
+                            category = 'Rate Limiting'
+                        elif '400' in error_type or 'invalid_request' in error_type.lower():
+                            category = 'Invalid Request'
+                        elif 'abort' in error_type.lower() or 'timeout' in error_type.lower():
+                            category = 'Connection Issues'
+                        elif '500' in error_type or 'internal_server' in error_type.lower():
+                            category = 'Server Errors'
+                        else:
+                            category = 'Other'
+                        
+                        if category not in categorized_errors:
+                            categorized_errors[category] = []
+                        
+                        # Extract meaningful error message
+                        if '"message":"' in error_type:
+                            try:
+                                import json
+                                parsed = json.loads(error_type.split(' ', 1)[1])
+                                message = parsed.get('error', {}).get('message', error_type)
+                            except:
+                                message = error_type
+                        else:
+                            message = error_type
+                        
+                        error_entry = {
+                            'message': message,
+                            'status_code': error['status_code'],
+                            'count': int(error['count']),
+                            'avg_duration_ms': float(error['avg_duration'] or 0),
+                            'first_occurrence': error['first_occurrence'],
+                            'last_occurrence': error['last_occurrence']
+                        }
+                        
+                        # Add special handling for "prompt too long" errors
+                        if 'prompt is too long' in error_type.lower():
+                            # Extract token count from error message
+                            import re
+                            token_match = re.search(r'(\d+) tokens > (\d+) maximum', error_type)
+                            if token_match:
+                                error_entry['actual_tokens'] = int(token_match.group(1))
+                                error_entry['max_tokens'] = int(token_match.group(2))
+                                error_entry['token_excess'] = int(token_match.group(1)) - int(token_match.group(2))
+                            
+                            # Get session context - find sessions that had this error and get their API request data
+                            error_session_query = f"""
+                            SELECT DISTINCT LogAttributes['session.id'] as session_id
+                            FROM otel.otel_logs 
+                            WHERE LogAttributes['error'] = '{error['error_type']}'
+                                AND Body = 'claude_code.api_error'
+                            """
+                            
+                            error_sessions = loop.run_until_complete(
+                                self.telemetry_client.execute_query(error_session_query)
+                            )
+                            
+                            if error_sessions:
+                                session_ids = "', '".join([s['session_id'] for s in error_sessions[:5]])
+                                session_query = f"""
+                                SELECT 
+                                    LogAttributes['session.id'] as session_id,
+                                    COUNT(*) as request_count,
+                                    MAX(toFloat64OrNull(LogAttributes['input_tokens']) + toFloat64OrNull(LogAttributes['cache_creation_tokens'])) as max_total_tokens,
+                                    AVG(toFloat64OrNull(LogAttributes['input_tokens']) + toFloat64OrNull(LogAttributes['cache_creation_tokens'])) as avg_total_tokens,
+                                    SUM(toFloat64OrNull(LogAttributes['input_tokens']) + toFloat64OrNull(LogAttributes['cache_creation_tokens'])) as total_session_tokens
+                                FROM otel.otel_logs 
+                                WHERE LogAttributes['session.id'] IN ('{session_ids}')
+                                    AND Body = 'claude_code.api_request'
+                                GROUP BY session_id
+                                ORDER BY max_total_tokens DESC
+                                LIMIT 5
+                                """
+                            
+                            session_context = loop.run_until_complete(
+                                self.telemetry_client.execute_query(session_query)
+                            )
+                            
+                            error_entry['affected_sessions'] = [
+                                {
+                                    'session_id': s['session_id'],
+                                    'request_count': int(s['request_count']),
+                                    'max_input_tokens': int(s['max_total_tokens'] or 0),
+                                    'avg_input_tokens': int(s['avg_total_tokens'] or 0),
+                                    'total_session_tokens': int(s['total_session_tokens'] or 0)
+                                } for s in session_context
+                            ]
+                        else:
+                            error_entry['affected_sessions'] = []
+                        
+                        categorized_errors[category].append(error_entry)
+                    
+                    loop.close()
+                    
+                    return jsonify({
+                        'error_summary': {
+                            'total_errors': len(recent_errors),
+                            'hours_analyzed': hours,
+                            'unique_error_types': len(error_breakdown),
+                        },
+                        'recent_errors': [
+                            {
+                                'timestamp': err.timestamp.isoformat(),
+                                'session_id': err.session_id,
+                                'error_type': err.error_type,
+                                'duration_ms': err.duration_ms,
+                                'model': err.model,
+                                'input_tokens': err.input_tokens,
+                                'terminal_type': err.terminal_type
+                            } for err in recent_errors[:50]  # Limit to most recent 50
+                        ],
+                        'error_breakdown': categorized_errors,
+                        'raw_breakdown': error_breakdown
+                    })
+                    
+                loop.close()
+                return jsonify({"error": "No telemetry client available"}), 500
+                
+            except Exception as e:
+                logger.error(f"Error details endpoint failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/tool-analytics")
+        def get_tool_analytics():
+            """Get comprehensive tool analytics data."""
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Get the tool optimizer data
+                widget_data = loop.run_until_complete(
+                    self.telemetry_widgets._get_tool_optimizer_data()
+                )
+                loop.close()
+                
+                return jsonify(widget_data.data)
+                
+            except Exception as e:
+                logger.error(f"Tool analytics endpoint failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/model-analytics")
+        def get_model_analytics():
+            """Get comprehensive model analytics data."""
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Get the model efficiency data
+                widget_data = loop.run_until_complete(
+                    self.telemetry_widgets._get_model_efficiency_data()
+                )
+                loop.close()
+                
+                return jsonify(widget_data.data)
+                
+            except Exception as e:
+                logger.error(f"Model analytics endpoint failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/cache-intelligence")
         def get_cache_intelligence():
             """Get cache intelligence data from cache dashboard."""
@@ -1501,25 +1706,61 @@ class ComprehensiveHealthDashboard:
 
         @self.app.route('/api/dashboard-metrics')
         def get_dashboard_metrics():
-            """Get overall dashboard metrics for enhanced dashboard"""
+            """Get overall dashboard metrics from real telemetry data"""
             try:
-                # Return real-world usage data from comprehensive analysis
+                # Get real aggregated statistics from telemetry database
+                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    try:
+                        stats = loop.run_until_complete(
+                            self.telemetry_client.get_total_aggregated_stats()
+                        )
+                        loop.close()
+                        
+                        return jsonify({
+                            'total_tokens': stats['total_tokens'],
+                            'total_sessions': stats['total_sessions'],
+                            'success_rate': stats['success_rate'],
+                            'active_agents': stats['active_agents'],
+                            'orchestration_status': 'operational',
+                            'telemetry_status': 'monitoring',
+                            'total_cost': stats['total_cost'],
+                            'total_errors': stats['total_errors'],
+                            'last_updated': datetime.now().isoformat()
+                        })
+                    except Exception as e:
+                        loop.close()
+                        logger.warning(f"Error getting real telemetry stats: {e}")
+                        # Fall back to static values if telemetry fails
+                        
+                # Fallback when telemetry client not available
                 return jsonify({
-                    'total_tokens': '89,973,722',
-                    'total_sessions': '1,350', 
-                    'success_rate': '95%',
-                    'active_agents': '11',
-                    'orchestration_status': 'operational',
-                    'telemetry_status': 'monitoring'
+                    'total_tokens': 'No data available',
+                    'total_sessions': '0',
+                    'success_rate': '0%',
+                    'active_agents': '0',
+                    'orchestration_status': 'offline',
+                    'telemetry_status': 'disconnected',
+                    'total_cost': '$0.00',
+                    'total_errors': 0,
+                    'last_updated': datetime.now().isoformat()
                 })
+                
             except Exception as e:
+                logger.error(f"Error in get_dashboard_metrics: {e}")
                 return jsonify({
-                    'total_tokens': '89,973,722',
-                    'total_sessions': '1,350', 
-                    'success_rate': '95%',
-                    'active_agents': '11',
-                    'orchestration_status': 'operational',
-                    'telemetry_status': 'monitoring'
+                    'total_tokens': 'Error loading',
+                    'total_sessions': '0',
+                    'success_rate': '0%',
+                    'active_agents': '0',
+                    'orchestration_status': 'error',
+                    'telemetry_status': 'error',
+                    'total_cost': '$0.00',
+                    'total_errors': 0,
+                    'last_updated': datetime.now().isoformat()
                 })
 
     def _setup_socketio_events(self):
