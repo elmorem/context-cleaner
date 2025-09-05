@@ -260,3 +260,27 @@ class FullContentQueries:
         stats['tools'] = tool_stats[0] if tool_stats else {}
         
         return stats
+    
+    async def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent conversation sessions with basic metadata."""
+        query = f"""
+        SELECT 
+            session_id,
+            min(timestamp) as session_start,
+            max(timestamp) as session_end,
+            count() as message_count,
+            sum(message_length) as total_characters,
+            countIf(role = 'user') as user_messages,
+            countIf(role = 'assistant') as assistant_messages,
+            countIf(contains_code_blocks) as code_messages,
+            sum(input_tokens) as total_input_tokens,
+            sum(output_tokens) as total_output_tokens,
+            sum(cost_usd) as session_cost
+        FROM otel.claude_message_content
+        WHERE timestamp >= now() - INTERVAL 30 DAY
+        GROUP BY session_id
+        ORDER BY session_start DESC
+        LIMIT {limit}
+        """
+        
+        return await self.clickhouse.execute_query(query)

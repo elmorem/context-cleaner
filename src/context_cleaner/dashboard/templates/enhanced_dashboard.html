@@ -53,6 +53,9 @@
             background: white;
             border-bottom: 1px solid var(--border-color);
             padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .nav-tabs ul {
@@ -80,6 +83,174 @@
         .nav-tabs a.active {
             color: var(--primary-color);
             border-bottom-color: var(--primary-color);
+        }
+
+        .priority-indicator {
+            font-size: 0.7rem;
+            margin-left: 0.25rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .smart-nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            padding-right: 2rem;
+        }
+
+        .nav-control-btn {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-control-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .nav-control-btn.active {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+
+        /* Compact mode styles */
+        .compact-mode .widget-card {
+            margin-bottom: 1rem;
+        }
+
+        .compact-mode .widget-header {
+            padding: 0.75rem;
+        }
+
+        .compact-mode .widget-title {
+            font-size: 0.875rem;
+        }
+
+        .compact-mode .widget-content {
+            padding: 0.75rem;
+        }
+
+        /* Smart Analytics Section Styles */
+        .analytics-header {
+            margin-bottom: 2rem;
+        }
+
+        .widget-recommendation-banner {
+            background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .widget-recommendation-banner button {
+            background: transparent;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: #92400e;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .widget-section {
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: white;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .section-header:hover {
+            background: #f1f5f9;
+        }
+
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .section-toggle {
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+
+        .section-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            padding: 1.5rem;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 1.5rem;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 2000px;
+            opacity: 1;
+        }
+
+        .priority-widget {
+            border-left: 4px solid var(--warning-color);
+            position: relative;
+        }
+
+        .priority-badge {
+            background: var(--warning-color);
+            color: white;
+            font-size: 0.6rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+
+        .priority-section .widget-grid {
+            border: 2px dashed var(--warning-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
         }
 
         .container {
@@ -496,10 +667,26 @@
             <li><a href="#overview" class="nav-link active">📊 Overview</a></li>
             <li><a href="#telemetry" class="nav-link">📈 Telemetry</a></li>
             <li><a href="#orchestration" class="nav-link">🤖 Orchestration</a></li>
-            <li><a href="#analytics" class="nav-link">🔍 Analytics</a></li>
+            <li><a href="#analytics" class="nav-link">🔍 Analytics<span class="priority-indicator">🔥</span></a></li>
             <li><a href="#performance" class="nav-link">⚡ Performance</a></li>
             <li><a href="#data-explorer" class="nav-link">🔎 Data Explorer</a></li>
         </ul>
+        
+        <!-- Smart Navigation Controls -->
+        <div class="smart-nav-controls">
+            <button class="nav-control-btn" onclick="toggleWidgetPriority()" title="Sort by Priority">
+                🎯 Smart Sort
+            </button>
+            <button class="nav-control-btn" onclick="toggleCompactMode()" title="Toggle Compact View">
+                📱 Compact
+            </button>
+            <button class="nav-control-btn" onclick="showWidgetRecommendations()" title="Widget Suggestions">
+                💡 Suggestions
+            </button>
+            <button class="nav-control-btn" onclick="resetLayout()" title="Reset Layout">
+                🔄 Reset
+            </button>
+        </div>
     </nav>
 
     <div class="container">
@@ -844,56 +1031,82 @@
 
         <!-- Analytics Section -->
         <section id="analytics" class="dashboard-section">
-            <h2>🔍 Advanced Analytics & Insights</h2>
-            <div class="widget-grid">
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">Context Health Metrics</h3>
-                        <div class="status-indicator status-healthy"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="context-health-widget" class="loading">Loading context health data...</div>
-                    </div>
+            <div class="analytics-header">
+                <h2>🔍 Advanced Analytics & Insights</h2>
+                <div class="widget-recommendation-banner" id="recommendation-banner" style="display: none;">
+                    <span id="recommendation-text"></span>
+                    <button onclick="hideRecommendation()">×</button>
                 </div>
+            </div>
 
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">Performance Trends</h3>
-                        <div class="status-indicator status-healthy"></div>
+            <!-- High Priority Widgets (Always Visible) -->
+            <div class="widget-section priority-section">
+                <div class="section-header" onclick="toggleSection('priority-widgets')">
+                    <h3>🔥 High Priority Analytics</h3>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div id="priority-widgets" class="widget-grid collapsible-content expanded">
+                    <!-- JSONL Analytics Widgets - Phase 2 Enhanced -->
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">🗣️ Conversation Timeline</h3>
+                            <div class="status-indicator" id="conversation-timeline-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="conversation-timeline-widget" class="loading">Loading conversation timeline...</div>
+                        </div>
                     </div>
-                    <div class="widget-content">
-                        <div id="performance-trends-widget" class="loading">Loading performance trends...</div>
+                    
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">📊 Code Pattern Analysis</h3>
+                            <div class="status-indicator" id="code-pattern-analysis-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="code-pattern-analysis-widget" class="loading">Loading code pattern analysis...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">🔍 Content Search Interface</h3>
+                            <div class="status-indicator" id="content-search-widget-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="content-search-widget" class="loading">Loading content search interface...</div>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Phase 4: JSONL Analytics Widgets -->
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">🗣️ Conversation Timeline</h3>
-                        <div class="status-indicator" id="conversation-timeline-status"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="conversation-timeline-widget" class="loading">Loading conversation timeline...</div>
-                    </div>
+            </div>
+
+            <!-- Standard Analytics (Collapsible) -->
+            <div class="widget-section standard-section">
+                <div class="section-header" onclick="toggleSection('standard-widgets')">
+                    <h3>📈 Standard Analytics</h3>
+                    <span class="section-toggle">▼</span>
                 </div>
-                
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">📊 Code Pattern Analysis</h3>
-                        <div class="status-indicator" id="code-pattern-analysis-status"></div>
+                <div id="standard-widgets" class="widget-grid collapsible-content expanded">
+                    <div class="widget-card">
+                        <div class="widget-header">
+                            <h3 class="widget-title">Context Health Metrics</h3>
+                            <div class="status-indicator status-healthy"></div>
+                        </div>
+                        <div class="widget-content">
+                            <div id="context-health-widget" class="loading">Loading context health data...</div>
+                        </div>
                     </div>
-                    <div class="widget-content">
-                        <div id="code-pattern-analysis-widget" class="loading">Loading code pattern analysis...</div>
-                    </div>
-                </div>
-                
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">🔍 Content Search Interface</h3>
-                        <div class="status-indicator" id="content-search-widget-status"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="content-search-widget" class="loading">Loading content search interface...</div>
+
+                    <div class="widget-card">
+                        <div class="widget-header">
+                            <h3 class="widget-title">Performance Trends</h3>
+                            <div class="status-indicator status-healthy"></div>
+                        </div>
+                        <div class="widget-content">
+                            <div id="performance-trends-widget" class="loading">Loading performance trends...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1328,6 +1541,9 @@ LIMIT 20</textarea>
     </button>
 
     <script>
+        // DEBUG: Test if JavaScript is working
+        console.log('🚀 JavaScript is running!');
+        
         // Auto-load overview metrics immediately when page loads
         (function() {
             function autoLoadMetrics() {
@@ -1558,9 +1774,171 @@ LIMIT 20</textarea>
             });
         }
 
+        // ==== PHASE 2: SMART DASHBOARD NAVIGATION FUNCTIONS ====
+        
+        // Toggle collapsible sections
+        window.toggleSection = function(sectionId) {
+            const content = document.getElementById(sectionId);
+            const toggle = document.querySelector(`[onclick="toggleSection('${sectionId}')"] .section-toggle`);
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+            } else {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                toggle.classList.remove('collapsed');
+            }
+            
+            // Store state in localStorage
+            localStorage.setItem(`section_${sectionId}`, content.classList.contains('expanded') ? 'expanded' : 'collapsed');
+        };
+
+        // Toggle widget priority sorting
+        window.toggleWidgetPriority = function() {
+            const btn = document.querySelector('[onclick="toggleWidgetPriority()"]');
+            const isActive = btn.classList.contains('active');
+            
+            if (isActive) {
+                btn.classList.remove('active');
+                restoreOriginalOrder();
+            } else {
+                btn.classList.add('active');
+                sortWidgetsByPriority();
+            }
+        };
+
+        // Sort widgets by priority (high-usage widgets first)
+        function sortWidgetsByPriority() {
+            const sections = document.querySelectorAll('.widget-section');
+            sections.forEach(section => {
+                const grid = section.querySelector('.widget-grid');
+                const widgets = Array.from(grid.querySelectorAll('.widget-card'));
+                
+                // Sort by priority: priority-widget class first, then alphabetically
+                widgets.sort((a, b) => {
+                    const aIsPriority = a.classList.contains('priority-widget');
+                    const bIsPriority = b.classList.contains('priority-widget');
+                    
+                    if (aIsPriority && !bIsPriority) return -1;
+                    if (!aIsPriority && bIsPriority) return 1;
+                    
+                    // If both same priority level, sort by title
+                    const aTitle = a.querySelector('.widget-title').textContent;
+                    const bTitle = b.querySelector('.widget-title').textContent;
+                    return aTitle.localeCompare(bTitle);
+                });
+                
+                // Re-append in sorted order
+                widgets.forEach(widget => grid.appendChild(widget));
+            });
+        }
+
+        // Restore original widget order
+        function restoreOriginalOrder() {
+            // Refresh the page section to restore original order
+            if (document.querySelector('.dashboard-section.active').id === 'analytics') {
+                setTimeout(() => loadAnalyticsWidgets(), 100);
+            }
+        }
+
+        // Toggle compact mode
+        window.toggleCompactMode = function() {
+            const btn = document.querySelector('[onclick="toggleCompactMode()"]');
+            const body = document.body;
+            
+            if (body.classList.contains('compact-mode')) {
+                body.classList.remove('compact-mode');
+                btn.classList.remove('active');
+                localStorage.setItem('compactMode', 'false');
+            } else {
+                body.classList.add('compact-mode');
+                btn.classList.add('active');
+                localStorage.setItem('compactMode', 'true');
+            }
+        };
+
+        // Show widget recommendations
+        window.showWidgetRecommendations = function() {
+            const banner = document.getElementById('recommendation-banner');
+            const textEl = document.getElementById('recommendation-text');
+            
+            // Simple recommendation logic based on current widgets
+            const recommendations = [
+                "💡 Based on your usage, consider expanding the 'High Priority Analytics' section for better insights.",
+                "🎯 The Code Pattern Analysis widget shows interesting trends - click to explore further.",
+                "🔍 Your Content Search Interface has processed significant data - great for finding patterns!",
+                "📊 Analytics are performing well - consider using compact mode for better screen usage.",
+                "⚡ Try collapsing 'Standard Analytics' to focus on high-priority widgets."
+            ];
+            
+            const randomRec = recommendations[Math.floor(Math.random() * recommendations.length)];
+            textEl.textContent = randomRec;
+            banner.style.display = 'flex';
+        };
+
+        // Hide recommendation banner
+        window.hideRecommendation = function() {
+            document.getElementById('recommendation-banner').style.display = 'none';
+        };
+
+        // Reset layout to defaults
+        window.resetLayout = function() {
+            // Remove all active states
+            document.querySelectorAll('.nav-control-btn').forEach(btn => btn.classList.remove('active'));
+            document.body.classList.remove('compact-mode');
+            
+            // Expand all sections
+            document.querySelectorAll('.collapsible-content').forEach(content => {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+            });
+            document.querySelectorAll('.section-toggle').forEach(toggle => {
+                toggle.classList.remove('collapsed');
+            });
+            
+            // Clear localStorage
+            localStorage.removeItem('compactMode');
+            localStorage.removeItem('section_priority-widgets');
+            localStorage.removeItem('section_standard-widgets');
+            
+            // Hide recommendations
+            hideRecommendation();
+            
+            console.log('Layout reset to defaults');
+        };
+
+        // Restore user preferences on load
+        function restoreUserPreferences() {
+            // Restore compact mode
+            if (localStorage.getItem('compactMode') === 'true') {
+                document.body.classList.add('compact-mode');
+                document.querySelector('[onclick="toggleCompactMode()"]').classList.add('active');
+            }
+            
+            // Restore section states
+            document.querySelectorAll('[id$="-widgets"]').forEach(section => {
+                const sectionId = section.id;
+                const savedState = localStorage.getItem(`section_${sectionId}`);
+                
+                if (savedState === 'collapsed') {
+                    section.classList.remove('expanded');
+                    section.classList.add('collapsed');
+                    document.querySelector(`[onclick="toggleSection('${sectionId}')"] .section-toggle`).classList.add('collapsed');
+                }
+            });
+        }
+
         // Load analytics widgets - WORKING VERSION
-        function loadAnalyticsWidgets() {
-            console.log('Loading analytics widgets...');
+        window.loadAnalyticsWidgets = function loadAnalyticsWidgets() {
+            console.log('🚀 Starting to load analytics widgets...');
+            console.log('📍 Current page URL:', window.location.href);
+            console.log('📋 Available elements:', {
+                timeline: document.getElementById('conversation-timeline-widget'),
+                codePattern: document.getElementById('code-pattern-analysis-widget'), 
+                contentSearch: document.getElementById('content-search-widget')
+            });
             try {
                 // Load dynamic Context Health widget data
                 var contextElement = document.getElementById('context-health-widget');
@@ -1632,13 +2010,15 @@ LIMIT 20</textarea>
                 // Phase 4: Load JSONL Analytics Widgets
                 
                 // Load Conversation Timeline widget
+                console.log('🕐 Loading Conversation Timeline widget...');
                 var timelineElement = document.getElementById('conversation-timeline-widget');
+                console.log('📱 Timeline element found:', !!timelineElement);
                 if (timelineElement) {
                     timelineElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading conversation timeline...</div>';
                     fetch('/api/telemetry-widget/conversation-timeline')
                         .then(response => response.json())
                         .then(data => {
-                            renderJsonlAnalyticsWidget('conversation-timeline', data);
+                            window.renderJsonlAnalyticsWidget('conversation-timeline', data);
                         })
                         .catch(error => {
                             console.error('Error loading conversation timeline:', error);
@@ -1653,7 +2033,7 @@ LIMIT 20</textarea>
                     fetch('/api/telemetry-widget/code-pattern-analysis')
                         .then(response => response.json())
                         .then(data => {
-                            renderJsonlAnalyticsWidget('code-pattern-analysis', data);
+                            window.renderJsonlAnalyticsWidget('code-pattern-analysis', data);
                         })
                         .catch(error => {
                             console.error('Error loading code pattern analysis:', error);
@@ -1661,14 +2041,16 @@ LIMIT 20</textarea>
                         });
                 }
                 
-                // Load Content Search Widget
+                // Load Content Search Widget  
+                console.log('🔍 Loading Content Search widget...');
                 var contentSearchElement = document.getElementById('content-search-widget');
+                console.log('📱 Content Search element found:', !!contentSearchElement);
                 if (contentSearchElement) {
                     contentSearchElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading content search interface...</div>';
                     fetch('/api/telemetry-widget/content-search-widget')
                         .then(response => response.json())
                         .then(data => {
-                            renderJsonlAnalyticsWidget('content-search-widget', data);
+                            window.renderJsonlAnalyticsWidget('content-search-widget', data);
                         })
                         .catch(error => {
                             console.error('Error loading content search widget:', error);
@@ -1683,9 +2065,27 @@ LIMIT 20</textarea>
         }
 
         // Render JSONL Analytics Widgets
-        function renderJsonlAnalyticsWidget(widgetType, data) {
-            const container = document.getElementById(`${widgetType}-widget`);
-            const statusElement = document.getElementById(`${widgetType}-status`);
+        window.renderJsonlAnalyticsWidget = function renderJsonlAnalyticsWidget(widgetType, data) {
+            console.log(`🎨 Rendering widget: ${widgetType}`, data);
+            console.log(`📊 Widget data status: ${data.status}, title: ${data.title}`);
+            
+            // Map widget types to actual HTML element IDs
+            const elementIdMap = {
+                'conversation-timeline': 'conversation-timeline-widget',
+                'code-pattern-analysis': 'code-pattern-analysis-widget', 
+                'content-search-widget': 'content-search-widget'
+            };
+            
+            const elementId = elementIdMap[widgetType];
+            console.log(`🔍 Looking for element ID: ${elementId} (from widgetType: ${widgetType})`);
+            
+            const container = document.getElementById(elementId);
+            const statusElement = document.getElementById(`${elementId.replace('-widget', '')}-status`);
+            
+            if (!container) {
+                console.error(`Container not found for widget: ${widgetType}`);
+                return;
+            }
             
             // Update status indicator
             let statusIcon = '✅';
@@ -1772,7 +2172,7 @@ LIMIT 20</textarea>
                         <div style="margin-bottom: 0.75rem;"><strong>Indexed Files:</strong> ${contentStats.total_files || 0}</div>
                         <div style="margin-bottom: 0.75rem;"><strong>Tool Results:</strong> ${contentStats.total_tools || 0}</div>
                         <div style="margin-bottom: 0.75rem;"><strong>Index Size:</strong> ${Math.round((contentStats.searchable_characters || 0) / (1024 * 1024) * 10) / 10} MB</div>
-                        ${searchData.search_suggestions?.length ? `
+                        ${searchData.search_suggestions && searchData.search_suggestions.length ? `
                             <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f9ff; border: 1px solid #0369a1; border-radius: 0.375rem;">
                                 <div style="font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">🔍 Search Suggestions:</div>
                                 <div style="font-size: 0.875rem; color: #1e40af;">
@@ -1785,8 +2185,18 @@ LIMIT 20</textarea>
                 `;
             }
             
-            if (container) {
-                container.innerHTML = contentHtml;
+            try {
+                if (container) {
+                    container.innerHTML = contentHtml;
+                    console.log(`Successfully rendered ${widgetType} widget`);
+                } else {
+                    console.error(`No container found for ${widgetType}`);
+                }
+            } catch (error) {
+                console.error(`Error rendering ${widgetType} widget:`, error);
+                if (container) {
+                    container.innerHTML = '<div style="color: #dc2626;">❌ Failed to render widget content</div>';
+                }
             }
         }
 
@@ -2446,6 +2856,9 @@ LIMIT 20</textarea>
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // Restore user preferences first
+            restoreUserPreferences();
+            
             // Load overview metrics immediately
             console.log('DOMContentLoaded - calling loadOverviewMetrics');
             if (typeof window.loadOverviewMetrics === 'function') {
@@ -2460,6 +2873,14 @@ LIMIT 20</textarea>
                 window.loadJsonlProcessingStatus();
             } else {
                 console.error('loadJsonlProcessingStatus function not found in DOMContentLoaded');
+            }
+            
+            // Load JSONL analytics widgets immediately  
+            console.log('DOMContentLoaded - calling loadAnalyticsWidgets');
+            if (typeof window.loadAnalyticsWidgets === 'function') {
+                window.loadAnalyticsWidgets();
+            } else {
+                console.error('loadAnalyticsWidgets function not found in DOMContentLoaded');
             }
             
             // Set up real-time updates

@@ -1454,19 +1454,30 @@ class TelemetryWidgetManager:
             
             # Get recent sessions if no session_id provided
             if not session_id:
-                # Get the most recent session from content statistics
-                content_stats = await self.content_queries.get_content_statistics()
-                if not content_stats.get('messages', {}).get('total_messages', 0):
+                recent_sessions = await self.content_queries.get_recent_sessions(limit=1)
+                if not recent_sessions:
                     return WidgetData(
                         widget_type=TelemetryWidgetType.CONVERSATION_TIMELINE,
                         title="Conversation Timeline",
-                        status="healthy",
-                        data={"message": "No conversations found"},
-                        alerts=[]
+                        status="warning",
+                        data={
+                            "session_id": "none",
+                            "timeline_events": [],
+                            "conversation_metrics": {
+                                "total_messages": 0,
+                                "duration_minutes": 0,
+                                "tools_used": 0,
+                                "files_accessed": 0
+                            },
+                            "key_insights": ["No recent conversations found"],
+                            "error_events": [],
+                            "file_operations": [],
+                            "tool_sequence": []
+                        },
+                        alerts=["No recent conversation data available"]
                     )
                 
-                # For demo, use a sample session or recent data
-                session_id = "recent_session"
+                session_id = recent_sessions[0]['session_id']
             
             # Get conversation timeline data
             conversation_data = await self.content_queries.get_complete_conversation(session_id)
@@ -1482,16 +1493,47 @@ class TelemetryWidgetManager:
             
             # Process conversation data into timeline events
             if conversation_data:
+                first_timestamp = None
+                last_timestamp = None
+                
                 for msg in conversation_data:
+                    timestamp = msg.get('timestamp', '')
+                    if timestamp:
+                        if first_timestamp is None:
+                            first_timestamp = timestamp
+                        last_timestamp = timestamp
+                    
                     event = {
-                        'timestamp': msg.get('timestamp', ''),
+                        'timestamp': timestamp,
                         'type': 'message',
                         'role': msg.get('role', 'unknown'),
-                        'content_preview': msg.get('message_preview', '')[:100] + '...',
-                        'has_code': msg.get('contains_code_blocks', False),
-                        'languages': msg.get('programming_languages', [])
+                        'content_preview': str(msg.get('message_content', ''))[:100] + '...' if msg.get('message_content') else 'No content',
+                        'has_code': bool(msg.get('contains_code_blocks', False)),
+                        'languages': msg.get('programming_languages', []) or [],
+                        'tokens': {
+                            'input': msg.get('input_tokens', 0),
+                            'output': msg.get('output_tokens', 0)
+                        },
+                        'cost': msg.get('cost_usd', 0),
+                        'model': msg.get('model_name', 'unknown')
                     }
                     timeline_events.append(event)
+                
+                # Calculate duration
+                if first_timestamp and last_timestamp and first_timestamp != last_timestamp:
+                    try:
+                        from datetime import datetime
+                        if isinstance(first_timestamp, str):
+                            first_dt = datetime.fromisoformat(first_timestamp.replace('Z', '+00:00'))
+                            last_dt = datetime.fromisoformat(last_timestamp.replace('Z', '+00:00'))
+                            duration = (last_dt - first_dt).total_seconds() / 60
+                            conversation_metrics['duration_minutes'] = round(duration, 1)
+                    except Exception:
+                        pass
+                
+                # Count tools and files (would need separate queries for accurate counts)
+                conversation_metrics['tools_used'] = sum(1 for event in timeline_events if event.get('has_code'))
+                conversation_metrics['files_accessed'] = 0  # Would need file access data
             
             # Generate key insights
             key_insights = []
@@ -1499,6 +1541,13 @@ class TelemetryWidgetManager:
                 key_insights.append("Long conversation with extensive interaction")
             if any(event.get('has_code') for event in timeline_events):
                 key_insights.append("Contains code blocks and programming content")
+            if conversation_metrics['duration_minutes'] > 60:
+                key_insights.append(f"Extended session ({conversation_metrics['duration_minutes']:.1f} minutes)")
+            
+            # Calculate total cost
+            total_cost = sum(event.get('cost', 0) for event in timeline_events)
+            if total_cost > 0:
+                key_insights.append(f"Session cost: ${total_cost:.4f}")
             
             # Determine status
             status = "healthy" if conversation_metrics['total_messages'] > 0 else "warning"
