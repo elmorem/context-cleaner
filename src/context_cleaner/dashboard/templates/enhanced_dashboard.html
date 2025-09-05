@@ -443,6 +443,177 @@
             margin: 0 auto;
         }
 
+        /* Phase 4.2: Mobile Responsiveness & Accessibility Improvements */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .main-nav ul {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .main-nav li {
+                width: 100%;
+            }
+            
+            .main-nav button {
+                width: 100%;
+                justify-content: center;
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+            
+            .smart-nav-controls {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .nav-control-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .filter-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .widgets-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .priority-widget,
+            .widget {
+                margin-bottom: 1rem;
+            }
+            
+            .widget-header {
+                padding: 0.75rem;
+            }
+            
+            .widget-content {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0.5rem;
+            }
+            
+            .main-nav button {
+                padding: 0.5rem;
+                font-size: 0.75rem;
+            }
+            
+            .filters-header h3 {
+                font-size: 1rem;
+            }
+            
+            .filter-label {
+                font-size: 0.75rem;
+            }
+            
+            .filter-group select {
+                font-size: 0.75rem;
+                padding: 0.375rem;
+            }
+            
+            .advanced-filters-panel {
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* Accessibility Improvements */
+        
+        /* Focus indicators */
+        button:focus,
+        select:focus,
+        input:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+        
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --border-color: #000;
+                --text-primary: #000;
+                --text-secondary: #333;
+            }
+            
+            .widget {
+                border: 2px solid #000;
+            }
+        }
+        
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .main-nav,
+            .smart-nav-controls,
+            .advanced-filters-panel {
+                display: none;
+            }
+            
+            .widget {
+                break-inside: avoid;
+                border: 1px solid #000;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        /* Screen reader only content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Skip links for keyboard navigation */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+        
+        .skip-link:focus {
+            top: 6px;
+        }
+
         .dashboard-section {
             display: none;
             animation: fadeIn 0.3s ease-in;
@@ -2218,6 +2389,99 @@ LIMIT 20</textarea>
             restoreFilterSelections();
         }
 
+        // ==== PHASE 4: PERFORMANCE OPTIMIZATION SYSTEM ====
+        
+        // Performance monitoring and caching
+        window.performanceOptimizer = {
+            cache: new Map(),
+            loadTimes: new Map(),
+            requestQueue: new Set(),
+            
+            // Cache with TTL
+            setCache: function(key, data, ttlMinutes = 5) {
+                const expiry = Date.now() + (ttlMinutes * 60 * 1000);
+                this.cache.set(key, { data, expiry });
+                console.log(`📦 Cached ${key} for ${ttlMinutes}min`);
+            },
+            
+            getCache: function(key) {
+                const cached = this.cache.get(key);
+                if (cached && Date.now() < cached.expiry) {
+                    console.log(`⚡ Cache hit for ${key}`);
+                    return cached.data;
+                }
+                if (cached) {
+                    this.cache.delete(key);
+                    console.log(`🗑️ Expired cache for ${key}`);
+                }
+                return null;
+            },
+            
+            // Performance timing
+            startTiming: function(operation) {
+                this.loadTimes.set(operation, Date.now());
+            },
+            
+            endTiming: function(operation) {
+                const start = this.loadTimes.get(operation);
+                if (start) {
+                    const duration = Date.now() - start;
+                    console.log(`⏱️ ${operation} took ${duration}ms`);
+                    this.loadTimes.delete(operation);
+                    return duration;
+                }
+                return 0;
+            }
+        };
+
+        // Debounced function utility
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Batch API requests for better performance
+        window.batchAPIRequests = async function(requests) {
+            window.performanceOptimizer.startTiming('batchRequests');
+            
+            try {
+                const promises = requests.map(async ({ url, cacheKey, ttl = 5 }) => {
+                    // Check cache first
+                    const cached = window.performanceOptimizer.getCache(cacheKey);
+                    if (cached) {
+                        return { url, data: cached, fromCache: true };
+                    }
+                    
+                    // Make request
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    // Cache result
+                    window.performanceOptimizer.setCache(cacheKey, data, ttl);
+                    
+                    return { url, data, fromCache: false };
+                });
+                
+                const results = await Promise.all(promises);
+                const duration = window.performanceOptimizer.endTiming('batchRequests');
+                
+                const cacheHits = results.filter(r => r.fromCache).length;
+                console.log(`🚀 Batch completed: ${results.length} requests, ${cacheHits} cache hits, ${duration}ms`);
+                
+                return results;
+            } catch (error) {
+                console.error('❌ Batch request failed:', error);
+                throw error;
+            }
+        };
+
         // ==== PHASE 3: ADVANCED MULTI-DIMENSIONAL FILTERING FUNCTIONS ====
 
         // Global filter state
@@ -2247,9 +2511,9 @@ LIMIT 20</textarea>
             }
         };
 
-        // Apply filters across all widgets
-        window.applyFilters = function() {
-            console.log('🎯 Applying filters across all widgets');
+        // Debounced apply filters for better performance
+        const debouncedApplyFilters = debounce(function() {
+            console.log('🎯 Applying filters across all widgets (debounced)');
             
             // Update filter state
             window.dashboardFilters = {
@@ -2266,8 +2530,14 @@ LIMIT 20</textarea>
             // Update active filters display
             updateActiveFiltersDisplay();
 
-            // Apply filters to all JSONL analytics widgets
+            // Apply filters to all JSONL analytics widgets with performance tracking
+            window.performanceOptimizer.startTiming('filterApplication');
             reloadFilteredWidgets();
+        }, 300); // 300ms debounce
+
+        // Apply filters across all widgets
+        window.applyFilters = function() {
+            debouncedApplyFilters();
         };
 
         // Update active filters display
@@ -2378,19 +2648,59 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             alert(statsMessage);
         };
 
-        // Reload filtered widgets
-        function reloadFilteredWidgets() {
+        // Optimized reload filtered widgets with batch requests
+        async function reloadFilteredWidgets() {
             console.log('♻️ Reloading widgets with filters:', window.dashboardFilters);
             
-            // Show loading indicators
+            // Show loading indicators  
             document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
-                content.innerHTML = '<div class="loading">Applying filters...</div>';
+                content.innerHTML = '<div class="loading">⚡ Applying filters...</div>';
             });
 
-            // Reload analytics widgets with filter parameters
-            setTimeout(() => {
-                loadAnalyticsWidgets();
-            }, 300);
+            try {
+                // Batch all widget requests for better performance
+                const requests = [
+                    { 
+                        url: '/api/telemetry-widget/conversation-timeline', 
+                        cacheKey: `timeline-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 // Shorter cache for filtered data
+                    },
+                    { 
+                        url: '/api/telemetry-widget/code-pattern-analysis', 
+                        cacheKey: `codepattern-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 
+                    },
+                    { 
+                        url: '/api/telemetry-widget/content-search-widget', 
+                        cacheKey: `contentsearch-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 
+                    }
+                ];
+
+                // Execute batch request  
+                const results = await window.batchAPIRequests(requests);
+
+                // Process results and update widgets
+                results.forEach(result => {
+                    if (result.url.includes('conversation-timeline')) {
+                        window.renderJsonlAnalyticsWidget('conversation-timeline', result.data);
+                    } else if (result.url.includes('code-pattern-analysis')) {
+                        window.renderJsonlAnalyticsWidget('code-pattern-analysis', result.data);
+                    } else if (result.url.includes('content-search-widget')) {
+                        window.renderJsonlAnalyticsWidget('content-search-widget', result.data);
+                    }
+                });
+
+                // Track performance
+                const filterDuration = window.performanceOptimizer.endTiming('filterApplication');
+                console.log(`✅ Filter application completed in ${filterDuration}ms`);
+
+            } catch (error) {
+                console.error('❌ Failed to reload filtered widgets:', error);
+                document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
+                    content.innerHTML = '<div style="color: #dc2626;">❌ Failed to apply filters</div>';
+                });
+            }
         }
 
         // Restore filter selections
