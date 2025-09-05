@@ -59,8 +59,8 @@ class ContextWindowAnalyzer:
             if not jsonl_files:
                 return None
                 
-            # Get the largest file (likely current active session)
-            latest_file = max(jsonl_files, key=os.path.getsize)
+            # Get the most recently modified file (actual latest session)
+            latest_file = max(jsonl_files, key=os.path.getmtime)
             return latest_file
             
         except Exception as e:

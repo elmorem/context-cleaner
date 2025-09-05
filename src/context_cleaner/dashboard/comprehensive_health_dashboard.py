@@ -862,6 +862,15 @@ class ComprehensiveHealthDashboard:
                     self.workflow_learner,
                     self.agent_selector
                 )
+                
+                # Initialize JSONL processor service for real-time processing dashboard
+                try:
+                    from ..telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+                    self.jsonl_processor = JsonlProcessorService(self.telemetry_client)
+                    logger.info("JSONL processor service initialized")
+                except Exception as e:
+                    logger.warning(f"JSONL processor service failed to initialize: {e}")
+                    self.jsonl_processor = None
                 logger.info("Telemetry dashboard integration enabled")
             except Exception as e:
                 logger.warning(f"Telemetry integration failed: {e}")
@@ -2074,6 +2083,84 @@ class ComprehensiveHealthDashboard:
                     'total_errors': 0,
                     'last_updated': datetime.now().isoformat()
                 })
+        
+        @self.app.route('/api/jsonl-processing-status')
+        def get_jsonl_processing_status():
+            """Get JSONL processing system status and metrics"""
+            if not self.telemetry_enabled or not hasattr(self, 'jsonl_processor') or not self.jsonl_processor:
+                return jsonify({
+                    "status": "unavailable", 
+                    "message": "JSONL processing service not available",
+                    "last_updated": datetime.now().isoformat()
+                })
+            
+            try:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    # Get processing status from service
+                    status_data = loop.run_until_complete(
+                        self.jsonl_processor.get_processing_status()
+                    )
+                    
+                    # Get content statistics for dashboard metrics
+                    content_stats = loop.run_until_complete(
+                        self.jsonl_processor.get_content_statistics()
+                    )
+                    
+                    loop.close()
+                    
+                    # Combine status and stats for comprehensive dashboard view
+                    return jsonify({
+                        "processing_status": status_data.get('status', 'unknown'),
+                        "database_healthy": status_data.get('database_connection', False),
+                        "tables_ready": status_data.get('content_tables_available', False),
+                        "privacy_level": status_data.get('privacy_level', 'standard'),
+                        
+                        # Content metrics for dashboard  
+                        "total_messages": content_stats.get('messages', {}).get('total_messages', 0),
+                        "total_files": content_stats.get('files', {}).get('unique_files', 0),
+                        "total_tools": content_stats.get('tools', {}).get('total_tool_executions', 0),
+                        "recent_activity": content_stats.get('entries_last_hour', 0),
+                        "storage_size_mb": round(content_stats.get('files', {}).get('total_file_bytes', 0) / 1024 / 1024, 2),
+                        
+                        # Processing performance metrics
+                        "processing_rate": "High",  # Will be enhanced with real metrics
+                        "error_rate": "Low",        # Will be enhanced with real metrics
+                        "system_load": "Normal",    # Will be enhanced with real metrics
+                        
+                        "last_updated": datetime.now().isoformat()
+                    })
+                    
+                except Exception as e:
+                    loop.close()
+                    logger.error(f"Error getting JSONL processing status: {e}")
+                    return jsonify({
+                        "status": "error",
+                        "error": str(e),
+                        "processing_status": "error",
+                        "database_healthy": False,
+                        "tables_ready": False,
+                        "total_messages": 0,
+                        "total_files": 0, 
+                        "total_tools": 0,
+                        "recent_activity": 0,
+                        "storage_size_mb": 0,
+                        "processing_rate": "Unknown",
+                        "error_rate": "Unknown",
+                        "system_load": "Unknown",
+                        "last_updated": datetime.now().isoformat()
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error in JSONL processing status endpoint: {e}")
+                return jsonify({
+                    "status": "error",
+                    "message": f"Error: {str(e)}",
+                    "last_updated": datetime.now().isoformat()
+                }), 500
 
     def _setup_socketio_events(self):
         """Setup SocketIO events for real-time updates."""
