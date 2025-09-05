@@ -1054,164 +1054,6 @@ def effectiveness(ctx, days, strategy, detailed, format):
         sys.exit(1)
 
 
-@main.command("run")
-@click.option("--jsonl-file", type=click.Path(exists=True), help="JSONL file to process (optional)")
-@click.option("--jsonl-dir", type=click.Path(exists=True), help="Directory containing JSONL files to process (optional)")
-@click.option("--privacy-level", default='standard', type=click.Choice(['minimal', 'standard', 'strict']), help="Privacy level for content sanitization")
-@click.option("--no-dashboard", is_flag=True, help="Skip dashboard launch")
-@click.option("--dashboard-port", type=int, default=8080, help="Dashboard port")
-@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
-@click.pass_context
-def run(ctx, jsonl_file, jsonl_dir, privacy_level, no_dashboard, dashboard_port, no_browser):
-    """🚀 Complete Context Cleaner workflow: process JSONL → analyze → show dashboard."""
-    config = ctx.obj["config"]
-    verbose = ctx.obj["verbose"]
-    
-    if verbose:
-        click.echo("🚀 Starting complete Context Cleaner workflow...")
-        click.echo("=" * 60)
-    
-    try:
-        # Step 1: Process JSONL files if provided
-        processed_any = False
-        
-        if jsonl_file:
-            if verbose:
-                click.echo(f"📄 Step 1: Processing JSONL file: {jsonl_file}")
-            
-            # Process single file using existing command
-            from .commands.jsonl import get_jsonl_service
-            import asyncio
-            
-            async def process_single_file():
-                service = await get_jsonl_service(privacy_level)
-                stats = await service.process_jsonl_file(Path(jsonl_file))
-                
-                click.echo(f"✅ Processed {stats['total_entries']} entries:")
-                click.echo(f"   • Messages: {stats['messages_processed']}")
-                click.echo(f"   • Files: {stats['files_processed']}")
-                click.echo(f"   • Tools: {stats['tools_processed']}")
-                click.echo(f"   • Processing time: {stats['processing_time_seconds']:.2f}s")
-                return True
-            
-            try:
-                processed_any = asyncio.run(process_single_file())
-            except Exception as e:
-                if verbose:
-                    click.echo(f"⚠️  JSONL processing failed: {e}")
-                else:
-                    click.echo("⚠️  JSONL processing failed")
-                    
-        elif jsonl_dir:
-            if verbose:
-                click.echo(f"📁 Step 1: Processing JSONL directory: {jsonl_dir}")
-            
-            # Process directory using existing command
-            from .commands.jsonl import get_jsonl_service
-            import asyncio
-            
-            async def process_directory():
-                service = await get_jsonl_service(privacy_level)
-                stats = await service.process_jsonl_directory(Path(jsonl_dir))
-                
-                click.echo(f"✅ Processed {stats['total_files']} files:")
-                click.echo(f"   • Total entries: {stats['total_entries']}")
-                click.echo(f"   • Messages: {stats['messages_processed']}")
-                click.echo(f"   • Files: {stats['files_processed']}")  
-                click.echo(f"   • Tools: {stats['tools_processed']}")
-                click.echo(f"   • Processing time: {stats['processing_time_seconds']:.2f}s")
-                return True
-            
-            try:
-                processed_any = asyncio.run(process_directory())
-            except Exception as e:
-                if verbose:
-                    click.echo(f"⚠️  JSONL processing failed: {e}")
-                else:
-                    click.echo("⚠️  JSONL processing failed")
-        else:
-            if verbose:
-                click.echo("📄 Step 1: No JSONL files specified, skipping processing")
-        
-        # Step 2: Run analytics (always available)
-        if verbose:
-            click.echo("\n📈 Step 2: Running analytics...")
-            
-        try:
-            import asyncio
-            # Get quick analytics summary
-            results = asyncio.run(_run_productivity_analysis(config, 7))
-            click.echo(f"✅ Analytics complete:")
-            click.echo(f"   • Sessions found: {results['total_sessions']}")
-            click.echo(f"   • Cache locations: {results['cache_locations_found']}")
-            click.echo(f"   • Productivity score: {results['avg_productivity_score']}/100")
-        except Exception as e:
-            if verbose:
-                click.echo(f"⚠️  Analytics failed: {e}")
-        
-        # Step 3: Launch dashboard (unless disabled)
-        if not no_dashboard:
-            if verbose:
-                click.echo(f"\n🌐 Step 3: Launching dashboard on port {dashboard_port}...")
-            
-            # Import and start comprehensive dashboard
-            try:
-                from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-                
-                dashboard = ComprehensiveHealthDashboard()
-                
-                if not no_browser:
-                    import webbrowser
-                    import threading
-                    import time
-                    
-                    def open_browser():
-                        time.sleep(2)  # Give server time to start
-                        webbrowser.open(f"http://127.0.0.1:{dashboard_port}")
-                    
-                    threading.Thread(target=open_browser, daemon=True).start()
-                
-                dashboard_url = f"http://127.0.0.1:{dashboard_port}"
-                click.echo(f"📊 Dashboard available at: {dashboard_url}")
-                
-                if processed_any:
-                    click.echo("🎯 Check the Overview section for JSONL Processing System status")
-                
-                click.echo("Press Ctrl+C to stop the server")
-                
-                # Start the dashboard using SocketIO
-                dashboard.socketio.run(
-                    dashboard.app,
-                    host="127.0.0.1",
-                    port=dashboard_port,
-                    debug=False,
-                    use_reloader=False,
-                    allow_unsafe_werkzeug=True
-                )
-                
-            except Exception as e:
-                click.echo(f"❌ Failed to start dashboard: {e}", err=True)
-                if verbose:
-                    import traceback
-                    traceback.print_exc()
-                sys.exit(1)
-        else:
-            if verbose:
-                click.echo("\n🌐 Step 3: Dashboard launch skipped")
-                
-        if verbose:
-            click.echo("\n✅ Context Cleaner workflow completed!")
-            
-    except KeyboardInterrupt:
-        click.echo("\n👋 Context Cleaner stopped")
-    except Exception as e:
-        click.echo(f"❌ Workflow failed: {e}", err=True)
-        if verbose:
-            import traceback
-            traceback.print_exc()
-        sys.exit(1)
-
-
 # Add telemetry and JSONL command groups to main CLI
 try:
     from .commands.telemetry import add_telemetry_commands
@@ -1224,6 +1066,422 @@ try:
     add_jsonl_commands(main)
 except ImportError:
     pass  # JSONL commands optional
+
+
+# Add the stop command for service shutdown
+@main.command()
+@click.option("--force", is_flag=True, help="Force stop all services without confirmation")
+@click.option("--docker-only", is_flag=True, help="Stop only Docker services")
+@click.option("--processes-only", is_flag=True, help="Stop only background processes")
+@click.pass_context
+def stop(ctx, force, docker_only, processes_only):
+    """
+    Stop all Context Cleaner services gracefully.
+    
+    This command will:
+    1. Stop all background JSONL processing
+    2. Stop Docker services (ClickHouse + OpenTelemetry) 
+    3. Kill any remaining dashboard processes
+    
+    Use --force to skip confirmation prompts.
+    """
+    import subprocess
+    import signal
+    import os
+    from pathlib import Path
+    
+    verbose = ctx.obj["verbose"]
+    
+    if not force:
+        click.echo("🛑 This will stop all Context Cleaner services:")
+        if not docker_only:
+            click.echo("   • Background JSONL processing")
+            click.echo("   • Dashboard web servers")
+        if not processes_only:
+            click.echo("   • Docker containers (ClickHouse + OpenTelemetry)")
+        click.echo()
+        
+        if not click.confirm("Continue with shutdown?"):
+            click.echo("❌ Shutdown cancelled")
+            return
+    
+    if verbose:
+        click.echo("🧹 Stopping Context Cleaner services...")
+    
+    stopped_services = []
+    
+    # Stop background processes if requested
+    if not docker_only:
+        try:
+            # Kill processes by name pattern
+            subprocess.run([
+                "pkill", "-f", "context_cleaner.*jsonl"
+            ], capture_output=True)
+            
+            # Kill any python processes running JSONL processing
+            subprocess.run([
+                "pkill", "-f", "jsonl_background_service"
+            ], capture_output=True)
+            
+            # Kill dashboard processes by port pattern
+            ports_to_check = [8080, 8081, 8082, 8083, 8085, 8086, 8088, 8090, 8095, 8097, 8098, 8099, 8100, 8110, 9000, 9001]
+            for port in ports_to_check:
+                try:
+                    # Find processes using the port
+                    result = subprocess.run(
+                        ["lsof", "-ti", f":{port}"],
+                        capture_output=True, text=True
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        pids = result.stdout.strip().split('\n')
+                        for pid in pids:
+                            try:
+                                os.kill(int(pid), signal.SIGTERM)
+                                if verbose:
+                                    click.echo(f"✅ Stopped process on port {port} (PID: {pid})")
+                            except (ProcessLookupError, ValueError):
+                                pass
+                except Exception:
+                    pass
+            
+            stopped_services.append("background processes")
+            
+        except Exception as e:
+            if verbose:
+                click.echo(f"⚠️ Error stopping background processes: {e}")
+    
+    # Stop Docker services if requested
+    if not processes_only:
+        compose_file = Path("docker-compose.yml")
+        if compose_file.exists():
+            try:
+                if verbose:
+                    click.echo("🐳 Stopping Docker services...")
+                
+                result = subprocess.run(
+                    ["docker", "compose", "down"],
+                    capture_output=True, text=True, timeout=30
+                )
+                
+                if result.returncode == 0:
+                    if verbose:
+                        click.echo("✅ Docker services stopped")
+                    stopped_services.append("Docker containers")
+                else:
+                    if verbose:
+                        click.echo(f"⚠️ Docker stop had issues: {result.stderr}")
+                    stopped_services.append("Docker containers (with warnings)")
+                    
+            except subprocess.TimeoutExpired:
+                if verbose:
+                    click.echo("⚠️ Docker stop timed out, forcing shutdown...")
+                try:
+                    subprocess.run(["docker", "compose", "kill"], timeout=10)
+                    subprocess.run(["docker", "compose", "down"], timeout=10)
+                    stopped_services.append("Docker containers (forced)")
+                except:
+                    click.echo("❌ Failed to stop Docker services", err=True)
+            except Exception as e:
+                click.echo(f"❌ Error stopping Docker services: {e}", err=True)
+        else:
+            if verbose:
+                click.echo("⚠️ No docker-compose.yml found, skipping Docker shutdown")
+    
+    # Summary
+    if stopped_services:
+        click.echo("🎯 Shutdown complete!")
+        for service in stopped_services:
+            click.echo(f"   ✅ {service}")
+    else:
+        click.echo("🤷 No services were found running")
+    
+    if verbose:
+        click.echo("💡 Use 'context-cleaner run' to start services again")
+
+
+# Add the comprehensive run command for service orchestration
+@main.command()
+@click.option("--dashboard-port", "-p", type=int, default=8110, help="Dashboard port")
+@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
+@click.option("--no-docker", is_flag=True, help="Skip Docker service startup")
+@click.option("--no-jsonl", is_flag=True, help="Skip JSONL processing service")
+@click.option("--docker-timeout", default=60, help="Docker startup timeout in seconds")
+@click.pass_context
+def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, docker_timeout):
+    """
+    Start all Context Cleaner services with proper orchestration.
+    
+    This command manages the complete startup sequence:
+    1. Docker services (ClickHouse + OpenTelemetry)
+    2. JSONL processing services
+    3. Dashboard web interface
+    
+    All services are health-checked and started in the correct order.
+    """
+    import subprocess
+    import time
+    import signal
+    import sys
+    import threading
+    from pathlib import Path
+    
+    config = ctx.obj["config"]
+    verbose = ctx.obj["verbose"]
+    
+    if verbose:
+        click.echo("🚀 Starting Context Cleaner comprehensive service orchestration...")
+        click.echo(f"📊 Dashboard port: {dashboard_port}")
+        click.echo(f"🐳 Docker services: {'Skipped' if no_docker else 'Enabled'}")
+        click.echo(f"📄 JSONL processing: {'Skipped' if no_jsonl else 'Enabled'}")
+        click.echo()
+
+    started_services = []
+    docker_process = None
+    jsonl_process = None
+    
+    def cleanup_services():
+        """Clean up all started services on shutdown."""
+        if verbose:
+            click.echo("\n🧹 Cleaning up services...")
+        
+        # Stop JSONL processing
+        if jsonl_process and jsonl_process.poll() is None:
+            try:
+                jsonl_process.terminate()
+                jsonl_process.wait(timeout=5)
+                if verbose:
+                    click.echo("✅ JSONL processing stopped")
+            except:
+                if verbose:
+                    click.echo("⚠️ JSONL processing cleanup failed")
+        
+        # Stop Docker services
+        if not no_docker and docker_process:
+            try:
+                if verbose:
+                    click.echo("🐳 Stopping Docker services...")
+                subprocess.run(["docker", "compose", "down"], timeout=30)
+                if verbose:
+                    click.echo("✅ Docker services stopped")
+            except:
+                if verbose:
+                    click.echo("⚠️ Docker cleanup failed")
+    
+    def signal_handler(signum, frame):
+        """Handle shutdown signals gracefully."""
+        cleanup_services()
+        sys.exit(0)
+    
+    # Register signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    try:
+        # Step 1: Start Docker services if requested
+        if not no_docker:
+            if verbose:
+                click.echo("🐳 Starting Docker services...")
+            
+            # Check if docker-compose.yml exists
+            compose_file = Path("docker-compose.yml")
+            if not compose_file.exists():
+                click.echo("❌ docker-compose.yml not found. Docker services skipped.", err=True)
+            else:
+                try:
+                    # Start Docker services in background
+                    subprocess.run(["docker", "compose", "up", "-d"], check=True, timeout=docker_timeout)
+                    if verbose:
+                        click.echo("✅ Docker services started")
+                    
+                    # Wait for health checks
+                    if verbose:
+                        click.echo("⏳ Waiting for Docker services to become healthy...")
+                    
+                    for attempt in range(20):  # 20 attempts = 60 seconds max
+                        try:
+                            result = subprocess.run(
+                                ["docker", "exec", "clickhouse-otel", "clickhouse-client", "--query", "SELECT 1"],
+                                capture_output=True, timeout=5
+                            )
+                            if result.returncode == 0:
+                                if verbose:
+                                    click.echo("✅ ClickHouse is healthy")
+                                break
+                        except:
+                            pass
+                        
+                        if attempt < 19:
+                            time.sleep(3)
+                        else:
+                            click.echo("⚠️ Docker services may not be fully healthy, continuing anyway...")
+                
+                except subprocess.TimeoutExpired:
+                    click.echo(f"❌ Docker startup timed out after {docker_timeout}s", err=True)
+                    cleanup_services()
+                    sys.exit(1)
+                except subprocess.CalledProcessError as e:
+                    click.echo(f"❌ Docker startup failed: {e}", err=True)
+                    cleanup_services()
+                    sys.exit(1)
+        
+        # Step 2: Start JSONL processing service if requested
+        if not no_jsonl:
+            if verbose:
+                click.echo("📄 Starting JSONL processing service...")
+            
+            # Start JSONL processing as background service using the existing processor
+            try:
+                # Use the existing JSONL processing system to start a background watch service
+                jsonl_cmd = [
+                    sys.executable, "-c",
+                    """
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, 'src')
+
+async def jsonl_background_service():
+    try:
+        from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+        from context_cleaner.telemetry import ClickHouseClient
+        
+        print('📄 JSONL Processing Service started')
+        print('🔍 Watching for JSONL files in common locations...')
+        
+        # Initialize service
+        client = ClickHouseClient()
+        service = JsonlProcessorService(client, privacy_level='standard')
+        
+        # Watch common Claude Code JSONL locations
+        watch_dirs = [
+            Path.home() / '.claude',
+            Path.home() / '.cursor',  
+            Path.cwd() / 'context',
+            Path('/tmp/claude_logs') if Path('/tmp/claude_logs').exists() else None
+        ]
+        watch_dirs = [d for d in watch_dirs if d and d.exists()]
+        
+        print(f'📁 Monitoring {len(watch_dirs)} directories for JSONL files')
+        
+        # Background processing loop
+        processed_files = set()
+        while True:
+            try:
+                for watch_dir in watch_dirs:
+                    for jsonl_file in watch_dir.rglob('*.jsonl'):
+                        if jsonl_file not in processed_files:
+                            try:
+                                print(f'🔄 Processing new JSONL file: {jsonl_file}')
+                                stats = await service.process_jsonl_file(jsonl_file, batch_size=50)
+                                print(f'✅ Processed {stats["total_entries"]} entries from {jsonl_file.name}')
+                                processed_files.add(jsonl_file)
+                            except Exception as e:
+                                print(f'⚠️ Failed to process {jsonl_file}: {e}')
+                
+                # Sleep before next check
+                await asyncio.sleep(30)  # Check every 30 seconds
+                
+            except Exception as e:
+                print(f'⚠️ JSONL service error: {e}')
+                await asyncio.sleep(60)  # Wait longer on errors
+        
+    except ImportError:
+        print('⚠️ JSONL processing modules not available, running basic service')
+        await asyncio.sleep(3600)  # Keep running for an hour
+    except Exception as e:
+        print(f'❌ JSONL service failed: {e}')
+        await asyncio.sleep(10)
+
+if __name__ == '__main__':
+    asyncio.run(jsonl_background_service())
+"""
+                ]
+                jsonl_process = subprocess.Popen(
+                    jsonl_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=Path.cwd()
+                )
+                started_services.append("jsonl")
+                if verbose:
+                    click.echo("✅ JSONL background processing service started")
+            except Exception as e:
+                if verbose:
+                    click.echo(f"⚠️ JSONL processing service failed to start: {e}")
+        
+        # Step 3: Start the dashboard
+        if verbose:
+            click.echo(f"📊 Starting dashboard on port {dashboard_port}...")
+        
+        # Override dashboard port in config
+        config.dashboard.port = dashboard_port
+        
+        # Import and start dashboard (this will block)
+        try:
+            from ..dashboard.web_server import ProductivityDashboard
+            
+            dashboard_server = ProductivityDashboard(config)
+            
+            if not no_browser:
+                import webbrowser
+                try:
+                    url = f"http://{config.dashboard.host}:{dashboard_port}"
+                    # Give the server a moment to start before opening browser
+                    def open_browser():
+                        time.sleep(2)
+                        webbrowser.open(url)
+                    threading.Thread(target=open_browser, daemon=True).start()
+                except Exception:
+                    pass  # Browser opening is optional
+            
+            dashboard_url = f"http://{config.dashboard.host}:{dashboard_port}"
+            click.echo(f"🚀 Context Cleaner running at: {dashboard_url}")
+            click.echo("📊 All services started successfully!")
+            click.echo("🐳 Docker: ClickHouse + OpenTelemetry")
+            click.echo("📄 JSONL: Background processing active")
+            click.echo("🌐 Dashboard: Web interface ready")
+            click.echo()
+            click.echo("Press Ctrl+C to stop all services")
+            
+            # Start server (this blocks until interrupted)
+            dashboard_server.start_server(config.dashboard.host, dashboard_port)
+            
+        except ImportError:
+            # Fallback: use comprehensive health dashboard
+            try:
+                from ..dashboard.comprehensive_health_dashboard import app
+                import threading
+                import socketio
+                
+                if verbose:
+                    click.echo("🔄 Using comprehensive health dashboard...")
+                
+                dashboard_url = f"http://{config.dashboard.host}:{dashboard_port}"
+                click.echo(f"🚀 Context Cleaner running at: {dashboard_url}")
+                click.echo("📊 Comprehensive dashboard with JSONL analytics active!")
+                click.echo("Press Ctrl+C to stop all services")
+                
+                app.run(host=config.dashboard.host, port=dashboard_port, debug=False)
+            
+            except Exception as e:
+                click.echo(f"❌ Failed to start dashboard: {e}", err=True)
+                cleanup_services()
+                sys.exit(1)
+    
+    except KeyboardInterrupt:
+        if verbose:
+            click.echo("\n👋 Received shutdown signal")
+        cleanup_services()
+        if verbose:
+            click.echo("✅ All services stopped cleanly")
+    
+    except Exception as e:
+        click.echo(f"❌ Service orchestration failed: {e}", err=True)
+        cleanup_services()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

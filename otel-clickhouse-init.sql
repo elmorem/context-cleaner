@@ -135,13 +135,13 @@ CREATE TABLE IF NOT EXISTS claude_message_content (
     contains_file_references Bool MATERIALIZED position(message_content, '/') > 0 OR position(message_content, '\\') > 0,
     programming_languages Array(String), -- Detected from content
     
+    PRIMARY KEY (message_uuid),
     INDEX idx_session (session_id) TYPE set(100) GRANULARITY 8192,
     INDEX idx_content_hash (message_hash) TYPE set(1000) GRANULARITY 8192,
     INDEX idx_content_search (message_content) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = MergeTree()
-PRIMARY KEY (message_uuid)
-ORDER BY (message_uuid, session_id, timestamp)
+ORDER BY (session_id, timestamp)
 PARTITION BY toDate(timestamp)
 TTL timestamp + INTERVAL 30 DAY;
 
@@ -167,13 +167,13 @@ CREATE TABLE IF NOT EXISTS claude_file_content (
     contains_imports Bool MATERIALIZED position(file_content, 'import ') > 0 OR position(file_content, '#include') > 0,
     line_count UInt32 MATERIALIZED length(file_content) - length(replaceAll(file_content, '\n', '')) + 1,
     
+    PRIMARY KEY (file_access_uuid),
     INDEX idx_file_path (file_path) TYPE set(1000) GRANULARITY 8192,
     INDEX idx_content_hash (file_content_hash) TYPE set(1000) GRANULARITY 8192,
     INDEX idx_content_search (file_content) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = ReplacingMergeTree() -- Use ReplacingMergeTree for file deduplication
-PRIMARY KEY (file_access_uuid)
-ORDER BY (file_access_uuid, file_path, file_content_hash)
+ORDER BY (file_path, file_content_hash)
 PARTITION BY toDate(timestamp)
 TTL timestamp + INTERVAL 30 DAY;
 
@@ -202,11 +202,11 @@ CREATE TABLE IF NOT EXISTS claude_tool_results (
     is_file_operation Bool MATERIALIZED tool_name IN ('Read', 'Write', 'Edit'),
     is_system_command Bool MATERIALIZED tool_name = 'Bash',
     
+    PRIMARY KEY (tool_result_uuid),
     INDEX idx_tool_name (tool_name) TYPE set(50) GRANULARITY 8192,
     INDEX idx_output_search (tool_output) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = MergeTree()
-PRIMARY KEY (tool_result_uuid)
-ORDER BY (tool_result_uuid, session_id, timestamp, tool_name)
+ORDER BY (session_id, timestamp, tool_name)
 PARTITION BY toDate(timestamp)  
 TTL timestamp + INTERVAL 30 DAY;

@@ -197,41 +197,8 @@ def search(search_term: str, limit: int, search_type: str, language: Optional[st
                     click.echo()
             
             else:  # tools
-                results = await service.search_tool_results(search_term, limit)
-                
-                if not results:
-                    click.echo("No tool results found containing the search term.")
-                    return
-                
-                click.echo(f"Found {len(results)} tool result(s):")
-                click.echo("=" * 60)
-                
-                for result in results:
-                    tool_name = result.get('tool_name', 'Unknown')
-                    timestamp = result.get('timestamp', 'Unknown')
-                    session_id = result.get('session_id', 'Unknown')[:12]
-                    success = result.get('success', False)
-                    output_size = result.get('output_size', 0)
-                    
-                    # Show snippet from output or input containing search term
-                    output = result.get('tool_output', '')
-                    input_data = result.get('tool_input', '')
-                    error = result.get('tool_error', '')
-                    
-                    snippet = ""
-                    if search_term.lower() in output.lower():
-                        snippet = output[:300]
-                    elif search_term.lower() in input_data.lower():
-                        snippet = input_data[:300]
-                    elif error and search_term.lower() in error.lower():
-                        snippet = error[:300]
-                    
-                    status_icon = "✅" if success else "❌"
-                    click.echo(f"🛠️  {tool_name} {status_icon} | {timestamp} | Session: {session_id}")
-                    click.echo(f"   Size: {output_size} bytes")
-                    if snippet:
-                        click.echo(f"   Context: {snippet}")
-                    click.echo()
+                click.echo("Tool search not yet implemented.")
+                return
             
         except Exception as e:
             click.echo(f"❌ Search failed: {e}", err=True)

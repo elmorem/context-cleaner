@@ -65,13 +65,14 @@ class FullContentJsonlParser:
         try:
             # Look for tool results that contain file content
             tool_result = jsonl_entry.get('toolUseResult', {})
+            if not isinstance(tool_result, dict):
+                return None
+                
             file_info = tool_result.get('file', {})
-            
-            # Handle case where file_info might be a string or None
-            if not file_info or isinstance(file_info, str):
+            if not isinstance(file_info, dict):
                 return None
             
-            if not isinstance(file_info, dict):
+            if not file_info:
                 return None
             
             file_content = file_info.get('content', '')  # COMPLETE FILE CONTENT
@@ -107,59 +108,47 @@ class FullContentJsonlParser:
     def extract_tool_results(jsonl_entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract COMPLETE tool execution results."""
         try:
-            # Look for tool result entries (these have toolUseResult with actual output)
-            tool_result = jsonl_entry.get('toolUseResult', {})
-            if not tool_result:
-                return None
-            
-            # Check if this entry has tool result content in the message
+            # Extract tool use information from message
             message = jsonl_entry.get('message', {})
             content = message.get('content', [])
             
-            tool_result_data = None
+            tool_data = None
             if isinstance(content, list):
                 for item in content:
-                    if item.get('type') == 'tool_result':
-                        tool_result_data = item
+                    if item.get('type') == 'tool_use':
+                        tool_data = item
                         break
             
-            if not tool_result_data:
+            if not tool_data:
                 return None
             
-            # Extract tool information from the result
-            tool_use_id = tool_result_data.get('tool_use_id', '')
-            tool_result_content = tool_result_data.get('content', '')
+            # Get complete tool result
+            tool_result = jsonl_entry.get('toolUseResult', {})
             
-            # Get complete tool output from toolUseResult
+            # Reconstruct complete tool input
+            tool_input_full = json.dumps(tool_data.get('input', {}), indent=2)
+            
+            # Get complete tool output
             stdout = tool_result.get('stdout', '')
             stderr = tool_result.get('stderr', '')
-            tool_output_full = stdout or tool_result_content  # Use content if no stdout
+            tool_output_full = stdout
             tool_error_full = stderr if stderr else None
             
-            # Try to infer tool name from context or use generic
-            tool_name = 'Unknown'
-            if 'docker' in tool_output_full.lower():
-                tool_name = 'Bash'
-            elif 'TodoWrite' in str(tool_result):
-                tool_name = 'TodoWrite'
-            elif len(tool_output_full) > 100:
-                tool_name = 'Read'  # Likely a file read
-            
             # Determine output type
-            output_type = FullContentJsonlParser._classify_tool_output(tool_output_full, tool_name)
+            output_type = FullContentJsonlParser._classify_tool_output(tool_output_full, tool_data.get('name'))
             
             return {
-                'tool_result_uuid': tool_use_id or str(uuid.uuid4()),
+                'tool_result_uuid': tool_data.get('id', str(uuid.uuid4())),
                 'session_id': jsonl_entry.get('sessionId'),
                 'message_uuid': jsonl_entry.get('uuid'),
                 'timestamp': FullContentJsonlParser._parse_timestamp(jsonl_entry.get('timestamp')),
-                'tool_name': tool_name,
-                'tool_input': f"Tool ID: {tool_use_id}",  # We don't have the input in result entries
+                'tool_name': tool_data.get('name'),
+                'tool_input': tool_input_full,        # COMPLETE TOOL INPUT
                 'tool_output': tool_output_full,      # COMPLETE TOOL OUTPUT
                 'tool_error': tool_error_full,        # COMPLETE ERROR OUTPUT
                 'execution_time_ms': 0,  # Could be calculated if timestamps available
-                'success': not bool(stderr) and not tool_result_data.get('is_error', False),
-                'exit_code': tool_result.get('exit_code', 0 if not stderr else 1),
+                'success': not bool(stderr),
+                'exit_code': tool_result.get('exit_code', 0),
                 'output_type': output_type
             }
             

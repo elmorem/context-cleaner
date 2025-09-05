@@ -220,12 +220,32 @@ class ClickHouseClient(TelemetryClient):
     async def get_total_aggregated_stats(self) -> Dict[str, Any]:
         """Get total aggregated statistics across all sessions."""
         try:
-            # Get total tokens, sessions, costs across all data
-            query = """
+            # Get total tokens from official Claude Code token usage metrics
+            # This includes input, output, cacheRead, and cacheCreation tokens
+            token_query = """
+            SELECT 
+                Attributes['type'] as token_type,
+                SUM(Value) as total_tokens
+            FROM otel.otel_metrics_sum
+            WHERE MetricName = 'claude_code.token.usage'
+            GROUP BY token_type
+            """
+            
+            token_results = await self.execute_query(token_query)
+            
+            # Calculate total tokens from all types (input + output + cacheRead + cacheCreation)
+            total_tokens = 0
+            token_breakdown = {}
+            for row in token_results:
+                token_type = row['token_type']
+                tokens = int(row['total_tokens'])
+                token_breakdown[token_type] = tokens
+                total_tokens += tokens
+            
+            # Get sessions, costs, and API calls from OTEL logs
+            stats_query = """
             SELECT 
                 COUNT(DISTINCT LogAttributes['session.id']) as total_sessions,
-                SUM(toFloat64OrNull(LogAttributes['input_tokens'])) as total_input_tokens,
-                SUM(toFloat64OrNull(LogAttributes['output_tokens'])) as total_output_tokens,
                 SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost,
                 COUNT(*) as total_api_calls,
                 SUM(CASE WHEN Body = 'claude_code.api_error' THEN 1 ELSE 0 END) as total_errors,
@@ -233,15 +253,13 @@ class ClickHouseClient(TelemetryClient):
                 MAX(Timestamp) as latest_session
             FROM otel.otel_logs
             WHERE Body IN ('claude_code.api_request', 'claude_code.api_error')
-                AND LogAttributes['input_tokens'] != ''
-                AND LogAttributes['output_tokens'] != ''
             """
             
-            results = await self.execute_query(query)
-            if not results:
+            stats_results = await self.execute_query(stats_query)
+            if not stats_results:
                 return self._get_fallback_stats()
             
-            data = results[0]
+            data = stats_results[0]
             
             # Get active agents/tools count
             tools_query = """
@@ -260,8 +278,6 @@ class ClickHouseClient(TelemetryClient):
             total_errors = int(data['total_errors'])
             success_rate = ((total_requests - total_errors) / max(total_requests, 1)) * 100 if total_requests > 0 else 0
             
-            total_tokens = int(data['total_input_tokens'] or 0) + int(data['total_output_tokens'] or 0)
-            
             return {
                 'total_tokens': f"{total_tokens:,}",
                 'total_sessions': f"{int(data['total_sessions'] or 0):,}",
@@ -273,7 +289,8 @@ class ClickHouseClient(TelemetryClient):
                 'latest_session': data['latest_session'],
                 'raw_total_tokens': total_tokens,
                 'raw_total_sessions': int(data['total_sessions'] or 0),
-                'raw_success_rate': success_rate
+                'raw_success_rate': success_rate,
+                'token_breakdown': token_breakdown  # Include breakdown for debugging
             }
             
         except Exception as e:
@@ -315,8 +332,8 @@ class ClickHouseClient(TelemetryClient):
             # Convert records to JSON lines format with datetime handling
             def default_serializer(obj):
                 if isinstance(obj, datetime):
-                    # Format for ClickHouse DateTime64 - remove timezone info
-                    return obj.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # Remove last 3 digits from microseconds
+                    # Format timestamp in ClickHouse-compatible format
+                    return obj.strftime('%Y-%m-%d %H:%M:%S')
                 raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
             
             json_lines = '\n'.join([json.dumps(record, default=default_serializer) for record in records])
@@ -411,4 +428,106 @@ class ClickHouseClient(TelemetryClient):
             
         except Exception as e:
             logger.error(f"Error getting JSONL content stats: {e}")
+            return {}
+
+    async def get_model_token_stats(self, time_range_days: int = 7) -> Dict[str, Dict[str, Any]]:
+        """Get model-specific token statistics from official Claude Code metrics."""
+        try:
+            # Get token data by model and type from official metrics
+            token_query = f"""
+            SELECT 
+                Attributes['model'] as model,
+                Attributes['type'] as token_type,
+                SUM(Value) as total_tokens
+            FROM otel.otel_metrics_sum
+            WHERE MetricName = 'claude_code.token.usage'
+                AND TimeUnix >= now() - INTERVAL {time_range_days} DAY
+                AND Attributes['model'] IS NOT NULL
+                AND Attributes['type'] IS NOT NULL
+            GROUP BY Attributes['model'], Attributes['type']
+            ORDER BY Attributes['model'], total_tokens DESC
+            """
+            
+            token_results = await self.execute_query(token_query)
+            
+            # Get cost and request count from OTEL logs (still needed for these metrics)
+            cost_query = f"""
+            SELECT 
+                LogAttributes['model'] as model,
+                COUNT(*) as request_count,
+                AVG(toFloat64OrNull(LogAttributes['cost_usd'])) as avg_cost,
+                SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost,
+                AVG(toFloat64OrNull(LogAttributes['duration_ms'])) as avg_duration
+            FROM otel.otel_logs 
+            WHERE Body = 'claude_code.api_request'
+                AND Timestamp >= now() - INTERVAL {time_range_days} DAY
+                AND LogAttributes['model'] IS NOT NULL
+                AND LogAttributes['cost_usd'] IS NOT NULL
+            GROUP BY LogAttributes['model']
+            ORDER BY request_count DESC
+            """
+            
+            cost_results = await self.execute_query(cost_query)
+            
+            # Combine token and cost data by model
+            model_stats = {}
+            
+            # Process token data first
+            for row in token_results:
+                model = row['model']
+                token_type = row['token_type']
+                tokens = int(row['total_tokens'])
+                
+                if model not in model_stats:
+                    model_stats[model] = {
+                        'input_tokens': 0,
+                        'output_tokens': 0,
+                        'cache_read_tokens': 0,
+                        'cache_creation_tokens': 0,
+                        'total_tokens': 0,
+                        'request_count': 0,
+                        'avg_cost': 0.0,
+                        'total_cost': 0.0,
+                        'avg_duration': 0.0
+                    }
+                
+                # Map token types to our structure
+                if token_type == 'input':
+                    model_stats[model]['input_tokens'] = tokens
+                elif token_type == 'output':
+                    model_stats[model]['output_tokens'] = tokens
+                elif token_type == 'cacheRead':
+                    model_stats[model]['cache_read_tokens'] = tokens
+                elif token_type == 'cacheCreation':
+                    model_stats[model]['cache_creation_tokens'] = tokens
+                
+                model_stats[model]['total_tokens'] += tokens
+            
+            # Add cost and request data
+            for row in cost_results:
+                model = row['model']
+                if model in model_stats:
+                    model_stats[model].update({
+                        'request_count': int(row['request_count']),
+                        'avg_cost': float(row['avg_cost'] or 0),
+                        'total_cost': float(row['total_cost'] or 0),
+                        'avg_duration': float(row['avg_duration'] or 0)
+                    })
+            
+            # Calculate efficiency metrics
+            for model, stats in model_stats.items():
+                total_tokens = stats['total_tokens']
+                total_cost = stats['total_cost']
+                
+                if total_tokens > 0 and total_cost > 0:
+                    stats['cost_per_token'] = total_cost / total_tokens
+                    stats['tokens_per_dollar'] = total_tokens / total_cost
+                else:
+                    stats['cost_per_token'] = 0
+                    stats['tokens_per_dollar'] = 0
+            
+            return model_stats
+            
+        except Exception as e:
+            logger.error(f"Error getting model token stats: {e}")
             return {}

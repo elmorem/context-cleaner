@@ -93,18 +93,18 @@ class FullContentQueries:
             -- Extract code context around search term
             substr(
                 file_content,
-                greatest(1, positionCaseInsensitive(file_content, {search_term:String}) - 200),
+                greatest(1, position(lower(file_content), lower({search_term:String})) - 200),
                 500
             ) as code_snippet
         FROM otel.claude_file_content
-        WHERE positionCaseInsensitive(file_content, {search_term:String}) > 0
+        WHERE lower(file_content) LIKE '%' || lower({search_term:String}) || '%'
         {language_filter}
         ORDER BY timestamp DESC
-        LIMIT {limit:Int32}
+        LIMIT 100
         """
         
         language_filter = ""
-        params = {'search_term': search_term, 'limit': 100}
+        params = {'search_term': search_term}
         
         if language:
             language_filter = "AND programming_language = {language:String}"
@@ -261,30 +261,26 @@ class FullContentQueries:
         
         return stats
     
-    async def search_tool_results(self, search_term: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """Search through COMPLETE tool execution results."""
-        query = """
+    async def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent conversation sessions with basic metadata."""
+        query = f"""
         SELECT 
-            tool_name,
             session_id,
-            message_uuid,
-            timestamp,
-            tool_input,
-            tool_output,
-            tool_error,
-            success,
-            output_size
-        FROM otel.claude_tool_results
-        WHERE positionCaseInsensitive(tool_output, {search_term:String}) > 0
-           OR positionCaseInsensitive(tool_input, {search_term:String}) > 0
-           OR positionCaseInsensitive(tool_error, {search_term:String}) > 0
-        ORDER BY timestamp DESC
-        LIMIT {limit:Int32}
+            min(timestamp) as session_start,
+            max(timestamp) as session_end,
+            count() as message_count,
+            sum(message_length) as total_characters,
+            countIf(role = 'user') as user_messages,
+            countIf(role = 'assistant') as assistant_messages,
+            countIf(contains_code_blocks) as code_messages,
+            sum(input_tokens) as total_input_tokens,
+            sum(output_tokens) as total_output_tokens,
+            sum(cost_usd) as session_cost
+        FROM otel.claude_message_content
+        WHERE timestamp >= now() - INTERVAL 30 DAY
+        GROUP BY session_id
+        ORDER BY session_start DESC
+        LIMIT {limit}
         """
         
-        results = await self.clickhouse.execute_query(query, {
-            'search_term': search_term,
-            'limit': limit
-        })
-        
-        return results
+        return await self.clickhouse.execute_query(query)

@@ -156,10 +156,6 @@ class JsonlProcessorService:
         """Get comprehensive content statistics."""
         return await self.queries.get_content_statistics()
     
-    async def search_tool_results(self, search_term: str, limit: int = 50) -> List[Dict[str, Any]]:
-        """Search through tool execution results."""
-        return await self.queries.search_tool_results(search_term, limit)
-    
     async def get_processing_status(self) -> Dict[str, Any]:
         """Get current status of JSONL content processing."""
         try:

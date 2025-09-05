@@ -53,6 +53,9 @@
             background: white;
             border-bottom: 1px solid var(--border-color);
             padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .nav-tabs ul {
@@ -82,10 +85,533 @@
             border-bottom-color: var(--primary-color);
         }
 
+        .priority-indicator {
+            font-size: 0.7rem;
+            margin-left: 0.25rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .smart-nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+            padding-right: 2rem;
+        }
+
+        .nav-control-btn {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-control-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .nav-control-btn.active {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+
+        /* Compact mode styles */
+        .compact-mode .widget-card {
+            margin-bottom: 1rem;
+        }
+
+        .compact-mode .widget-header {
+            padding: 0.75rem;
+        }
+
+        .compact-mode .widget-title {
+            font-size: 0.875rem;
+        }
+
+        .compact-mode .widget-content {
+            padding: 0.75rem;
+        }
+
+        /* Smart Analytics Section Styles */
+        .analytics-header {
+            margin-bottom: 2rem;
+        }
+
+        .widget-recommendation-banner {
+            background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+            border: 1px solid #f59e0b;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .widget-recommendation-banner button {
+            background: transparent;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            color: #92400e;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .widget-section {
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            background: white;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .section-header:hover {
+            background: #f1f5f9;
+        }
+
+        .section-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .section-toggle {
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+
+        .section-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .collapsible-content {
+            padding: 1.5rem;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 1.5rem;
+        }
+
+        .collapsible-content.expanded {
+            max-height: 2000px;
+            opacity: 1;
+        }
+
+        .priority-widget {
+            border-left: 4px solid var(--warning-color);
+            position: relative;
+        }
+
+        .priority-badge {
+            background: var(--warning-color);
+            color: white;
+            font-size: 0.6rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+
+        .priority-section .widget-grid {
+            border: 2px dashed var(--warning-color);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        }
+
+        /* Phase 3: Advanced Filtering Styles */
+        .advanced-filters-panel {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .filters-header {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .filters-header:hover {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+        }
+
+        .filters-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .filters-toggle {
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+            color: var(--primary-color);
+        }
+
+        .filters-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .filters-content {
+            padding: 1.5rem;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .filters-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 1.5rem;
+        }
+
+        .filters-content.expanded {
+            max-height: 1000px;
+            opacity: 1;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .filter-group select {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .filter-btn.clear {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+
+        .filter-btn.clear:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .filter-btn.save {
+            background: #f0f9ff;
+            color: #2563eb;
+            border-color: #bfdbfe;
+        }
+
+        .filter-btn.save:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+
+        .filter-btn.stats {
+            background: #f9fafb;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+
+        .filter-btn.stats:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .active-filters {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .active-filters h4 {
+            margin: 0 0 0.75rem 0;
+            color: #92400e;
+            font-size: 0.875rem;
+        }
+
+        #active-filters-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .filter-tag {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .filter-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 0.25rem;
+        }
+
+        .filter-tag .remove:hover {
+            color: #451a03;
+        }
+
         .container {
             padding: 2rem;
             max-width: 1400px;
             margin: 0 auto;
+        }
+
+        /* Phase 4.2: Mobile Responsiveness & Accessibility Improvements */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .main-nav ul {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .main-nav li {
+                width: 100%;
+            }
+            
+            .main-nav button {
+                width: 100%;
+                justify-content: center;
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+            
+            .smart-nav-controls {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .nav-control-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .filters-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .filter-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .widgets-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .priority-widget,
+            .widget {
+                margin-bottom: 1rem;
+            }
+            
+            .widget-header {
+                padding: 0.75rem;
+            }
+            
+            .widget-content {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0.5rem;
+            }
+            
+            .main-nav button {
+                padding: 0.5rem;
+                font-size: 0.75rem;
+            }
+            
+            .filters-header h3 {
+                font-size: 1rem;
+            }
+            
+            .filter-label {
+                font-size: 0.75rem;
+            }
+            
+            .filter-group select {
+                font-size: 0.75rem;
+                padding: 0.375rem;
+            }
+            
+            .advanced-filters-panel {
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* Accessibility Improvements */
+        
+        /* Focus indicators */
+        button:focus,
+        select:focus,
+        input:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+        
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --border-color: #000;
+                --text-primary: #000;
+                --text-secondary: #333;
+            }
+            
+            .widget {
+                border: 2px solid #000;
+            }
+        }
+        
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            .main-nav,
+            .smart-nav-controls,
+            .advanced-filters-panel {
+                display: none;
+            }
+            
+            .widget {
+                break-inside: avoid;
+                border: 1px solid #000;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        /* Screen reader only content */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Skip links for keyboard navigation */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+        
+        .skip-link:focus {
+            top: 6px;
         }
 
         .dashboard-section {
@@ -496,10 +1022,26 @@
             <li><a href="#overview" class="nav-link active">📊 Overview</a></li>
             <li><a href="#telemetry" class="nav-link">📈 Telemetry</a></li>
             <li><a href="#orchestration" class="nav-link">🤖 Orchestration</a></li>
-            <li><a href="#analytics" class="nav-link">🔍 Analytics</a></li>
+            <li><a href="#analytics" class="nav-link">🔍 Analytics<span class="priority-indicator">🔥</span></a></li>
             <li><a href="#performance" class="nav-link">⚡ Performance</a></li>
             <li><a href="#data-explorer" class="nav-link">🔎 Data Explorer</a></li>
         </ul>
+        
+        <!-- Smart Navigation Controls -->
+        <div class="smart-nav-controls">
+            <button class="nav-control-btn" onclick="toggleWidgetPriority()" title="Sort by Priority">
+                🎯 Smart Sort
+            </button>
+            <button class="nav-control-btn" onclick="toggleCompactMode()" title="Toggle Compact View">
+                📱 Compact
+            </button>
+            <button class="nav-control-btn" onclick="showWidgetRecommendations()" title="Widget Suggestions">
+                💡 Suggestions
+            </button>
+            <button class="nav-control-btn" onclick="resetLayout()" title="Reset Layout">
+                🔄 Reset
+            </button>
+        </div>
     </nav>
 
     <div class="container">
@@ -752,7 +1294,26 @@
 
         <!-- Telemetry Section -->
         <section id="telemetry" class="dashboard-section">
-            <h2>📈 Real-Time Telemetry Monitoring</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>📈 Real-Time Telemetry Monitoring</h2>
+                <div class="time-range-selector">
+                    <label for="telemetry-time-range" style="margin-right: 0.5rem; font-weight: 500; color: var(--text-secondary);">Time Range:</label>
+                    <select id="telemetry-time-range" onchange="updateTelemetryTimeRange()" style="
+                        padding: 0.5rem 1rem;
+                        border: 1px solid var(--border-color);
+                        border-radius: 6px;
+                        background: white;
+                        color: var(--text-primary);
+                        font-size: 0.875rem;
+                        cursor: pointer;
+                        min-width: 120px;
+                    ">
+                        <option value="today">Today</option>
+                        <option value="7days" selected>Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                    </select>
+                </div>
+            </div>
             <div class="widget-grid">
                 <div class="widget-card">
                     <div class="widget-header">
@@ -844,25 +1405,173 @@
 
         <!-- Analytics Section -->
         <section id="analytics" class="dashboard-section">
-            <h2>🔍 Advanced Analytics & Insights</h2>
-            <div class="widget-grid">
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">Context Health Metrics</h3>
-                        <div class="status-indicator status-healthy"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="context-health-widget" class="loading">Loading context health data...</div>
-                    </div>
+            <div class="analytics-header">
+                <h2>🔍 Advanced Analytics & Insights</h2>
+                <div class="widget-recommendation-banner" id="recommendation-banner" style="display: none;">
+                    <span id="recommendation-text"></span>
+                    <button onclick="hideRecommendation()">×</button>
                 </div>
 
-                <div class="widget-card">
-                    <div class="widget-header">
-                        <h3 class="widget-title">Performance Trends</h3>
-                        <div class="status-indicator status-healthy"></div>
+                <!-- Phase 3: Advanced Multi-dimensional Filters -->
+                <div class="advanced-filters-panel" id="filters-panel">
+                    <div class="filters-header" onclick="toggleFiltersPanel()">
+                        <h3>🎯 Advanced Filters</h3>
+                        <span class="filters-toggle">▼</span>
                     </div>
-                    <div class="widget-content">
-                        <div id="performance-trends-widget" class="loading">Loading performance trends...</div>
+                    
+                    <div class="filters-content" id="filters-content">
+                        <div class="filters-grid">
+                            <!-- Time Range Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">📅 Time Range</label>
+                                <select id="time-range-filter" onchange="applyFilters()">
+                                    <option value="1h">Last Hour</option>
+                                    <option value="6h">Last 6 Hours</option>
+                                    <option value="24h" selected>Last 24 Hours</option>
+                                    <option value="7d">Last 7 Days</option>
+                                    <option value="30d">Last 30 Days</option>
+                                    <option value="all">All Time</option>
+                                </select>
+                            </div>
+
+                            <!-- Programming Language Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">💻 Language</label>
+                                <select id="language-filter" onchange="applyFilters()">
+                                    <option value="">All Languages</option>
+                                    <option value="python">Python</option>
+                                    <option value="javascript">JavaScript</option>
+                                    <option value="html">HTML</option>
+                                    <option value="css">CSS</option>
+                                    <option value="markdown">Markdown</option>
+                                    <option value="sql">SQL</option>
+                                    <option value="bash">Bash</option>
+                                </select>
+                            </div>
+
+                            <!-- Session Type Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">🗂️ Session Type</label>
+                                <select id="session-type-filter" onchange="applyFilters()">
+                                    <option value="">All Sessions</option>
+                                    <option value="short">Short (&lt; 10 messages)</option>
+                                    <option value="medium">Medium (10-50 messages)</option>
+                                    <option value="long">Long (&gt; 50 messages)</option>
+                                </select>
+                            </div>
+
+                            <!-- Content Type Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">📄 Content Type</label>
+                                <select id="content-type-filter" onchange="applyFilters()">
+                                    <option value="">All Content</option>
+                                    <option value="code">Code Heavy</option>
+                                    <option value="discussion">Discussion</option>
+                                    <option value="debugging">Debugging</option>
+                                    <option value="analysis">Data Analysis</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Logic -->
+                            <div class="filter-group">
+                                <label class="filter-label">⚙️ Logic</label>
+                                <select id="filter-logic" onchange="applyFilters()">
+                                    <option value="and">AND (All must match)</option>
+                                    <option value="or">OR (Any can match)</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Actions -->
+                            <div class="filter-actions">
+                                <button onclick="clearAllFilters()" class="filter-btn clear">
+                                    🧹 Clear All
+                                </button>
+                                <button onclick="saveFilterPreset()" class="filter-btn save">
+                                    💾 Save Preset
+                                </button>
+                                <button onclick="showFilterStats()" class="filter-btn stats">
+                                    📊 Filter Stats
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Active Filters Display -->
+                        <div class="active-filters" id="active-filters" style="display: none;">
+                            <h4>🏷️ Active Filters:</h4>
+                            <div id="active-filters-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- High Priority Widgets (Always Visible) -->
+            <div class="widget-section priority-section">
+                <div class="section-header" onclick="toggleSection('priority-widgets')">
+                    <h3>🔥 High Priority Analytics</h3>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div id="priority-widgets" class="widget-grid collapsible-content expanded">
+                    <!-- JSONL Analytics Widgets - Phase 2 Enhanced -->
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">🗣️ Conversation Timeline</h3>
+                            <div class="status-indicator" id="conversation-timeline-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="conversation-timeline-widget" class="loading">Loading conversation timeline...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">📊 Code Pattern Analysis</h3>
+                            <div class="status-indicator" id="code-pattern-analysis-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="code-pattern-analysis-widget" class="loading">Loading code pattern analysis...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="widget-card priority-widget">
+                        <div class="widget-header">
+                            <h3 class="widget-title">🔍 Content Search Interface</h3>
+                            <div class="status-indicator" id="content-search-widget-status"></div>
+                            <span class="priority-badge">HIGH</span>
+                        </div>
+                        <div class="widget-content">
+                            <div id="content-search-widget" class="loading">Loading content search interface...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Standard Analytics (Collapsible) -->
+            <div class="widget-section standard-section">
+                <div class="section-header" onclick="toggleSection('standard-widgets')">
+                    <h3>📈 Standard Analytics</h3>
+                    <span class="section-toggle">▼</span>
+                </div>
+                <div id="standard-widgets" class="widget-grid collapsible-content expanded">
+                    <div class="widget-card">
+                        <div class="widget-header">
+                            <h3 class="widget-title">Context Health Metrics</h3>
+                            <div class="status-indicator status-healthy"></div>
+                        </div>
+                        <div class="widget-content">
+                            <div id="context-health-widget" class="loading">Loading context health data...</div>
+                        </div>
+                    </div>
+
+                    <div class="widget-card">
+                        <div class="widget-header">
+                            <h3 class="widget-title">Performance Trends</h3>
+                            <div class="status-indicator status-healthy"></div>
+                        </div>
+                        <div class="widget-content">
+                            <div id="performance-trends-widget" class="loading">Loading performance trends...</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1297,6 +2006,9 @@ LIMIT 20</textarea>
     </button>
 
     <script>
+        // DEBUG: Test if JavaScript is working
+        console.log('🚀 JavaScript is running!');
+        
         // Auto-load overview metrics immediately when page loads
         (function() {
             function autoLoadMetrics() {
@@ -1496,10 +2208,10 @@ LIMIT 20</textarea>
         };
 
         // Load telemetry widgets
-        function loadTelemetryWidgets() {
+        function loadTelemetryWidgets(timeRange = '7days') {
             const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
             widgets.forEach(widget => {
-                fetch(`/api/telemetry-widget/${widget}`)
+                fetch(`/api/telemetry-widget/${widget}?timeRange=${timeRange}`)
                     .then(response => response.json())
                     .then(data => {
                         renderTelemetryWidget(widget, data);
@@ -1509,6 +2221,23 @@ LIMIT 20</textarea>
                             `<div style="color: #dc2626;">Error loading ${widget} data</div>`;
                     });
             });
+        }
+
+        // Update telemetry widgets based on selected time range
+        function updateTelemetryTimeRange() {
+            const timeRange = document.getElementById('telemetry-time-range').value;
+            
+            // Show loading state for all widgets
+            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
+            widgets.forEach(widget => {
+                const element = document.getElementById(`${widget}-widget`);
+                if (element) {
+                    element.innerHTML = '<div class="loading">🔄 Updating data...</div>';
+                }
+            });
+            
+            // Load widgets with new time range
+            loadTelemetryWidgets(timeRange);
         }
 
         // Load orchestration widgets
@@ -1527,9 +2256,519 @@ LIMIT 20</textarea>
             });
         }
 
+        // ==== PHASE 2: SMART DASHBOARD NAVIGATION FUNCTIONS ====
+        
+        // Toggle collapsible sections
+        window.toggleSection = function(sectionId) {
+            const content = document.getElementById(sectionId);
+            const toggle = document.querySelector(`[onclick="toggleSection('${sectionId}')"] .section-toggle`);
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+            } else {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                toggle.classList.remove('collapsed');
+            }
+            
+            // Store state in localStorage
+            localStorage.setItem(`section_${sectionId}`, content.classList.contains('expanded') ? 'expanded' : 'collapsed');
+        };
+
+        // Toggle widget priority sorting
+        window.toggleWidgetPriority = function() {
+            const btn = document.querySelector('[onclick="toggleWidgetPriority()"]');
+            const isActive = btn.classList.contains('active');
+            
+            if (isActive) {
+                btn.classList.remove('active');
+                restoreOriginalOrder();
+            } else {
+                btn.classList.add('active');
+                sortWidgetsByPriority();
+            }
+        };
+
+        // Sort widgets by priority (high-usage widgets first)
+        function sortWidgetsByPriority() {
+            const sections = document.querySelectorAll('.widget-section');
+            sections.forEach(section => {
+                const grid = section.querySelector('.widget-grid');
+                const widgets = Array.from(grid.querySelectorAll('.widget-card'));
+                
+                // Sort by priority: priority-widget class first, then alphabetically
+                widgets.sort((a, b) => {
+                    const aIsPriority = a.classList.contains('priority-widget');
+                    const bIsPriority = b.classList.contains('priority-widget');
+                    
+                    if (aIsPriority && !bIsPriority) return -1;
+                    if (!aIsPriority && bIsPriority) return 1;
+                    
+                    // If both same priority level, sort by title
+                    const aTitle = a.querySelector('.widget-title').textContent;
+                    const bTitle = b.querySelector('.widget-title').textContent;
+                    return aTitle.localeCompare(bTitle);
+                });
+                
+                // Re-append in sorted order
+                widgets.forEach(widget => grid.appendChild(widget));
+            });
+        }
+
+        // Restore original widget order
+        function restoreOriginalOrder() {
+            // Refresh the page section to restore original order
+            if (document.querySelector('.dashboard-section.active').id === 'analytics') {
+                setTimeout(() => loadAnalyticsWidgets(), 100);
+            }
+        }
+
+        // Toggle compact mode
+        window.toggleCompactMode = function() {
+            const btn = document.querySelector('[onclick="toggleCompactMode()"]');
+            const body = document.body;
+            
+            if (body.classList.contains('compact-mode')) {
+                body.classList.remove('compact-mode');
+                btn.classList.remove('active');
+                localStorage.setItem('compactMode', 'false');
+            } else {
+                body.classList.add('compact-mode');
+                btn.classList.add('active');
+                localStorage.setItem('compactMode', 'true');
+            }
+        };
+
+        // Show widget recommendations
+        window.showWidgetRecommendations = function() {
+            const banner = document.getElementById('recommendation-banner');
+            const textEl = document.getElementById('recommendation-text');
+            
+            // Simple recommendation logic based on current widgets
+            const recommendations = [
+                "💡 Based on your usage, consider expanding the 'High Priority Analytics' section for better insights.",
+                "🎯 The Code Pattern Analysis widget shows interesting trends - click to explore further.",
+                "🔍 Your Content Search Interface has processed significant data - great for finding patterns!",
+                "📊 Analytics are performing well - consider using compact mode for better screen usage.",
+                "⚡ Try collapsing 'Standard Analytics' to focus on high-priority widgets."
+            ];
+            
+            const randomRec = recommendations[Math.floor(Math.random() * recommendations.length)];
+            textEl.textContent = randomRec;
+            banner.style.display = 'flex';
+        };
+
+        // Hide recommendation banner
+        window.hideRecommendation = function() {
+            document.getElementById('recommendation-banner').style.display = 'none';
+        };
+
+        // Reset layout to defaults
+        window.resetLayout = function() {
+            // Remove all active states
+            document.querySelectorAll('.nav-control-btn').forEach(btn => btn.classList.remove('active'));
+            document.body.classList.remove('compact-mode');
+            
+            // Expand all sections
+            document.querySelectorAll('.collapsible-content').forEach(content => {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+            });
+            document.querySelectorAll('.section-toggle').forEach(toggle => {
+                toggle.classList.remove('collapsed');
+            });
+            
+            // Clear localStorage
+            localStorage.removeItem('compactMode');
+            localStorage.removeItem('section_priority-widgets');
+            localStorage.removeItem('section_standard-widgets');
+            
+            // Hide recommendations
+            hideRecommendation();
+            
+            console.log('Layout reset to defaults');
+        };
+
+        // Restore user preferences on load
+        function restoreUserPreferences() {
+            // Restore compact mode
+            if (localStorage.getItem('compactMode') === 'true') {
+                document.body.classList.add('compact-mode');
+                document.querySelector('[onclick="toggleCompactMode()"]').classList.add('active');
+            }
+            
+            // Restore section states
+            document.querySelectorAll('[id$="-widgets"]').forEach(section => {
+                const sectionId = section.id;
+                const savedState = localStorage.getItem(`section_${sectionId}`);
+                
+                if (savedState === 'collapsed') {
+                    section.classList.remove('expanded');
+                    section.classList.add('collapsed');
+                    document.querySelector(`[onclick="toggleSection('${sectionId}')"] .section-toggle`).classList.add('collapsed');
+                }
+            });
+
+            // Restore filters panel state
+            const filtersState = localStorage.getItem('filtersPanel');
+            if (filtersState === 'collapsed') {
+                document.getElementById('filters-content').classList.remove('expanded');
+                document.getElementById('filters-content').classList.add('collapsed');
+                document.querySelector('.filters-toggle').classList.add('collapsed');
+            } else {
+                document.getElementById('filters-content').classList.add('expanded');
+            }
+
+            // Restore filter selections
+            restoreFilterSelections();
+        }
+
+        // ==== PHASE 4: PERFORMANCE OPTIMIZATION SYSTEM ====
+        
+        // Performance monitoring and caching
+        window.performanceOptimizer = {
+            cache: new Map(),
+            loadTimes: new Map(),
+            requestQueue: new Set(),
+            
+            // Cache with TTL
+            setCache: function(key, data, ttlMinutes = 5) {
+                const expiry = Date.now() + (ttlMinutes * 60 * 1000);
+                this.cache.set(key, { data, expiry });
+                console.log(`📦 Cached ${key} for ${ttlMinutes}min`);
+            },
+            
+            getCache: function(key) {
+                const cached = this.cache.get(key);
+                if (cached && Date.now() < cached.expiry) {
+                    console.log(`⚡ Cache hit for ${key}`);
+                    return cached.data;
+                }
+                if (cached) {
+                    this.cache.delete(key);
+                    console.log(`🗑️ Expired cache for ${key}`);
+                }
+                return null;
+            },
+            
+            // Performance timing
+            startTiming: function(operation) {
+                this.loadTimes.set(operation, Date.now());
+            },
+            
+            endTiming: function(operation) {
+                const start = this.loadTimes.get(operation);
+                if (start) {
+                    const duration = Date.now() - start;
+                    console.log(`⏱️ ${operation} took ${duration}ms`);
+                    this.loadTimes.delete(operation);
+                    return duration;
+                }
+                return 0;
+            }
+        };
+
+        // Debounced function utility
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Batch API requests for better performance
+        window.batchAPIRequests = async function(requests) {
+            window.performanceOptimizer.startTiming('batchRequests');
+            
+            try {
+                const promises = requests.map(async ({ url, cacheKey, ttl = 5 }) => {
+                    // Check cache first
+                    const cached = window.performanceOptimizer.getCache(cacheKey);
+                    if (cached) {
+                        return { url, data: cached, fromCache: true };
+                    }
+                    
+                    // Make request
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    // Cache result
+                    window.performanceOptimizer.setCache(cacheKey, data, ttl);
+                    
+                    return { url, data, fromCache: false };
+                });
+                
+                const results = await Promise.all(promises);
+                const duration = window.performanceOptimizer.endTiming('batchRequests');
+                
+                const cacheHits = results.filter(r => r.fromCache).length;
+                console.log(`🚀 Batch completed: ${results.length} requests, ${cacheHits} cache hits, ${duration}ms`);
+                
+                return results;
+            } catch (error) {
+                console.error('❌ Batch request failed:', error);
+                throw error;
+            }
+        };
+
+        // ==== PHASE 3: ADVANCED MULTI-DIMENSIONAL FILTERING FUNCTIONS ====
+
+        // Global filter state
+        window.dashboardFilters = {
+            timeRange: '24h',
+            language: '',
+            sessionType: '',
+            contentType: '',
+            logic: 'and'
+        };
+
+        // Toggle filters panel
+        window.toggleFiltersPanel = function() {
+            const content = document.getElementById('filters-content');
+            const toggle = document.querySelector('.filters-toggle');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                localStorage.setItem('filtersPanel', 'collapsed');
+            } else {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                toggle.classList.remove('collapsed');
+                localStorage.setItem('filtersPanel', 'expanded');
+            }
+        };
+
+        // Debounced apply filters for better performance
+        const debouncedApplyFilters = debounce(function() {
+            console.log('🎯 Applying filters across all widgets (debounced)');
+            
+            // Update filter state
+            window.dashboardFilters = {
+                timeRange: document.getElementById('time-range-filter').value,
+                language: document.getElementById('language-filter').value,
+                sessionType: document.getElementById('session-type-filter').value,
+                contentType: document.getElementById('content-type-filter').value,
+                logic: document.getElementById('filter-logic').value
+            };
+
+            // Save filter selections
+            localStorage.setItem('dashboardFilters', JSON.stringify(window.dashboardFilters));
+
+            // Update active filters display
+            updateActiveFiltersDisplay();
+
+            // Apply filters to all JSONL analytics widgets with performance tracking
+            window.performanceOptimizer.startTiming('filterApplication');
+            reloadFilteredWidgets();
+        }, 300); // 300ms debounce
+
+        // Apply filters across all widgets
+        window.applyFilters = function() {
+            debouncedApplyFilters();
+        };
+
+        // Update active filters display
+        function updateActiveFiltersDisplay() {
+            const activeFiltersEl = document.getElementById('active-filters');
+            const activeFiltersListEl = document.getElementById('active-filters-list');
+            const filters = window.dashboardFilters;
+            
+            const activeFilters = [];
+            
+            // Check each filter
+            if (filters.timeRange !== '24h') {
+                activeFilters.push({ label: 'Time', value: getTimeRangeLabel(filters.timeRange), key: 'timeRange' });
+            }
+            if (filters.language) {
+                activeFilters.push({ label: 'Language', value: filters.language, key: 'language' });
+            }
+            if (filters.sessionType) {
+                activeFilters.push({ label: 'Session', value: getSessionTypeLabel(filters.sessionType), key: 'sessionType' });
+            }
+            if (filters.contentType) {
+                activeFilters.push({ label: 'Content', value: filters.contentType, key: 'contentType' });
+            }
+
+            if (activeFilters.length > 0) {
+                activeFiltersListEl.innerHTML = activeFilters.map(filter => 
+                    `<div class="filter-tag">
+                        ${filter.label}: ${filter.value}
+                        <span class="remove" onclick="removeFilter('${filter.key}')">×</span>
+                    </div>`
+                ).join('');
+                activeFiltersEl.style.display = 'block';
+            } else {
+                activeFiltersEl.style.display = 'none';
+            }
+        }
+
+        // Helper functions for filter labels
+        function getTimeRangeLabel(value) {
+            const labels = {
+                '1h': 'Last Hour',
+                '6h': 'Last 6 Hours', 
+                '24h': 'Last 24 Hours',
+                '7d': 'Last 7 Days',
+                '30d': 'Last 30 Days',
+                'all': 'All Time'
+            };
+            return labels[value] || value;
+        }
+
+        function getSessionTypeLabel(value) {
+            const labels = {
+                'short': 'Short Sessions',
+                'medium': 'Medium Sessions',
+                'long': 'Long Sessions'
+            };
+            return labels[value] || value;
+        }
+
+        // Remove individual filter
+        window.removeFilter = function(filterKey) {
+            const filterElement = document.getElementById(`${filterKey === 'timeRange' ? 'time-range' : filterKey}-filter`);
+            if (filterElement) {
+                filterElement.value = filterKey === 'timeRange' ? '24h' : '';
+                applyFilters();
+            }
+        };
+
+        // Clear all filters
+        window.clearAllFilters = function() {
+            document.getElementById('time-range-filter').value = '24h';
+            document.getElementById('language-filter').value = '';
+            document.getElementById('session-type-filter').value = '';
+            document.getElementById('content-type-filter').value = '';
+            document.getElementById('filter-logic').value = 'and';
+            
+            applyFilters();
+            console.log('🧹 All filters cleared');
+        };
+
+        // Save filter preset
+        window.saveFilterPreset = function() {
+            const presetName = prompt('Enter a name for this filter preset:');
+            if (presetName) {
+                const presets = JSON.parse(localStorage.getItem('filterPresets') || '{}');
+                presets[presetName] = { ...window.dashboardFilters };
+                localStorage.setItem('filterPresets', JSON.stringify(presets));
+                console.log(`💾 Filter preset "${presetName}" saved`);
+                alert(`Filter preset "${presetName}" saved successfully!`);
+            }
+        };
+
+        // Show filter statistics
+        window.showFilterStats = function() {
+            const filters = window.dashboardFilters;
+            const statsMessage = `
+📊 Current Filter Statistics:
+
+🕐 Time Range: ${getTimeRangeLabel(filters.timeRange)}
+💻 Language: ${filters.language || 'All Languages'}
+🗂️ Session Type: ${getSessionTypeLabel(filters.sessionType) || 'All Sessions'}
+📄 Content Type: ${filters.contentType || 'All Content'}
+⚙️ Logic: ${filters.logic.toUpperCase()}
+
+Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== 'and').length}
+            `;
+            
+            alert(statsMessage);
+        };
+
+        // Optimized reload filtered widgets with batch requests
+        async function reloadFilteredWidgets() {
+            console.log('♻️ Reloading widgets with filters:', window.dashboardFilters);
+            
+            // Show loading indicators  
+            document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
+                content.innerHTML = '<div class="loading">⚡ Applying filters...</div>';
+            });
+
+            try {
+                // Batch all widget requests for better performance
+                const requests = [
+                    { 
+                        url: '/api/telemetry-widget/conversation-timeline', 
+                        cacheKey: `timeline-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 // Shorter cache for filtered data
+                    },
+                    { 
+                        url: '/api/telemetry-widget/code-pattern-analysis', 
+                        cacheKey: `codepattern-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 
+                    },
+                    { 
+                        url: '/api/telemetry-widget/content-search-widget', 
+                        cacheKey: `contentsearch-${JSON.stringify(window.dashboardFilters)}`,
+                        ttl: 2 
+                    }
+                ];
+
+                // Execute batch request  
+                const results = await window.batchAPIRequests(requests);
+
+                // Process results and update widgets
+                results.forEach(result => {
+                    if (result.url.includes('conversation-timeline')) {
+                        window.renderJsonlAnalyticsWidget('conversation-timeline', result.data);
+                    } else if (result.url.includes('code-pattern-analysis')) {
+                        window.renderJsonlAnalyticsWidget('code-pattern-analysis', result.data);
+                    } else if (result.url.includes('content-search-widget')) {
+                        window.renderJsonlAnalyticsWidget('content-search-widget', result.data);
+                    }
+                });
+
+                // Track performance
+                const filterDuration = window.performanceOptimizer.endTiming('filterApplication');
+                console.log(`✅ Filter application completed in ${filterDuration}ms`);
+
+            } catch (error) {
+                console.error('❌ Failed to reload filtered widgets:', error);
+                document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
+                    content.innerHTML = '<div style="color: #dc2626;">❌ Failed to apply filters</div>';
+                });
+            }
+        }
+
+        // Restore filter selections
+        function restoreFilterSelections() {
+            const savedFilters = localStorage.getItem('dashboardFilters');
+            if (savedFilters) {
+                try {
+                    const filters = JSON.parse(savedFilters);
+                    
+                    document.getElementById('time-range-filter').value = filters.timeRange || '24h';
+                    document.getElementById('language-filter').value = filters.language || '';
+                    document.getElementById('session-type-filter').value = filters.sessionType || '';
+                    document.getElementById('content-type-filter').value = filters.contentType || '';
+                    document.getElementById('filter-logic').value = filters.logic || 'and';
+                    
+                    window.dashboardFilters = filters;
+                    updateActiveFiltersDisplay();
+                } catch (e) {
+                    console.warn('Failed to restore filter selections:', e);
+                }
+            }
+        }
+
         // Load analytics widgets - WORKING VERSION
-        function loadAnalyticsWidgets() {
-            console.log('Loading analytics widgets...');
+        window.loadAnalyticsWidgets = function loadAnalyticsWidgets() {
+            console.log('🚀 Starting to load analytics widgets...');
+            console.log('📍 Current page URL:', window.location.href);
+            console.log('📋 Available elements:', {
+                timeline: document.getElementById('conversation-timeline-widget'),
+                codePattern: document.getElementById('code-pattern-analysis-widget'), 
+                contentSearch: document.getElementById('content-search-widget')
+            });
             try {
                 // Load dynamic Context Health widget data
                 var contextElement = document.getElementById('context-health-widget');
@@ -1598,9 +2837,196 @@ LIMIT 20</textarea>
                         });
                 }
                 
+                // Phase 4: Load JSONL Analytics Widgets
+                
+                // Load Conversation Timeline widget
+                console.log('🕐 Loading Conversation Timeline widget...');
+                var timelineElement = document.getElementById('conversation-timeline-widget');
+                console.log('📱 Timeline element found:', !!timelineElement);
+                if (timelineElement) {
+                    timelineElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading conversation timeline...</div>';
+                    fetch('/api/telemetry-widget/conversation-timeline')
+                        .then(response => response.json())
+                        .then(data => {
+                            window.renderJsonlAnalyticsWidget('conversation-timeline', data);
+                        })
+                        .catch(error => {
+                            console.error('Error loading conversation timeline:', error);
+                            timelineElement.innerHTML = '<div style="color: #dc2626;">❌ Failed to load conversation timeline</div>';
+                        });
+                }
+                
+                // Load Code Pattern Analysis widget
+                var codePatternElement = document.getElementById('code-pattern-analysis-widget');
+                if (codePatternElement) {
+                    codePatternElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading code pattern analysis...</div>';
+                    fetch('/api/telemetry-widget/code-pattern-analysis')
+                        .then(response => response.json())
+                        .then(data => {
+                            window.renderJsonlAnalyticsWidget('code-pattern-analysis', data);
+                        })
+                        .catch(error => {
+                            console.error('Error loading code pattern analysis:', error);
+                            codePatternElement.innerHTML = '<div style="color: #dc2626;">❌ Failed to load code pattern analysis</div>';
+                        });
+                }
+                
+                // Load Content Search Widget  
+                console.log('🔍 Loading Content Search widget...');
+                var contentSearchElement = document.getElementById('content-search-widget');
+                console.log('📱 Content Search element found:', !!contentSearchElement);
+                if (contentSearchElement) {
+                    contentSearchElement.innerHTML = '<div style="color: #6b7280;">🔄 Loading content search interface...</div>';
+                    fetch('/api/telemetry-widget/content-search-widget')
+                        .then(response => response.json())
+                        .then(data => {
+                            window.renderJsonlAnalyticsWidget('content-search-widget', data);
+                        })
+                        .catch(error => {
+                            console.error('Error loading content search widget:', error);
+                            contentSearchElement.innerHTML = '<div style="color: #dc2626;">❌ Failed to load content search interface</div>';
+                        });
+                }
+                
                 console.log('Analytics widgets loaded successfully');
             } catch (error) {
                 console.error('Error loading analytics:', error);
+            }
+        }
+
+        // Render JSONL Analytics Widgets
+        window.renderJsonlAnalyticsWidget = function renderJsonlAnalyticsWidget(widgetType, data) {
+            console.log(`🎨 Rendering widget: ${widgetType}`, data);
+            console.log(`📊 Widget data status: ${data.status}, title: ${data.title}`);
+            
+            // Map widget types to actual HTML element IDs
+            const elementIdMap = {
+                'conversation-timeline': 'conversation-timeline-widget',
+                'code-pattern-analysis': 'code-pattern-analysis-widget', 
+                'content-search-widget': 'content-search-widget'
+            };
+            
+            const elementId = elementIdMap[widgetType];
+            console.log(`🔍 Looking for element ID: ${elementId} (from widgetType: ${widgetType})`);
+            
+            const container = document.getElementById(elementId);
+            const statusElement = document.getElementById(`${elementId.replace('-widget', '')}-status`);
+            
+            if (!container) {
+                console.error(`Container not found for widget: ${widgetType}`);
+                return;
+            }
+            
+            // Update status indicator
+            let statusIcon = '✅';
+            let statusColor = '#059669';
+            let statusText = 'Healthy';
+            
+            if (data.status === 'warning') {
+                statusIcon = '⚠️';
+                statusColor = '#d97706'; 
+                statusText = 'Warning';
+                if (statusElement) statusElement.className = 'status-indicator status-warning';
+            } else if (data.status === 'error') {
+                statusIcon = '🚨';
+                statusColor = '#dc2626';
+                statusText = 'Critical';
+                if (statusElement) statusElement.className = 'status-indicator status-critical';
+            } else {
+                if (statusElement) statusElement.className = 'status-indicator status-healthy';
+            }
+            
+            let contentHtml = '';
+            
+            if (widgetType === 'conversation-timeline') {
+                const timelineData = data.data || {};
+                contentHtml = `
+                    <div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">${statusIcon} Conversation Timeline - ${statusText}</div>
+                    <div style="font-size: 0.875rem; color: #374151;">
+                        <div style="margin-bottom: 0.75rem;"><strong>Session ID:</strong> ${timelineData.session_id || 'N/A'}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Total Messages:</strong> ${timelineData.conversation_metrics?.total_messages || 0}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Tools Used:</strong> ${timelineData.conversation_metrics?.tools_used || 0}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Files Accessed:</strong> ${timelineData.conversation_metrics?.files_accessed || 0}</div>
+                        ${timelineData.key_insights?.length ? `
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f9ff; border: 1px solid #0369a1; border-radius: 0.375rem;">
+                                <div style="font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">💡 Key Insights:</div>
+                                <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #1e40af;">
+                                    ${timelineData.key_insights.map(insight => `<li style="margin-bottom: 0.25rem;">${insight}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ${new Date().toLocaleTimeString()}</div>
+                `;
+            } else if (widgetType === 'code-pattern-analysis') {
+                const codeData = data.data || {};
+                const langDist = codeData.language_distribution || {};
+                const topLangs = Object.entries(langDist).slice(0, 5);
+                
+                contentHtml = `
+                    <div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">${statusIcon} Code Pattern Analysis - ${statusText}</div>
+                    <div style="font-size: 0.875rem; color: #374151;">
+                        ${topLangs.length ? `
+                            <div style="margin-bottom: 1rem;">
+                                <strong>Language Distribution:</strong>
+                                <div style="margin-top: 0.5rem;">
+                                    ${topLangs.map(([lang, pct]) => `
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                            <span>${lang}</span>
+                                            <span style="font-weight: 600;">${Math.round(pct)}%</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : '<div style="margin-bottom: 0.75rem;"><strong>Language Distribution:</strong> No data available</div>'}
+                        <div style="margin-bottom: 0.75rem;"><strong>Code Files:</strong> ${codeData.file_type_breakdown?.code || 0}</div>
+                        ${codeData.optimization_suggestions?.length ? `
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f9ff; border: 1px solid #0369a1; border-radius: 0.375rem;">
+                                <div style="font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">💡 Optimization Suggestions:</div>
+                                <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #1e40af;">
+                                    ${codeData.optimization_suggestions.map(suggestion => `<li style="margin-bottom: 0.25rem;">${suggestion}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ${new Date().toLocaleTimeString()}</div>
+                `;
+            } else if (widgetType === 'content-search-widget') {
+                const searchData = data.data || {};
+                const contentStats = searchData.indexed_content_stats || {};
+                
+                contentHtml = `
+                    <div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">${statusIcon} Content Search Interface - ${statusText}</div>
+                    <div style="font-size: 0.875rem; color: #374151;">
+                        <div style="margin-bottom: 0.75rem;"><strong>Searchable Messages:</strong> ${contentStats.total_messages || 0}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Indexed Files:</strong> ${contentStats.total_files || 0}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Tool Results:</strong> ${contentStats.total_tools || 0}</div>
+                        <div style="margin-bottom: 0.75rem;"><strong>Index Size:</strong> ${Math.round((contentStats.searchable_characters || 0) / (1024 * 1024) * 10) / 10} MB</div>
+                        ${searchData.search_suggestions && searchData.search_suggestions.length ? `
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f9ff; border: 1px solid #0369a1; border-radius: 0.375rem;">
+                                <div style="font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">🔍 Search Suggestions:</div>
+                                <div style="font-size: 0.875rem; color: #1e40af;">
+                                    ${searchData.search_suggestions.slice(0, 5).map(suggestion => `<span style="background: #e0f2fe; padding: 0.25rem 0.5rem; border-radius: 0.25rem; margin: 0.125rem; display: inline-block;">${suggestion}</span>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">Last updated: ${new Date().toLocaleTimeString()}</div>
+                `;
+            }
+            
+            try {
+                if (container) {
+                    container.innerHTML = contentHtml;
+                    console.log(`Successfully rendered ${widgetType} widget`);
+                } else {
+                    console.error(`No container found for ${widgetType}`);
+                }
+            } catch (error) {
+                console.error(`Error rendering ${widgetType} widget:`, error);
+                if (container) {
+                    container.innerHTML = '<div style="color: #dc2626;">❌ Failed to render widget content</div>';
+                }
             }
         }
 
@@ -2103,6 +3529,41 @@ LIMIT 20</textarea>
                     `;
                 }
                 
+                // Add detailed analytics cards if available
+                if (modelData.query_type_distribution && Object.keys(modelData.query_type_distribution).length > 0) {
+                    const topQueryTypes = Object.entries(modelData.query_type_distribution)
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 3);
+                    
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #475569; font-size: 0.875rem; margin-bottom: 0.5rem;">📊 Top Query Types</div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                ${topQueryTypes.map(([type, percentage]) => `
+                                    <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.25rem; border: 1px solid #e5e7eb;">
+                                        <div style="font-size: 0.75rem; color: #6b7280; text-transform: capitalize;">${type.replace('_', ' ')}</div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: #374151;">${percentage.toFixed(1)}%</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Add model specializations if available
+                if (modelData.model_specializations && Object.keys(modelData.model_specializations).length > 0) {
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #92400e; font-size: 0.875rem; margin-bottom: 0.5rem;">🎯 Model Specializations</div>
+                            <div style="font-size: 0.8rem; color: #78350f; line-height: 1.4;">
+                                ${Object.entries(modelData.model_specializations).map(([model, specialization]) => `
+                                    <div style="margin-bottom: 0.25rem;"><strong>${model}:</strong> ${specialization}</div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 contentHtml += `
                     <div style="margin-top: 1rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.375rem; text-align: center;">
                         <button onclick="showModelDetailsModal()" style="background: #10b981; color: white; border: none; padding: 0.375rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer;">
@@ -2162,29 +3623,104 @@ LIMIT 20</textarea>
             
             if (widgetType === 'orchestration-status') {
                 const orchData = data.data || {};
+                
+                // Display active tools details
+                let toolsHtml = '';
+                if (orchData.active_tools_details && orchData.active_tools_details.length > 0) {
+                    toolsHtml = '<div style="margin-top: 1rem;"><strong>🔧 Active Tools:</strong>';
+                    orchData.active_tools_details.slice(0, 5).forEach(tool => {
+                        const errorRate = Math.round(tool.error_rate * 100);
+                        const errorColor = errorRate > 5 ? '#dc2626' : errorRate > 0 ? '#f59e0b' : '#059669';
+                        toolsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #f8fafc; border-radius: 0.375rem; font-size: 0.875rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500;">${tool.name}</span>
+                                    <span style="color: ${errorColor}; font-size: 0.75rem;">
+                                        ${tool.uses} uses · ${errorRate}% errors
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: #6b7280;">
+                                    ${tool.sessions} sessions · ${tool.uses_per_session.toFixed(1)} uses/session
+                                </div>
+                            </div>
+                        `;
+                    });
+                    toolsHtml += '</div>';
+                }
+                
+                // Display insights
+                let insightsHtml = '';
+                if (orchData.insights && orchData.insights.length > 0) {
+                    insightsHtml = '<div style="margin-top: 1rem;"><strong>💡 Key Insights:</strong>';
+                    orchData.insights.slice(0, 3).forEach(insight => {
+                        insightsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #ecfdf5; border-left: 3px solid #059669; font-size: 0.875rem;">
+                                ${insight}
+                            </div>
+                        `;
+                    });
+                    insightsHtml += '</div>';
+                }
+                
                 contentHtml = `
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Active Workflows:</strong> ${orchData.active_workflows || 0}
+                        <strong>System Health Score:</strong> ${Math.round(orchData.system_health_score * 100)}%
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Queue Depth:</strong> ${orchData.queue_depth || 0}
+                        <strong>Active Sessions:</strong> ${orchData.active_sessions_count || 0}
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Success Rate:</strong> ${(orchData.success_rate || 0) * 100}%
+                        <strong>Recent Activity:</strong> ${orchData.recent_activity_count || 0} operations
                     </div>
+                    ${toolsHtml}
+                    ${insightsHtml}
                 `;
             } else if (widgetType === 'agent-utilization') {
                 const agentData = data.data || {};
+                
+                // Display high-performance tools
+                let perfToolsHtml = '';
+                if (agentData.high_performance_tools && agentData.high_performance_tools.length > 0) {
+                    perfToolsHtml = '<div style="margin-top: 1rem;"><strong>🚀 High-Performance Tools:</strong>';
+                    agentData.high_performance_tools.slice(0, 5).forEach(toolName => {
+                        perfToolsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #ecfdf5; border-radius: 0.375rem; font-size: 0.875rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500;">${toolName}</span>
+                                    <span style="color: #059669; font-size: 0.75rem;">✅ High Performance</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    perfToolsHtml += '</div>';
+                }
+                
+                // Display recommendations
+                let recommendationsHtml = '';
+                if (agentData.recommendations && agentData.recommendations.length > 0) {
+                    recommendationsHtml = '<div style="margin-top: 1rem;"><strong>📋 Recommendations:</strong>';
+                    agentData.recommendations.slice(0, 2).forEach(rec => {
+                        recommendationsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #fef3c7; border-left: 3px solid #f59e0b; font-size: 0.875rem;">
+                                ${rec}
+                            </div>
+                        `;
+                    });
+                    recommendationsHtml += '</div>';
+                }
+                
                 contentHtml = `
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Active Agents:</strong> ${agentData.active_agents || 0}
+                        <strong>Active Tools Today:</strong> ${agentData.active_tools_today || 0}
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Utilization Rate:</strong> ${(agentData.utilization_rate || 0) * 100}%
+                        <strong>Recent Activity:</strong> ${agentData.recent_activity_count || 0} operations
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Avg Response Time:</strong> ${agentData.avg_response_time || 0}ms
+                        <strong>Session Performance:</strong> ${Math.round((agentData.session_performance?.avg_efficiency || 0) * 100)}%
                     </div>
+                    ${perfToolsHtml}
+                    ${recommendationsHtml}
                 `;
             } else if (widgetType === 'workflow-performance') {
                 const perfData = data.data || {};
@@ -2260,6 +3796,9 @@ LIMIT 20</textarea>
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            // Restore user preferences first
+            restoreUserPreferences();
+            
             // Load overview metrics immediately
             console.log('DOMContentLoaded - calling loadOverviewMetrics');
             if (typeof window.loadOverviewMetrics === 'function') {
@@ -2274,6 +3813,14 @@ LIMIT 20</textarea>
                 window.loadJsonlProcessingStatus();
             } else {
                 console.error('loadJsonlProcessingStatus function not found in DOMContentLoaded');
+            }
+            
+            // Load JSONL analytics widgets immediately  
+            console.log('DOMContentLoaded - calling loadAnalyticsWidgets');
+            if (typeof window.loadAnalyticsWidgets === 'function') {
+                window.loadAnalyticsWidgets();
+            } else {
+                console.error('loadAnalyticsWidgets function not found in DOMContentLoaded');
             }
             
             // Set up real-time updates
@@ -2862,6 +4409,59 @@ LIMIT 20</textarea>
                                     <ul style="margin: 0; padding: 0 0 0 1.25rem; color: #92400e;">
                                         ${modelData.recommendations.map(rec => `<li style="margin-bottom: 0.5rem; line-height: 1.4;">${rec}</li>`).join('')}
                                     </ul>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${sortedModels.length > 0 ? `
+                            <div style="margin-bottom: 2rem;">
+                                <h3 style="color: #1f2937; margin-bottom: 1rem;">🔍 Detailed Query Analysis by Model</h3>
+                                <div style="display: grid; gap: 1rem;">
+                                    ${sortedModels.map(([modelKey, model]) => {
+                                        const isHaiku = modelKey.toLowerCase().includes('haiku');
+                                        const tierColor = isHaiku ? '#10b981' : '#6366f1';
+                                        const tierBg = isHaiku ? '#f0fdf4' : '#f0f0ff';
+                                        const queryAnalysis = model.query_analysis || {};
+                                        
+                                        return `
+                                            <div style="padding: 1.5rem; background: ${tierBg}; border: 1px solid ${tierColor}; border-radius: 0.5rem;">
+                                                <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1.1rem;">${model.display_name} - Query Type Breakdown</h4>
+                                                <div style="display: grid; gap: 0.75rem;">
+                                                    ${Object.entries(queryAnalysis).map(([queryType, details]) => {
+                                                        const count = details.count || 0;
+                                                        const percentage = details.percentage || 0;
+                                                        const examples = details.examples || [];
+                                                        const characteristics = details.characteristics || '';
+                                                        
+                                                        return `
+                                                            <div style="padding: 1rem; background: white; border: 1px solid ${tierColor}; border-radius: 0.375rem; border-left: 4px solid ${tierColor};">
+                                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                                                    <div style="font-weight: 600; color: #1f2937; text-transform: capitalize;">${queryType.replace('_', ' ')}</div>
+                                                                    <div style="color: ${tierColor}; font-weight: 600; font-size: 0.9rem;">${count} queries (${percentage.toFixed(1)}%)</div>
+                                                                </div>
+                                                                
+                                                                ${examples.length > 0 ? `
+                                                                    <div style="margin-bottom: 0.75rem;">
+                                                                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; font-weight: 600;">Examples:</div>
+                                                                        <div style="font-size: 0.85rem; color: #374151; line-height: 1.4;">
+                                                                            ${examples.slice(0, 2).map(example => `• ${example}`).join('<br>')}
+                                                                        </div>
+                                                                    </div>
+                                                                ` : ''}
+                                                                
+                                                                ${characteristics ? `
+                                                                    <div style="margin-bottom: 0.5rem;">
+                                                                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; font-weight: 600;">Characteristics:</div>
+                                                                        <div style="font-size: 0.85rem; color: #4b5563; line-height: 1.4; font-style: italic;">${characteristics}</div>
+                                                                    </div>
+                                                                ` : ''}
+                                                            </div>
+                                                        `;
+                                                    }).join('')}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
                                 </div>
                             </div>
                         ` : ''}
