@@ -253,6 +253,190 @@
             background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
         }
 
+        /* Phase 3: Advanced Filtering Styles */
+        .advanced-filters-panel {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .filters-header {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .filters-header:hover {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+        }
+
+        .filters-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .filters-toggle {
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+            color: var(--primary-color);
+        }
+
+        .filters-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .filters-content {
+            padding: 1.5rem;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+        }
+
+        .filters-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 1.5rem;
+        }
+
+        .filters-content.expanded {
+            max-height: 1000px;
+            opacity: 1;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .filter-group select {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .filter-btn.clear {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+
+        .filter-btn.clear:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+        }
+
+        .filter-btn.save {
+            background: #f0f9ff;
+            color: #2563eb;
+            border-color: #bfdbfe;
+        }
+
+        .filter-btn.save:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+
+        .filter-btn.stats {
+            background: #f9fafb;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+
+        .filter-btn.stats:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .active-filters {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .active-filters h4 {
+            margin: 0 0 0.75rem 0;
+            color: #92400e;
+            font-size: 0.875rem;
+        }
+
+        #active-filters-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .filter-tag {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .filter-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 0.25rem;
+        }
+
+        .filter-tag .remove:hover {
+            color: #451a03;
+        }
+
         .container {
             padding: 2rem;
             max-width: 1400px;
@@ -1036,6 +1220,97 @@
                 <div class="widget-recommendation-banner" id="recommendation-banner" style="display: none;">
                     <span id="recommendation-text"></span>
                     <button onclick="hideRecommendation()">×</button>
+                </div>
+
+                <!-- Phase 3: Advanced Multi-dimensional Filters -->
+                <div class="advanced-filters-panel" id="filters-panel">
+                    <div class="filters-header" onclick="toggleFiltersPanel()">
+                        <h3>🎯 Advanced Filters</h3>
+                        <span class="filters-toggle">▼</span>
+                    </div>
+                    
+                    <div class="filters-content" id="filters-content">
+                        <div class="filters-grid">
+                            <!-- Time Range Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">📅 Time Range</label>
+                                <select id="time-range-filter" onchange="applyFilters()">
+                                    <option value="1h">Last Hour</option>
+                                    <option value="6h">Last 6 Hours</option>
+                                    <option value="24h" selected>Last 24 Hours</option>
+                                    <option value="7d">Last 7 Days</option>
+                                    <option value="30d">Last 30 Days</option>
+                                    <option value="all">All Time</option>
+                                </select>
+                            </div>
+
+                            <!-- Programming Language Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">💻 Language</label>
+                                <select id="language-filter" onchange="applyFilters()">
+                                    <option value="">All Languages</option>
+                                    <option value="python">Python</option>
+                                    <option value="javascript">JavaScript</option>
+                                    <option value="html">HTML</option>
+                                    <option value="css">CSS</option>
+                                    <option value="markdown">Markdown</option>
+                                    <option value="sql">SQL</option>
+                                    <option value="bash">Bash</option>
+                                </select>
+                            </div>
+
+                            <!-- Session Type Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">🗂️ Session Type</label>
+                                <select id="session-type-filter" onchange="applyFilters()">
+                                    <option value="">All Sessions</option>
+                                    <option value="short">Short (&lt; 10 messages)</option>
+                                    <option value="medium">Medium (10-50 messages)</option>
+                                    <option value="long">Long (&gt; 50 messages)</option>
+                                </select>
+                            </div>
+
+                            <!-- Content Type Filter -->
+                            <div class="filter-group">
+                                <label class="filter-label">📄 Content Type</label>
+                                <select id="content-type-filter" onchange="applyFilters()">
+                                    <option value="">All Content</option>
+                                    <option value="code">Code Heavy</option>
+                                    <option value="discussion">Discussion</option>
+                                    <option value="debugging">Debugging</option>
+                                    <option value="analysis">Data Analysis</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Logic -->
+                            <div class="filter-group">
+                                <label class="filter-label">⚙️ Logic</label>
+                                <select id="filter-logic" onchange="applyFilters()">
+                                    <option value="and">AND (All must match)</option>
+                                    <option value="or">OR (Any can match)</option>
+                                </select>
+                            </div>
+
+                            <!-- Filter Actions -->
+                            <div class="filter-actions">
+                                <button onclick="clearAllFilters()" class="filter-btn clear">
+                                    🧹 Clear All
+                                </button>
+                                <button onclick="saveFilterPreset()" class="filter-btn save">
+                                    💾 Save Preset
+                                </button>
+                                <button onclick="showFilterStats()" class="filter-btn stats">
+                                    📊 Filter Stats
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Active Filters Display -->
+                        <div class="active-filters" id="active-filters" style="display: none;">
+                            <h4>🏷️ Active Filters:</h4>
+                            <div id="active-filters-list"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1928,6 +2203,215 @@ LIMIT 20</textarea>
                     document.querySelector(`[onclick="toggleSection('${sectionId}')"] .section-toggle`).classList.add('collapsed');
                 }
             });
+
+            // Restore filters panel state
+            const filtersState = localStorage.getItem('filtersPanel');
+            if (filtersState === 'collapsed') {
+                document.getElementById('filters-content').classList.remove('expanded');
+                document.getElementById('filters-content').classList.add('collapsed');
+                document.querySelector('.filters-toggle').classList.add('collapsed');
+            } else {
+                document.getElementById('filters-content').classList.add('expanded');
+            }
+
+            // Restore filter selections
+            restoreFilterSelections();
+        }
+
+        // ==== PHASE 3: ADVANCED MULTI-DIMENSIONAL FILTERING FUNCTIONS ====
+
+        // Global filter state
+        window.dashboardFilters = {
+            timeRange: '24h',
+            language: '',
+            sessionType: '',
+            contentType: '',
+            logic: 'and'
+        };
+
+        // Toggle filters panel
+        window.toggleFiltersPanel = function() {
+            const content = document.getElementById('filters-content');
+            const toggle = document.querySelector('.filters-toggle');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                localStorage.setItem('filtersPanel', 'collapsed');
+            } else {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                toggle.classList.remove('collapsed');
+                localStorage.setItem('filtersPanel', 'expanded');
+            }
+        };
+
+        // Apply filters across all widgets
+        window.applyFilters = function() {
+            console.log('🎯 Applying filters across all widgets');
+            
+            // Update filter state
+            window.dashboardFilters = {
+                timeRange: document.getElementById('time-range-filter').value,
+                language: document.getElementById('language-filter').value,
+                sessionType: document.getElementById('session-type-filter').value,
+                contentType: document.getElementById('content-type-filter').value,
+                logic: document.getElementById('filter-logic').value
+            };
+
+            // Save filter selections
+            localStorage.setItem('dashboardFilters', JSON.stringify(window.dashboardFilters));
+
+            // Update active filters display
+            updateActiveFiltersDisplay();
+
+            // Apply filters to all JSONL analytics widgets
+            reloadFilteredWidgets();
+        };
+
+        // Update active filters display
+        function updateActiveFiltersDisplay() {
+            const activeFiltersEl = document.getElementById('active-filters');
+            const activeFiltersListEl = document.getElementById('active-filters-list');
+            const filters = window.dashboardFilters;
+            
+            const activeFilters = [];
+            
+            // Check each filter
+            if (filters.timeRange !== '24h') {
+                activeFilters.push({ label: 'Time', value: getTimeRangeLabel(filters.timeRange), key: 'timeRange' });
+            }
+            if (filters.language) {
+                activeFilters.push({ label: 'Language', value: filters.language, key: 'language' });
+            }
+            if (filters.sessionType) {
+                activeFilters.push({ label: 'Session', value: getSessionTypeLabel(filters.sessionType), key: 'sessionType' });
+            }
+            if (filters.contentType) {
+                activeFilters.push({ label: 'Content', value: filters.contentType, key: 'contentType' });
+            }
+
+            if (activeFilters.length > 0) {
+                activeFiltersListEl.innerHTML = activeFilters.map(filter => 
+                    `<div class="filter-tag">
+                        ${filter.label}: ${filter.value}
+                        <span class="remove" onclick="removeFilter('${filter.key}')">×</span>
+                    </div>`
+                ).join('');
+                activeFiltersEl.style.display = 'block';
+            } else {
+                activeFiltersEl.style.display = 'none';
+            }
+        }
+
+        // Helper functions for filter labels
+        function getTimeRangeLabel(value) {
+            const labels = {
+                '1h': 'Last Hour',
+                '6h': 'Last 6 Hours', 
+                '24h': 'Last 24 Hours',
+                '7d': 'Last 7 Days',
+                '30d': 'Last 30 Days',
+                'all': 'All Time'
+            };
+            return labels[value] || value;
+        }
+
+        function getSessionTypeLabel(value) {
+            const labels = {
+                'short': 'Short Sessions',
+                'medium': 'Medium Sessions',
+                'long': 'Long Sessions'
+            };
+            return labels[value] || value;
+        }
+
+        // Remove individual filter
+        window.removeFilter = function(filterKey) {
+            const filterElement = document.getElementById(`${filterKey === 'timeRange' ? 'time-range' : filterKey}-filter`);
+            if (filterElement) {
+                filterElement.value = filterKey === 'timeRange' ? '24h' : '';
+                applyFilters();
+            }
+        };
+
+        // Clear all filters
+        window.clearAllFilters = function() {
+            document.getElementById('time-range-filter').value = '24h';
+            document.getElementById('language-filter').value = '';
+            document.getElementById('session-type-filter').value = '';
+            document.getElementById('content-type-filter').value = '';
+            document.getElementById('filter-logic').value = 'and';
+            
+            applyFilters();
+            console.log('🧹 All filters cleared');
+        };
+
+        // Save filter preset
+        window.saveFilterPreset = function() {
+            const presetName = prompt('Enter a name for this filter preset:');
+            if (presetName) {
+                const presets = JSON.parse(localStorage.getItem('filterPresets') || '{}');
+                presets[presetName] = { ...window.dashboardFilters };
+                localStorage.setItem('filterPresets', JSON.stringify(presets));
+                console.log(`💾 Filter preset "${presetName}" saved`);
+                alert(`Filter preset "${presetName}" saved successfully!`);
+            }
+        };
+
+        // Show filter statistics
+        window.showFilterStats = function() {
+            const filters = window.dashboardFilters;
+            const statsMessage = `
+📊 Current Filter Statistics:
+
+🕐 Time Range: ${getTimeRangeLabel(filters.timeRange)}
+💻 Language: ${filters.language || 'All Languages'}
+🗂️ Session Type: ${getSessionTypeLabel(filters.sessionType) || 'All Sessions'}
+📄 Content Type: ${filters.contentType || 'All Content'}
+⚙️ Logic: ${filters.logic.toUpperCase()}
+
+Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== 'and').length}
+            `;
+            
+            alert(statsMessage);
+        };
+
+        // Reload filtered widgets
+        function reloadFilteredWidgets() {
+            console.log('♻️ Reloading widgets with filters:', window.dashboardFilters);
+            
+            // Show loading indicators
+            document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
+                content.innerHTML = '<div class="loading">Applying filters...</div>';
+            });
+
+            // Reload analytics widgets with filter parameters
+            setTimeout(() => {
+                loadAnalyticsWidgets();
+            }, 300);
+        }
+
+        // Restore filter selections
+        function restoreFilterSelections() {
+            const savedFilters = localStorage.getItem('dashboardFilters');
+            if (savedFilters) {
+                try {
+                    const filters = JSON.parse(savedFilters);
+                    
+                    document.getElementById('time-range-filter').value = filters.timeRange || '24h';
+                    document.getElementById('language-filter').value = filters.language || '';
+                    document.getElementById('session-type-filter').value = filters.sessionType || '';
+                    document.getElementById('content-type-filter').value = filters.contentType || '';
+                    document.getElementById('filter-logic').value = filters.logic || 'and';
+                    
+                    window.dashboardFilters = filters;
+                    updateActiveFiltersDisplay();
+                } catch (e) {
+                    console.warn('Failed to restore filter selections:', e);
+                }
+            }
         }
 
         // Load analytics widgets - WORKING VERSION
