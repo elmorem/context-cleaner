@@ -22,14 +22,27 @@ class ClickHouseClient(TelemetryClient):
         self.database = database
         self.connection_string = f"tcp://{host}:{port}"
         
-    async def execute_query(self, query: str) -> List[Dict[str, Any]]:
+    async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Execute a query against ClickHouse and return results."""
         try:
+            # Handle parameterized queries by substituting parameters
+            final_query = query
+            if params:
+                for key, value in params.items():
+                    if isinstance(value, str):
+                        # Escape and quote string values
+                        escaped_value = value.replace("'", "\\'").replace("\\", "\\\\")
+                        final_query = final_query.replace(f"{{{key}:String}}", f"'{escaped_value}'")
+                    elif isinstance(value, (int, float)):
+                        final_query = final_query.replace(f"{{{key}:UInt32}}", str(value))
+                        final_query = final_query.replace(f"{{{key}:Float64}}", str(value))
+                        final_query = final_query.replace(f"{{{key}:Int32}}", str(value))
+            
             # Use docker exec to run clickhouse-client
             cmd = [
                 "docker", "exec", "clickhouse-otel", 
                 "clickhouse-client", 
-                "--query", query,
+                "--query", final_query,
                 "--format", "JSONEachRow"
             ]
             
@@ -290,3 +303,111 @@ class ClickHouseClient(TelemetryClient):
             return len(results) > 0 and results[0].get('health') == 1
         except Exception:
             return False
+
+    # ===== JSONL CONTENT METHODS =====
+    
+    async def bulk_insert(self, table_name: str, records: List[Dict[str, Any]]) -> bool:
+        """Bulk insert records into specified table."""
+        if not records:
+            return True
+            
+        try:
+            # Convert records to JSON lines format with datetime handling
+            def default_serializer(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+            
+            json_lines = '\n'.join([json.dumps(record, default=default_serializer) for record in records])
+            
+            # Use clickhouse-client with JSONEachRow format for bulk insert
+            cmd = [
+                "docker", "exec", "-i", "clickhouse-otel", 
+                "clickhouse-client", 
+                "--query", f"INSERT INTO otel.{table_name} FORMAT JSONEachRow",
+            ]
+            
+            result = subprocess.run(
+                cmd, 
+                input=json_lines, 
+                text=True, 
+                capture_output=True, 
+                timeout=60
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"Bulk insert failed for {table_name}: {result.stderr}")
+                return False
+            
+            logger.info(f"Successfully inserted {len(records)} records into {table_name}")
+            return True
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"Bulk insert timed out for {table_name}")
+            return False
+        except Exception as e:
+            logger.error(f"Bulk insert error for {table_name}: {e}")
+            return False
+    
+    async def get_jsonl_content_stats(self) -> Dict[str, Any]:
+        """Get statistics about JSONL content storage."""
+        try:
+            stats = {}
+            
+            # Message content stats
+            message_query = """
+            SELECT 
+                count() as total_messages,
+                uniq(session_id) as unique_sessions,
+                sum(message_length) as total_characters,
+                avg(message_length) as avg_message_length,
+                sum(input_tokens) as total_input_tokens,
+                sum(output_tokens) as total_output_tokens,
+                sum(cost_usd) as total_cost,
+                countIf(contains_code_blocks) as messages_with_code,
+                min(timestamp) as earliest_message,
+                max(timestamp) as latest_message
+            FROM otel.claude_message_content
+            WHERE timestamp >= now() - INTERVAL 30 DAY
+            """
+            
+            message_results = await self.execute_query(message_query)
+            stats['messages'] = message_results[0] if message_results else {}
+            
+            # File content stats
+            file_query = """
+            SELECT 
+                count() as total_file_accesses,
+                uniq(file_path) as unique_files,
+                sum(file_size) as total_file_bytes,
+                avg(file_size) as avg_file_size,
+                avg(line_count) as avg_line_count,
+                countIf(contains_secrets) as files_with_secrets,
+                countIf(contains_imports) as files_with_imports
+            FROM otel.claude_file_content
+            WHERE timestamp >= now() - INTERVAL 30 DAY
+            """
+            
+            file_results = await self.execute_query(file_query)
+            stats['files'] = file_results[0] if file_results else {}
+            
+            # Tool results stats
+            tool_query = """
+            SELECT 
+                count() as total_tool_executions,
+                uniq(tool_name) as unique_tools,
+                countIf(success) as successful_executions,
+                round(countIf(success) * 100.0 / count(), 2) as success_rate,
+                sum(output_size) as total_output_bytes
+            FROM otel.claude_tool_results
+            WHERE timestamp >= now() - INTERVAL 30 DAY
+            """
+            
+            tool_results = await self.execute_query(tool_query)
+            stats['tools'] = tool_results[0] if tool_results else {}
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting JSONL content stats: {e}")
+            return {}

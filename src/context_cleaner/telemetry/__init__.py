@@ -14,11 +14,15 @@ Key features:
 from .clients.clickhouse_client import ClickHouseClient
 from .error_recovery.manager import ErrorRecoveryManager
 from .cost_optimization.engine import CostOptimizationEngine
+from .jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+from .jsonl_enhancement.full_content_queries import FullContentQueries
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "ClickHouseClient",
     "ErrorRecoveryManager", 
     "CostOptimizationEngine",
+    "JsonlProcessorService",
+    "FullContentQueries",
 ]
