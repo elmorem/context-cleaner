@@ -1235,6 +1235,122 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Model analytics endpoint failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
+        @self.app.route("/api/telemetry/model-detailed/<string:model_name>")
+        def get_model_detailed_analytics(model_name):
+            """Get detailed drill-down analytics for a specific model."""
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Get JSONL content query handler
+                from ..telemetry.jsonl_enhancement.full_content_queries import FullContentQueries
+                
+                clickhouse_client = self.telemetry_widgets.clickhouse_client
+                query_handler = FullContentQueries(clickhouse_client)
+                
+                # Get recent conversations using this model (limit to last 50 for performance)
+                recent_conversations_query = """
+                SELECT 
+                    session_id,
+                    message_uuid,
+                    timestamp,
+                    role,
+                    LEFT(message_content, 200) as content_preview,
+                    message_length,
+                    input_tokens,
+                    output_tokens,
+                    cost_usd,
+                    programming_languages
+                FROM otel.claude_message_content
+                WHERE model_name = {model_name:String}
+                    AND timestamp >= now() - INTERVAL 7 DAY
+                ORDER BY timestamp DESC
+                LIMIT 50
+                """
+                
+                conversations = loop.run_until_complete(
+                    clickhouse_client.execute_query(
+                        recent_conversations_query, 
+                        {'model_name': model_name}
+                    )
+                )
+                
+                # Get token usage breakdown by query type for this model
+                token_breakdown_query = """
+                SELECT 
+                    CASE 
+                        WHEN arrayExists(x -> x IN ['python', 'javascript', 'typescript'], programming_languages) THEN 'code_generation'
+                        WHEN contains(lower(message_content), 'read') OR contains(lower(message_content), 'file') THEN 'file_operations'  
+                        WHEN contains(lower(message_content), 'bash') OR contains(lower(message_content), 'command') THEN 'tool_usage'
+                        ELSE 'general_conversation'
+                    END as query_type,
+                    COUNT(*) as query_count,
+                    AVG(input_tokens) as avg_input_tokens,
+                    AVG(output_tokens) as avg_output_tokens,
+                    MIN(input_tokens) as min_input_tokens,
+                    MAX(input_tokens) as max_input_tokens,
+                    SUM(input_tokens) as total_input_tokens,
+                    SUM(output_tokens) as total_output_tokens,
+                    SUM(cost_usd) as total_cost
+                FROM otel.claude_message_content
+                WHERE model_name = {model_name:String}
+                    AND timestamp >= now() - INTERVAL 7 DAY
+                GROUP BY query_type
+                ORDER BY query_count DESC
+                """
+                
+                token_breakdown = loop.run_until_complete(
+                    clickhouse_client.execute_query(
+                        token_breakdown_query,
+                        {'model_name': model_name}
+                    )
+                )
+                
+                # Get time-based usage patterns (hourly breakdown for last 7 days)
+                usage_patterns_query = """
+                SELECT 
+                    toHour(timestamp) as hour_of_day,
+                    COUNT(*) as message_count,
+                    AVG(input_tokens + output_tokens) as avg_total_tokens,
+                    SUM(cost_usd) as hourly_cost
+                FROM otel.claude_message_content
+                WHERE model_name = {model_name:String}
+                    AND timestamp >= now() - INTERVAL 7 DAY
+                GROUP BY hour_of_day
+                ORDER BY hour_of_day
+                """
+                
+                usage_patterns = loop.run_until_complete(
+                    clickhouse_client.execute_query(
+                        usage_patterns_query,
+                        {'model_name': model_name}
+                    )
+                )
+                
+                loop.close()
+                
+                # Format the response
+                response_data = {
+                    'model_name': model_name,
+                    'recent_conversations': conversations,
+                    'token_usage_breakdown': token_breakdown,
+                    'usage_patterns': usage_patterns,
+                    'summary': {
+                        'total_conversations': len(conversations),
+                        'total_input_tokens': sum(conv.get('input_tokens', 0) for conv in conversations),
+                        'total_output_tokens': sum(conv.get('output_tokens', 0) for conv in conversations),
+                        'total_cost': sum(conv.get('cost_usd', 0) for conv in conversations),
+                        'avg_conversation_length': sum(conv.get('message_length', 0) for conv in conversations) / max(len(conversations), 1),
+                        'query_types_count': len(token_breakdown)
+                    }
+                }
+                
+                return jsonify(response_data)
+                
+            except Exception as e:
+                logger.error(f"Model detailed analytics endpoint failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/cache-intelligence")
         def get_cache_intelligence():
             """Get cache intelligence data from cache dashboard."""
@@ -1747,6 +1863,16 @@ class ComprehensiveHealthDashboard:
         def get_telemetry_widget(widget_type):
             """Get telemetry widget data for enhanced dashboard"""
             try:
+                # Get time range parameter from query string (default to 7days)
+                time_range = request.args.get('timeRange', '7days')
+                
+                # Convert time range to days for backend processing
+                time_range_days = {
+                    'today': 1,
+                    '7days': 7, 
+                    '30days': 30
+                }.get(time_range, 7)
+                
                 if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
                     # Use asyncio to run async widget data retrieval
                     loop = asyncio.new_event_loop()
@@ -1769,7 +1895,7 @@ class ComprehensiveHealthDashboard:
                             from ..telemetry.dashboard.widgets import TelemetryWidgetType
                             widget_enum = getattr(TelemetryWidgetType, widget_map[widget_type])
                             data = loop.run_until_complete(
-                                self.telemetry_widgets.get_widget_data(widget_enum)
+                                self.telemetry_widgets.get_widget_data(widget_enum, time_range_days=time_range_days)
                             )
                             loop.close()
                             return jsonify({
@@ -1810,7 +1936,6 @@ class ComprehensiveHealthDashboard:
                     widget_map = {
                         'orchestration-status': 'ORCHESTRATION_STATUS',
                         'agent-utilization': 'AGENT_UTILIZATION',
-                        'workflow-performance': 'WORKFLOW_PERFORMANCE'
                     }
                     
                     if widget_type in widget_map:
@@ -2043,9 +2168,21 @@ class ComprehensiveHealthDashboard:
                         stats = loop.run_until_complete(
                             self.telemetry_client.get_total_aggregated_stats()
                         )
+                        
+                        # Get model efficiency data from telemetry widgets
+                        model_efficiency_data = None
+                        if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
+                            try:
+                                model_widget = loop.run_until_complete(
+                                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
+                                )
+                                model_efficiency_data = model_widget.data if model_widget else None
+                            except Exception as e:
+                                logger.warning(f"Error getting model efficiency data: {e}")
+                        
                         loop.close()
                         
-                        return jsonify({
+                        response_data = {
                             'total_tokens': stats['total_tokens'],
                             'total_sessions': stats['total_sessions'],
                             'success_rate': stats['success_rate'],
@@ -2055,7 +2192,13 @@ class ComprehensiveHealthDashboard:
                             'total_cost': stats['total_cost'],
                             'total_errors': stats['total_errors'],
                             'last_updated': datetime.now().isoformat()
-                        })
+                        }
+                        
+                        # Add model efficiency data if available
+                        if model_efficiency_data:
+                            response_data['model_efficiency'] = model_efficiency_data
+                        
+                        return jsonify(response_data)
                     except Exception as e:
                         loop.close()
                         logger.warning(f"Error getting real telemetry stats: {e}")

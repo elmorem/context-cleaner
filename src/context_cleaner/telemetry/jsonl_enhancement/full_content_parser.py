@@ -65,7 +65,12 @@ class FullContentJsonlParser:
         try:
             # Look for tool results that contain file content
             tool_result = jsonl_entry.get('toolUseResult', {})
+            if not isinstance(tool_result, dict):
+                return None
+                
             file_info = tool_result.get('file', {})
+            if not isinstance(file_info, dict):
+                return None
             
             if not file_info:
                 return None

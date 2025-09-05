@@ -1294,7 +1294,26 @@
 
         <!-- Telemetry Section -->
         <section id="telemetry" class="dashboard-section">
-            <h2>📈 Real-Time Telemetry Monitoring</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>📈 Real-Time Telemetry Monitoring</h2>
+                <div class="time-range-selector">
+                    <label for="telemetry-time-range" style="margin-right: 0.5rem; font-weight: 500; color: var(--text-secondary);">Time Range:</label>
+                    <select id="telemetry-time-range" onchange="updateTelemetryTimeRange()" style="
+                        padding: 0.5rem 1rem;
+                        border: 1px solid var(--border-color);
+                        border-radius: 6px;
+                        background: white;
+                        color: var(--text-primary);
+                        font-size: 0.875rem;
+                        cursor: pointer;
+                        min-width: 120px;
+                    ">
+                        <option value="today">Today</option>
+                        <option value="7days" selected>Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                    </select>
+                </div>
+            </div>
             <div class="widget-grid">
                 <div class="widget-card">
                     <div class="widget-header">
@@ -2189,10 +2208,10 @@ LIMIT 20</textarea>
         };
 
         // Load telemetry widgets
-        function loadTelemetryWidgets() {
+        function loadTelemetryWidgets(timeRange = '7days') {
             const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
             widgets.forEach(widget => {
-                fetch(`/api/telemetry-widget/${widget}`)
+                fetch(`/api/telemetry-widget/${widget}?timeRange=${timeRange}`)
                     .then(response => response.json())
                     .then(data => {
                         renderTelemetryWidget(widget, data);
@@ -2202,6 +2221,23 @@ LIMIT 20</textarea>
                             `<div style="color: #dc2626;">Error loading ${widget} data</div>`;
                     });
             });
+        }
+
+        // Update telemetry widgets based on selected time range
+        function updateTelemetryTimeRange() {
+            const timeRange = document.getElementById('telemetry-time-range').value;
+            
+            // Show loading state for all widgets
+            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
+            widgets.forEach(widget => {
+                const element = document.getElementById(`${widget}-widget`);
+                if (element) {
+                    element.innerHTML = '<div class="loading">🔄 Updating data...</div>';
+                }
+            });
+            
+            // Load widgets with new time range
+            loadTelemetryWidgets(timeRange);
         }
 
         // Load orchestration widgets
@@ -3493,6 +3529,41 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                     `;
                 }
                 
+                // Add detailed analytics cards if available
+                if (modelData.query_type_distribution && Object.keys(modelData.query_type_distribution).length > 0) {
+                    const topQueryTypes = Object.entries(modelData.query_type_distribution)
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 3);
+                    
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #475569; font-size: 0.875rem; margin-bottom: 0.5rem;">📊 Top Query Types</div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                ${topQueryTypes.map(([type, percentage]) => `
+                                    <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.25rem; border: 1px solid #e5e7eb;">
+                                        <div style="font-size: 0.75rem; color: #6b7280; text-transform: capitalize;">${type.replace('_', ' ')}</div>
+                                        <div style="font-size: 1rem; font-weight: 600; color: #374151;">${percentage.toFixed(1)}%</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Add model specializations if available
+                if (modelData.model_specializations && Object.keys(modelData.model_specializations).length > 0) {
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #92400e; font-size: 0.875rem; margin-bottom: 0.5rem;">🎯 Model Specializations</div>
+                            <div style="font-size: 0.8rem; color: #78350f; line-height: 1.4;">
+                                ${Object.entries(modelData.model_specializations).map(([model, specialization]) => `
+                                    <div style="margin-bottom: 0.25rem;"><strong>${model}:</strong> ${specialization}</div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 contentHtml += `
                     <div style="margin-top: 1rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.375rem; text-align: center;">
                         <button onclick="showModelDetailsModal()" style="background: #10b981; color: white; border: none; padding: 0.375rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer;">
@@ -3552,29 +3623,104 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             
             if (widgetType === 'orchestration-status') {
                 const orchData = data.data || {};
+                
+                // Display active tools details
+                let toolsHtml = '';
+                if (orchData.active_tools_details && orchData.active_tools_details.length > 0) {
+                    toolsHtml = '<div style="margin-top: 1rem;"><strong>🔧 Active Tools:</strong>';
+                    orchData.active_tools_details.slice(0, 5).forEach(tool => {
+                        const errorRate = Math.round(tool.error_rate * 100);
+                        const errorColor = errorRate > 5 ? '#dc2626' : errorRate > 0 ? '#f59e0b' : '#059669';
+                        toolsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #f8fafc; border-radius: 0.375rem; font-size: 0.875rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500;">${tool.name}</span>
+                                    <span style="color: ${errorColor}; font-size: 0.75rem;">
+                                        ${tool.uses} uses · ${errorRate}% errors
+                                    </span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: #6b7280;">
+                                    ${tool.sessions} sessions · ${tool.uses_per_session.toFixed(1)} uses/session
+                                </div>
+                            </div>
+                        `;
+                    });
+                    toolsHtml += '</div>';
+                }
+                
+                // Display insights
+                let insightsHtml = '';
+                if (orchData.insights && orchData.insights.length > 0) {
+                    insightsHtml = '<div style="margin-top: 1rem;"><strong>💡 Key Insights:</strong>';
+                    orchData.insights.slice(0, 3).forEach(insight => {
+                        insightsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #ecfdf5; border-left: 3px solid #059669; font-size: 0.875rem;">
+                                ${insight}
+                            </div>
+                        `;
+                    });
+                    insightsHtml += '</div>';
+                }
+                
                 contentHtml = `
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Active Workflows:</strong> ${orchData.active_workflows || 0}
+                        <strong>System Health Score:</strong> ${Math.round(orchData.system_health_score * 100)}%
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Queue Depth:</strong> ${orchData.queue_depth || 0}
+                        <strong>Active Sessions:</strong> ${orchData.active_sessions_count || 0}
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Success Rate:</strong> ${(orchData.success_rate || 0) * 100}%
+                        <strong>Recent Activity:</strong> ${orchData.recent_activity_count || 0} operations
                     </div>
+                    ${toolsHtml}
+                    ${insightsHtml}
                 `;
             } else if (widgetType === 'agent-utilization') {
                 const agentData = data.data || {};
+                
+                // Display high-performance tools
+                let perfToolsHtml = '';
+                if (agentData.high_performance_tools && agentData.high_performance_tools.length > 0) {
+                    perfToolsHtml = '<div style="margin-top: 1rem;"><strong>🚀 High-Performance Tools:</strong>';
+                    agentData.high_performance_tools.slice(0, 5).forEach(toolName => {
+                        perfToolsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #ecfdf5; border-radius: 0.375rem; font-size: 0.875rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 500;">${toolName}</span>
+                                    <span style="color: #059669; font-size: 0.75rem;">✅ High Performance</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    perfToolsHtml += '</div>';
+                }
+                
+                // Display recommendations
+                let recommendationsHtml = '';
+                if (agentData.recommendations && agentData.recommendations.length > 0) {
+                    recommendationsHtml = '<div style="margin-top: 1rem;"><strong>📋 Recommendations:</strong>';
+                    agentData.recommendations.slice(0, 2).forEach(rec => {
+                        recommendationsHtml += `
+                            <div style="margin: 0.5rem 0; padding: 0.5rem; background: #fef3c7; border-left: 3px solid #f59e0b; font-size: 0.875rem;">
+                                ${rec}
+                            </div>
+                        `;
+                    });
+                    recommendationsHtml += '</div>';
+                }
+                
                 contentHtml = `
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Active Agents:</strong> ${agentData.active_agents || 0}
+                        <strong>Active Tools Today:</strong> ${agentData.active_tools_today || 0}
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Utilization Rate:</strong> ${(agentData.utilization_rate || 0) * 100}%
+                        <strong>Recent Activity:</strong> ${agentData.recent_activity_count || 0} operations
                     </div>
                     <div style="margin-bottom: 0.75rem;">
-                        <strong>Avg Response Time:</strong> ${agentData.avg_response_time || 0}ms
+                        <strong>Session Performance:</strong> ${Math.round((agentData.session_performance?.avg_efficiency || 0) * 100)}%
                     </div>
+                    ${perfToolsHtml}
+                    ${recommendationsHtml}
                 `;
             } else if (widgetType === 'workflow-performance') {
                 const perfData = data.data || {};
@@ -4263,6 +4409,59 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                                     <ul style="margin: 0; padding: 0 0 0 1.25rem; color: #92400e;">
                                         ${modelData.recommendations.map(rec => `<li style="margin-bottom: 0.5rem; line-height: 1.4;">${rec}</li>`).join('')}
                                     </ul>
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        ${sortedModels.length > 0 ? `
+                            <div style="margin-bottom: 2rem;">
+                                <h3 style="color: #1f2937; margin-bottom: 1rem;">🔍 Detailed Query Analysis by Model</h3>
+                                <div style="display: grid; gap: 1rem;">
+                                    ${sortedModels.map(([modelKey, model]) => {
+                                        const isHaiku = modelKey.toLowerCase().includes('haiku');
+                                        const tierColor = isHaiku ? '#10b981' : '#6366f1';
+                                        const tierBg = isHaiku ? '#f0fdf4' : '#f0f0ff';
+                                        const queryAnalysis = model.query_analysis || {};
+                                        
+                                        return `
+                                            <div style="padding: 1.5rem; background: ${tierBg}; border: 1px solid ${tierColor}; border-radius: 0.5rem;">
+                                                <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1.1rem;">${model.display_name} - Query Type Breakdown</h4>
+                                                <div style="display: grid; gap: 0.75rem;">
+                                                    ${Object.entries(queryAnalysis).map(([queryType, details]) => {
+                                                        const count = details.count || 0;
+                                                        const percentage = details.percentage || 0;
+                                                        const examples = details.examples || [];
+                                                        const characteristics = details.characteristics || '';
+                                                        
+                                                        return `
+                                                            <div style="padding: 1rem; background: white; border: 1px solid ${tierColor}; border-radius: 0.375rem; border-left: 4px solid ${tierColor};">
+                                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                                                    <div style="font-weight: 600; color: #1f2937; text-transform: capitalize;">${queryType.replace('_', ' ')}</div>
+                                                                    <div style="color: ${tierColor}; font-weight: 600; font-size: 0.9rem;">${count} queries (${percentage.toFixed(1)}%)</div>
+                                                                </div>
+                                                                
+                                                                ${examples.length > 0 ? `
+                                                                    <div style="margin-bottom: 0.75rem;">
+                                                                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; font-weight: 600;">Examples:</div>
+                                                                        <div style="font-size: 0.85rem; color: #374151; line-height: 1.4;">
+                                                                            ${examples.slice(0, 2).map(example => `• ${example}`).join('<br>')}
+                                                                        </div>
+                                                                    </div>
+                                                                ` : ''}
+                                                                
+                                                                ${characteristics ? `
+                                                                    <div style="margin-bottom: 0.5rem;">
+                                                                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 0.25rem; font-weight: 600;">Characteristics:</div>
+                                                                        <div style="font-size: 0.85rem; color: #4b5563; line-height: 1.4; font-style: italic;">${characteristics}</div>
+                                                                    </div>
+                                                                ` : ''}
+                                                            </div>
+                                                        `;
+                                                    }).join('')}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
                                 </div>
                             </div>
                         ` : ''}
