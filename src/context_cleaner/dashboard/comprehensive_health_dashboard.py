@@ -1757,7 +1757,11 @@ class ComprehensiveHealthDashboard:
                         'cost-tracker': 'COST_TRACKER', 
                         'timeout-risk': 'TIMEOUT_RISK',
                         'tool-optimizer': 'TOOL_OPTIMIZER',
-                        'model-efficiency': 'MODEL_EFFICIENCY'
+                        'model-efficiency': 'MODEL_EFFICIENCY',
+                        # Phase 4: JSONL Analytics Widgets
+                        'conversation-timeline': 'CONVERSATION_TIMELINE',
+                        'code-pattern-analysis': 'CODE_PATTERN_ANALYSIS',
+                        'content-search-widget': 'CONTENT_SEARCH_WIDGET'
                     }
                     
                     if widget_type in widget_map:
