@@ -1054,6 +1054,164 @@ def effectiveness(ctx, days, strategy, detailed, format):
         sys.exit(1)
 
 
+@main.command("run")
+@click.option("--jsonl-file", type=click.Path(exists=True), help="JSONL file to process (optional)")
+@click.option("--jsonl-dir", type=click.Path(exists=True), help="Directory containing JSONL files to process (optional)")
+@click.option("--privacy-level", default='standard', type=click.Choice(['minimal', 'standard', 'strict']), help="Privacy level for content sanitization")
+@click.option("--no-dashboard", is_flag=True, help="Skip dashboard launch")
+@click.option("--dashboard-port", type=int, default=8080, help="Dashboard port")
+@click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
+@click.pass_context
+def run(ctx, jsonl_file, jsonl_dir, privacy_level, no_dashboard, dashboard_port, no_browser):
+    """🚀 Complete Context Cleaner workflow: process JSONL → analyze → show dashboard."""
+    config = ctx.obj["config"]
+    verbose = ctx.obj["verbose"]
+    
+    if verbose:
+        click.echo("🚀 Starting complete Context Cleaner workflow...")
+        click.echo("=" * 60)
+    
+    try:
+        # Step 1: Process JSONL files if provided
+        processed_any = False
+        
+        if jsonl_file:
+            if verbose:
+                click.echo(f"📄 Step 1: Processing JSONL file: {jsonl_file}")
+            
+            # Process single file using existing command
+            from .commands.jsonl import get_jsonl_service
+            import asyncio
+            
+            async def process_single_file():
+                service = await get_jsonl_service(privacy_level)
+                stats = await service.process_jsonl_file(Path(jsonl_file))
+                
+                click.echo(f"✅ Processed {stats['total_entries']} entries:")
+                click.echo(f"   • Messages: {stats['messages_processed']}")
+                click.echo(f"   • Files: {stats['files_processed']}")
+                click.echo(f"   • Tools: {stats['tools_processed']}")
+                click.echo(f"   • Processing time: {stats['processing_time_seconds']:.2f}s")
+                return True
+            
+            try:
+                processed_any = asyncio.run(process_single_file())
+            except Exception as e:
+                if verbose:
+                    click.echo(f"⚠️  JSONL processing failed: {e}")
+                else:
+                    click.echo("⚠️  JSONL processing failed")
+                    
+        elif jsonl_dir:
+            if verbose:
+                click.echo(f"📁 Step 1: Processing JSONL directory: {jsonl_dir}")
+            
+            # Process directory using existing command
+            from .commands.jsonl import get_jsonl_service
+            import asyncio
+            
+            async def process_directory():
+                service = await get_jsonl_service(privacy_level)
+                stats = await service.process_jsonl_directory(Path(jsonl_dir))
+                
+                click.echo(f"✅ Processed {stats['total_files']} files:")
+                click.echo(f"   • Total entries: {stats['total_entries']}")
+                click.echo(f"   • Messages: {stats['messages_processed']}")
+                click.echo(f"   • Files: {stats['files_processed']}")  
+                click.echo(f"   • Tools: {stats['tools_processed']}")
+                click.echo(f"   • Processing time: {stats['processing_time_seconds']:.2f}s")
+                return True
+            
+            try:
+                processed_any = asyncio.run(process_directory())
+            except Exception as e:
+                if verbose:
+                    click.echo(f"⚠️  JSONL processing failed: {e}")
+                else:
+                    click.echo("⚠️  JSONL processing failed")
+        else:
+            if verbose:
+                click.echo("📄 Step 1: No JSONL files specified, skipping processing")
+        
+        # Step 2: Run analytics (always available)
+        if verbose:
+            click.echo("\n📈 Step 2: Running analytics...")
+            
+        try:
+            import asyncio
+            # Get quick analytics summary
+            results = asyncio.run(_run_productivity_analysis(config, 7))
+            click.echo(f"✅ Analytics complete:")
+            click.echo(f"   • Sessions found: {results['total_sessions']}")
+            click.echo(f"   • Cache locations: {results['cache_locations_found']}")
+            click.echo(f"   • Productivity score: {results['avg_productivity_score']}/100")
+        except Exception as e:
+            if verbose:
+                click.echo(f"⚠️  Analytics failed: {e}")
+        
+        # Step 3: Launch dashboard (unless disabled)
+        if not no_dashboard:
+            if verbose:
+                click.echo(f"\n🌐 Step 3: Launching dashboard on port {dashboard_port}...")
+            
+            # Import and start comprehensive dashboard
+            try:
+                from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+                
+                dashboard = ComprehensiveHealthDashboard()
+                
+                if not no_browser:
+                    import webbrowser
+                    import threading
+                    import time
+                    
+                    def open_browser():
+                        time.sleep(2)  # Give server time to start
+                        webbrowser.open(f"http://127.0.0.1:{dashboard_port}")
+                    
+                    threading.Thread(target=open_browser, daemon=True).start()
+                
+                dashboard_url = f"http://127.0.0.1:{dashboard_port}"
+                click.echo(f"📊 Dashboard available at: {dashboard_url}")
+                
+                if processed_any:
+                    click.echo("🎯 Check the Overview section for JSONL Processing System status")
+                
+                click.echo("Press Ctrl+C to stop the server")
+                
+                # Start the dashboard using SocketIO
+                dashboard.socketio.run(
+                    dashboard.app,
+                    host="127.0.0.1",
+                    port=dashboard_port,
+                    debug=False,
+                    use_reloader=False,
+                    allow_unsafe_werkzeug=True
+                )
+                
+            except Exception as e:
+                click.echo(f"❌ Failed to start dashboard: {e}", err=True)
+                if verbose:
+                    import traceback
+                    traceback.print_exc()
+                sys.exit(1)
+        else:
+            if verbose:
+                click.echo("\n🌐 Step 3: Dashboard launch skipped")
+                
+        if verbose:
+            click.echo("\n✅ Context Cleaner workflow completed!")
+            
+    except KeyboardInterrupt:
+        click.echo("\n👋 Context Cleaner stopped")
+    except Exception as e:
+        click.echo(f"❌ Workflow failed: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+
 # Add telemetry and JSONL command groups to main CLI
 try:
     from .commands.telemetry import add_telemetry_commands

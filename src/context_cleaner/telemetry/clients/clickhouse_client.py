@@ -315,7 +315,8 @@ class ClickHouseClient(TelemetryClient):
             # Convert records to JSON lines format with datetime handling
             def default_serializer(obj):
                 if isinstance(obj, datetime):
-                    return obj.isoformat()
+                    # Format for ClickHouse DateTime64 - remove timezone info
+                    return obj.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # Remove last 3 digits from microseconds
                 raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
             
             json_lines = '\n'.join([json.dumps(record, default=default_serializer) for record in records])

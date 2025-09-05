@@ -93,18 +93,18 @@ class FullContentQueries:
             -- Extract code context around search term
             substr(
                 file_content,
-                greatest(1, position(lower(file_content), lower({search_term:String})) - 200),
+                greatest(1, positionCaseInsensitive(file_content, {search_term:String}) - 200),
                 500
             ) as code_snippet
         FROM otel.claude_file_content
-        WHERE lower(file_content) LIKE '%' || lower({search_term:String}) || '%'
+        WHERE positionCaseInsensitive(file_content, {search_term:String}) > 0
         {language_filter}
         ORDER BY timestamp DESC
-        LIMIT 100
+        LIMIT {limit:Int32}
         """
         
         language_filter = ""
-        params = {'search_term': search_term}
+        params = {'search_term': search_term, 'limit': 100}
         
         if language:
             language_filter = "AND programming_language = {language:String}"
@@ -260,3 +260,31 @@ class FullContentQueries:
         stats['tools'] = tool_stats[0] if tool_stats else {}
         
         return stats
+    
+    async def search_tool_results(self, search_term: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Search through COMPLETE tool execution results."""
+        query = """
+        SELECT 
+            tool_name,
+            session_id,
+            message_uuid,
+            timestamp,
+            tool_input,
+            tool_output,
+            tool_error,
+            success,
+            output_size
+        FROM otel.claude_tool_results
+        WHERE positionCaseInsensitive(tool_output, {search_term:String}) > 0
+           OR positionCaseInsensitive(tool_input, {search_term:String}) > 0
+           OR positionCaseInsensitive(tool_error, {search_term:String}) > 0
+        ORDER BY timestamp DESC
+        LIMIT {limit:Int32}
+        """
+        
+        results = await self.clickhouse.execute_query(query, {
+            'search_term': search_term,
+            'limit': limit
+        })
+        
+        return results
