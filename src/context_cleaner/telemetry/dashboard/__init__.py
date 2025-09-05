@@ -11,6 +11,15 @@ from .widgets import (
     ModelEfficiencyData,
 )
 
+# Context Rot Meter components
+try:
+    from ..context_rot.widget import ContextRotMeterData
+    CONTEXT_ROT_DATA_AVAILABLE = True
+except ImportError:
+    CONTEXT_ROT_DATA_AVAILABLE = False
+    class ContextRotMeterData:
+        pass
+
 __all__ = [
     'TelemetryWidgetManager',
     'TelemetryWidgetType',
@@ -20,4 +29,5 @@ __all__ = [
     'TimeoutRiskData',
     'ToolOptimizerData',
     'ModelEfficiencyData',
+    'ContextRotMeterData',
 ]

@@ -3,10 +3,13 @@
 from .analyzer import ContextRotAnalyzer
 from .security import SecureContextRotAnalyzer, PrivacyConfig
 from .monitor import ProductionReadyContextRotMonitor
+from .widget import ContextRotWidget, ContextRotMeterData
 
 __all__ = [
     'ContextRotAnalyzer',
     'SecureContextRotAnalyzer', 
     'PrivacyConfig',
-    'ProductionReadyContextRotMonitor'
+    'ProductionReadyContextRotMonitor',
+    'ContextRotWidget',
+    'ContextRotMeterData'
 ]
