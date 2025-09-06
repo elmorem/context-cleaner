@@ -41,6 +41,16 @@ class SentimentScore(Enum):
     CONFUSED = "confused"
 
 
+class SentimentCategory(Enum):
+    """Extended sentiment categories for detailed analysis."""
+    JOY = "joy"
+    NEUTRAL = "neutral"
+    ANGER = "anger"
+    FRUSTRATION = "frustration"
+    SADNESS = "sadness"
+    CONFUSION = "confusion"
+
+
 @dataclass
 class SentimentResult:
     """Result of sentiment analysis with confidence scoring."""
@@ -71,7 +81,16 @@ class ConversationFlow:
     repetition_ratio: float      # Ratio of repeated concepts
     escalation_detected: bool    # Increasing frustration over time
     flow_quality_score: float   # 0.0 to 1.0 (higher = better flow)
-    pattern_evidence: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ConversationFlowResult:
+    """Result of conversation flow analysis."""
+    flow_score: float            # Overall flow quality (0.0 to 1.0)
+    patterns_detected: List[str] = field(default_factory=list)
+    anomalies: List[str] = field(default_factory=list)
+    confidence: float = 0.0      # Confidence in analysis (0.0 to 1.0)
+    processing_time_ms: float = 0.0
 
 
 class SentimentPipeline:

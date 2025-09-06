@@ -25,10 +25,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from collections import defaultdict, deque
+from enum import Enum
 
 from ..clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
+
+
+class SensitivityFeedback(Enum):
+    """User feedback on sensitivity levels."""
+    TOO_SENSITIVE = "too_sensitive"
+    APPROPRIATE = "appropriate" 
+    NOT_SENSITIVE_ENOUGH = "not_sensitive_enough"
 
 
 @dataclass
