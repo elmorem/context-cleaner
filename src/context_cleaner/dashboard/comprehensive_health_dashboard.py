@@ -1865,13 +1865,23 @@ class ComprehensiveHealthDashboard:
             try:
                 # Get time range parameter from query string (default to 7days)
                 time_range = request.args.get('timeRange', '7days')
+                session_id = request.args.get('sessionId')  # Optional session ID for Context Rot Meter
                 
                 # Convert time range to days for backend processing
                 time_range_days = {
                     'today': 1,
                     '7days': 7, 
-                    '30days': 30
+                    '30days': 30,
+                    '30minutes': 1/48,    # 30 minutes = 1/48 of a day
+                    '60minutes': 1/24,    # 1 hour = 1/24 of a day
+                    '180minutes': 1/8,    # 3 hours = 1/8 of a day
+                    '360minutes': 1/4,    # 6 hours = 1/4 of a day
+                    '720minutes': 1/2     # 12 hours = 1/2 of a day
                 }.get(time_range, 7)
+                
+                # Debug logging for Context Rot Meter
+                if widget_type == 'context-rot-meter':
+                    logger.info(f"Context Rot Meter API called: hasattr={hasattr(self, 'telemetry_widgets')}, telemetry_widgets={getattr(self, 'telemetry_widgets', None) is not None}")
                 
                 if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
                     # Use asyncio to run async widget data retrieval
@@ -1884,6 +1894,7 @@ class ComprehensiveHealthDashboard:
                         'timeout-risk': 'TIMEOUT_RISK',
                         'tool-optimizer': 'TOOL_OPTIMIZER',
                         'model-efficiency': 'MODEL_EFFICIENCY',
+                        'context-rot-meter': 'CONTEXT_ROT_METER',  # Phase 3: Context Rot Meter
                         # Phase 4: JSONL Analytics Widgets
                         'conversation-timeline': 'CONVERSATION_TIMELINE',
                         'code-pattern-analysis': 'CODE_PATTERN_ANALYSIS',
@@ -1894,8 +1905,14 @@ class ComprehensiveHealthDashboard:
                         try:
                             from ..telemetry.dashboard.widgets import TelemetryWidgetType
                             widget_enum = getattr(TelemetryWidgetType, widget_map[widget_type])
+                            
+                            # Debug logging for Context Rot Meter enum
+                            if widget_type == 'context-rot-meter':
+                                logger.info(f"Context Rot Meter: widget_enum={widget_enum}, type={type(widget_enum)}")
+                                logger.info(f"Context Rot Meter: calling get_widget_data with session_id={session_id}, time_range_days={time_range_days}")
+                            
                             data = loop.run_until_complete(
-                                self.telemetry_widgets.get_widget_data(widget_enum, time_range_days=time_range_days)
+                                self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
                             )
                             loop.close()
                             return jsonify({
@@ -1908,7 +1925,11 @@ class ComprehensiveHealthDashboard:
                             })
                         except Exception as e:
                             loop.close()
-                            logger.warning(f"Error getting telemetry widget {widget_type}: {e}")
+                            import traceback
+                            logger.error(f"Error getting telemetry widget {widget_type}: {e}")
+                            logger.error(f"Traceback: {traceback.format_exc()}")
+                            if widget_type == 'context-rot-meter':
+                                logger.error(f"Context Rot Meter specific error: widget_enum={widget_enum}, exception_type={type(e)}")
                             
                 return jsonify({
                     'title': f'{widget_type.replace("-", " ").title()}',

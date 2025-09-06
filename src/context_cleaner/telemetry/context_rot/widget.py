@@ -6,7 +6,15 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
-from ..dashboard.widgets import WidgetData, TelemetryWidgetType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..dashboard.widgets import WidgetData, TelemetryWidgetType
+else:
+    # Use lazy import to avoid circular dependency
+    def get_widget_classes():
+        from ..dashboard.widgets import WidgetData, TelemetryWidgetType
+        return WidgetData, TelemetryWidgetType
 from ..clients.clickhouse_client import ClickHouseClient
 from .analyzer import ContextRotAnalyzer
 
@@ -43,8 +51,6 @@ class ContextRotMeterData:
 class ContextRotWidget:
     """Context Rot Meter widget for real-time conversation quality monitoring."""
     
-    widget_type = TelemetryWidgetType.CONTEXT_ROT_METER
-    
     def __init__(self, clickhouse_client: ClickHouseClient, context_rot_analyzer: ContextRotAnalyzer):
         """
         Initialize Context Rot Widget.
@@ -59,7 +65,29 @@ class ContextRotWidget:
         self._cache = {}
         self._cache_ttl = 30  # seconds
         
-    async def get_widget_data(self, session_id: Optional[str] = None, time_window_minutes: int = 30) -> WidgetData:
+        # Initialize widget_type during __init__ to avoid lazy import issues
+        try:
+            WidgetData, TelemetryWidgetType = get_widget_classes()
+            self._widget_type = TelemetryWidgetType.CONTEXT_ROT_METER
+        except Exception as e:
+            logger.error(f"Failed to initialize widget_type: {e}")
+            # Fallback - will be set properly later
+            self._widget_type = None
+    
+    @property
+    def widget_type(self):
+        """Get widget type, with fallback initialization if needed."""
+        if self._widget_type is None:
+            try:
+                WidgetData, TelemetryWidgetType = get_widget_classes()
+                self._widget_type = TelemetryWidgetType.CONTEXT_ROT_METER
+            except Exception as e:
+                logger.error(f"Failed to get widget_type: {e}")
+                # Return a string fallback to prevent further errors
+                return "context_rot_meter"
+        return self._widget_type
+        
+    async def get_widget_data(self, session_id: Optional[str] = None, time_window_minutes: int = 30):
         """
         Get context rot widget data for dashboard display.
         
@@ -71,6 +99,9 @@ class ContextRotWidget:
             WidgetData formatted for dashboard consumption
         """
         start_time = datetime.now()
+        
+        # Get widget classes to avoid circular import
+        WidgetData, TelemetryWidgetType = get_widget_classes()
         
         try:
             # Check cache first
@@ -163,7 +194,7 @@ class ContextRotWidget:
                 attention_alerts=int(metrics.get('attention_alerts', 0)),
                 time_window_minutes=time_window_minutes,
                 recommendations=health_analysis.get('recommendations', []),
-                analysis_latency_ms=float(system_metrics.get('memory_usage_mb', 0.0)),
+                analysis_latency_ms=float(system_metrics.get('analysis_latency_ms', 0.0)),
                 memory_usage_mb=float(system_metrics.get('memory_usage_mb', 0.0)),
                 hourly_averages=trends.get('hourly_trends', [])
             )
@@ -326,8 +357,10 @@ class ContextRotWidget:
         
         return alerts
     
-    def _get_error_widget_data(self, error_message: str, session_id: Optional[str]) -> WidgetData:
+    def _get_error_widget_data(self, error_message: str, session_id: Optional[str]):
         """Create error widget data when analysis fails."""
+        WidgetData, TelemetryWidgetType = get_widget_classes()
+        
         title = f"Context Rot - Error"
         if session_id:
             title = f"Context Rot - Session {session_id[:8]}... (Error)"

@@ -1364,6 +1364,16 @@
                         <div id="model-efficiency-widget" class="loading">Loading model efficiency data...</div>
                     </div>
                 </div>
+
+                <div class="widget-card">
+                    <div class="widget-header">
+                        <h3 class="widget-title">Context Rot Meter</h3>
+                        <div class="status-indicator status-healthy"></div>
+                    </div>
+                    <div class="widget-content">
+                        <div id="context-rot-meter-widget" class="loading">Loading context rot analysis...</div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -2209,7 +2219,7 @@ LIMIT 20</textarea>
 
         // Load telemetry widgets
         function loadTelemetryWidgets(timeRange = '7days') {
-            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
+            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency', 'context-rot-meter'];
             widgets.forEach(widget => {
                 fetch(`/api/telemetry-widget/${widget}?timeRange=${timeRange}`)
                     .then(response => response.json())
@@ -2228,7 +2238,7 @@ LIMIT 20</textarea>
             const timeRange = document.getElementById('telemetry-time-range').value;
             
             // Show loading state for all widgets
-            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency'];
+            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency', 'context-rot-meter'];
             widgets.forEach(widget => {
                 const element = document.getElementById(`${widget}-widget`);
                 if (element) {
@@ -3571,6 +3581,170 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                         </button>
                     </div>
                 `;
+            } else if (widgetType === 'context-rot-meter') {
+                const contextRotData = data.data || {};
+                const contextRot = contextRotData.context_rot || {};
+                
+                // Helper function to get explanation for rot score
+                function getRotScoreExplanation(score) {
+                    const scorePercent = (score * 100).toFixed(1);
+                    if (score < 0.3) return `${scorePercent}% - Excellent! Your conversation is focused and efficient with minimal repetition.`;
+                    if (score < 0.5) return `${scorePercent}% - Good conversation quality with some minor repetitive patterns.`;
+                    if (score < 0.7) return `${scorePercent}% - Moderate issues detected. Consider clarifying context or avoiding circular discussions.`;
+                    return `${scorePercent}% - High rot detected. The conversation may be stuck in loops or losing focus.`;
+                }
+                
+                // Helper function to get confidence explanation  
+                function getConfidenceExplanation(confidence) {
+                    const confPercent = (confidence * 100).toFixed(0);
+                    if (confidence > 0.8) return `${confPercent}% - High confidence. Analysis based on substantial conversation data.`;
+                    if (confidence > 0.6) return `${confPercent}% - Good confidence. Sufficient data for reliable analysis.`;
+                    if (confidence > 0.4) return `${confPercent}% - Moderate confidence. Limited data may affect accuracy.`;
+                    return `${confPercent}% - Low confidence. Analysis based on minimal data - consider longer time window.`;
+                }
+                
+                // Helper function to get trend explanation
+                function getTrendExplanation(trend) {
+                    if (trend === 'improving') return 'Your conversation quality is getting better over time! 📈';
+                    if (trend === 'degrading') return 'Conversation quality is declining. Consider refocusing or taking a break. 📉';
+                    return 'Conversation quality is stable with no significant changes. ➡️';
+                }
+
+                // Enhanced display with explanations
+                contentHtml = `
+                    <!-- Context Rot Score Explanation -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${contextRot.current_rot_score < 0.3 ? '#f0fdf4' : contextRot.current_rot_score < 0.7 ? '#fffbeb' : '#fef2f2'}; border-radius: 0.375rem; border: 1px solid ${contextRot.current_rot_score < 0.3 ? '#10b981' : contextRot.current_rot_score < 0.7 ? '#f59e0b' : '#ef4444'};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <div style="font-weight: 600; color: #374151;">🎯 Context Rot Score</div>
+                            <div style="color: ${contextRot.session_health_status === 'healthy' ? '#059669' : contextRot.session_health_status === 'degraded' ? '#d97706' : '#dc2626'}; font-weight: 600; text-transform: capitalize;">
+                                ${contextRot.session_health_status || 'Unknown'}
+                            </div>
+                        </div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
+                            ${contextRot.current_rot_score ? getRotScoreExplanation(contextRot.current_rot_score) : 'N/A - No data available for analysis'}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
+                            💡 Context Rot measures conversation efficiency by detecting repetitive patterns, circular discussions, and focus drift.
+                        </div>
+                    </div>
+                    
+                    <!-- Confidence Level Explanation -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">🎯 Analysis Confidence</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
+                            ${contextRot.confidence_level ? getConfidenceExplanation(contextRot.confidence_level) : 'N/A - Insufficient data for confidence assessment'}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
+                            💡 Confidence reflects the reliability of our analysis based on conversation length and data quality.
+                        </div>
+                    </div>
+                    
+                    <!-- Trend Analysis Explanation -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${contextRot.trend_direction === 'improving' ? '#f0fdf4' : contextRot.trend_direction === 'degrading' ? '#fef2f2' : '#f8fafc'}; border-radius: 0.375rem; border: 1px solid ${contextRot.trend_direction === 'improving' ? '#10b981' : contextRot.trend_direction === 'degrading' ? '#ef4444' : '#e2e8f0'};">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">📈 Quality Trend</div>
+                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
+                            ${contextRot.trend_direction ? getTrendExplanation(contextRot.trend_direction) : 'Stable - No significant trend detected ➡️'}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
+                            💡 Trend analysis compares recent conversation quality with earlier patterns to show improvement or decline.
+                        </div>
+                    </div>
+
+                    <!-- Measurement Summary -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fafafa; border-radius: 0.375rem; border: 1px solid #e5e5e5;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">📊 Analysis Summary</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem;">
+                            <div><strong>Measurements:</strong> ${contextRot.measurements_count || 0}</div>
+                            <div><strong>Alerts:</strong> ${contextRot.attention_alerts || 0}</div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.5rem; font-style: italic;">
+                            📋 Based on ${contextRot.time_window_minutes || 30} minutes of conversation data
+                        </div>
+                    </div>
+                `;
+                
+                // Add User Activation Interface
+                contentHtml += `
+                    <!-- User Activation Interface -->
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem; color: #374151;">🔍 Analyze Your Conversation</div>
+                        
+                        <!-- Session ID Input -->
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="display: block; font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem;">
+                                Session ID (optional - leave blank for current session):
+                            </label>
+                            <input type="text" id="context-rot-session-id" placeholder="e.g., abc123def456..." 
+                                style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;">
+                        </div>
+                        
+                        <!-- Time Window Selection -->
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="display: block; font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem;">
+                                Analysis Time Window:
+                            </label>
+                            <select id="context-rot-time-window" 
+                                style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;">
+                                <option value="30">Last 30 minutes</option>
+                                <option value="60">Last 1 hour</option>
+                                <option value="180">Last 3 hours</option>
+                                <option value="360">Last 6 hours</option>
+                                <option value="720">Last 12 hours</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button onclick="analyzeContextRot()" id="analyze-context-rot-btn"
+                                style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; flex: 1; min-width: 120px;"
+                                onmouseover="this.style.background='#1d4ed8'" 
+                                onmouseout="this.style.background='#2563eb'">
+                                🔍 Analyze Now
+                            </button>
+                            <button onclick="startLiveMonitoring()" id="live-monitoring-btn"
+                                style="background: #059669; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; flex: 1; min-width: 120px;"
+                                onmouseover="this.style.background='#047857'" 
+                                onmouseout="this.style.background='#059669'">
+                                📊 Live Monitor
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Show recommendations if available
+                if (contextRot.recommendations && contextRot.recommendations.length > 0) {
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fff7ed; border: 1px solid #f59e0b; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #d97706; margin-bottom: 0.5rem;">💡 Recommendations:</div>
+                            <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #92400e;">
+                                ${contextRot.recommendations.slice(0, 3).map(rec => `<li style="margin-bottom: 0.25rem;">${rec}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                // Show historical data if available  
+                if (contextRot.hourly_averages && contextRot.hourly_averages.length > 0) {
+                    const recentHours = contextRot.hourly_averages.slice(-6);
+                    contentHtml += `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f0fdf4; border: 1px solid #10b981; border-radius: 0.375rem;">
+                            <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">📈 Recent Trends (Last 6 Hours):</div>
+                            <div style="font-size: 0.8rem; color: #047857;">
+                                ${recentHours.map((hour, idx) => `
+                                    <div style="display: inline-block; margin-right: 1rem; margin-bottom: 0.25rem;">
+                                        ${idx + 1}: ${(hour.avg_rot * 100).toFixed(0)}%
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                contentHtml += `
+                    <div style="margin-top: 1rem; font-size: 0.75rem; color: #9ca3af; text-align: center;">
+                        💡 Tip: Context Rot Meter analyzes conversation quality, repetition patterns, and efficiency metrics
+                    </div>
+                `;
             } else {
                 // Fallback for unknown widget types
                 contentHtml = `
@@ -4748,6 +4922,148 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             };
             return colors[riskLevel] || '#6b7280';
         }
+
+        // Context Rot Analysis Functions
+        let contextRotLiveMonitoring = false;
+        let contextRotMonitoringInterval = null;
+
+        async function analyzeContextRot() {
+            const sessionId = document.getElementById('context-rot-session-id').value.trim();
+            const timeWindow = document.getElementById('context-rot-time-window').value;
+            const button = document.getElementById('analyze-context-rot-btn');
+            
+            // Show loading state
+            button.innerHTML = '🔄 Analyzing...';
+            button.disabled = true;
+            
+            try {
+                // Build API URL with parameters
+                const params = new URLSearchParams({
+                    timeRange: `${timeWindow}minutes`
+                });
+                if (sessionId) {
+                    params.append('sessionId', sessionId);
+                }
+                
+                const response = await fetch(`/api/telemetry-widget/context-rot-meter?${params}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                // Update the widget with fresh data
+                renderTelemetryWidget('context-rot-meter', data);
+                
+                // Show success feedback
+                showContextRotNotification('Analysis complete! Results updated above.', 'success');
+                
+            } catch (error) {
+                console.error('Context rot analysis failed:', error);
+                showContextRotNotification(`Analysis failed: ${error.message}`, 'error');
+            } finally {
+                // Reset button
+                button.innerHTML = '🔍 Analyze Now';
+                button.disabled = false;
+            }
+        }
+
+        function startLiveMonitoring() {
+            const button = document.getElementById('live-monitoring-btn');
+            
+            if (contextRotLiveMonitoring) {
+                // Stop monitoring
+                stopContextRotMonitoring();
+            } else {
+                // Start monitoring
+                contextRotLiveMonitoring = true;
+                button.innerHTML = '⏹️ Stop Monitor';
+                button.style.background = '#dc2626';
+                button.onmouseover = function() { this.style.background = '#b91c1c'; };
+                button.onmouseout = function() { this.style.background = '#dc2626'; };
+                
+                // Start periodic analysis
+                contextRotMonitoringInterval = setInterval(() => {
+                    analyzeContextRot();
+                }, 30000); // Every 30 seconds
+                
+                // Run initial analysis
+                analyzeContextRot();
+                
+                showContextRotNotification('Live monitoring started - analyzing every 30 seconds', 'info');
+            }
+        }
+
+        function stopContextRotMonitoring() {
+            contextRotLiveMonitoring = false;
+            if (contextRotMonitoringInterval) {
+                clearInterval(contextRotMonitoringInterval);
+                contextRotMonitoringInterval = null;
+            }
+            
+            const button = document.getElementById('live-monitoring-btn');
+            button.innerHTML = '📊 Live Monitor';
+            button.style.background = '#059669';
+            button.onmouseover = function() { this.style.background = '#047857'; };
+            button.onmouseout = function() { this.style.background = '#059669'; };
+            
+            showContextRotNotification('Live monitoring stopped', 'info');
+        }
+
+        function showContextRotNotification(message, type = 'info') {
+            // Create notification element if it doesn't exist
+            let notification = document.getElementById('context-rot-notification');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'context-rot-notification';
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 12px 16px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: white;
+                    z-index: 10000;
+                    min-width: 300px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    transition: all 0.3s ease;
+                    transform: translateX(100%);
+                    opacity: 0;
+                `;
+                document.body.appendChild(notification);
+            }
+            
+            // Set color based on type
+            const colors = {
+                success: '#059669',
+                error: '#dc2626',
+                info: '#2563eb',
+                warning: '#d97706'
+            };
+            notification.style.background = colors[type] || colors.info;
+            notification.textContent = message;
+            
+            // Show notification
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+                notification.style.opacity = '1';
+            }, 100);
+            
+            // Hide after 4 seconds
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                notification.style.opacity = '0';
+            }, 4000);
+        }
+
+        // Clean up monitoring on page unload
+        window.addEventListener('beforeunload', () => {
+            if (contextRotLiveMonitoring) {
+                stopContextRotMonitoring();
+            }
+        });
     </script>
     
     <!-- Error Details Modal -->

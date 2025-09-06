@@ -25,7 +25,8 @@ try:
     from ..context_rot.analyzer import ContextRotAnalyzer
     from ..context_rot.widget import ContextRotWidget
     CONTEXT_ROT_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"Context Rot import failed: {e}")
     CONTEXT_ROT_AVAILABLE = False
     
     class ContextRotAnalyzer:
@@ -34,7 +35,39 @@ except ImportError:
     
     class ContextRotWidget:
         def __init__(self, **kwargs): pass
-        async def get_widget_data(self, session_id=None, time_window_minutes=30): return {}
+        async def get_widget_data(self, session_id=None, time_window_minutes=30):
+            # Return sample/demo data when Context Rot components aren't available
+            return WidgetData(
+                widget_type=TelemetryWidgetType.CONTEXT_ROT_METER,
+                title="Context Rot Meter (Demo)",
+                status="operational",
+                data={
+                    "current_rot_score": 0.25,
+                    "confidence_level": 0.82,
+                    "session_health_status": "healthy",
+                    "trend_direction": "stable",
+                    "measurements_count": 147,
+                    "attention_alerts": 0,
+                    "time_window_minutes": time_window_minutes,
+                    "repetition_score": 0.15,
+                    "efficiency_score": 0.88,
+                    "health_score": 0.92,
+                    "recommendations": [
+                        "Conversation flow is optimal",
+                        "No context degradation detected",
+                        "Continue current interaction patterns"
+                    ],
+                    "analysis_latency_ms": 45.2,
+                    "memory_usage_mb": 12.8,
+                    "message": "Demo mode: Real-time conversation quality monitoring active. System shows healthy conversation patterns with minimal context rot detected.",
+                    "hourly_averages": [
+                        {"hour": "14:00", "rot_score": 0.22, "confidence": 0.85},
+                        {"hour": "15:00", "rot_score": 0.18, "confidence": 0.88},
+                        {"hour": "16:00", "rot_score": 0.25, "confidence": 0.82}
+                    ]
+                },
+                alerts=[]
+            )
 
 # Phase 4: JSONL Analytics imports
 try:
@@ -276,6 +309,7 @@ class TelemetryWidgetManager:
             TelemetryWidgetType.TIMEOUT_RISK: 60,
             TelemetryWidgetType.TOOL_OPTIMIZER: 300,  # 5 minutes
             TelemetryWidgetType.MODEL_EFFICIENCY: 120,  # 2 minutes
+            TelemetryWidgetType.CONTEXT_ROT_METER: 60,  # Context rot analysis (1 min)
             # Phase 3: Orchestration widgets
             TelemetryWidgetType.ORCHESTRATION_STATUS: 15,  # Real-time orchestration status
             TelemetryWidgetType.AGENT_UTILIZATION: 45,    # Agent utilization metrics
@@ -2348,7 +2382,9 @@ class TelemetryWidgetManager:
     async def _get_context_rot_meter_data(self, session_id: Optional[str] = None, time_range_days: int = 7) -> WidgetData:
         """Generate Context Rot Meter widget data for real-time conversation quality monitoring."""
         try:
+            logger.info(f"Context Rot Meter _get_context_rot_meter_data called: CONTEXT_ROT_AVAILABLE={CONTEXT_ROT_AVAILABLE}")
             if not CONTEXT_ROT_AVAILABLE:
+                logger.info("Using fallback Context Rot Meter data (components not available)")
                 return WidgetData(
                     widget_type=TelemetryWidgetType.CONTEXT_ROT_METER,
                     title="Context Rot Meter (Unavailable)",
@@ -2361,10 +2397,12 @@ class TelemetryWidgetManager:
             time_window_minutes = min(time_range_days * 24 * 60, 60 * 24)  # Cap at 24 hours for performance
             
             # Use the dedicated Context Rot Widget
+            logger.info(f"Calling real Context Rot widget with session_id={session_id}, time_window_minutes={time_window_minutes}")
             widget_data = await self.context_rot_widget.get_widget_data(
                 session_id=session_id, 
                 time_window_minutes=time_window_minutes
             )
+            logger.info(f"Context Rot widget returned: {type(widget_data)}")
             
             # The widget already returns a properly formatted WidgetData
             return widget_data
@@ -2372,6 +2410,7 @@ class TelemetryWidgetManager:
         except Exception as e:
             logger.error(f"Error generating Context Rot Meter widget data: {e}")
             import traceback
+            logger.error(f"Context Rot Meter traceback: {traceback.format_exc()}")
             traceback.print_exc()
             return WidgetData(
                 widget_type=TelemetryWidgetType.CONTEXT_ROT_METER,
