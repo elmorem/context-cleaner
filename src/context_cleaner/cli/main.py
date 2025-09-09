@@ -1081,6 +1081,13 @@ try:
 except ImportError:
     pass  # Migration commands optional
 
+# Add bridge service commands
+try:
+    from .commands.bridge_service import bridge
+    main.add_command(bridge)
+except ImportError:
+    pass  # Bridge service commands optional
+
 
 # Add the stop command for service shutdown
 @main.command()
