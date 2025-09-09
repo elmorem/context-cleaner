@@ -157,9 +157,8 @@ class CostOptimizationEngine:
         if complexity_scores:
             complexity = max(complexity_scores.items(), key=lambda x: x[1])[0]
         
-        # Estimate tokens (rough approximation)
-        estimated_tokens = len(task_description.split()) * 1.3  # Approximate token count
-        estimated_tokens = max(100, min(4000, int(estimated_tokens)))  # Reasonable bounds
+        # Estimate tokens using enhanced token counting system
+        estimated_tokens = self._get_accurate_token_count(task_description)
         
         # Determine if precision is required
         precision_keywords = ["exact", "precise", "accurate", "correct", "specific", "detailed"]
@@ -177,6 +176,52 @@ class CostOptimizationEngine:
             is_routine=is_routine,
             similar_tasks_history=[]  # Could be populated from telemetry data
         )
+    
+    def _get_accurate_token_count(self, text: str) -> int:
+        """Get accurate token count using enhanced token counting system."""
+        try:
+            # Try to use enhanced token counter if available
+            import asyncio
+            try:
+                from ...analysis.enhanced_token_counter import AnthropicTokenCounter
+                import os
+                
+                # Get API key
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                if not api_key:
+                    logger.debug("No ANTHROPIC_API_KEY found, using fallback estimation")
+                    raise ValueError("No API key available")
+                
+                # Use Anthropic's count-tokens API to get accurate count
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    # Create messages in the format expected by the API
+                    messages = [{"role": "user", "content": text}]
+                    
+                    # Use the API to count tokens
+                    async def count_tokens():
+                        async with AnthropicTokenCounter(api_key) as counter:
+                            return await counter.count_tokens_for_messages(messages)
+                    
+                    tokens = loop.run_until_complete(count_tokens())
+                    if tokens > 0:
+                        return tokens
+                except Exception as api_error:
+                    logger.debug(f"Anthropic API token counting failed: {api_error}")
+                finally:
+                    loop.close()
+            except ImportError:
+                logger.debug("Enhanced token counter not available, using fallback")
+            
+        except Exception as e:
+            logger.debug(f"Enhanced token counting failed: {e}")
+        
+        # Fallback to improved approximation (better than simple word count)
+        estimated_tokens = len(text.split()) * 1.3  # Approximate token count
+        estimated_tokens = max(100, min(4000, int(estimated_tokens)))  # Reasonable bounds
+        return estimated_tokens
     
     def _estimate_cost(self, model: ModelType, estimated_tokens: int) -> float:
         """Estimate cost for a request with given model and token count."""

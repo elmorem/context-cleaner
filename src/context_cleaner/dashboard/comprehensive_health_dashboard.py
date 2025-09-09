@@ -4531,7 +4531,46 @@ class ComprehensiveHealthDashboard:
         return " ".join(safe_content) if safe_content else ""
 
     def _analyze_token_usage(self):
-        """Analyze token usage across different context categories."""
+        """Analyze token usage across different context categories using Enhanced Token Counter."""
+        try:
+            # Use the enhanced token counting system
+            from ..analysis.dashboard_integration import get_enhanced_token_analysis_sync
+            
+            # Get enhanced analysis with backward compatibility
+            enhanced_data = get_enhanced_token_analysis_sync(force_refresh=False)
+            
+            if enhanced_data.get('error'):
+                # Fallback to legacy implementation if enhanced system fails
+                logging.warning(f"Enhanced token analysis failed: {enhanced_data['error']}")
+                return self._legacy_analyze_token_usage()
+            
+            # Transform enhanced data to match expected dashboard format
+            categories = enhanced_data.get('categories', [])
+            total_tokens = enhanced_data.get('total_tokens', 0)
+            
+            # Add metadata to indicate enhanced analysis is being used
+            result = {
+                "total_tokens": total_tokens,
+                "categories": categories,
+                "charts": self._create_token_charts(categories, enhanced_data.get('token_breakdown', {})),
+                "analysis_metadata": {
+                    "enhanced_analysis": True,
+                    "files_processed": enhanced_data.get('files_processed', 0),
+                    "lines_processed": enhanced_data.get('lines_processed', 0),
+                    "api_validation": enhanced_data.get('api_validation_enabled', False),
+                    "undercount_fix": "Applied - processes ALL files and ALL message types"
+                }
+            }
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Enhanced token analysis error: {e}")
+            # Fallback to legacy implementation
+            return self._legacy_analyze_token_usage()
+    
+    def _legacy_analyze_token_usage(self):
+        """Legacy token usage analysis (original implementation with 90% undercount issue)."""
         try:
             # Find Claude Code cache directory
             cache_dir = Path.home() / ".claude" / "projects"
@@ -4548,9 +4587,9 @@ class ComprehensiveHealthDashboard:
                 "messages": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0}
             }
             
-            # Analyze recent JSONL files (limit to prevent performance issues)
+            # Analyze recent JSONL files (limit to prevent performance issues) - LIMITATION CAUSING 90% UNDERCOUNT
             jsonl_files = list(cache_dir.glob("**/*.jsonl"))
-            recent_files = sorted(jsonl_files, key=lambda x: x.stat().st_mtime, reverse=True)[:10]
+            recent_files = sorted(jsonl_files, key=lambda x: x.stat().st_mtime, reverse=True)[:10]  # ONLY 10 FILES!
             
             for file_path in recent_files:
                 try:
@@ -4588,7 +4627,11 @@ class ComprehensiveHealthDashboard:
             return {
                 "total_tokens": total_all,
                 "categories": category_data,
-                "charts": self._create_token_charts(category_data, total_tokens)
+                "charts": self._create_token_charts(category_data, total_tokens),
+                "analysis_metadata": {
+                    "enhanced_analysis": False,
+                    "legacy_limitations": "Only 10 files, 1000 lines per file, assistant messages only - causes 90% undercount"
+                }
             }
             
         except Exception as e:

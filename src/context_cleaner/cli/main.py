@@ -1067,6 +1067,20 @@ try:
 except ImportError:
     pass  # JSONL commands optional
 
+# Add enhanced token analysis commands 
+try:
+    from .commands.enhanced_token_analysis import token_analysis
+    main.add_command(token_analysis)
+except ImportError:
+    pass  # Enhanced token analysis commands optional
+
+# Add migration commands 
+try:
+    from .commands.migration import migration
+    main.add_command(migration)
+except ImportError:
+    pass  # Migration commands optional
+
 
 # Add the stop command for service shutdown
 @main.command()
