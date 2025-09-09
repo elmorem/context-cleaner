@@ -1,29 +1,336 @@
-"""ClickHouse client for telemetry data access."""
+"""ClickHouse client for telemetry data access with enhanced connection management."""
 
 import os
 import asyncio
-from typing import Dict, List, Any, Optional
+import time
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 import subprocess
 import json
 import logging
+from dataclasses import dataclass, field
+from enum import Enum
+import random
+import contextlib
 
 from .base import TelemetryClient, SessionMetrics, ErrorEvent, TelemetryEvent
 
 logger = logging.getLogger(__name__)
 
 
-class ClickHouseClient(TelemetryClient):
-    """ClickHouse client for accessing Claude Code telemetry data."""
+class ConnectionStatus(Enum):
+    """Connection status enumeration."""
     
-    def __init__(self, host: str = "localhost", port: int = 9000, database: str = "otel"):
+    HEALTHY = "healthy"
+    DEGRADED = "degraded" 
+    UNHEALTHY = "unhealthy"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class ConnectionMetrics:
+    """Metrics for connection health monitoring."""
+    
+    total_queries: int = 0
+    successful_queries: int = 0
+    failed_queries: int = 0
+    average_response_time_ms: float = 0.0
+    last_success_timestamp: Optional[datetime] = None
+    last_failure_timestamp: Optional[datetime] = None
+    consecutive_failures: int = 0
+    connection_established_at: datetime = field(default_factory=datetime.now)
+    
+    @property
+    def success_rate(self) -> float:
+        """Calculate success rate percentage."""
+        if self.total_queries == 0:
+            return 100.0
+        return (self.successful_queries / self.total_queries) * 100.0
+    
+    @property 
+    def failure_rate(self) -> float:
+        """Calculate failure rate percentage."""
+        return 100.0 - self.success_rate
+
+
+@dataclass
+class ConnectionPool:
+    """Connection pool management for ClickHouse operations."""
+    
+    max_connections: int = 5
+    connection_timeout_seconds: int = 30
+    query_timeout_seconds: int = 60
+    health_check_interval_seconds: int = 60
+    max_consecutive_failures: int = 3
+    
+    # Internal state
+    active_connections: int = 0
+    metrics: ConnectionMetrics = field(default_factory=ConnectionMetrics)
+    _last_health_check: datetime = field(default_factory=datetime.now)
+    _circuit_breaker_open: bool = False
+    _circuit_breaker_open_until: Optional[datetime] = None
+
+
+class ClickHouseClient(TelemetryClient):
+    """Enhanced ClickHouse client with connection pooling and health monitoring."""
+    
+    def __init__(
+        self, 
+        host: str = "localhost", 
+        port: int = 9000, 
+        database: str = "otel",
+        max_connections: int = 5,
+        connection_timeout: int = 30,
+        query_timeout: int = 60,
+        enable_health_monitoring: bool = True
+    ):
         self.host = host
         self.port = port
         self.database = database
         self.connection_string = f"tcp://{host}:{port}"
         
+        # Enhanced connection management
+        self.pool = ConnectionPool(
+            max_connections=max_connections,
+            connection_timeout_seconds=connection_timeout,
+            query_timeout_seconds=query_timeout
+        )
+        self.enable_health_monitoring = enable_health_monitoring
+        
+        # Connection state
+        self._is_initialized = False
+        self._health_check_task: Optional[asyncio.Task] = None
+        self._connection_lock = asyncio.Lock()
+        
+        logger.info(f"Initialized ClickHouseClient with enhanced features: "
+                   f"host={host}, port={port}, database={database}, "
+                   f"max_connections={max_connections}")
+    
+    async def initialize(self) -> bool:
+        """Initialize the client with connection pooling and health monitoring."""
+        if self._is_initialized:
+            return True
+        
+        try:
+            async with self._connection_lock:
+                if self._is_initialized:
+                    return True
+                
+                # Test initial connection
+                health_ok = await self._perform_health_check()
+                if not health_ok:
+                    logger.error("Failed initial health check during initialization")
+                    return False
+                
+                # Start health monitoring task
+                if self.enable_health_monitoring:
+                    self._health_check_task = asyncio.create_task(self._health_monitor_loop())
+                
+                self._is_initialized = True
+                logger.info("ClickHouseClient initialization completed successfully")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize ClickHouseClient: {e}")
+            return False
+    
+    async def close(self):
+        """Clean shutdown of client and resources."""
+        if self._health_check_task and not self._health_check_task.done():
+            self._health_check_task.cancel()
+            try:
+                await self._health_check_task
+            except asyncio.CancelledError:
+                pass
+        
+        async with self._connection_lock:
+            self._is_initialized = False
+            logger.info("ClickHouseClient closed successfully")
+    
+    async def _health_monitor_loop(self):
+        """Background task for periodic health monitoring."""
+        while True:
+            try:
+                await asyncio.sleep(self.pool.health_check_interval_seconds)
+                await self._perform_health_check()
+            except asyncio.CancelledError:
+                logger.debug("Health monitor loop cancelled")
+                break
+            except Exception as e:
+                logger.warning(f"Health monitor error: {e}")
+    
+    async def _perform_health_check(self) -> bool:
+        """Perform health check and update connection status."""
+        start_time = time.time()
+        
+        try:
+            # Simple health check query
+            result = await self._execute_raw_query("SELECT 1 as health", timeout=10)
+            response_time_ms = (time.time() - start_time) * 1000
+            
+            success = len(result) > 0 and result[0].get('health') == 1
+            
+            if success:
+                self._record_successful_query(response_time_ms)
+                self._reset_circuit_breaker()
+                return True
+            else:
+                self._record_failed_query("Invalid health check response")
+                return False
+                
+        except Exception as e:
+            self._record_failed_query(str(e))
+            return False
+    
+    def _record_successful_query(self, response_time_ms: float):
+        """Record successful query for metrics."""
+        metrics = self.pool.metrics
+        metrics.total_queries += 1
+        metrics.successful_queries += 1
+        metrics.consecutive_failures = 0
+        metrics.last_success_timestamp = datetime.now()
+        
+        # Update average response time (exponential moving average)
+        if metrics.average_response_time_ms == 0:
+            metrics.average_response_time_ms = response_time_ms
+        else:
+            metrics.average_response_time_ms = (
+                metrics.average_response_time_ms * 0.9 + response_time_ms * 0.1
+            )
+    
+    def _record_failed_query(self, error_message: str):
+        """Record failed query for metrics."""
+        metrics = self.pool.metrics
+        metrics.total_queries += 1
+        metrics.failed_queries += 1
+        metrics.consecutive_failures += 1
+        metrics.last_failure_timestamp = datetime.now()
+        
+        logger.warning(f"Query failed: {error_message}")
+        
+        # Trip circuit breaker if too many consecutive failures
+        if metrics.consecutive_failures >= self.pool.max_consecutive_failures:
+            self._trip_circuit_breaker()
+    
+    def _trip_circuit_breaker(self):
+        """Trip the circuit breaker to prevent further queries."""
+        self.pool._circuit_breaker_open = True
+        self.pool._circuit_breaker_open_until = (
+            datetime.now() + timedelta(seconds=60)  # 60-second timeout
+        )
+        logger.error(f"Circuit breaker tripped after {self.pool.metrics.consecutive_failures} "
+                    f"consecutive failures")
+    
+    def _reset_circuit_breaker(self):
+        """Reset the circuit breaker after successful query."""
+        if self.pool._circuit_breaker_open:
+            self.pool._circuit_breaker_open = False
+            self.pool._circuit_breaker_open_until = None
+            logger.info("Circuit breaker reset after successful query")
+    
+    def _is_circuit_breaker_open(self) -> bool:
+        """Check if circuit breaker is currently open."""
+        if not self.pool._circuit_breaker_open:
+            return False
+        
+        if (self.pool._circuit_breaker_open_until and 
+            datetime.now() > self.pool._circuit_breaker_open_until):
+            # Timeout expired, allow one test query
+            self.pool._circuit_breaker_open = False
+            self.pool._circuit_breaker_open_until = None
+            logger.info("Circuit breaker timeout expired, allowing test query")
+            return False
+        
+        return True
+    
+    async def get_connection_status(self) -> ConnectionStatus:
+        """Get current connection status."""
+        if self._is_circuit_breaker_open():
+            return ConnectionStatus.UNHEALTHY
+        
+        metrics = self.pool.metrics
+        
+        if metrics.total_queries == 0:
+            return ConnectionStatus.UNKNOWN
+        
+        success_rate = metrics.success_rate
+        response_time = metrics.average_response_time_ms
+        
+        if success_rate >= 95 and response_time < 1000:
+            return ConnectionStatus.HEALTHY
+        elif success_rate >= 80 and response_time < 5000:
+            return ConnectionStatus.DEGRADED
+        else:
+            return ConnectionStatus.UNHEALTHY
+    
+    async def get_connection_metrics(self) -> Dict[str, Any]:
+        """Get detailed connection metrics."""
+        metrics = self.pool.metrics
+        status = await self.get_connection_status()
+        
+        return {
+            "status": status.value,
+            "total_queries": metrics.total_queries,
+            "successful_queries": metrics.successful_queries,
+            "failed_queries": metrics.failed_queries,
+            "success_rate_percent": metrics.success_rate,
+            "failure_rate_percent": metrics.failure_rate,
+            "average_response_time_ms": metrics.average_response_time_ms,
+            "consecutive_failures": metrics.consecutive_failures,
+            "circuit_breaker_open": self.pool._circuit_breaker_open,
+            "last_success": metrics.last_success_timestamp.isoformat() if metrics.last_success_timestamp else None,
+            "last_failure": metrics.last_failure_timestamp.isoformat() if metrics.last_failure_timestamp else None,
+            "connection_established_at": metrics.connection_established_at.isoformat(),
+            "max_connections": self.pool.max_connections,
+            "active_connections": self.pool.active_connections,
+        }
+    
+    async def _execute_raw_query(self, query: str, timeout: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Execute raw query with connection management."""
+        timeout = timeout or self.pool.query_timeout_seconds
+        
+        try:
+            # Use docker exec to run clickhouse-client
+            cmd = [
+                "docker", "exec", "clickhouse-otel", 
+                "clickhouse-client", 
+                "--query", query,
+                "--format", "JSONEachRow"
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+            
+            if result.returncode != 0:
+                raise RuntimeError(f"ClickHouse query failed: {result.stderr}")
+            
+            # Parse JSON lines
+            results = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    try:
+                        results.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse JSON line: {line}, error: {e}")
+            
+            return results
+            
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(f"ClickHouse query timed out after {timeout}s")
+        except Exception as e:
+            raise RuntimeError(f"ClickHouse query error: {e}")
+        
     async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Execute a query against ClickHouse and return results."""
+        """Execute a query against ClickHouse with enhanced error handling and monitoring."""
+        # Check if client is initialized
+        if not self._is_initialized:
+            await self.initialize()
+        
+        # Check circuit breaker
+        if self._is_circuit_breaker_open():
+            raise RuntimeError("Circuit breaker is open due to consecutive failures")
+        
+        start_time = time.time()
+        
         try:
             # Handle parameterized queries by substituting parameters
             final_query = query
@@ -38,37 +345,102 @@ class ClickHouseClient(TelemetryClient):
                         final_query = final_query.replace(f"{{{key}:Float64}}", str(value))
                         final_query = final_query.replace(f"{{{key}:Int32}}", str(value))
             
-            # Use docker exec to run clickhouse-client
-            cmd = [
-                "docker", "exec", "clickhouse-otel", 
-                "clickhouse-client", 
-                "--query", final_query,
-                "--format", "JSONEachRow"
-            ]
+            # Execute query with monitoring
+            results = await self._execute_raw_query(final_query)
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode != 0:
-                logger.error(f"ClickHouse query failed: {result.stderr}")
-                return []
-            
-            # Parse JSON lines
-            results = []
-            for line in result.stdout.strip().split('\n'):
-                if line:
-                    try:
-                        results.append(json.loads(line))
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse JSON line: {line}, error: {e}")
+            # Record success
+            response_time_ms = (time.time() - start_time) * 1000
+            self._record_successful_query(response_time_ms)
             
             return results
             
-        except subprocess.TimeoutExpired:
-            logger.error("ClickHouse query timed out")
-            return []
         except Exception as e:
-            logger.error(f"ClickHouse query error: {e}")
+            # Record failure
+            self._record_failed_query(str(e))
+            logger.error(f"ClickHouse query failed: {e}")
             return []
+    
+    async def bulk_insert_enhanced(self, table_name: str, records: List[Dict[str, Any]], 
+                                 batch_size: int = 1000, max_retries: int = 3) -> Dict[str, Any]:
+        """
+        Enhanced bulk insert with batching, retries, and detailed result tracking.
+        
+        Args:
+            table_name: Target table name
+            records: List of records to insert
+            batch_size: Number of records per batch
+            max_retries: Maximum retry attempts per batch
+            
+        Returns:
+            Dictionary with insertion results and metrics
+        """
+        if not records:
+            return {
+                "success": True,
+                "total_records": 0,
+                "successful_records": 0,
+                "failed_records": 0,
+                "batches_processed": 0,
+                "batches_failed": 0,
+                "processing_time_seconds": 0.0,
+                "errors": []
+            }
+        
+        start_time = time.time()
+        successful_records = 0
+        failed_records = 0
+        batches_processed = 0
+        batches_failed = 0
+        errors = []
+        
+        # Process records in batches
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i + batch_size]
+            batch_success = False
+            
+            # Retry logic for each batch
+            for attempt in range(max_retries + 1):
+                try:
+                    success = await self.bulk_insert(table_name, batch)
+                    if success:
+                        successful_records += len(batch)
+                        batches_processed += 1
+                        batch_success = True
+                        break
+                    else:
+                        raise RuntimeError("Bulk insert returned False")
+                        
+                except Exception as e:
+                    if attempt == max_retries:
+                        error_msg = f"Batch {i//batch_size + 1} failed after {max_retries + 1} attempts: {e}"
+                        errors.append(error_msg)
+                        failed_records += len(batch)
+                        batches_failed += 1
+                        logger.error(error_msg)
+                    else:
+                        # Exponential backoff
+                        wait_time = 2 ** attempt
+                        await asyncio.sleep(wait_time)
+        
+        processing_time = time.time() - start_time
+        overall_success = failed_records == 0
+        
+        result = {
+            "success": overall_success,
+            "total_records": len(records),
+            "successful_records": successful_records,
+            "failed_records": failed_records,
+            "batches_processed": batches_processed,
+            "batches_failed": batches_failed,
+            "processing_time_seconds": processing_time,
+            "average_records_per_second": len(records) / processing_time if processing_time > 0 else 0,
+            "errors": errors
+        }
+        
+        logger.info(f"Bulk insert completed: {successful_records}/{len(records)} records successful "
+                   f"in {processing_time:.2f}s ({result['average_records_per_second']:.1f} records/sec)")
+        
+        return result
     
     async def get_session_metrics(self, session_id: str) -> Optional[SessionMetrics]:
         """Get comprehensive metrics for a specific session."""
@@ -314,12 +686,48 @@ class ClickHouseClient(TelemetryClient):
         }
 
     async def health_check(self) -> bool:
-        """Check if ClickHouse connection is healthy."""
+        """Check if ClickHouse connection is healthy with enhanced diagnostics."""
+        return await self._perform_health_check()
+    
+    async def comprehensive_health_check(self) -> Dict[str, Any]:
+        """Perform comprehensive health check with detailed metrics."""
+        start_time = time.time()
+        
+        health_results = {
+            "overall_healthy": False,
+            "connection_status": "unknown",
+            "database_accessible": False,
+            "response_time_ms": 0.0,
+            "error_message": None,
+            "metrics": await self.get_connection_metrics(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
         try:
-            results = await self.execute_query("SELECT 1 as health")
-            return len(results) > 0 and results[0].get('health') == 1
-        except Exception:
-            return False
+            # Basic connectivity test
+            basic_health = await self._perform_health_check()
+            health_results["overall_healthy"] = basic_health
+            
+            # Get connection status
+            status = await self.get_connection_status()
+            health_results["connection_status"] = status.value
+            
+            # Test database access
+            try:
+                results = await self._execute_raw_query(f"SHOW TABLES FROM {self.database}")
+                health_results["database_accessible"] = True
+                health_results["tables_found"] = len(results)
+            except Exception as e:
+                health_results["database_accessible"] = False
+                health_results["database_error"] = str(e)
+            
+            health_results["response_time_ms"] = (time.time() - start_time) * 1000
+            
+        except Exception as e:
+            health_results["error_message"] = str(e)
+            health_results["response_time_ms"] = (time.time() - start_time) * 1000
+        
+        return health_results
 
     # ===== JSONL CONTENT METHODS =====
     
