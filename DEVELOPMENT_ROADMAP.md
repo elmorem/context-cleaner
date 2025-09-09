@@ -297,7 +297,7 @@ elif aggressive:
   - **Testing**: CLI integration tests (92% coverage), command validation, analytics integration tests, effectiveness tracking validation
 
 #### **Week 18: Advanced Analytics & Reporting** 
-- **PR21: Enhanced Cleanup Analytics and Historical Tracking** ⚠️ **NEEDS COMPLETION** (Est: 3-5 days)
+- **PR21: Enhanced Cleanup Analytics and Historical Tracking** ⚠️ **NEEDS COMPLETION** (Est: 2-3 days)
   - **STATUS**: NOT STARTED - requires PR20 completion
   - **SCOPE**:
     - Cleanup session tracking with effectiveness measurement
@@ -308,6 +308,18 @@ elif aggressive:
     - Cross-session correlation and usage-based effectiveness measurement
   - **Dependencies**: ⚠️ Requires PR20 (CLI integration) for manipulation data collection
   - **Priority**: HIGH - needed for complete optimization analytics system
+
+#### **Week 18.5: Critical Data Bridge Implementation** ⚠️ **CRITICAL PRIORITY**
+- **PR22: Enhanced Token Analysis Database Integration** (Est: 3-4 days)
+  - **STATUS**: CRITICAL - Addresses 2.768 billion token data loss issue
+  - **SCOPE**:
+    - Create data bridge service connecting Enhanced Token Analysis to ClickHouse
+    - Implement historical data backfill process for JSONL analysis results
+    - Add database schema for enhanced token summaries and session metrics
+    - Create automated synchronization between JSONL analysis and telemetry database
+    - Implement data validation and integrity checks
+  - **Dependencies**: Requires working ClickHouse database and enhanced token counter (✅ exists)
+  - **Priority**: CRITICAL - Core functionality gap that prevents dashboard from showing accurate data
 
 ## 🎯 **PHASE 5 COMPLETION STATUS & NEXT PYPI RELEASE ASSESSMENT**
 
@@ -321,38 +333,43 @@ elif aggressive:
 - **PR19**: Interactive optimization workflow with all 4 modes ✅
 
 #### ⚠️ **REMAINING PHASE 5 TASKS** 
-- **PR20**: Enhanced CLI integration & analytics (3-4 days estimated)
-- **PR21**: Historical tracking & effectiveness measurement (3-5 days estimated)
-- **Total Remaining**: 6-9 days of focused development
+- **PR20**: Enhanced CLI integration & analytics (2-3 days estimated)
+- **PR21**: Historical tracking & effectiveness measurement (2-3 days estimated)
+- **PR22**: Critical Data Bridge Implementation (3-4 days estimated) **NEW - CRITICAL**
+- **Total Remaining**: 7-10 days of focused development
 
 ### 🚀 **NEXT PYPI RELEASE READINESS ASSESSMENT**
 
 #### **DECISION: Release Strategy Options**
 
-**Option A: Release v0.2.0 NOW (Recommended)**
+**Option A: Release v0.2.0 NOW (Not Recommended - Data Loss Issue)**
 - **Status**: Core context cleaning functionality 100% operational
 - **Value**: Users get fully functional context optimization tool
-- **Missing**: Advanced analytics and historical tracking (non-blocking)
-- **Timeline**: Ready for release immediately after testing
-- **Rationale**: Core value proposition complete, advanced features can come in v0.3.0
+- **CRITICAL ISSUE**: Dashboard cannot show accurate 2.768B token data (data bridge missing)
+- **Timeline**: BLOCKED until PR22 (data bridge) implemented
+- **Rationale**: Cannot release with 2.7B token data loss - core dashboard functionality broken
 
-**Option B: Complete Phase 5 First (v0.2.5)**  
-- **Status**: Wait for PR20 + PR21 completion (6-9 additional days)
-- **Value**: Full analytics suite with historical tracking
-- **Risk**: Delays getting working tool to users
+**Option B: Complete Phase 5 First (v0.2.5 - RECOMMENDED)**  
+- **Status**: Wait for PR20 + PR21 + PR22 completion (7-10 additional days)
+- **Value**: Full analytics suite with historical tracking AND accurate data display
+- **Requirement**: Must implement PR22 (data bridge) to resolve 2.7B token data loss
 - **Timeline**: ~1-2 weeks additional development
+- **Rationale**: Cannot release with broken dashboard - users expect accurate data
 
-#### **RECOMMENDED: Option A - Release v0.2.0 with Core Functionality**
+#### **REVISED RECOMMENDATION: Option B - Complete Phase 5 Including PR22**
 
-**Immediate Release Preparation Tasks:**
+**Phase 5 Completion Tasks (Before Release):**
 - ✅ Core context cleaning: COMPLETE (PR19 merged)
 - ✅ All optimization modes functional: COMPLETE
 - ✅ Safety & validation: COMPLETE  
 - ✅ Comprehensive test coverage: 95% success rate
+- [ ] **PR22: Critical Data Bridge Implementation (CRITICAL)** - 3-4 days
+- [ ] PR20: Enhanced CLI integration & analytics - 2-3 days
+- [ ] PR21: Historical tracking & effectiveness measurement - 2-3 days
 - [ ] Distribution packaging update (MANIFEST.in, LICENSE, setup.py validation)
 - [ ] Documentation updates (README.md, CHANGELOG.md, usage examples)
-- [ ] Version bump to v0.2.0 and changelog creation
-- [ ] Comprehensive manual testing protocol (see below)
+- [ ] Version bump to v0.2.5 and changelog creation
+- [ ] Comprehensive manual testing protocol including data bridge validation
 
 #### **🧪 COMPREHENSIVE MANUAL TESTING PROTOCOL**
 
