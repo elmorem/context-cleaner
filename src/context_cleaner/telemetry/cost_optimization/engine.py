@@ -62,6 +62,14 @@ class CostOptimizationEngine:
                 "story", "ideas", "innovative", "artistic"
             ]
         }
+
+    def _get_accurate_token_count(self, content_str: str) -> int:
+        """Get accurate token count using ccusage approach."""
+        try:
+            from ...analysis.enhanced_token_counter import get_accurate_token_count
+            return get_accurate_token_count(content_str)
+        except ImportError:
+            return 0
     
     async def should_use_haiku(self, task_description: str, session_id: str) -> bool:
         """Determine if Haiku should be used based on task analysis and budget."""
@@ -218,18 +226,19 @@ class CostOptimizationEngine:
         except Exception as e:
             logger.debug(f"Enhanced token counting failed: {e}")
         
-        # Fallback to improved approximation (better than simple word count)
-        estimated_tokens = len(text.split()) * 1.3  # Approximate token count
-        estimated_tokens = max(100, min(4000, int(estimated_tokens)))  # Reasonable bounds
-        return estimated_tokens
+        # ccusage approach: Return 0 when accurate token count is not available
+        # (no crude estimation fallbacks)
+        logger.warning("No accurate token counting method available, returning 0 (ccusage approach)")
+        return 0
     
     def _estimate_cost(self, model: ModelType, estimated_tokens: int) -> float:
         """Estimate cost for a request with given model and token count."""
         cost_data = self.model_costs[model]
         
-        # Assume input:output ratio of 4:1 (typical for most tasks)
+        # Use ccusage approach for accurate token counting
         input_tokens = estimated_tokens
-        output_tokens = estimated_tokens // 4
+        # ccusage approach: Use accurate token count when available, return 0 when not available
+        output_tokens = self._get_accurate_token_count(str(estimated_tokens)) or 0
         
         input_cost = (input_tokens / 1000) * cost_data["input_cost_per_1k_tokens"]
         output_cost = (output_tokens / 1000) * cost_data["output_cost_per_1k_tokens"]

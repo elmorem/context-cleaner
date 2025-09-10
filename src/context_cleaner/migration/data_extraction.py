@@ -386,9 +386,19 @@ class DataExtractionEngine:
                     session_metrics.content_categories[category] = 0
                 session_metrics.content_categories[category] += len(content.split())
 
-                # Estimate tokens (rough approximation)
-                estimated_tokens = len(content.split()) * 1.3  # Token-to-word ratio
-                session_metrics.calculated_total_tokens += int(estimated_tokens)
+                # Use actual token data from usage stats (ccusage approach)
+                if usage:
+                    # Use actual reported tokens when available (following ccusage accuracy)
+                    actual_tokens = (
+                        usage.get("input_tokens", 0) +
+                        usage.get("output_tokens", 0) + 
+                        usage.get("cache_creation_input_tokens", 0) +
+                        usage.get("cache_read_input_tokens", 0)
+                    )
+                    if actual_tokens > 0:
+                        session_metrics.calculated_total_tokens += actual_tokens
+                        logger.debug(f"Used {actual_tokens} actual tokens from JSONL usage data")
+                    # Skip content without actual usage data to maintain accuracy (ccusage method)
 
             # Extract timestamps
             timestamp = self._extract_timestamp(entry)

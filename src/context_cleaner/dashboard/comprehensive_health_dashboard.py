@@ -1777,10 +1777,21 @@ class ComprehensiveHealthDashboard:
                     'directories': []
                 })
 
-        @self.app.route("/api/data-explorer/query", methods=['POST'])
+        @self.app.route("/api/data-explorer/query", methods=['GET', 'POST'])
         def execute_custom_query():
             """Execute custom SQL query for data exploration."""
             try:
+                # Handle GET request for health check
+                if request.method == 'GET':
+                    return jsonify({
+                        'status': 'healthy',
+                        'message': 'Data explorer query endpoint is available. Use POST with JSON query to explore data.',
+                        'example_query': 'SELECT COUNT(*) FROM otel.messages LIMIT 10',
+                        'supported_methods': ['POST'],
+                        'last_updated': datetime.now().isoformat()
+                    })
+                
+                # Handle POST request for actual queries
                 if not request.is_json:
                     return jsonify({"error": "Request must be JSON"}), 400
                 
@@ -2463,11 +2474,11 @@ class ComprehensiveHealthDashboard:
                             SELECT 
                                 file_path,
                                 splitByChar('.', file_path)[-1] as file_extension,
-                                length(content) as file_size
+                                length(file_content) as file_size
                             FROM otel.claude_file_content
                             WHERE timestamp >= now() - INTERVAL 30 DAY
                                 AND file_path != ''
-                                AND content != ''
+                                AND file_content != ''
                         ),
                         tool_languages AS (
                             SELECT 
@@ -2552,10 +2563,20 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error in code patterns analytics endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
 
-        @self.app.route('/api/content-search', methods=['POST'])
+        @self.app.route('/api/content-search', methods=['GET', 'POST'])
         def search_content():
             """Search across conversation content, files, and tool outputs."""
             try:
+                # Handle GET request for health check
+                if request.method == 'GET':
+                    return jsonify({
+                        'results': [], 
+                        'status': 'healthy',
+                        'message': 'Content search endpoint is available. Use POST with JSON body to search.',
+                        'last_updated': datetime.now().isoformat()
+                    })
+                
+                # Handle POST request for actual search
                 if not request.is_json:
                     return jsonify({'error': 'Request must be JSON'}), 400
                 
@@ -3888,12 +3909,17 @@ class ComprehensiveHealthDashboard:
 
         except Exception as e:
             logger.warning(f"Token calculation failed, using fallback: {e}")
-            # Fallback to simple estimation
+            # ccusage approach: Return 0 when accurate token count is not available
+            # (no crude estimation fallbacks)
             try:
+                from ..analysis.enhanced_token_counter import get_accurate_token_count
                 content_str = str(context_data)
-                return len(content_str) // 4
-            except:
-                return 1000  # Safe default
+                return get_accurate_token_count(content_str)
+            except ImportError:
+                logger.warning("No accurate token counting method available, returning 0 (ccusage approach)")
+                return 0
+            except Exception:
+                return 0
 
     async def _create_fallback_health_report(self) -> ComprehensiveHealthReport:
         """Create a minimal health report when analysis fails."""

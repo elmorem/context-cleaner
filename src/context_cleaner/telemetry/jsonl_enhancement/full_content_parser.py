@@ -52,6 +52,11 @@ class FullContentJsonlParser:
                 'input_tokens': message.get('usage', {}).get('input_tokens', 0),
                 'output_tokens': message.get('usage', {}).get('output_tokens', 0),
                 'cost_usd': message.get('usage', {}).get('cost_usd', 0.0),
+                'cache_creation_input_tokens': message.get('usage', {}).get('cache_creation_input_tokens', 0),
+                'cache_read_input_tokens': message.get('usage', {}).get('cache_read_input_tokens', 0),
+                'cache_creation_tokens': message.get('usage', {}).get('cache_creation_tokens', 0),
+                'cache_read_tokens': message.get('usage', {}).get('cache_read_tokens', 0),
+                'service_tier': message.get('usage', {}).get('service_tier'),
                 'programming_languages': detected_languages
             }
             

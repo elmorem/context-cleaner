@@ -218,22 +218,39 @@ class SessionCacheParser:
             return None
 
     def _parse_token_metrics(self, usage_data: Dict[str, Any]) -> TokenMetrics:
-        """Parse token usage metrics."""
+        """Parse comprehensive token usage metrics matching ccusage approach with validation."""
         cache_creation = usage_data.get("cache_creation", {})
+        
+        def safe_int(value, default=0):
+            """Safely convert value to int, handling malformed data."""
+            try:
+                return max(0, int(value)) if value is not None else default
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid token count value: {value}, using {default}")
+                return default
+        
+        def safe_float(value, default=0.0):
+            """Safely convert value to float, handling malformed data."""
+            try:
+                return max(0.0, float(value)) if value is not None else default
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid cost value: {value}, using {default}")
+                return default
 
         return TokenMetrics(
-            input_tokens=usage_data.get("input_tokens", 0),
-            output_tokens=usage_data.get("output_tokens", 0),
-            cache_creation_input_tokens=usage_data.get(
-                "cache_creation_input_tokens", 0
-            ),
-            cache_read_input_tokens=usage_data.get("cache_read_input_tokens", 0),
-            ephemeral_5m_input_tokens=cache_creation.get(
-                "ephemeral_5m_input_tokens", 0
-            ),
-            ephemeral_1h_input_tokens=cache_creation.get(
-                "ephemeral_1h_input_tokens", 0
-            ),
+            input_tokens=safe_int(usage_data.get("input_tokens")),
+            output_tokens=safe_int(usage_data.get("output_tokens")),
+            cache_creation_input_tokens=safe_int(usage_data.get("cache_creation_input_tokens")),
+            cache_read_input_tokens=safe_int(usage_data.get("cache_read_input_tokens")),
+            ephemeral_5m_input_tokens=safe_int(cache_creation.get("ephemeral_5m_input_tokens")),
+            ephemeral_1h_input_tokens=safe_int(cache_creation.get("ephemeral_1h_input_tokens")),
+            # Extract comprehensive ccusage-style fields with validation
+            cost_usd=safe_float(usage_data.get("cost_usd")),
+            service_tier=usage_data.get("service_tier") if isinstance(usage_data.get("service_tier"), str) else None,
+            model_name=usage_data.get("model") if isinstance(usage_data.get("model"), str) else None,
+            # Handle alternative field names for backward compatibility
+            cache_creation_tokens=safe_int(usage_data.get("cache_creation_tokens")),
+            cache_read_tokens=safe_int(usage_data.get("cache_read_tokens")),
         )
 
     def _parse_tool_usage(
@@ -273,8 +290,13 @@ class SessionCacheParser:
         start_time = min(msg.timestamp for msg in messages)
         end_time = max(msg.timestamp for msg in messages)
 
-        # Calculate metrics
-        total_tokens = sum(msg.estimated_tokens for msg in messages)
+        # Calculate metrics using actual token metrics (ccusage approach)
+        total_tokens = 0
+        for msg in messages:
+            if msg.token_metrics:
+                # Use actual token metrics when available (like ccusage)
+                total_tokens += msg.token_metrics.total_tokens
+            # Skip messages without actual token metrics to maintain accuracy
 
         # Extract file operations
         file_operations = []

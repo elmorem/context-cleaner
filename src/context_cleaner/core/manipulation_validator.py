@@ -181,6 +181,14 @@ class ManipulationValidator:
             "Enhanced ManipulationValidator initialized with safety constraints"
         )
 
+    def _get_accurate_token_count(self, content_str: str) -> int:
+        """Get accurate token count using ccusage approach."""
+        try:
+            from ..analysis.enhanced_token_counter import get_accurate_token_count
+            return get_accurate_token_count(content_str)
+        except ImportError:
+            return 0
+
     def _assess_content_risk(self, content: str) -> str:
         """Assess risk level of content being modified."""
         import re
@@ -455,8 +463,9 @@ class ManipulationValidator:
                 errors.append(f"Target keys not found in context: {missing_keys}")
 
             # Calculate operation impact
+            # ccusage approach: Use accurate token counting
             total_context_tokens = sum(
-                len(str(value)) // 4 for value in context_data.values()
+                self._get_accurate_token_count(str(value)) for value in context_data.values()
             )
 
             if total_context_tokens > 0:
@@ -585,7 +594,8 @@ class ManipulationValidator:
                 )
 
             # Validate total impact
-            total_context_tokens = sum(len(str(v)) // 4 for v in context_data.values())
+            # ccusage approach: Use accurate token counting
+            total_context_tokens = sum(self._get_accurate_token_count(str(v)) for v in context_data.values())
             if total_context_tokens > 0:
                 total_reduction_ratio = (
                     plan.estimated_total_reduction / total_context_tokens
@@ -723,8 +733,9 @@ class ManipulationValidator:
                 )
 
             # Calculate token counts
-            original_tokens = sum(len(str(v)) // 4 for v in original_context.values())
-            modified_tokens = sum(len(str(v)) // 4 for v in modified_context.values())
+            # ccusage approach: Use accurate token counting
+            original_tokens = sum(self._get_accurate_token_count(str(v)) for v in original_context.values())
+            modified_tokens = sum(self._get_accurate_token_count(str(v)) for v in modified_context.values())
 
             # Expected token reduction from operations
             expected_reduction = sum(

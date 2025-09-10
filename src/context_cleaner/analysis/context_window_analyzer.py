@@ -8,6 +8,9 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
+from .session_parser import SessionCacheParser
+from .models import CacheConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,6 +19,8 @@ class ContextWindowAnalyzer:
     
     def __init__(self, claude_projects_dir: str = None):
         self.claude_projects_dir = claude_projects_dir or os.path.expanduser("~/.claude/projects")
+        # Initialize SessionCacheParser for accurate token counting (ccusage approach)
+        self.session_parser = SessionCacheParser(CacheConfig())
         
     def get_directory_context_stats(self) -> Dict[str, Dict[str, any]]:
         """Get context window statistics for each active directory."""
@@ -77,9 +82,18 @@ class ContextWindowAnalyzer:
             stat = os.stat(session_file)
             last_modified = datetime.fromtimestamp(stat.st_mtime)
             
-            # Estimate context window usage
-            # Rough estimate: 1 token ≈ 4 characters for text
-            estimated_tokens = file_size // 4
+            # Get actual token usage from JSONL using SessionCacheParser (ccusage approach)
+            estimated_tokens = 0
+            try:
+                session_analysis = self.session_parser.parse_session_file(Path(session_file))
+                if session_analysis:
+                    estimated_tokens = session_analysis.total_tokens
+                    logger.debug(f"Parsed {estimated_tokens} actual tokens from {session_file}")
+                else:
+                    logger.warning(f"Could not parse session file: {session_file}")
+            except Exception as e:
+                logger.error(f"Error parsing tokens from {session_file}: {e}")
+                # No fallback estimation - maintain accuracy by returning 0
             
             # Count entries and tool usage
             entry_count, tool_calls, file_reads = self._count_session_activity(session_file)

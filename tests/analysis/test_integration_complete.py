@@ -53,7 +53,13 @@ class TestCompleteSystemIntegration:
                     "content": user_content
                 }
             })
-            expected_missed_content += len(user_content.split()) * 1.3  # Estimated tokens
+            # ccusage approach: Use accurate token counting for test validation
+            try:
+                from src.context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+                expected_missed_content += get_accurate_token_count(user_content)
+            except ImportError:
+                # Fallback for tests when enhanced counter not available
+                expected_missed_content += len(user_content.split())  # Basic count for test
             
             # System context - MISSED by current system
             system_content = f"<system-reminder>You are Claude Code with extensive capabilities for session {i}. " + \
@@ -67,7 +73,13 @@ class TestCompleteSystemIntegration:
                     "content": system_content
                 }
             })
-            expected_missed_content += len(system_content.split()) * 1.3
+            # ccusage approach: Use accurate token counting for test validation
+            try:
+                from src.context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+                expected_missed_content += get_accurate_token_count(system_content)
+            except ImportError:
+                # Fallback for tests when enhanced counter not available
+                expected_missed_content += len(system_content.split())  # Basic count for test
             
             # Multiple tool usage - MISSED by current system
             for j in range(3):
@@ -81,7 +93,13 @@ class TestCompleteSystemIntegration:
                         "content": tool_content
                     }
                 })
-                expected_missed_content += len(tool_content.split()) * 1.3
+                # ccusage approach: Use accurate token counting for test validation
+                try:
+                    from src.context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+                    expected_missed_content += get_accurate_token_count(tool_content)
+                except ImportError:
+                    # Fallback for tests when enhanced counter not available
+                    expected_missed_content += len(tool_content.split())  # Basic count for test
             
             # Small assistant response - ONLY thing counted by current system
             assistant_content = f"I'll help with session {i}."

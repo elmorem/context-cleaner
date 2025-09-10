@@ -375,6 +375,8 @@ class JSONLDiscoveryService:
                 lines_sampled = 0
                 sessions_found: Set[str] = set()
                 total_content_length = 0
+                total_actual_tokens = 0
+                entries_with_token_data = 0
 
                 async with aiofiles.open(file_info.path, "r", encoding="utf-8") as file:
                     # Sample first 100 lines for estimation
@@ -392,7 +394,13 @@ class JSONLDiscoveryService:
                             if session_id:
                                 sessions_found.add(session_id)
 
-                            # Estimate content length for token calculation
+                            # Try to extract actual token usage data first (ccusage approach)
+                            actual_tokens = self._extract_actual_tokens(entry)
+                            if actual_tokens > 0:
+                                total_actual_tokens += actual_tokens
+                                entries_with_token_data += 1
+                            
+                            # Extract content length as fallback
                             content = self._extract_content(entry)
                             total_content_length += len(content)
 
@@ -415,10 +423,17 @@ class JSONLDiscoveryService:
                     session_density = len(sessions_found) / lines_sampled
                     file_info.estimated_sessions = max(1, int(file_info.estimated_lines * session_density))
 
-                    # Estimate tokens (rough approximation: 1.3 tokens per word, avg 10 words per line)
-                    avg_content_per_line = total_content_length / lines_sampled if lines_sampled > 0 else 100
-                    estimated_words = (avg_content_per_line / 5) * file_info.estimated_lines  # Rough word estimate
-                    file_info.estimated_tokens = max(1, int(estimated_words * 1.3))
+                    # Use actual token data if available (ccusage approach), otherwise estimate
+                    if entries_with_token_data > 0:
+                        # Use actual token data from JSONL entries (most accurate)
+                        avg_tokens_per_entry = total_actual_tokens / entries_with_token_data
+                        entries_per_file = file_info.estimated_lines
+                        file_info.estimated_tokens = max(1, int(avg_tokens_per_entry * entries_per_file))
+                        logger.debug(f"Used actual token data: {entries_with_token_data}/{lines_sampled} entries had token data")
+                    else:
+                        # Fallback to enhanced analysis or rough estimate only when no actual data is available
+                        logger.warning(f"No actual token data found in {file_info.filename}, skipping token estimation")
+                        file_info.estimated_tokens = 0  # Following ccusage approach - no crude estimation
 
             except Exception as e:
                 result.add_warning(f"Content analysis failed for {file_info.filename}: {str(e)}")
@@ -576,6 +591,52 @@ class JSONLDiscoveryService:
         # Combine all content sources
         combined_content = " ".join(str(source) for source in content_sources if source)
         return combined_content
+
+    def _extract_actual_tokens(self, entry: Dict) -> int:
+        """
+        Extract actual token usage from JSONL entry using ccusage approach.
+        
+        Returns:
+            int: Actual token count from usage data, or 0 if not available
+        """
+        try:
+            # ccusage approach: Extract actual token data from usage statistics
+            # Check for input tokens in usage data
+            if 'usage' in entry and isinstance(entry['usage'], dict):
+                usage = entry['usage']
+                
+                # Look for input_tokens (most accurate)
+                if 'input_tokens' in usage and usage['input_tokens'] is not None:
+                    return int(usage['input_tokens'])
+                
+                # Fallback: Look for total_tokens if available
+                if 'total_tokens' in usage and usage['total_tokens'] is not None:
+                    return int(usage['total_tokens'])
+            
+            # Check for token data in different structures
+            if 'input_tokens' in entry and entry['input_tokens'] is not None:
+                return int(entry['input_tokens'])
+            
+            if 'total_tokens' in entry and entry['total_tokens'] is not None:
+                return int(entry['total_tokens'])
+            
+            # Check for token data in message structure
+            if 'messages' in entry and isinstance(entry['messages'], list):
+                total_tokens = 0
+                for message in entry['messages']:
+                    if isinstance(message, dict) and 'tokens' in message:
+                        if message['tokens'] is not None:
+                            total_tokens += int(message['tokens'])
+                if total_tokens > 0:
+                    return total_tokens
+            
+            # ccusage approach: Return 0 when no actual token data is available
+            # (no crude estimation fallbacks)
+            return 0
+            
+        except (ValueError, TypeError, KeyError) as e:
+            logger.debug(f"Error extracting actual tokens: {e}")
+            return 0
 
     async def save_manifest(self, result: FileDiscoveryResult, output_path: str) -> bool:
         """Save discovery result as JSON manifest file."""

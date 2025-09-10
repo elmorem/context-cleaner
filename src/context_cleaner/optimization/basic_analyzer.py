@@ -144,6 +144,14 @@ class SafeContextAnalyzer:
         self.cache = SimpleCache(ttl=self.CACHE_TTL)
         self._start_time = time.time()
 
+    def _get_accurate_token_count(self, content_str: str) -> int:
+        """Get accurate token count using ccusage approach."""
+        try:
+            from ..analysis.enhanced_token_counter import get_accurate_token_count
+            return get_accurate_token_count(content_str)
+        except ImportError:
+            return 0
+
     def _get_cache_key(self, data: Dict[str, Any]) -> str:
         """Generate cache key from data hash."""
         try:
@@ -195,7 +203,7 @@ class SafeContextAnalyzer:
             # Basic size calculation
             json_str = json.dumps(data, default=str)
             total_chars = len(json_str)
-            estimated_tokens = total_chars // 4
+            estimated_tokens = self._get_accurate_token_count(json_str)
             top_level_keys = len(data.keys()) if isinstance(data, dict) else 0
 
             # Size categorization

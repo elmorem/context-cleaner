@@ -26,6 +26,8 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass, field
 import hashlib
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # Optional dependency for file system monitoring
 try:
@@ -83,13 +85,15 @@ class JSONLFileHandler(FileSystemEventHandler):
         """Handle file modification events."""
         if not event.is_directory and event.src_path.endswith('.jsonl'):
             logger.info(f"JSONL file modified: {event.src_path}")
-            asyncio.create_task(self.sync_service.process_file_change(event.src_path))
+            # Use thread-safe call to schedule async operation
+            self.sync_service._schedule_file_processing(event.src_path, is_new=False)
             
     def on_created(self, event):
         """Handle new file creation events."""
         if not event.is_directory and event.src_path.endswith('.jsonl'):
             logger.info(f"New JSONL file created: {event.src_path}")
-            asyncio.create_task(self.sync_service.process_new_file(event.src_path))
+            # Use thread-safe call to schedule async operation
+            self.sync_service._schedule_file_processing(event.src_path, is_new=True)
 
 class IncrementalSyncService:
     """
@@ -112,6 +116,10 @@ class IncrementalSyncService:
         self.observer: Optional[Observer] = None
         self.running = False
         self._sync_lock = asyncio.Lock()
+        
+        # Event loop and threading for cross-thread async communication
+        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="jsonl-sync")
         
         # Load existing state
         self._load_state()
@@ -175,6 +183,22 @@ class IncrementalSyncService:
         except Exception as e:
             logger.error(f"Could not hash file {file_path}: {e}")
             return ""
+    
+    def _schedule_file_processing(self, file_path: str, is_new: bool = False):
+        """Thread-safe method to schedule async file processing from watchdog events."""
+        if self._main_loop is not None and not self._main_loop.is_closed():
+            # Schedule the coroutine on the main event loop
+            if is_new:
+                future = asyncio.run_coroutine_threadsafe(
+                    self.process_new_file(file_path), self._main_loop
+                )
+            else:
+                future = asyncio.run_coroutine_threadsafe(
+                    self.process_file_change(file_path), self._main_loop
+                )
+            # Don't wait for result to avoid blocking the watchdog thread
+        else:
+            logger.warning(f"No event loop available to process file: {file_path}")
             
     async def discover_new_files(self) -> List[str]:
         """
@@ -254,11 +278,23 @@ class IncrementalSyncService:
                 
             logger.info(f"Processing {len(new_lines)} new lines from {file_path}")
             
-            # Estimate tokens from new lines (simple heuristic)
+            # Extract actual tokens from new JSONL entries (ccusage approach)
             estimated_tokens = 0
             for entry in new_lines:
-                content = str(entry.get('message', {}).get('content', ''))
-                estimated_tokens += len(content.split()) * 1.3  # Rough token estimate
+                # Try to get actual token usage from JSONL entry
+                usage_data = entry.get('usage')
+                if usage_data and isinstance(usage_data, dict):
+                    # Use actual token metrics when available (ccusage method)
+                    actual_tokens = (
+                        usage_data.get('input_tokens', 0) +
+                        usage_data.get('output_tokens', 0) + 
+                        usage_data.get('cache_creation_input_tokens', 0) +
+                        usage_data.get('cache_read_input_tokens', 0)
+                    )
+                    if actual_tokens > 0:
+                        estimated_tokens += actual_tokens
+                        logger.debug(f"Extracted {actual_tokens} actual tokens from JSONL entry")
+                    # Skip entries without actual token usage data to maintain accuracy
                 
             # Update file state
             new_state = FileProcessingState(
@@ -341,13 +377,7 @@ class IncrementalSyncService:
             records = await self.bridge_service._transform_analysis_to_records(analysis)
             
             if records and self.bridge_service.clickhouse_client:
-                # Clear existing data for today (to avoid duplicates)
-                today = datetime.now().date()
-                await self.bridge_service.clickhouse_client.execute_query(
-                    f"DELETE FROM otel.token_usage_summary WHERE date = '{today}'"
-                )
-                
-                # Insert updated data
+                # Insert updated data (SummingMergeTree automatically handles aggregation)
                 await self.bridge_service._batch_insert_records(records, batch_size=100)
                 logger.info(f"Synced {len(records)} updated records to database")
             else:
@@ -362,6 +392,9 @@ class IncrementalSyncService:
         
         Implements "real-time token tracking for new conversations" from Sept 9th analysis.
         """
+        # Capture the current event loop for cross-thread communication
+        self._main_loop = asyncio.get_running_loop()
+        
         if self.running:
             logger.warning("File monitoring already running")
             return
