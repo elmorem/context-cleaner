@@ -1195,11 +1195,15 @@
                         (function(){
                             setTimeout(function(){
                                 fetch('/api/dashboard-metrics').then(r=>r.json()).then(d=>{
-                                    document.getElementById('total-tokens').textContent=d.total_tokens||'Loading...';
-                                    document.getElementById('total-sessions').textContent=d.total_sessions||'Loading...';
+                                    document.getElementById('total-tokens').textContent=d.total_tokens||'0';
+                                    document.getElementById('metric-total-sessions').textContent=d.total_sessions||'0';
                                     document.getElementById('success-rate').textContent=d.success_rate||'95%';
-                                    document.getElementById('active-agents').textContent=d.active_agents||'11';
-                                }).catch(e=>console.error('Metrics load failed:',e));
+                                    document.getElementById('active-agents').textContent=d.active_agents||'0';
+                                }).catch(e=>{
+                                    console.error('Metrics load failed:',e);
+                                    document.getElementById('total-tokens').textContent='Error';
+                                    document.getElementById('metric-total-sessions').textContent='Error';
+                                });
                             }, 200);
                         })();
                     </script>
@@ -1207,7 +1211,7 @@
                 </div>
                 <div class="metric-card">
                     <h3>Sessions Analyzed</h3>
-                    <div class="metric-value" id="total-sessions">Loading...</div>
+                    <div class="metric-value" id="metric-total-sessions">Loading...</div>
                     <div class="metric-change positive" id="sessions-change">Active monitoring</div>
                 </div>
                 <div class="metric-card">
@@ -1339,15 +1343,15 @@
             (function() {
                 function loadDashboardMetrics() {
                     console.log('Loading dashboard metrics...');
-                    fetch('/api/dashboard-metrics')
+                    return fetch('/api/dashboard-metrics')
                         .then(response => response.json())
                         .then(data => {
                             console.log('Dashboard metrics loaded:', data);
                             if (document.getElementById('total-tokens')) {
-                                document.getElementById('total-tokens').textContent = data.total_tokens || 'Loading...';
+                                document.getElementById('total-tokens').textContent = data.total_tokens || '0';
                             }
-                            if (document.getElementById('total-sessions')) {
-                                document.getElementById('total-sessions').textContent = data.total_sessions || 'Loading...';
+                            if (document.getElementById('metric-total-sessions')) {
+                                document.getElementById('metric-total-sessions').textContent = data.total_sessions || '0';
                             }
                             if (document.getElementById('success-rate')) {
                                 document.getElementById('success-rate').textContent = data.success_rate || '95%';
@@ -1361,10 +1365,22 @@
                         });
                 }
                 
-                // Strategy 2: Multiple timing attempts
-                setTimeout(loadDashboardMetrics, 100);   // Quick attempt
-                setTimeout(loadDashboardMetrics, 500);   // Medium delay
-                setTimeout(loadDashboardMetrics, 1000);  // Longer delay
+                // Strategy 2: Single attempt with proper error handling
+                let dashboardMetricsLoaded = false;
+                const loadMetricsOnce = function() {
+                    if (!dashboardMetricsLoaded) {
+                        loadDashboardMetrics().then(() => {
+                            dashboardMetricsLoaded = true;
+                        }).catch(e => {
+                            console.error('Dashboard metrics failed after retry:', e);
+                            // Set error state instead of leaving "Loading..."
+                            if (document.getElementById('total-tokens')) {
+                                document.getElementById('total-tokens').textContent = 'Error';
+                            }
+                        });
+                    }
+                };
+                setTimeout(loadMetricsOnce, 100);  // Single attempt after DOM ready
                 
                 // Strategy 3: Make globally available for refresh button
                 window.manualLoadMetrics = loadDashboardMetrics;
@@ -2252,8 +2268,8 @@ LIMIT 20</textarea>
                         if (data.total_tokens && document.getElementById('total-tokens')) {
                             document.getElementById('total-tokens').textContent = data.total_tokens;
                         }
-                        if (data.total_sessions && document.getElementById('total-sessions')) {
-                            document.getElementById('total-sessions').textContent = data.total_sessions;
+                        if (data.total_sessions && document.getElementById('metric-total-sessions')) {
+                            document.getElementById('metric-total-sessions').textContent = data.total_sessions;
                         }
                         if (data.success_rate && document.getElementById('success-rate')) {
                             document.getElementById('success-rate').textContent = data.success_rate;
@@ -2278,79 +2294,40 @@ LIMIT 20</textarea>
             setTimeout(autoLoadMetrics, 1000);
         })();
 
-        // Tab navigation
+        // Tab navigation - CONSOLIDATED EVENT HANDLERS
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 
-                // Update active nav
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-                
-                // Show corresponding section
+                // Get the section ID from the link
                 const sectionId = link.getAttribute('href').substring(1);
-                document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
-                document.getElementById(sectionId).classList.add('active');
                 
-                // Load data for section
-                loadSectionData(sectionId);
-                
-                // Special handling for Conversations tab - load JSONL analytics
-                if (sectionId === 'conversations') {
-                    setTimeout(function() {
-                        try {
-                            console.log('Conversations tab clicked - loading JSONL analytics');
-                            loadConversationAnalytics();
-                        } catch (error) {
-                            console.error('Error loading conversations on click:', error);
-                        }
-                    }, 100);
-                }
-                
-                // Special handling for Analytics tab - direct execution
-                if (sectionId === 'analytics') {
-                    setTimeout(function() {
-                        try {
-                            console.log('Analytics tab clicked - loading dynamic data');
-                            loadAnalyticsWidgets();
-                        } catch (error) {
-                            console.error('Error loading analytics on click:', error);
-                        }
-                    }, 100);
-                }
-                
-                // Special handling for Performance tab
-                if (sectionId === 'performance') {
-                    setTimeout(function() {
-                        try {
-                            console.log('Performance tab clicked - loading real-time data');
-                            loadPerformanceWidgets();
-                        } catch (error) {
-                            console.error('Error loading performance on click:', error);
-                        }
-                    }, 100);
-                }
-                
-                // Special handling for Data Explorer tab
-                if (sectionId === 'data-explorer') {
-                    setTimeout(function() {
-                        try {
-                            console.log('Data Explorer tab clicked - initializing interface');
-                            // No special data loading needed, interface is ready
-                        } catch (error) {
-                            console.error('Error loading data explorer on click:', error);
-                        }
-                    }, 100);
-                }
+                // Use the centralized showTab function for consistency
+                showTab(sectionId);
             });
         });
 
         // Initialize socket connection for real-time updates
         const socket = io();
 
+        // Track loading state to prevent duplicate calls
+        let currentlyLoadingSection = null;
+        
         // Load section data
         function loadSectionData(section) {
+            // Prevent duplicate loading of the same section
+            if (currentlyLoadingSection === section) {
+                console.log(`Already loading section: ${section}, skipping duplicate call`);
+                return;
+            }
+            
+            currentlyLoadingSection = section;
             console.log(`Loading data for section: ${section}`);
+            
+            // Clear loading state after a short delay
+            setTimeout(() => {
+                currentlyLoadingSection = null;
+            }, 1000);
             
             if (section === 'overview') {
                 loadOverviewMetrics();
@@ -2380,7 +2357,7 @@ LIMIT 20</textarea>
                         document.getElementById('total-tokens').textContent = data.total_tokens;
                     }
                     if (data.total_sessions) {
-                        document.getElementById('total-sessions').textContent = data.total_sessions;
+                        document.getElementById('metric-total-sessions').textContent = data.total_sessions;
                     }
                     if (data.success_rate) {
                         document.getElementById('success-rate').textContent = data.success_rate;
@@ -2456,17 +2433,60 @@ LIMIT 20</textarea>
 
         // Load telemetry widgets
         function loadTelemetryWidgets(timeRange = '7days') {
-            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency', 'context-rot-meter'];
-            widgets.forEach(widget => {
-                fetch(`/api/telemetry-widget/${widget}?timeRange=${timeRange}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        renderTelemetryWidget(widget, data);
-                    })
-                    .catch(error => {
-                        document.getElementById(`${widget}-widget`).innerHTML = 
-                            `<div style="color: #dc2626;">Error loading ${widget} data</div>`;
-                    });
+            // Use actual working telemetry widget endpoints
+            const workingWidgets = [
+                { endpoint: 'code-pattern-analysis', elementId: 'error-monitor-widget', title: 'API Error Monitor - Code Patterns' },
+                { endpoint: 'conversation-timeline', elementId: 'cost-tracker-widget', title: 'Cost Burn Rate - Conversation Timeline' },
+                { endpoint: 'content-search-widget', elementId: 'timeout-risk-widget', title: 'Timeout Risk - Content Search' },
+                { endpoint: 'context-rot-meter', elementId: 'context-rot-meter-widget', title: 'Context Rot Meter' }
+            ];
+            
+            workingWidgets.forEach(widgetConfig => {
+                const element = document.getElementById(widgetConfig.elementId);
+                if (element) {
+                    element.innerHTML = '<div class="loading">🔄 Loading telemetry data...</div>';
+                    
+                    fetch(`/api/telemetry-widget/${widgetConfig.endpoint}?timeRange=${timeRange}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            // Render working telemetry data
+                            element.innerHTML = `
+                                <div style="padding: 1rem;">
+                                    <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem;">${widgetConfig.title}</h4>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                                        <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">✅ ${data.status || 'Active'}</div>
+                                        <div style="font-size: 0.875rem; color: #6b7280;">
+                                            Last updated: ${data.last_updated || 'Unknown'}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #374151;">
+                                        ${data.data ? Object.keys(data.data).length + ' data points available' : 'Data loading...'}
+                                    </div>
+                                </div>
+                            `;
+                        })
+                        .catch(error => {
+                            console.error(`Error loading ${widgetConfig.endpoint}:`, error);
+                            element.innerHTML = 
+                                `<div style="color: #dc2626; padding: 1rem;">❌ Error loading ${widgetConfig.title}</div>`;
+                        });
+                }
+            });
+            
+            // Handle remaining widgets that don't have working endpoints
+            const remainingWidgets = ['tool-optimizer-widget', 'model-efficiency-widget'];
+            remainingWidgets.forEach(elementId => {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.innerHTML = `
+                        <div style="padding: 1rem; color: #6b7280; font-style: italic;">
+                            📊 Widget data not yet available
+                            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                                This widget will show data once telemetry endpoints are configured.
+                            </div>
+                        </div>
+                    `;
+                }
             });
         }
 
@@ -2474,10 +2494,10 @@ LIMIT 20</textarea>
         function updateTelemetryTimeRange() {
             const timeRange = document.getElementById('telemetry-time-range').value;
             
-            // Show loading state for all widgets
-            const widgets = ['error-monitor', 'cost-tracker', 'timeout-risk', 'tool-optimizer', 'model-efficiency', 'context-rot-meter'];
-            widgets.forEach(widget => {
-                const element = document.getElementById(`${widget}-widget`);
+            // Show loading state for all telemetry widgets
+            const allWidgets = ['error-monitor-widget', 'cost-tracker-widget', 'timeout-risk-widget', 'tool-optimizer-widget', 'model-efficiency-widget', 'context-rot-meter-widget'];
+            allWidgets.forEach(elementId => {
+                const element = document.getElementById(elementId);
                 if (element) {
                     element.innerHTML = '<div class="loading">🔄 Updating data...</div>';
                 }
@@ -2489,18 +2509,98 @@ LIMIT 20</textarea>
 
         // Load orchestration widgets
         function loadOrchestrationWidgets() {
-            const widgets = ['orchestration-status', 'agent-utilization', 'workflow-performance'];
-            widgets.forEach(widget => {
-                fetch(`/api/orchestration-widget/${widget}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        renderOrchestrationWidget(widget, data);
-                    })
-                    .catch(error => {
-                        document.getElementById(`${widget}-widget`).innerHTML = 
-                            `<div style="color: #dc2626;">Error loading ${widget} data</div>`;
+            const widgets = [
+                { id: 'orchestration-status', title: 'Orchestration Status', dataKey: 'orchestration_status' },
+                { id: 'agent-utilization', title: 'Agent Utilization', dataKey: 'active_agents' },
+                { id: 'workflow-performance', title: 'Workflow Performance', dataKey: 'model_efficiency' }
+            ];
+            
+            // Fetch dashboard metrics which contains orchestration data
+            fetch('/api/dashboard-metrics')
+                .then(response => response.json())
+                .then(data => {
+                    widgets.forEach(widget => {
+                        const element = document.getElementById(`${widget.id}-widget`);
+                        if (element) {
+                            let content = `
+                                <div style="padding: 1rem;">
+                                    <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem;">${widget.title}</h4>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            `;
+                            
+                            // Render different content based on widget type
+                            if (widget.id === 'orchestration-status') {
+                                const status = data.orchestration_status || 'unknown';
+                                const statusColor = status === 'operational' ? '#059669' : '#d97706';
+                                const statusIcon = status === 'operational' ? '✅' : '⚠️';
+                                content += `
+                                    <div style="font-weight: 600; color: ${statusColor}; margin-bottom: 0.5rem;">
+                                        ${statusIcon} ${status.charAt(0).toUpperCase() + status.slice(1)}
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Success Rate: ${data.success_rate || 'N/A'}
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Total Errors: ${data.total_errors || 0}
+                                    </div>
+                                `;
+                            } else if (widget.id === 'agent-utilization') {
+                                content += `
+                                    <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">
+                                        🤖 ${data.active_agents || 0} Active Agents
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Total Sessions: ${data.total_sessions || 0}
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Processing ${data.total_tokens || 0} tokens
+                                    </div>
+                                `;
+                            } else if (widget.id === 'workflow-performance') {
+                                const efficiency = data.model_efficiency;
+                                const efficiencyScore = efficiency?.efficiency_score ? (efficiency.efficiency_score * 100).toFixed(1) : 'N/A';
+                                const avgResponseTime = efficiency?.avg_response_time ? efficiency.avg_response_time.toFixed(1) : 'N/A';
+                                content += `
+                                    <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">
+                                        📊 ${efficiencyScore}% Efficiency
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Avg Response: ${avgResponseTime}ms
+                                    </div>
+                                    <div style="font-size: 0.875rem; color: #6b7280;">
+                                        Total Cost: ${data.total_cost || 'N/A'}
+                                    </div>
+                                `;
+                            }
+                            
+                            content += `
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: #9ca3af;">
+                                        Last updated: ${data.last_updated ? new Date(data.last_updated).toLocaleTimeString() : 'Unknown'}
+                                    </div>
+                                </div>
+                            `;
+                            
+                            element.innerHTML = content;
+                        }
                     });
-            });
+                })
+                .catch(error => {
+                    console.error('Error loading orchestration data:', error);
+                    widgets.forEach(widget => {
+                        const element = document.getElementById(`${widget.id}-widget`);
+                        if (element) {
+                            element.innerHTML = `
+                                <div style="color: #dc2626; padding: 1rem;">
+                                    ❌ Error loading ${widget.title}
+                                    <div style="font-size: 0.75rem; margin-top: 0.5rem; color: #6b7280;">
+                                        Check connection to dashboard metrics API
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                });
         }
 
         // ==== PHASE 2: SMART DASHBOARD NAVIGATION FUNCTIONS ====
@@ -4249,18 +4349,8 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                 }
             };
             
-            // Add click event listeners to navigation links
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const href = this.getAttribute('href');
-                    if (href && href.startsWith('#')) {
-                        const sectionId = href.substring(1);
-                        window.showSection(sectionId);
-                    }
-                });
-            });
+            // Navigation links are already handled by the main event listener
+            // Remove duplicate event listener to prevent conflicts
             
             console.log('Navigation setup complete');
         }
@@ -4271,7 +4361,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             restoreUserPreferences();
             
             // Set up navigation functionality
-            setupNavigation();
+            // setupNavigation(); // DISABLED - Using consolidated showTab() approach instead
             
             // Load overview metrics immediately
             console.log('DOMContentLoaded - calling loadOverviewMetrics');
@@ -5656,8 +5746,9 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
         window.refreshCodePatterns = refreshCodePatterns;
         window.handleSearchKeyup = handleSearchKeyup;
         window.performContentSearch = performContentSearch;
-
-        });
+        
+        // Make loadSectionData globally available for the showTab function
+        window.loadSectionData = loadSectionData;
     </script>
     
     <!-- Error Details Modal -->
@@ -5710,21 +5801,32 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
     </div>
 
     <script>
-        // Tab navigation functionality
+        // Tab navigation functionality - CONSOLIDATED IMPLEMENTATION
         function showTab(tabName) {
-            // Hide all tab sections
-            const allSections = ['overview', 'conversations', 'telemetry', 'orchestration', 'analytics', 'performance', 'data-explorer'];
-            allSections.forEach(name => {
-                const section = document.getElementById(name);
-                if (section) {
-                    section.style.display = 'none';
-                }
+            console.log(`showTab called for: ${tabName}`);
+            
+            // Remove active class from all sections (uses CSS to hide)
+            document.querySelectorAll('.dashboard-section').forEach(section => {
+                section.classList.remove('active');
+                // Properly remove any inline display styles that might override CSS
+                section.style.removeProperty('display');
             });
             
-            // Show the selected tab
+            // Add active class to the selected section (uses CSS to show)
             const activeSection = document.getElementById(tabName);
             if (activeSection) {
-                activeSection.style.display = 'block';
+                activeSection.classList.add('active');
+                console.log(`Successfully activated section: ${tabName}`);
+                
+                // Debug: Log the section's computed styles to verify visibility
+                const computedStyle = window.getComputedStyle(activeSection);
+                console.log(`Section ${tabName} display style:`, computedStyle.display);
+                console.log(`Section ${tabName} classes:`, activeSection.className);
+            } else {
+                console.error(`Section not found: ${tabName}`);
+                // Debug: List all available sections
+                const allSections = document.querySelectorAll('.dashboard-section');
+                console.log('Available sections:', Array.from(allSections).map(s => s.id));
             }
             
             // Update active tab styling
@@ -5735,11 +5837,16 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             const activeLink = document.querySelector(`a[href="#${tabName}"]`);
             if (activeLink) {
                 activeLink.classList.add('active');
+                console.log(`Tab link activated for: ${tabName}`);
+            } else {
+                console.error(`Tab link not found for: ${tabName}`);
             }
             
-            // Load data for specific tabs
-            if (tabName === 'conversations') {
-                loadConversationData();
+            // Load section-specific data
+            if (typeof loadSectionData === 'function') {
+                loadSectionData(tabName);
+            } else {
+                console.error('loadSectionData function not available');
             }
         }
 

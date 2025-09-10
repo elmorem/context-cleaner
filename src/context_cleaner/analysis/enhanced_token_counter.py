@@ -445,10 +445,18 @@ class EnhancedTokenCounterService:
             category = self._categorize_content(content)
             session_metrics.content_categories[category] += len(content.split())
             
-        # Estimate tokens using simple heuristics (rough approximation)
-        if content:
-            estimated_tokens = len(content.split()) * 1.3  # Rough token-to-word ratio
-            session_metrics.calculated_total_tokens += int(estimated_tokens)
+        # Use actual token metrics when available (ccusage approach - no estimation fallbacks)
+        if usage:
+            # Only use actual reported tokens - no estimation fallbacks that cause inaccuracy
+            actual_tokens = (
+                usage.get("input_tokens", 0) +
+                usage.get("output_tokens", 0) + 
+                usage.get("cache_creation_input_tokens", 0) +
+                usage.get("cache_read_input_tokens", 0)
+            )
+            if actual_tokens > 0:
+                session_metrics.calculated_total_tokens += actual_tokens
+        # Skip content without actual token metrics to maintain ccusage-level accuracy
     
     def _extract_session_id(self, entry: Dict) -> str:
         """Extract session ID from JSONL entry."""

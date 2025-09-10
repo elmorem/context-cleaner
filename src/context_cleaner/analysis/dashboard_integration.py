@@ -303,56 +303,48 @@ async def get_enhanced_token_analysis_for_dashboard(force_refresh: bool = False)
 # Synchronous wrapper for backward compatibility
 def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, Any]:
     """
-    Synchronous wrapper for dashboard integration with hardcoded 2.7B token fix.
+    Synchronous wrapper for dashboard integration using fixed enhanced token counter.
     
-    TEMP FIX: Return our verified 2.7B token analysis results to bypass aiofiles issues.
+    Now uses the actual enhanced token counter with ccusage-level accuracy fixes applied.
     """
     
-    logger.info("🚀 Using verified 2.7B token analysis (aiofiles bypass fix)")
+    logger.info("🚀 Using fixed enhanced token counter (legacy fallbacks removed)")
     
-    # Return our proven 2.768 billion token analysis results
-    return {
-        "total_tokens": 2_768_012_012,  # 2.768 billion tokens found in local analysis
-        "files_processed": 88,
-        "lines_processed": 215_000,
-        "categories": [
-            {
-                "name": "FowlData Project",
-                "path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-fowldata",
-                "input_tokens": 96_000,
-                "output_tokens": 2_100_000, 
-                "cache_creation_tokens": 89_000_000,
-                "cache_read_tokens": 2_679_000_000,
-                "total_tokens": 2_679_096_000,
-                "file_count": 75,
-                "avg_tokens_per_file": 35_721_280
+    try:
+        # Use the actual enhanced token counter with all fixes applied
+        import asyncio
+        analyzer = DashboardTokenAnalyzer()
+        
+        # Run async analysis in sync context
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(
+            analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
+        )
+        
+    except Exception as e:
+        logger.error(f"Enhanced token analysis failed: {e}")
+        
+        # Return minimal error response instead of old hardcoded data
+        return {
+            "total_tokens": 0,
+            "files_processed": 0,
+            "lines_processed": 0,
+            "categories": [],
+            "token_breakdown": {
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0
             },
-            {
-                "name": "Context Cleaner Project",
-                "path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner", 
-                "input_tokens": 15_000,
-                "output_tokens": 450_000,
-                "cache_creation_tokens": 12_000_000,
-                "cache_read_tokens": 76_000_000,
-                "total_tokens": 88_465_000,
-                "file_count": 13,
-                "avg_tokens_per_file": 6_805_000
+            "api_validation_enabled": False,
+            "analysis_metadata": {
+                "enhanced_analysis": False,
+                "error": f"Analysis failed: {str(e)}",
+                "fix_status": "Error - using ccusage-accurate method but analysis failed"
             }
-        ],
-        "token_breakdown": {
-            "input_tokens": 111_000,
-            "output_tokens": 2_550_000,
-            "cache_creation_tokens": 101_000_000,
-            "cache_read_tokens": 2_664_351_012
-        },
-        "api_validation_enabled": False,
-        "analysis_metadata": {
-            "enhanced_analysis": True,
-            "undercount_fix_applied": True,
-            "data_source": "comprehensive_local_analysis_verified",
-            "improvement_factor": "1900x_increase_over_legacy",
-            "legacy_count": 1_453_836,
-            "enhanced_count": 2_768_012_012,
-            "fix_status": "Applied - bypassed aiofiles issue with verified results"
         }
-    }
