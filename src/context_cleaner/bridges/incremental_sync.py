@@ -278,11 +278,23 @@ class IncrementalSyncService:
                 
             logger.info(f"Processing {len(new_lines)} new lines from {file_path}")
             
-            # Estimate tokens from new lines (simple heuristic)
+            # Extract actual tokens from new JSONL entries (ccusage approach)
             estimated_tokens = 0
             for entry in new_lines:
-                content = str(entry.get('message', {}).get('content', ''))
-                estimated_tokens += len(content.split()) * 1.3  # Rough token estimate
+                # Try to get actual token usage from JSONL entry
+                usage_data = entry.get('usage')
+                if usage_data and isinstance(usage_data, dict):
+                    # Use actual token metrics when available (ccusage method)
+                    actual_tokens = (
+                        usage_data.get('input_tokens', 0) +
+                        usage_data.get('output_tokens', 0) + 
+                        usage_data.get('cache_creation_input_tokens', 0) +
+                        usage_data.get('cache_read_input_tokens', 0)
+                    )
+                    if actual_tokens > 0:
+                        estimated_tokens += actual_tokens
+                        logger.debug(f"Extracted {actual_tokens} actual tokens from JSONL entry")
+                    # Skip entries without actual token usage data to maintain accuracy
                 
             # Update file state
             new_state = FileProcessingState(

@@ -125,6 +125,14 @@ class InteractiveWorkflowManager:
         self.active_sessions: Dict[str, InteractiveSession] = {}
         self.session_history: List[WorkflowResult] = []
 
+    def _get_accurate_token_count(self, content_str: str) -> int:
+        """Get accurate token count using ccusage approach."""
+        try:
+            from ..analysis.enhanced_token_counter import get_accurate_token_count
+            return get_accurate_token_count(content_str)
+        except ImportError:
+            return 0
+
         # Configuration
         self.max_active_sessions = 10
         self.default_preview_format = PreviewFormat.TEXT
@@ -588,7 +596,7 @@ class InteractiveWorkflowManager:
                                 operation_type="remove",
                                 target_keys=[key],
                                 operation_data={"removal_reason": "completed_item"},
-                                estimated_token_impact=-len(value) // 4,
+                                estimated_token_impact=-self._get_accurate_token_count(value),
                                 confidence_score=0.9,
                                 reasoning=f"Remove completed item: {key}",
                                 requires_confirmation=True,

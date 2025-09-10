@@ -294,7 +294,15 @@ class ContextAnalyzer:
             # Extract basic metrics
             context_str = json.dumps(context_data, default=str)
             total_chars = len(context_str)
-            total_tokens = total_chars // 4  # Rough token estimate
+            
+            # ccusage approach: Use accurate token counting
+            try:
+                from ..analysis.enhanced_token_counter import get_accurate_token_count
+                total_tokens = get_accurate_token_count(context_str)
+            except ImportError:
+                # ccusage approach: Return 0 when accurate counting is not available
+                # (no crude estimation fallbacks)
+                total_tokens = 0
             context_categories = self._extract_context_categories(context_data)
 
             # Run analysis components in parallel for performance

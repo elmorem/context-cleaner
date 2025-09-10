@@ -3909,12 +3909,17 @@ class ComprehensiveHealthDashboard:
 
         except Exception as e:
             logger.warning(f"Token calculation failed, using fallback: {e}")
-            # Fallback to simple estimation
+            # ccusage approach: Return 0 when accurate token count is not available
+            # (no crude estimation fallbacks)
             try:
+                from ..analysis.enhanced_token_counter import get_accurate_token_count
                 content_str = str(context_data)
-                return len(content_str) // 4
-            except:
-                return 1000  # Safe default
+                return get_accurate_token_count(content_str)
+            except ImportError:
+                logger.warning("No accurate token counting method available, returning 0 (ccusage approach)")
+                return 0
+            except Exception:
+                return 0
 
     async def _create_fallback_health_report(self) -> ComprehensiveHealthReport:
         """Create a minimal health report when analysis fails."""

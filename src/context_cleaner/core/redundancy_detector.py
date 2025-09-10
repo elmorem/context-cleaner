@@ -327,7 +327,15 @@ class RedundancyDetector:
 
             total_items = sum(len(items) for items in categories.values())
             total_content = json.dumps(context_data, default=str)
-            total_tokens = len(total_content) // 4
+            
+            # ccusage approach: Use accurate token counting
+            try:
+                from ..analysis.enhanced_token_counter import get_accurate_token_count
+                total_tokens = get_accurate_token_count(total_content)
+            except ImportError:
+                # ccusage approach: Return 0 when accurate counting is not available
+                # (no crude estimation fallbacks)
+                total_tokens = 0
 
             # Analyze messages and conversations for duplicates
             messages = categories["messages"]

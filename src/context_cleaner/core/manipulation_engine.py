@@ -107,13 +107,22 @@ class ManipulationEngine:
         return hashlib.md5(f"{time.time()}{hash(id(self))}".encode()).hexdigest()[:8]
 
     def _calculate_content_tokens(self, content: Any) -> int:
-        """Estimate token count for content."""
+        """Calculate accurate token count for content using ccusage approach."""
         try:
+            # Convert content to string representation
             if isinstance(content, (dict, list)):
                 content_str = json.dumps(content, default=str)
             else:
                 content_str = str(content)
-            return len(content_str) // 4  # Rough token estimate
+            
+            # ccusage approach: Use accurate token counting
+            try:
+                from ..analysis.enhanced_token_counter import get_accurate_token_count
+                return get_accurate_token_count(content_str)
+            except ImportError:
+                # ccusage approach: Return 0 when accurate counting is not available
+                # (no crude estimation fallbacks)
+                return 0
         except Exception:
             return 0
 

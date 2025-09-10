@@ -26,9 +26,10 @@ Result: Inconsistent, inaccurate token calculations throughout the system
 
 #### Fix 1.1: Enhanced Token Counter Self-Defeating Fallback
 - **File**: `/Users/markelmore/_code/context-cleaner/src/context_cleaner/analysis/enhanced_token_counter.py:450`
-- **Current Problem**: 
+- **Status**: ✅ **COMPLETED** - Fixed in Phase 3 comprehensive cleanup
+- **Previous Problem**: 
   ```python
-  estimated_tokens = len(content.split()) * 1.3  # Rough token-to-word ratio
+  estimated_tokens = len(content.split()) * 1.3  # Rough token-to-word ratio (LEGACY)
   ```
 - **Solution**: Replace with proper JSONL token extraction or return 0
 - **Implementation**:
