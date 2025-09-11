@@ -1,8 +1,12 @@
 """
 Debug commands for Context Cleaner process registry and service orchestration.
 
-This module provides debug commands to validate and troubleshoot the service 
-orchestration system, particularly the process registry functionality.
+This module provides comprehensive debug commands to validate and troubleshoot:
+- Service orchestration system and lifecycle management
+- Process registry functionality and health monitoring
+- Docker container states and integration
+- Service dependency resolution and startup ordering  
+- Cross-process communication and discovery
 """
 
 import asyncio
