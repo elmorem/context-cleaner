@@ -33,6 +33,13 @@ import urllib.request
 import urllib.error
 from .api_ui_consistency_checker import APIUIConsistencyChecker
 from ..telemetry.collector import get_collector
+from .process_registry import (
+    ProcessEntry,
+    ProcessRegistryDatabase,
+    ProcessDiscoveryEngine,
+    get_process_registry,
+    get_discovery_engine
+)
 
 
 class ServiceStatus(Enum):
@@ -143,6 +150,10 @@ class ServiceOrchestrator:
         self.docker_daemon_status = DockerDaemonStatus.UNKNOWN
         self.container_states: Dict[str, ContainerState] = {}
         
+        # Process Registry Integration (Phase 1)
+        self.process_registry = get_process_registry()
+        self.discovery_engine = get_discovery_engine()
+        
         # Initialize service definitions
         self._initialize_service_definitions()
         
@@ -152,66 +163,75 @@ class ServiceOrchestrator:
 
     def _cleanup_existing_processes(self):
         """
-        Clean up any existing Context Cleaner processes to ensure singleton operation.
-        This prevents multiple instances of the same service from running.
+        Clean up any existing Context Cleaner processes using the integrated process registry.
+        This ensures singleton operation and maintains registry consistency.
         """
         if self.verbose:
-            print("🧹 Cleaning up existing Context Cleaner processes...")
+            print("🧹 Cleaning up existing Context Cleaner processes (registry-aware)...")
         
         try:
-            # Find all processes matching Context Cleaner patterns
-            context_cleaner_processes = []
+            # 1. Discover all current Context Cleaner processes
+            discovered_processes = self.discovery_engine.discover_all_processes()
             
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            if self.verbose and discovered_processes:
+                print(f"   Found {len(discovered_processes)} Context Cleaner processes:")
+                for process in discovered_processes:
+                    print(f"   - PID {process.pid} ({process.service_type}): {process.command_line[:80]}...")
+            
+            # 2. Get processes from registry for comparison
+            registered_processes = self.process_registry.get_all_processes()
+            
+            # 3. Clean up processes (except ourselves)
+            cleaned_count = 0
+            for process in discovered_processes:
+                if process.pid == os.getpid():
+                    continue  # Don't kill ourselves
+                
                 try:
-                    cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
+                    # Attempt graceful termination
+                    proc = psutil.Process(process.pid)
+                    proc.terminate()
                     
-                    # Check for Context Cleaner processes
-                    if ('python' in proc.info['name'].lower() and 
-                        'context_cleaner' in cmdline and
-                        proc.pid != os.getpid()):  # Don't kill ourselves
+                    # Wait up to 5 seconds for graceful termination
+                    try:
+                        proc.wait(timeout=5)
+                    except psutil.TimeoutExpired:
+                        # Force kill if graceful termination failed
+                        proc.kill()
+                        proc.wait()
+                    
+                    # Remove from registry if it was registered
+                    self.process_registry.unregister_process(process.pid)
+                    
+                    cleaned_count += 1
+                    if self.verbose:
+                        print(f"   ✅ Cleaned up PID {process.pid} ({process.service_type})")
                         
-                        context_cleaner_processes.append({
-                            'pid': proc.pid,
-                            'cmdline': cmdline,
-                            'process': proc
-                        })
-                        
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    # Process already gone or can't access it
+                    # Still try to clean from registry
+                    self.process_registry.unregister_process(process.pid)
                     continue
             
-            if context_cleaner_processes:
-                if self.verbose:
-                    print(f"   Found {len(context_cleaner_processes)} existing processes to clean up:")
-                    for proc_info in context_cleaner_processes:
-                        print(f"   - PID {proc_info['pid']}: {proc_info['cmdline'][:80]}...")
-                
-                # Terminate processes gracefully
-                for proc_info in context_cleaner_processes:
-                    try:
-                        proc = proc_info['process']
-                        proc.terminate()
-                        
-                        # Wait up to 5 seconds for graceful termination
-                        try:
-                            proc.wait(timeout=5)
-                        except psutil.TimeoutExpired:
-                            # Force kill if graceful termination failed
-                            proc.kill()
-                            proc.wait()
-                            
-                        if self.verbose:
-                            print(f"   ✅ Cleaned up PID {proc_info['pid']}")
-                            
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        # Process already gone or can't access it
-                        continue
-                
-                # Brief pause to ensure cleanup is complete
-                time.sleep(2)
-                
-                if self.verbose:
-                    print("   🎯 Process cleanup complete")
+            # 4. Clean up stale registry entries (processes that aren't running)
+            stale_cleanup_count = 0
+            for registered_process in registered_processes:
+                try:
+                    # Check if process is still running
+                    proc = psutil.Process(registered_process.pid)
+                    if not proc.is_running():
+                        self.process_registry.unregister_process(registered_process.pid)
+                        stale_cleanup_count += 1
+                except psutil.NoSuchProcess:
+                    # Process is definitely gone, remove from registry
+                    self.process_registry.unregister_process(registered_process.pid)
+                    stale_cleanup_count += 1
+            
+            # Brief pause to ensure cleanup is complete
+            time.sleep(2)
+            
+            if self.verbose:
+                print(f"   🎯 Process cleanup complete: {cleaned_count} processes cleaned, {stale_cleanup_count} stale entries removed")
             else:
                 if self.verbose:
                     print("   ✅ No existing processes found")
@@ -786,6 +806,19 @@ class ServiceOrchestrator:
                 state.pid = process.pid
                 state.start_time = datetime.now()
                 
+                # Register process in the process registry
+                process_entry = ProcessEntry(
+                    pid=process.pid,
+                    command_line=' '.join(service.start_command),
+                    service_type=self._map_service_to_type(service_name),
+                    start_time=state.start_time,
+                    registration_time=datetime.now(),
+                    port=self._extract_port_from_command(service.start_command),
+                    status='running',
+                    registration_source='orchestrator'
+                )
+                self.process_registry.register_process(process_entry)
+                
                 # For Docker services, update container metadata
                 if "docker" in " ".join(service.start_command):
                     container_name = self._extract_container_name(service.start_command)
@@ -858,6 +891,11 @@ class ServiceOrchestrator:
                 success = True
             
             state.status = ServiceStatus.STOPPED
+            
+            # Unregister from process registry if we had a PID
+            if state.pid:
+                self.process_registry.unregister_process(state.pid)
+            
             state.process = None
             state.pid = None
             state.health_status = False
@@ -1017,19 +1055,47 @@ class ServiceOrchestrator:
             await self._start_service(service_name)
 
     def get_service_status(self) -> Dict[str, Any]:
-        """Get comprehensive status of all services."""
+        """Get comprehensive status of all services with process registry integration."""
         status = {
             "orchestrator": {
                 "running": self.running,
                 "uptime": (datetime.now() - datetime.now()).total_seconds() if self.running else 0
             },
-            "services": {}
+            "services": {},
+            "process_registry": {
+                "total_registered": 0,
+                "by_service_type": {},
+                "registry_status": "unknown"
+            }
         }
         
+        try:
+            # Get process registry information
+            registered_processes = self.process_registry.get_all_processes()
+            status["process_registry"]["total_registered"] = len(registered_processes)
+            status["process_registry"]["registry_status"] = "accessible"
+            
+            # Group by service type
+            by_type = {}
+            for process in registered_processes:
+                service_type = process.service_type
+                if service_type not in by_type:
+                    by_type[service_type] = []
+                by_type[service_type].append({
+                    "pid": process.pid,
+                    "start_time": process.start_time.isoformat() if process.start_time else None,
+                    "status": process.status
+                })
+            status["process_registry"]["by_service_type"] = by_type
+            
+        except Exception as e:
+            status["process_registry"]["registry_status"] = f"error: {str(e)}"
+        
+        # Service status information
         for service_name, state in self.service_states.items():
             service = self.services[service_name]
             
-            status["services"][service_name] = {
+            service_info = {
                 "name": service.description,
                 "status": state.status.value,
                 "required": service.required,
@@ -1039,8 +1105,28 @@ class ServiceOrchestrator:
                 "restart_count": state.restart_count,
                 "last_error": state.last_error,
                 "pid": state.pid,
-                "metrics": state.metrics
+                "metrics": state.metrics,
+                "registry_info": None
             }
+            
+            # Add process registry information if available
+            if state.pid:
+                try:
+                    registry_entry = self.process_registry.get_process(state.pid)
+                    if registry_entry:
+                        service_info["registry_info"] = {
+                            "registered": True,
+                            "service_type": registry_entry.service_type,
+                            "registration_time": registry_entry.registration_time.isoformat(),
+                            "registration_source": registry_entry.registration_source,
+                            "last_health_check": registry_entry.last_health_check.isoformat() if registry_entry.last_health_check else None
+                        }
+                    else:
+                        service_info["registry_info"] = {"registered": False, "reason": "not_found"}
+                except Exception as e:
+                    service_info["registry_info"] = {"registered": False, "reason": f"error: {str(e)}"}
+            
+            status["services"][service_name] = service_info
         
         return status
 
@@ -1465,3 +1551,120 @@ class ServiceOrchestrator:
             validation_results["error"] = str(e)
             validation_results["summary"] = f"Validation failed: {str(e)}"
             return validation_results
+    
+    def _map_service_to_type(self, service_name: str) -> str:
+        """Map orchestrator service names to process registry service types."""
+        service_type_mapping = {
+            "clickhouse": "clickhouse",
+            "otel": "otel_collector", 
+            "jsonl_bridge": "bridge_sync",
+            "dashboard": "dashboard",
+            "consistency_checker": "consistency_checker",
+            "telemetry_collector": "telemetry_collector"
+        }
+        return service_type_mapping.get(service_name, "unknown")
+    
+    def _extract_port_from_command(self, command: List[str]) -> Optional[int]:
+        """Extract port number from command line arguments."""
+        if not command:
+            return None
+        
+        try:
+            # Look for --port parameter
+            for i, arg in enumerate(command):
+                if arg == "--port" and i + 1 < len(command):
+                    return int(command[i + 1])
+                elif arg.startswith("--port="):
+                    return int(arg.split("=", 1)[1])
+            
+            # Look for -p parameter
+            for i, arg in enumerate(command):
+                if arg == "-p" and i + 1 < len(command):
+                    return int(command[i + 1])
+            
+            return None
+        except (ValueError, IndexError):
+            return None
+    
+    async def discover_and_register_running_services(self) -> Dict[str, Any]:
+        """
+        Discover running Context Cleaner services and register them in the process registry.
+        This implements automatic service discovery and registration.
+        """
+        discovery_results = {
+            "timestamp": datetime.now().isoformat(),
+            "discovered_processes": 0,
+            "registered_processes": 0,
+            "already_registered": 0,
+            "failed_registrations": 0,
+            "services": [],
+            "summary": ""
+        }
+        
+        try:
+            # Discover all running Context Cleaner processes
+            discovered_processes = self.discovery_engine.discover_all_processes()
+            discovery_results["discovered_processes"] = len(discovered_processes)
+            
+            if self.verbose:
+                print(f"🔍 Discovered {len(discovered_processes)} running Context Cleaner processes")
+            
+            for process in discovered_processes:
+                service_info = {
+                    "pid": process.pid,
+                    "service_type": process.service_type,
+                    "command_line": process.command_line[:100] + "...",
+                    "status": "unknown"
+                }
+                
+                try:
+                    # Check if already registered
+                    existing_process = self.process_registry.get_process(process.pid)
+                    if existing_process:
+                        discovery_results["already_registered"] += 1
+                        service_info["status"] = "already_registered"
+                        if self.verbose:
+                            print(f"   ℹ️  PID {process.pid} ({process.service_type}) already registered")
+                    else:
+                        # Register the discovered process
+                        success = self.process_registry.register_process(process)
+                        if success:
+                            discovery_results["registered_processes"] += 1
+                            service_info["status"] = "registered"
+                            if self.verbose:
+                                print(f"   ✅ Registered PID {process.pid} ({process.service_type})")
+                        else:
+                            discovery_results["failed_registrations"] += 1
+                            service_info["status"] = "registration_failed"
+                            if self.verbose:
+                                print(f"   ❌ Failed to register PID {process.pid} ({process.service_type})")
+                
+                except Exception as e:
+                    discovery_results["failed_registrations"] += 1
+                    service_info["status"] = f"error: {str(e)}"
+                    if self.verbose:
+                        print(f"   ⚠️  Error processing PID {process.pid}: {e}")
+                
+                discovery_results["services"].append(service_info)
+            
+            # Generate summary
+            total_discovered = discovery_results["discovered_processes"]
+            registered = discovery_results["registered_processes"]
+            already_reg = discovery_results["already_registered"]
+            failed = discovery_results["failed_registrations"]
+            
+            if total_discovered == 0:
+                discovery_results["summary"] = "No Context Cleaner processes found"
+            elif registered == 0 and already_reg == total_discovered:
+                discovery_results["summary"] = f"All {total_discovered} processes were already registered"
+            elif failed == 0:
+                discovery_results["summary"] = f"Successfully processed {total_discovered} processes ({registered} new, {already_reg} already registered)"
+            else:
+                discovery_results["summary"] = f"Processed {total_discovered} processes: {registered} registered, {already_reg} already registered, {failed} failed"
+            
+            return discovery_results
+            
+        except Exception as e:
+            discovery_results["error"] = str(e)
+            discovery_results["summary"] = f"Discovery failed: {str(e)}"
+            return discovery_results
