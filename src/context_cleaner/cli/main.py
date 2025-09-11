@@ -1306,17 +1306,35 @@ def stop(ctx, force, docker_only, processes_only, orchestrated):
 @click.option("--no-docker", is_flag=True, help="Skip Docker service startup")
 @click.option("--no-jsonl", is_flag=True, help="Skip JSONL processing service")
 @click.option("--status-only", is_flag=True, help="Show service status and exit")
+@click.option("--config-file", type=click.Path(exists=True), help="Custom configuration file")
+@click.option("--dev-mode", is_flag=True, help="Enable development mode with debug logging")
 @click.pass_context
-def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only):
+def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, config_file, dev_mode):
     """
-    Start all Context Cleaner services with proper orchestration.
+    🚀 SINGLE ENTRY POINT - Start all Context Cleaner services with orchestration.
     
-    This command manages the complete startup sequence:
-    1. Docker services (ClickHouse + OpenTelemetry)  
-    2. JSONL processing services
-    3. Dashboard web interface
+    This is the recommended way to start Context Cleaner. It provides:
     
-    All services are health-checked and started in dependency order.
+    ✅ Complete service orchestration and dependency management
+    ✅ Health monitoring and automatic service recovery  
+    ✅ Integrated dashboard with all analytics and insights
+    ✅ Process registry tracking and cleanup
+    ✅ Real-time telemetry and performance monitoring
+    
+    STARTUP SEQUENCE:
+    1. 🐳 Docker services (ClickHouse + OpenTelemetry)  
+    2. 🔗 JSONL processing and data bridge services
+    3. 📊 Comprehensive health dashboard
+    4. 🔍 Process registry and monitoring
+    
+    QUICK START:
+      context-cleaner run                    # Start everything
+      context-cleaner run --status-only      # Check service status
+      context-cleaner run --no-docker        # Skip Docker services
+      context-cleaner debug service-health   # Troubleshoot issues
+      context-cleaner stop                   # Stop all services
+    
+    For troubleshooting, use 'context-cleaner debug --help' commands.
     """
     import asyncio
     import threading
@@ -1324,7 +1342,19 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only):
     import time
     
     config = ctx.obj["config"]
-    verbose = ctx.obj["verbose"]
+    verbose = ctx.obj["verbose"] or dev_mode
+    
+    # Handle custom config file
+    if config_file:
+        from pathlib import Path
+        config = ContextCleanerConfig.from_file(Path(config_file))
+        ctx.obj["config"] = config
+    
+    # Enable development mode
+    if dev_mode:
+        ctx.obj["verbose"] = True
+        verbose = True
+        click.echo("🔧 Development mode enabled - verbose logging active")
     
     # Import service orchestrator
     try:
