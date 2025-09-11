@@ -1131,6 +1131,13 @@ try:
 except ImportError:
     pass  # Bridge service commands optional
 
+# Add debug commands for process registry validation
+try:
+    from .commands.debug import debug
+    main.add_command(debug)
+except ImportError:
+    pass  # Debug commands optional
+
 
 # Add the stop command for service shutdown
 @main.command()
