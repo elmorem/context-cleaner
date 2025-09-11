@@ -312,27 +312,51 @@ class EnhancedTokenCounterService:
         line_count = 0
         
         try:
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
-                async for line in file:
-                    if max_lines and line_count >= max_lines:
-                        break
-                        
-                    line_count += 1
-                    
-                    try:
-                        entry = json.loads(line.strip())
-                        session_id = self._extract_session_id(entry)
-                        
-                        if session_id not in sessions:
-                            sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+            if aiofiles:
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+                    async for line in file:
+                        if max_lines and line_count >= max_lines:
+                            break
                             
-                        await self._process_entry(entry, sessions[session_id], token_counter)
+                        line_count += 1
                         
-                    except json.JSONDecodeError:
-                        continue
-                    except Exception as e:
-                        logger.debug(f"Error processing line in {file_path}: {e}")
-                        continue
+                        try:
+                            entry = json.loads(line.strip())
+                            session_id = self._extract_session_id(entry)
+                            
+                            if session_id not in sessions:
+                                sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+                                
+                            await self._process_entry(entry, sessions[session_id], token_counter)
+                            
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            logger.debug(f"Error processing line in {file_path}: {e}")
+                            continue
+            else:
+                # Fallback to synchronous file reading
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    for line in file:
+                        if max_lines and line_count >= max_lines:
+                            break
+                            
+                        line_count += 1
+                        
+                        try:
+                            entry = json.loads(line.strip())
+                            session_id = self._extract_session_id(entry)
+                            
+                            if session_id not in sessions:
+                                sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+                                
+                            await self._process_entry(entry, sessions[session_id], token_counter)
+                            
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            logger.debug(f"Error processing line in {file_path}: {e}")
+                            continue
                         
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
@@ -349,27 +373,51 @@ class EnhancedTokenCounterService:
         line_count = 0
         
         try:
-            async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
-                async for line in file:
-                    if max_lines and line_count >= max_lines:
-                        break
-                        
-                    line_count += 1
-                    
-                    try:
-                        entry = json.loads(line.strip())
-                        session_id = self._extract_session_id(entry)
-                        
-                        if session_id not in sessions:
-                            sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+            if aiofiles:
+                async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+                    async for line in file:
+                        if max_lines and line_count >= max_lines:
+                            break
                             
-                        await self._process_entry_fallback(entry, sessions[session_id])
+                        line_count += 1
                         
-                    except json.JSONDecodeError:
-                        continue
-                    except Exception as e:
-                        logger.debug(f"Error processing line in {file_path}: {e}")
-                        continue
+                        try:
+                            entry = json.loads(line.strip())
+                            session_id = self._extract_session_id(entry)
+                            
+                            if session_id not in sessions:
+                                sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+                                
+                            await self._process_entry_fallback(entry, sessions[session_id])
+                            
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            logger.debug(f"Error processing line in {file_path}: {e}")
+                            continue
+            else:
+                # Fallback to synchronous file reading
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    for line in file:
+                        if max_lines and line_count >= max_lines:
+                            break
+                            
+                        line_count += 1
+                        
+                        try:
+                            entry = json.loads(line.strip())
+                            session_id = self._extract_session_id(entry)
+                            
+                            if session_id not in sessions:
+                                sessions[session_id] = SessionTokenMetrics(session_id=session_id)
+                                
+                            await self._process_entry_fallback(entry, sessions[session_id])
+                            
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            logger.debug(f"Error processing line in {file_path}: {e}")
+                            continue
                         
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")

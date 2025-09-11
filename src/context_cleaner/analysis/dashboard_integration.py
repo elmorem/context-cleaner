@@ -315,16 +315,26 @@ def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, A
         import asyncio
         analyzer = DashboardTokenAnalyzer()
         
-        # Run async analysis in sync context
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
+        # Run async analysis in sync context - use thread executor to avoid event loop conflicts
+        import concurrent.futures
+        import threading
+        
+        def run_async_analysis():
+            """Run the async analysis in a separate thread with its own event loop."""
+            # Create a new event loop in this thread
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(
+                    analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
+                )
+            finally:
+                loop.close()
         
-        return loop.run_until_complete(
-            analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
-        )
+        # Run the async function in a separate thread to avoid event loop conflicts
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_async_analysis)
+            return future.result(timeout=60)  # 60 second timeout
         
     except Exception as e:
         logger.error(f"Enhanced token analysis failed: {e}")

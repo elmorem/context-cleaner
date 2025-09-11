@@ -27,7 +27,12 @@ import sys
 import os
 import psutil
 import re
+import platform
+import socket
+import urllib.request
+import urllib.error
 from .api_ui_consistency_checker import APIUIConsistencyChecker
+from ..telemetry.collector import get_collector
 
 
 class ServiceStatus(Enum):
@@ -38,6 +43,29 @@ class ServiceStatus(Enum):
     STOPPING = "stopping"
     FAILED = "failed"
     UNKNOWN = "unknown"
+    ATTACHED = "attached"  # For containers that were already running
+
+
+class DockerDaemonStatus(Enum):
+    """Docker daemon status enumeration."""
+    RUNNING = "running"
+    STOPPED = "stopped"
+    STARTING = "starting"
+    FAILED = "failed"
+    NOT_INSTALLED = "not_installed"
+    UNKNOWN = "unknown"
+
+
+class ContainerState(Enum):
+    """Container state enumeration."""
+    RUNNING = "running"
+    STOPPED = "stopped"
+    PAUSED = "paused"
+    RESTARTING = "restarting"
+    REMOVING = "removing"
+    EXITED = "exited"
+    DEAD = "dead"
+    NOT_FOUND = "not_found"
 
 
 @dataclass
@@ -72,6 +100,11 @@ class ServiceState:
     restart_count: int = 0
     last_error: Optional[str] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
+    container_id: Optional[str] = None
+    container_state: Optional[ContainerState] = None
+    was_attached: bool = False  # True if we attached to existing container
+    url: Optional[str] = None  # For web services like dashboard
+    accessibility_status: Optional[str] = None  # Details about accessibility checks
 
 
 class ServiceOrchestrator:
@@ -102,6 +135,13 @@ class ServiceOrchestrator:
         
         # API/UI Consistency Checker
         self.consistency_checker: Optional[APIUIConsistencyChecker] = None
+        
+        # Telemetry Collector
+        self.telemetry_collector = None
+        
+        # Docker management
+        self.docker_daemon_status = DockerDaemonStatus.UNKNOWN
+        self.container_states: Dict[str, ContainerState] = {}
         
         # Initialize service definitions
         self._initialize_service_definitions()
@@ -266,6 +306,22 @@ class ServiceOrchestrator:
             required=False,  # Optional monitoring service
             startup_delay=30
         )
+        
+        # 6. Telemetry Collector
+        self.services["telemetry_collector"] = ServiceDefinition(
+            name="telemetry_collector",
+            description="Claude Code telemetry data collection and monitoring",
+            start_command=None,  # Handled internally
+            stop_command=None,  # Handled internally
+            health_check=self._check_telemetry_collector_health,
+            health_check_interval=60,
+            restart_on_failure=True,
+            startup_timeout=10,
+            shutdown_timeout=5,
+            dependencies=["clickhouse"],
+            required=False,  # Optional telemetry service
+            startup_delay=5
+        )
 
     async def start_all_services(self, dashboard_port: int = 8110) -> bool:
         """
@@ -286,6 +342,12 @@ class ServiceOrchestrator:
         
         # Clean up any existing processes to ensure singleton operation
         self._cleanup_existing_processes()
+        
+        # Ensure Docker daemon is running and containers are in proper state
+        if not await self._ensure_docker_environment():
+            if self.verbose:
+                print("❌ Failed to ensure Docker environment is ready")
+            return False
         
         # Initialize service states
         for service_name in self.services:
@@ -318,6 +380,8 @@ class ServiceOrchestrator:
                     success &= await self._start_dashboard_service(dashboard_port)
                 elif service_name == "consistency_checker":
                     success &= await self._start_consistency_checker_service(dashboard_port)
+                elif service_name == "telemetry_collector":
+                    success &= await self._start_telemetry_collector_service()
                 else:
                     success &= await self._start_service(service_name)
                 
@@ -369,6 +433,8 @@ class ServiceOrchestrator:
                     success &= await self._stop_dashboard_service()
                 elif service_name == "consistency_checker":
                     success &= await self._stop_consistency_checker_service()
+                elif service_name == "telemetry_collector":
+                    success &= await self._stop_telemetry_collector_service()
                 else:
                     success &= await self._stop_service(service_name)
             except Exception as e:
@@ -384,24 +450,327 @@ class ServiceOrchestrator:
         
         return success
 
+    async def _ensure_docker_environment(self) -> bool:
+        """
+        Ensure Docker daemon is running and containers are in proper state.
+        This is the core method that handles intelligent state management.
+        """
+        if self.verbose:
+            print("🐳 Ensuring Docker environment is ready...")
+        
+        # 1. Check Docker daemon status
+        daemon_status = await self._check_docker_daemon_status()
+        if daemon_status != DockerDaemonStatus.RUNNING:
+            if self.verbose:
+                print(f"   Docker daemon status: {daemon_status.value}")
+                
+            if daemon_status == DockerDaemonStatus.STOPPED:
+                if self.verbose:
+                    print("   🔄 Starting Docker daemon...")
+                if not await self._start_docker_daemon():
+                    return False
+            elif daemon_status == DockerDaemonStatus.NOT_INSTALLED:
+                if self.verbose:
+                    print("   ❌ Docker is not installed or not in PATH")
+                return False
+            else:
+                if self.verbose:
+                    print("   ❌ Docker daemon is not accessible")
+                return False
+        
+        # 2. Check container states and attach to running ones or start as needed
+        container_names = ["clickhouse-otel", "otel-collector"]
+        for container_name in container_names:
+            container_state = await self._get_container_state(container_name)
+            service_name = "clickhouse" if "clickhouse" in container_name else "otel"
+            
+            if self.verbose:
+                print(f"   📦 Container {container_name}: {container_state.value}")
+            
+            if container_state == ContainerState.RUNNING:
+                # Container is already running - attach to it
+                if self.verbose:
+                    print(f"   ✅ Attaching to running container {container_name}")
+                await self._attach_to_running_container(service_name, container_name)
+            elif container_state in [ContainerState.STOPPED, ContainerState.EXITED]:
+                # Container exists but is stopped - we'll start it later in normal flow
+                if self.verbose:
+                    print(f"   🔄 Container {container_name} will be started during service startup")
+            elif container_state == ContainerState.NOT_FOUND:
+                # Container doesn't exist - we'll create it later in normal flow
+                if self.verbose:
+                    print(f"   🆕 Container {container_name} will be created during service startup")
+        
+        if self.verbose:
+            print("   ✅ Docker environment is ready")
+        return True
+
+    async def _check_docker_daemon_status(self) -> DockerDaemonStatus:
+        """Check if Docker daemon is running."""
+        try:
+            # Try to run a simple docker command
+            result = await asyncio.create_subprocess_exec(
+                "docker", "info",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await result.wait()
+            
+            if result.returncode == 0:
+                return DockerDaemonStatus.RUNNING
+            else:
+                # Docker command failed - check if it's because daemon is not running
+                stderr = await result.stderr.read()
+                if b"daemon" in stderr.lower() or b"connection" in stderr.lower():
+                    return DockerDaemonStatus.STOPPED
+                else:
+                    return DockerDaemonStatus.FAILED
+                    
+        except FileNotFoundError:
+            # Docker command not found
+            return DockerDaemonStatus.NOT_INSTALLED
+        except Exception as e:
+            self.logger.error(f"Error checking Docker daemon status: {e}")
+            return DockerDaemonStatus.FAILED
+
+    async def _start_docker_daemon(self) -> bool:
+        """Start Docker daemon if possible."""
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Try to start Docker Desktop
+                if self.verbose:
+                    print("   🍎 Starting Docker Desktop on macOS...")
+                
+                # Check if Docker Desktop is installed
+                docker_app_path = "/Applications/Docker.app"
+                if os.path.exists(docker_app_path):
+                    result = await asyncio.create_subprocess_exec(
+                        "open", "-a", "Docker",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await result.wait()
+                    
+                    if result.returncode == 0:
+                        # Wait for Docker daemon to start
+                        for i in range(30):  # Wait up to 30 seconds
+                            await asyncio.sleep(1)
+                            if await self._check_docker_daemon_status() == DockerDaemonStatus.RUNNING:
+                                if self.verbose:
+                                    print("   ✅ Docker daemon started successfully")
+                                return True
+                        
+                        if self.verbose:
+                            print("   ⏰ Timeout waiting for Docker daemon to start")
+                        return False
+                    else:
+                        if self.verbose:
+                            print("   ❌ Failed to start Docker Desktop")
+                        return False
+                else:
+                    if self.verbose:
+                        print("   ❌ Docker Desktop not found at expected location")
+                    return False
+                    
+            elif system == "linux":
+                # Try to start Docker service
+                if self.verbose:
+                    print("   🐧 Starting Docker service on Linux...")
+                
+                # Try systemctl first
+                result = await asyncio.create_subprocess_exec(
+                    "sudo", "systemctl", "start", "docker",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await result.wait()
+                
+                if result.returncode == 0:
+                    # Wait for service to start
+                    for i in range(15):  # Wait up to 15 seconds
+                        await asyncio.sleep(1)
+                        if await self._check_docker_daemon_status() == DockerDaemonStatus.RUNNING:
+                            if self.verbose:
+                                print("   ✅ Docker service started successfully")
+                            return True
+                    
+                    if self.verbose:
+                        print("   ⏰ Timeout waiting for Docker service to start")
+                    return False
+                else:
+                    if self.verbose:
+                        print("   ❌ Failed to start Docker service")
+                    return False
+                    
+            else:
+                if self.verbose:
+                    print(f"   ❓ Unsupported platform: {system}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error starting Docker daemon: {e}")
+            if self.verbose:
+                print(f"   ❌ Error starting Docker daemon: {e}")
+            return False
+
+    async def _get_container_state(self, container_name: str) -> ContainerState:
+        """Get the current state of a container."""
+        try:
+            result = await asyncio.create_subprocess_exec(
+                "docker", "inspect", container_name, "--format", "{{.State.Status}}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+            
+            if result.returncode == 0:
+                status = stdout.decode().strip().lower()
+                status_mapping = {
+                    "running": ContainerState.RUNNING,
+                    "stopped": ContainerState.STOPPED,
+                    "paused": ContainerState.PAUSED,
+                    "restarting": ContainerState.RESTARTING,
+                    "removing": ContainerState.REMOVING,
+                    "exited": ContainerState.EXITED,
+                    "dead": ContainerState.DEAD
+                }
+                return status_mapping.get(status, ContainerState.NOT_FOUND)
+            else:
+                # Container not found
+                return ContainerState.NOT_FOUND
+                
+        except Exception as e:
+            self.logger.error(f"Error getting container state for {container_name}: {e}")
+            return ContainerState.NOT_FOUND
+
+    def _extract_container_name(self, command: List[str]) -> Optional[str]:
+        """Extract container name from Docker command."""
+        try:
+            if not command or "docker" not in command[0]:
+                return None
+            
+            # Look for --name parameter
+            for i, arg in enumerate(command):
+                if arg == "--name" and i + 1 < len(command):
+                    return command[i + 1]
+                elif arg.startswith("--name="):
+                    return arg.split("=", 1)[1]
+            
+            # For docker run commands, the last argument is often the image name
+            # We'll use a simple heuristic: if there's a recognizable container name pattern
+            for arg in reversed(command):
+                if "clickhouse" in arg.lower() or "otel" in arg.lower() or "collector" in arg.lower():
+                    # Extract just the service name part
+                    if "/" in arg:
+                        return arg.split("/")[-1]
+                    return arg
+                    
+            return None
+        except Exception as e:
+            self.logger.error(f"Error extracting container name from command {command}: {e}")
+            return None
+
+    async def _attach_to_running_container(self, service_name: str, container_name: str):
+        """Attach to an already running container."""
+        try:
+            # Get container ID
+            result = await asyncio.create_subprocess_exec(
+                "docker", "inspect", container_name, "--format", "{{.Id}}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+            
+            if result.returncode == 0:
+                container_id = stdout.decode().strip()
+                
+                # Update service state to indicate we've attached
+                if service_name in self.service_states:
+                    state = self.service_states[service_name]
+                    state.status = ServiceStatus.ATTACHED
+                    state.container_id = container_id
+                    state.container_state = ContainerState.RUNNING
+                    state.was_attached = True
+                    state.health_status = True
+                    state.start_time = datetime.now()
+                    state.last_health_check = datetime.now()
+                    
+                    if self.verbose:
+                        print(f"   ✅ Attached to running {service_name} container ({container_id[:12]})")
+                
+        except Exception as e:
+            self.logger.error(f"Error attaching to container {container_name}: {e}")
+
     async def _start_service(self, service_name: str) -> bool:
-        """Start a specific service."""
+        """Start a specific service with intelligent container state management."""
         service = self.services[service_name]
         state = self.service_states[service_name]
+        
+        # Check if already attached to running container
+        if state.status == ServiceStatus.ATTACHED:
+            if self.verbose:
+                print(f"   ⚡ Service {service_name} already attached to running container")
+            return True
         
         state.status = ServiceStatus.STARTING
         
         try:
-            # Check if dependencies are running
+            # Check if dependencies are running or attached
             for dep in service.dependencies:
                 dep_state = self.service_states.get(dep)
-                if not dep_state or dep_state.status != ServiceStatus.RUNNING:
-                    state.last_error = f"Dependency {dep} not running"
+                if not dep_state or dep_state.status not in [ServiceStatus.RUNNING, ServiceStatus.ATTACHED]:
+                    state.last_error = f"Dependency {dep} not running (status: {dep_state.status if dep_state else 'None'})"
                     state.status = ServiceStatus.FAILED
                     return False
             
-            # Start the service
-            if service.start_command:
+            # For Docker services, check container state first
+            if service.start_command and "docker" in " ".join(service.start_command):
+                container_name = self._extract_container_name(service.start_command)
+                if container_name:
+                    container_state = await self._get_container_state(container_name)
+                    
+                    if container_state == ContainerState.RUNNING:
+                        # Attach to existing running container
+                        if self.verbose:
+                            print(f"   🔗 Attaching to running {service_name} container")
+                        
+                        # Get container ID for tracking
+                        result = await self._run_docker_command(["ps", "-q", "--filter", f"name={container_name}"])
+                        if result and result.returncode == 0:
+                            container_id = result.stdout.strip()
+                            state.container_id = container_id
+                            state.container_state = ContainerState.RUNNING
+                            state.was_attached = True
+                            state.status = ServiceStatus.ATTACHED
+                            state.start_time = datetime.now()
+                            state.last_health_check = datetime.now()
+                            
+                            if self.verbose:
+                                print(f"   ✅ Attached to running {service_name} container ({container_id[:12]})")
+                            return True
+                    
+                    elif container_state in [ContainerState.STOPPED, ContainerState.EXITED]:
+                        # Restart stopped container
+                        if self.verbose:
+                            print(f"   🔄 Restarting stopped {service_name} container")
+                        
+                        restart_result = await self._run_docker_command(["restart", container_name])
+                        if restart_result and restart_result.returncode == 0:
+                            state.container_state = ContainerState.RUNNING
+                            state.start_time = datetime.now()
+                            if self.verbose:
+                                print(f"   ✅ Restarted {service_name} container")
+                        else:
+                            if self.verbose:
+                                print(f"   ❌ Failed to restart {service_name} container")
+                            state.last_error = f"Failed to restart container: {restart_result.stderr if restart_result else 'Unknown error'}"
+                            state.status = ServiceStatus.FAILED
+                            return False
+            
+            # Start the service if not already handled above
+            if service.start_command and state.status != ServiceStatus.ATTACHED:
                 env = os.environ.copy()
                 env.update(service.environment_vars)
                 
@@ -416,21 +785,41 @@ class ServiceOrchestrator:
                 state.process = process
                 state.pid = process.pid
                 state.start_time = datetime.now()
+                
+                # For Docker services, update container metadata
+                if "docker" in " ".join(service.start_command):
+                    container_name = self._extract_container_name(service.start_command)
+                    if container_name:
+                        # Give container time to start
+                        await asyncio.sleep(3)
+                        
+                        result = await self._run_docker_command(["ps", "-q", "--filter", f"name={container_name}"])
+                        if result and result.returncode == 0 and result.stdout.strip():
+                            state.container_id = result.stdout.strip()
+                            state.container_state = ContainerState.RUNNING
             
-            # Wait for service to become healthy
-            deadline = time.time() + service.startup_timeout
-            while time.time() < deadline:
-                if service.health_check and await self._run_health_check(service_name):
-                    state.status = ServiceStatus.RUNNING
-                    state.health_status = True
+            # Wait for service to become healthy (skip for attached services)
+            if state.status != ServiceStatus.ATTACHED:
+                deadline = time.time() + service.startup_timeout
+                while time.time() < deadline:
+                    if service.health_check and await self._run_health_check(service_name):
+                        state.status = ServiceStatus.RUNNING
+                        state.health_status = True
+                        state.last_health_check = datetime.now()
+                        return True
+                    await asyncio.sleep(2)
+                
+                # Timeout reached
+                state.last_error = f"Startup timeout ({service.startup_timeout}s)"
+                state.status = ServiceStatus.FAILED
+                return False
+            else:
+                # For attached services, run one health check to verify
+                if service.health_check:
+                    is_healthy = await self._run_health_check(service_name)
+                    state.health_status = is_healthy
                     state.last_health_check = datetime.now()
-                    return True
-                await asyncio.sleep(2)
-            
-            # Timeout reached
-            state.last_error = f"Startup timeout ({service.startup_timeout}s)"
-            state.status = ServiceStatus.FAILED
-            return False
+                return True
             
         except Exception as e:
             state.last_error = str(e)
@@ -622,6 +1011,8 @@ class ServiceOrchestrator:
         elif service_name == "consistency_checker":
             port = state.metrics.get("port", 8110)
             await self._start_consistency_checker_service(port)
+        elif service_name == "telemetry_collector":
+            await self._start_telemetry_collector_service()
         else:
             await self._start_service(service_name)
 
@@ -720,6 +1111,70 @@ class ServiceOrchestrator:
             self.logger.error(f"Failed to stop consistency checker: {e}")
             return False
     
+    async def _start_telemetry_collector_service(self) -> bool:
+        """Start the telemetry collection service."""
+        state = self.service_states["telemetry_collector"]
+        state.status = ServiceStatus.STARTING
+        
+        try:
+            # Initialize the telemetry collector
+            self.telemetry_collector = get_collector()
+            
+            # Start the service
+            success = await self.telemetry_collector.start_service()
+            
+            if success:
+                state.status = ServiceStatus.RUNNING
+                state.start_time = datetime.now()
+                state.health_status = True
+                state.last_health_check = datetime.now()
+                
+                # Store service metrics
+                metrics = self.telemetry_collector.get_service_metrics()
+                state.metrics.update(metrics)
+                
+                if self.verbose:
+                    print(f"   ✅ Telemetry collector service started (session: {metrics.get('session_id', 'unknown')})")
+                
+                return True
+            else:
+                state.status = ServiceStatus.FAILED
+                state.last_error = "Failed to start telemetry collector service"
+                return False
+            
+        except Exception as e:
+            state.last_error = str(e)
+            state.status = ServiceStatus.FAILED
+            self.logger.error(f"Failed to start telemetry collector: {e}")
+            return False
+    
+    async def _stop_telemetry_collector_service(self) -> bool:
+        """Stop the telemetry collection service."""
+        state = self.service_states["telemetry_collector"]
+        state.status = ServiceStatus.STOPPING
+        
+        try:
+            if self.telemetry_collector:
+                success = await self.telemetry_collector.stop_service()
+                if success:
+                    if self.verbose:
+                        print("   ✅ Telemetry collector service stopped")
+                else:
+                    if self.verbose:
+                        print("   ⚠️  Telemetry collector reported stop failure")
+                        
+                self.telemetry_collector = None
+            
+            state.status = ServiceStatus.STOPPED
+            state.health_status = False
+            
+            return True
+            
+        except Exception as e:
+            state.last_error = str(e)
+            self.logger.error(f"Failed to stop telemetry collector: {e}")
+            return False
+    
     def get_consistency_report(self) -> Optional[Dict[str, Any]]:
         """Get the latest consistency check report."""
         if self.consistency_checker:
@@ -769,12 +1224,47 @@ class ServiceOrchestrator:
             return False
 
     def _check_dashboard_health(self) -> bool:
-        """Check if dashboard is healthy."""
+        """Check if dashboard is healthy with comprehensive accessibility validation."""
         try:
-            # Dashboard health is managed by the main process
-            # This is a placeholder for future HTTP health checks
+            state = self.service_states.get("dashboard")
+            if not state:
+                return False
+            
+            # Get the dashboard port from metrics
+            port = state.metrics.get("port", 8110)
+            url = f"http://127.0.0.1:{port}"
+            state.url = url
+            
+            # 1. Check if port is actually bound and listening
+            if not self._check_port_listening("127.0.0.1", port):
+                state.accessibility_status = f"Port {port} not listening"
+                if self.verbose:
+                    print(f"   ❌ Dashboard port {port} not bound/listening")
+                return False
+            
+            # 2. Check HTTP connectivity
+            if not self._check_http_connectivity(url):
+                state.accessibility_status = f"HTTP connection to {url} failed"
+                if self.verbose:
+                    print(f"   ❌ Dashboard HTTP connectivity failed at {url}")
+                return False
+            
+            # 3. Validate HTTP response content
+            if not self._validate_dashboard_response(url):
+                state.accessibility_status = f"Dashboard response validation failed at {url}"
+                if self.verbose:
+                    print(f"   ❌ Dashboard response validation failed at {url}")
+                return False
+            
+            state.accessibility_status = f"Dashboard accessible at {url}"
+            if self.verbose:
+                print(f"   ✅ Dashboard health check passed at {url}")
             return True
-        except:
+            
+        except Exception as e:
+            if state:
+                state.accessibility_status = f"Health check error: {str(e)}"
+            self.logger.error(f"Dashboard health check error: {e}")
             return False
     
     def _check_consistency_checker_health(self) -> bool:
@@ -798,3 +1288,180 @@ class ServiceOrchestrator:
             return False
         except:
             return False
+    
+    def _check_telemetry_collector_health(self) -> bool:
+        """Check if the telemetry collector is healthy."""
+        try:
+            if self.telemetry_collector is None:
+                return False
+            
+            # Use the collector's built-in health check
+            return self.telemetry_collector.is_healthy()
+        except:
+            return False
+    
+    def _check_port_listening(self, host: str, port: int) -> bool:
+        """Check if a port is bound and listening."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(5)  # 5 second timeout
+                result = sock.connect_ex((host, port))
+                return result == 0
+        except Exception as e:
+            self.logger.debug(f"Port check failed for {host}:{port}: {e}")
+            return False
+    
+    def _check_http_connectivity(self, url: str) -> bool:
+        """Check if HTTP connection can be established."""
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ContextCleaner-HealthCheck/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return response.status == 200
+        except urllib.error.HTTPError as e:
+            # Even 404 or other HTTP errors mean the server is responding
+            return 200 <= e.code < 500
+        except Exception as e:
+            self.logger.debug(f"HTTP connectivity check failed for {url}: {e}")
+            return False
+    
+    def _validate_dashboard_response(self, url: str) -> bool:
+        """Validate that the dashboard response contains expected content."""
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ContextCleaner-HealthCheck/1.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                content = response.read().decode('utf-8', errors='ignore')
+                
+                # Check for typical dashboard indicators
+                dashboard_indicators = [
+                    'Context Cleaner',
+                    'dashboard',
+                    '<html',
+                    '<body',
+                    'DOCTYPE'
+                ]
+                
+                # At least one indicator should be present
+                for indicator in dashboard_indicators:
+                    if indicator.lower() in content.lower():
+                        return True
+                
+                # If no indicators found, log for debugging
+                self.logger.debug(f"Dashboard response validation failed - no indicators found in content (length: {len(content)})")
+                return False
+                
+        except Exception as e:
+            self.logger.debug(f"Dashboard response validation failed for {url}: {e}")
+            return False
+    
+    async def check_dashboard_accessibility(self, host: str = "127.0.0.1", port: int = 8110) -> Dict[str, Any]:
+        """Comprehensive dashboard accessibility check."""
+        url = f"http://{host}:{port}"
+        
+        result = {
+            "url": url,
+            "accessible": False,
+            "port_listening": False,
+            "http_connectivity": False,
+            "response_valid": False,
+            "error_details": [],
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        try:
+            # 1. Port listening check
+            result["port_listening"] = self._check_port_listening(host, port)
+            if not result["port_listening"]:
+                result["error_details"].append(f"Port {port} not bound/listening on {host}")
+                return result
+            
+            # 2. HTTP connectivity check
+            result["http_connectivity"] = self._check_http_connectivity(url)
+            if not result["http_connectivity"]:
+                result["error_details"].append(f"HTTP connection failed to {url}")
+                return result
+            
+            # 3. Response validation check
+            result["response_valid"] = self._validate_dashboard_response(url)
+            if not result["response_valid"]:
+                result["error_details"].append(f"Dashboard response validation failed for {url}")
+                return result
+            
+            result["accessible"] = True
+            return result
+            
+        except Exception as e:
+            result["error_details"].append(f"Accessibility check exception: {str(e)}")
+            return result
+    
+    async def validate_all_running_dashboards(self) -> Dict[str, Any]:
+        """Validate all currently running dashboard processes for accessibility."""
+        validation_results = {
+            "timestamp": datetime.now().isoformat(),
+            "dashboards_found": 0,
+            "accessible_dashboards": 0,
+            "failed_dashboards": 0,
+            "results": [],
+            "summary": ""
+        }
+        
+        try:
+            # Find all Context Cleaner dashboard processes
+            dashboard_processes = []
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                try:
+                    cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
+                    if ('python' in proc.info['name'].lower() and 
+                        'context_cleaner' in cmdline and 
+                        'dashboard' in cmdline):
+                        
+                        # Extract port from command line
+                        port_match = re.search(r'--port[\s=](\d+)', cmdline)
+                        port = int(port_match.group(1)) if port_match else 8110
+                        
+                        dashboard_processes.append({
+                            'pid': proc.pid,
+                            'port': port,
+                            'cmdline': cmdline
+                        })
+                        
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+            
+            validation_results["dashboards_found"] = len(dashboard_processes)
+            
+            # Check accessibility for each dashboard
+            for dashboard in dashboard_processes:
+                accessibility_result = await self.check_dashboard_accessibility(
+                    port=dashboard['port']
+                )
+                
+                dashboard_result = {
+                    "pid": dashboard['pid'],
+                    "port": dashboard['port'],
+                    "cmdline": dashboard['cmdline'][:100] + "...",
+                    "accessibility": accessibility_result
+                }
+                
+                validation_results["results"].append(dashboard_result)
+                
+                if accessibility_result["accessible"]:
+                    validation_results["accessible_dashboards"] += 1
+                else:
+                    validation_results["failed_dashboards"] += 1
+            
+            # Generate summary
+            if validation_results["dashboards_found"] == 0:
+                validation_results["summary"] = "No dashboard processes found"
+            elif validation_results["accessible_dashboards"] == validation_results["dashboards_found"]:
+                validation_results["summary"] = f"All {validation_results['dashboards_found']} dashboards are accessible"
+            elif validation_results["accessible_dashboards"] == 0:
+                validation_results["summary"] = f"None of {validation_results['dashboards_found']} dashboards are accessible"
+            else:
+                validation_results["summary"] = f"{validation_results['accessible_dashboards']}/{validation_results['dashboards_found']} dashboards are accessible"
+            
+            return validation_results
+            
+        except Exception as e:
+            validation_results["error"] = str(e)
+            validation_results["summary"] = f"Validation failed: {str(e)}"
+            return validation_results

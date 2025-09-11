@@ -96,23 +96,58 @@ def start(ctx):
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
 @click.option("--interactive", is_flag=True, help="Enable interactive dashboard mode")
 @click.option("--operations", is_flag=True, help="Show available operations")
+@click.option("--no-orchestration", is_flag=True, help="Skip service orchestration (not recommended)")
 @click.pass_context
-def dashboard(ctx, port, host, no_browser, interactive, operations):
+def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestration):
     """Launch the productivity dashboard web interface."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
 
     # Override configuration if provided
+    dashboard_port = port or config.dashboard.port
+    dashboard_host = host or config.dashboard.host
+    
     if port:
         config.dashboard.port = port
     if host:
         config.dashboard.host = host
 
     if verbose:
-        server_addr = f"{config.dashboard.host}:{config.dashboard.port}"
+        server_addr = f"{dashboard_host}:{dashboard_port}"
         click.echo(f"🌐 Starting dashboard server on {server_addr}")
 
     try:
+        # Start service orchestration unless explicitly disabled
+        if not no_orchestration:
+            try:
+                from ..services import ServiceOrchestrator
+                import asyncio
+                import sys
+                
+                if verbose:
+                    click.echo("🔧 Starting service orchestration...")
+                
+                orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
+                
+                # Start all required services
+                success = asyncio.run(orchestrator.start_all_services(dashboard_port))
+                
+                if not success:
+                    click.echo("❌ Failed to start required services", err=True)
+                    click.echo("💡 You can use --no-orchestration to skip service management", err=True)
+                    sys.exit(1)
+                    
+                if verbose:
+                    click.echo("✅ Service orchestration completed")
+                    
+            except ImportError:
+                if verbose:
+                    click.echo("⚠️  Service orchestrator not available, proceeding without it...")
+            except Exception as e:
+                if verbose:
+                    click.echo(f"⚠️  Service orchestration failed: {e}")
+                    click.echo("💡 Proceeding without orchestration - some features may not work")
+
         # Check if enhanced dashboard features are requested
         if interactive or operations:
             from .analytics_commands import AnalyticsCommandHandler
@@ -122,24 +157,32 @@ def dashboard(ctx, port, host, no_browser, interactive, operations):
                 interactive=interactive, operations=operations, format="text"
             )
         else:
-            # Create and start dashboard
-            dashboard_server = ProductivityDashboard(config)
+            # Create and start comprehensive health dashboard
+            from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+            
+            dashboard = ComprehensiveHealthDashboard(config=config)
 
             if not no_browser:
                 import webbrowser
+                import threading
+                import time
 
-                try:
-                    url = f"http://{config.dashboard.host}:{config.dashboard.port}"
-                    webbrowser.open(url)
-                except Exception:
-                    pass  # Browser opening is optional
+                def open_browser():
+                    time.sleep(2)
+                    try:
+                        url = f"http://{dashboard_host}:{dashboard_port}"
+                        webbrowser.open(url)
+                    except Exception:
+                        pass
+                
+                threading.Thread(target=open_browser, daemon=True).start()
 
-            dashboard_url = f"http://{config.dashboard.host}:{config.dashboard.port}"
+            dashboard_url = f"http://{dashboard_host}:{dashboard_port}"
             click.echo(f"📊 Dashboard running at: {dashboard_url}")
             click.echo("Press Ctrl+C to stop the server")
 
             # Start server (blocking)
-            dashboard_server.start_server(config.dashboard.host, config.dashboard.port)
+            dashboard.start_server(host=dashboard_host, port=dashboard_port, debug=False, open_browser=False)
 
     except KeyboardInterrupt:
         click.echo("\n👋 Dashboard server stopped")
