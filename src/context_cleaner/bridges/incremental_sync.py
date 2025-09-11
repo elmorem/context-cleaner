@@ -419,6 +419,11 @@ class IncrementalSyncService:
             
             logger.info("Real-time file monitoring started")
             
+            # Process any existing unprocessed files on startup
+            logger.info("Performing startup catch-up for existing files...")
+            await self.sync_incremental_changes()
+            logger.info("Startup catch-up completed")
+            
         except Exception as e:
             error_msg = f"Failed to start file monitoring: {e}"
             logger.error(error_msg)
