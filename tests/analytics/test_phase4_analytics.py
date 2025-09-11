@@ -48,8 +48,7 @@ class TestPredictiveIntelligenceEngine:
     async def test_generate_predictions_basic(self):
         """Test basic prediction generation."""
         result = await self.engine.generate_predictions(
-            prediction_type=PredictionType.PRODUCTIVITY,
-            horizon=ForecastHorizon.DAY
+            horizons=[ForecastHorizon.DAY]
         )
         
         assert result is not None
@@ -59,7 +58,10 @@ class TestPredictiveIntelligenceEngine:
     @pytest.mark.asyncio
     async def test_early_warning_system_basic(self):
         """Test early warning system basic functionality."""
-        warnings = await self.engine.check_early_warnings()
+        warnings = await self.engine.check_early_warnings(
+            current_health_score=0.8,
+            context_metrics={"token_count": 1000, "complexity_score": 5.0}
+        )
         
         assert warnings is not None
         assert isinstance(warnings, list)
@@ -91,8 +93,8 @@ class TestContentIntelligenceEngine:
         result = await self.engine.analyze_conversation(test_data)
         
         assert result is not None
-        assert "semantic_insights" in result
-        assert "conversation_flow" in result
+        assert "semantic_analysis" in result
+        assert "flow_analysis" in result
         assert "knowledge_extraction" in result
 
     @pytest.mark.asyncio
@@ -104,10 +106,10 @@ class TestContentIntelligenceEngine:
         result = await analyzer.analyze_content(test_text, "test_content")
         
         assert result is not None
-        assert result.content_id == "test_content"
+        assert result.insight_id == "test_content"
         assert result.sentiment_score is not None
-        assert isinstance(result.key_topics, list)
-        assert isinstance(result.entities, list)
+        assert isinstance(result.topics, list)
+        assert isinstance(result.named_entities, list)
 
 
 class TestBusinessIntelligenceEngine:
@@ -181,8 +183,7 @@ class TestAnalyticsIntegration:
         
         # Generate outputs from each
         predictions = await predictive.generate_predictions(
-            PredictionType.PRODUCTIVITY, 
-            ForecastHorizon.DAY
+            horizons=[ForecastHorizon.DAY]
         )
         
         content_analysis = await content.analyze_conversation([
@@ -198,7 +199,7 @@ class TestAnalyticsIntegration:
         
         # Verify the outputs have expected structure
         assert isinstance(predictions, list)
-        assert "semantic_insights" in content_analysis
+        assert "semantic_analysis" in content_analysis
         assert "comprehensive_bi_report" in bi_report
 
 
