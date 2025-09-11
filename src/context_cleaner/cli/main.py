@@ -1138,6 +1138,13 @@ try:
 except ImportError:
     pass  # Debug commands optional
 
+# Add Phase 4 - Advanced Analytics & Reporting commands
+try:
+    from .commands.analytics import analytics
+    main.add_command(analytics)
+except ImportError:
+    pass  # Phase 4 analytics commands optional
+
 
 # Add the stop command for service shutdown
 @main.command()
