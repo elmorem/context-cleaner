@@ -228,6 +228,13 @@ class ClickHouseClient(TelemetryClient):
             self.pool._circuit_breaker_open_until = None
             logger.info("Circuit breaker reset after successful query")
     
+    def reset_circuit_breaker_manually(self):
+        """Manually reset the circuit breaker and clear failure metrics."""
+        self.pool._circuit_breaker_open = False
+        self.pool._circuit_breaker_open_until = None
+        self.pool.metrics.consecutive_failures = 0
+        logger.info("Circuit breaker manually reset and failure count cleared")
+    
     def _is_circuit_breaker_open(self) -> bool:
         """Check if circuit breaker is currently open."""
         if not self.pool._circuit_breaker_open:

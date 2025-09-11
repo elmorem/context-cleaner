@@ -29,6 +29,9 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+# Import conversation processing
+from ...telemetry.jsonl_enhancement.full_content_processor import FullContentBatchProcessor
+
 # Optional dependency for file system monitoring
 try:
     from watchdog.observers import Observer
@@ -280,9 +283,11 @@ class IncrementalSyncService:
             
             # Extract actual tokens from new JSONL entries (ccusage approach)
             estimated_tokens = 0
+            successful_extractions = 0
             for entry in new_lines:
                 # Try to get actual token usage from JSONL entry
-                usage_data = entry.get('usage')
+                # Fix: Usage data is nested under 'message' key
+                usage_data = entry.get('message', {}).get('usage')
                 if usage_data and isinstance(usage_data, dict):
                     # Use actual token metrics when available (ccusage method)
                     # Ensure all values are integers to prevent type errors
@@ -300,8 +305,14 @@ class IncrementalSyncService:
                     actual_tokens = input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens
                     if actual_tokens > 0:
                         estimated_tokens += actual_tokens
-                        logger.debug(f"Extracted {actual_tokens} actual tokens from JSONL entry")
+                        successful_extractions += 1
+                        logger.debug(f"Extracted {actual_tokens} actual tokens from JSONL entry (input: {input_tokens}, output: {output_tokens}, cache_creation: {cache_creation_tokens}, cache_read: {cache_read_tokens})")
                     # Skip entries without actual token usage data to maintain accuracy
+                else:
+                    # Log when usage data is not found to help with debugging
+                    entry_type = entry.get('type', 'unknown')
+                    message_role = entry.get('message', {}).get('role', 'unknown')
+                    logger.debug(f"No usage data found for entry type={entry_type}, role={message_role}")
                 
             # Update file state
             new_state = FileProcessingState(
@@ -317,6 +328,25 @@ class IncrementalSyncService:
             self.file_states[file_path] = new_state
             self.stats.lines_processed += len(new_lines)
             self.stats.tokens_synced += int(estimated_tokens)
+            
+            # Process conversation data alongside token extraction
+            conversations_processed = 0
+            try:
+                processor = FullContentBatchProcessor(self.bridge_service.clickhouse_client)
+                conversation_stats = await processor.process_jsonl_entries(new_lines)
+                conversations_processed = conversation_stats.get('messages_processed', 0)
+                logger.info(f"Conversation processing complete: {conversations_processed} messages processed")
+            except Exception as e:
+                logger.error(f"Error processing conversations for {file_path}: {e}")
+            
+            # Enhanced logging for observability
+            logger.info(f"File processing complete: {file_path}")
+            logger.info(f"  Lines processed: {len(new_lines)}")
+            logger.info(f"  Successful token extractions: {successful_extractions}/{len(new_lines)}")
+            logger.info(f"  Total tokens extracted: {estimated_tokens}")
+            
+            if successful_extractions == 0 and len(new_lines) > 0:
+                logger.warning(f"WARNING: No tokens extracted from {len(new_lines)} entries in {file_path}. This may indicate a data structure issue.")
             
             return True
             

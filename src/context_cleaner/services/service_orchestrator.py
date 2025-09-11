@@ -12,6 +12,7 @@ This module provides comprehensive service lifecycle management for all Context 
 
 import asyncio
 import json
+import os
 import signal
 import subprocess
 import threading
@@ -32,6 +33,7 @@ import socket
 import urllib.request
 import urllib.error
 from .api_ui_consistency_checker import APIUIConsistencyChecker
+from .port_conflict_manager import PortConflictManager, PortConflictStrategy
 from ..telemetry.collector import get_collector
 from .process_registry import (
     ProcessEntry,
@@ -153,6 +155,9 @@ class ServiceOrchestrator:
         # Process Registry Integration (Phase 1)
         self.process_registry = get_process_registry()
         self.discovery_engine = get_discovery_engine()
+        
+        # Port Conflict Management
+        self.port_conflict_manager = PortConflictManager(verbose=verbose, logger=self.logger)
         
         # Initialize service definitions
         self._initialize_service_definitions()
@@ -360,6 +365,34 @@ class ServiceOrchestrator:
             print("🚀 Starting Context Cleaner service orchestration...")
             print(f"📊 Dashboard port: {dashboard_port}")
         
+        # Port conflict detection and resolution
+        service_ports = {"dashboard": dashboard_port}
+        conflicts = await self.port_conflict_manager.detect_port_conflicts(service_ports)
+        
+        # Resolve dashboard port conflicts if detected
+        if conflicts.get("dashboard", False):
+            if self.verbose:
+                print(f"⚠️  Port conflict detected for dashboard on port {dashboard_port}")
+            
+            available_port, session = await self.port_conflict_manager.find_available_port(
+                "dashboard", 
+                dashboard_port, 
+                PortConflictStrategy.HYBRID,
+                max_attempts=15
+            )
+            
+            if available_port:
+                dashboard_port = available_port
+                if self.verbose:
+                    print(f"✅ Resolved dashboard port conflict: using port {dashboard_port}")
+                    retry_stats = self.port_conflict_manager.get_retry_statistics()
+                    total_duration = session.total_duration_ms or 0
+                    print(f"   📊 Resolution took {len(session.attempts)} attempts in {total_duration}ms")
+            else:
+                if self.verbose:
+                    print("❌ Failed to resolve dashboard port conflict - no available ports found")
+                return False
+        
         # Clean up any existing processes to ensure singleton operation
         self._cleanup_existing_processes()
         
@@ -498,8 +531,8 @@ class ServiceOrchestrator:
                     print("   ❌ Docker daemon is not accessible")
                 return False
         
-        # 2. Check container states and attach to running ones or start as needed
-        container_names = ["clickhouse-otel", "otel-collector"]
+        # 2. Discover containers dynamically and attach to running ones or start as needed
+        container_names = await self._discover_project_containers()
         for container_name in container_names:
             container_state = await self._get_container_state(container_name)
             service_name = "clickhouse" if "clickhouse" in container_name else "otel"
@@ -1128,6 +1161,12 @@ class ServiceOrchestrator:
             
             status["services"][service_name] = service_info
         
+        # Add port conflict management statistics
+        try:
+            status["port_conflict_manager"] = self.port_conflict_manager.get_retry_statistics()
+        except Exception as e:
+            status["port_conflict_manager"] = {"error": str(e), "status": "unavailable"}
+        
         return status
 
     def _signal_handler(self, signum, frame):
@@ -1272,6 +1311,206 @@ class ServiceOrchestrator:
         if self.consistency_checker:
             return self.consistency_checker.get_critical_issues()
         return []
+    
+    # Container Discovery Methods
+    async def _discover_project_containers(self) -> List[str]:
+        """
+        Dynamically discover containers related to this project using multiple strategies.
+        
+        Returns:
+            List of container names that should be managed by the orchestrator
+        """
+        discovered_containers = []
+        
+        if self.verbose:
+            print("🔍 Dynamically discovering project containers...")
+        
+        # Strategy 1: Try docker-compose.yml parsing first (most reliable)
+        compose_containers = await self._discover_compose_containers()
+        discovered_containers.extend(compose_containers)
+        
+        # Strategy 2: Image-based discovery for well-known services
+        known_images = [
+            "clickhouse/clickhouse-server",
+            "otel/opentelemetry-collector-contrib"
+        ]
+        
+        for image in known_images:
+            containers = await self._discover_containers_by_image(image)
+            for container in containers:
+                if container not in discovered_containers:
+                    discovered_containers.append(container)
+        
+        # Strategy 3: Port-based discovery for ClickHouse
+        clickhouse_ports = [8123, 9000]  # Standard ClickHouse ports
+        for port in clickhouse_ports:
+            containers = await self._discover_containers_by_port(port)
+            for container in containers:
+                if container not in discovered_containers and "clickhouse" in container.lower():
+                    discovered_containers.append(container)
+        
+        # Strategy 4: Name pattern matching
+        name_patterns = [
+            "*clickhouse*",
+            "*otel*collector*"
+        ]
+        
+        for pattern in name_patterns:
+            containers = await self._discover_containers_by_name_pattern(pattern)
+            for container in containers:
+                if container not in discovered_containers:
+                    discovered_containers.append(container)
+        
+        # Remove duplicates and filter out non-project containers
+        filtered_containers = []
+        for container in discovered_containers:
+            if container and container not in filtered_containers:
+                # Basic filtering to avoid system containers
+                if not any(exclude in container.lower() for exclude in ["redis", "mysql", "postgres", "nginx"]):
+                    filtered_containers.append(container)
+        
+        if self.verbose:
+            if filtered_containers:
+                print(f"   ✅ Discovered containers: {', '.join(filtered_containers)}")
+            else:
+                print("   ⚠️  No project containers discovered - falling back to defaults")
+                # Fallback to hardcoded names if discovery fails completely
+                filtered_containers = ["clickhouse-otel", "otel-collector"]
+        
+        return filtered_containers
+    
+    async def _discover_compose_containers(self) -> List[str]:
+        """Discover containers from docker-compose.yml if it exists."""
+        compose_file = "docker-compose.yml"
+        containers = []
+        
+        if not os.path.exists(compose_file):
+            return containers
+        
+        try:
+            # Simple parsing approach - look for 'container_name:' entries
+            with open(compose_file, 'r') as f:
+                content = f.read()
+                container_names = self._simple_compose_parse(content)
+                containers.extend(container_names)
+                
+                if self.verbose and container_names:
+                    print(f"   📄 Found in docker-compose.yml: {', '.join(container_names)}")
+                    
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Could not parse docker-compose.yml: {e}")
+        
+        return containers
+    
+    def _simple_compose_parse(self, content: str) -> List[str]:
+        """Simple regex-based parsing of docker-compose.yml for container names."""
+        import re
+        container_names = []
+        
+        # Look for 'container_name: name' patterns
+        container_name_matches = re.findall(r'container_name:\s*([^\s\n]+)', content)
+        container_names.extend(container_name_matches)
+        
+        # Also look for service names under 'services:' that might become container names
+        services_matches = re.findall(r'services:\s*\n((?:\s+\w+:.*\n?)*)', content, re.MULTILINE)
+        if services_matches:
+            for services_block in services_matches:
+                service_names = re.findall(r'^\s+(\w+):', services_block, re.MULTILINE)
+                # Only add if there's no explicit container_name for this service
+                for service_name in service_names:
+                    if not re.search(rf'{service_name}:.*container_name:', content, re.DOTALL):
+                        # Docker Compose default: project_name + service_name + instance
+                        # For our case, likely to be context-cleaner_servicename_1 or just servicename
+                        potential_names = [
+                            service_name,
+                            f"context-cleaner-{service_name}",
+                            f"context-cleaner_{service_name}_1"
+                        ]
+                        container_names.extend(potential_names)
+        
+        return container_names
+    
+    async def _discover_containers_by_image(self, image_name: str) -> List[str]:
+        """Discover containers running a specific image."""
+        try:
+            # Use docker ps to find containers with specific image
+            result = await self._run_docker_command([
+                "ps", "--filter", f"ancestor={image_name}", "--format", "{{.Names}}"
+            ])
+            
+            if result:
+                containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Image discovery failed for {image_name}: {e}")
+        
+        return []
+    
+    async def _discover_containers_by_port(self, port: int) -> List[str]:
+        """Discover containers exposing a specific port."""
+        try:
+            # Use docker ps to find containers exposing specific port
+            result = await self._run_docker_command([
+                "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"
+            ])
+            
+            if result:
+                containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Port discovery failed for {port}: {e}")
+        
+        return []
+    
+    async def _discover_containers_by_name_pattern(self, pattern: str) -> List[str]:
+        """Discover containers matching a name pattern."""
+        try:
+            # Use docker ps to find containers matching pattern
+            result = await self._run_docker_command([
+                "ps", "--filter", f"name={pattern}", "--format", "{{.Names}}"
+            ])
+            
+            if result:
+                containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Name pattern discovery failed for {pattern}: {e}")
+        
+        return []
+    
+    async def _run_docker_command(self, args: List[str]) -> Optional[str]:
+        """Run a docker command and return the output."""
+        try:
+            cmd = ["docker"] + args
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                return result.stdout.strip()
+            else:
+                if self.verbose:
+                    print(f"   ⚠️  Docker command failed: {' '.join(cmd)} - {result.stderr}")
+                return None
+                
+        except subprocess.TimeoutExpired:
+            if self.verbose:
+                print(f"   ⚠️  Docker command timed out: {' '.join(args)}")
+            return None
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Docker command error: {e}")
+            return None
 
     # Health check implementations
     def _check_clickhouse_health(self) -> bool:

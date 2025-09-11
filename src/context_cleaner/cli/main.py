@@ -97,9 +97,29 @@ def start(ctx):
 @click.option("--interactive", is_flag=True, help="Enable interactive dashboard mode")
 @click.option("--operations", is_flag=True, help="Show available operations")
 @click.option("--no-orchestration", is_flag=True, help="Skip service orchestration (not recommended)")
+@click.option("--force-cleanup", is_flag=True, help="Force cleanup of existing dashboard instances")
+@click.option("--no-singleton", is_flag=True, help="Skip singleton enforcement (may cause port conflicts)")
 @click.pass_context
-def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestration):
-    """Launch the productivity dashboard web interface."""
+def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestration, force_cleanup, no_singleton):
+    """
+    Launch the productivity dashboard web interface with singleton enforcement.
+    
+    This command now uses the Dashboard Service Manager to prevent multiple competing
+    dashboard instances and ensure reliable port allocation. Features:
+    
+    ✅ Singleton dashboard enforcement - only one instance runs at a time
+    ✅ Automatic cleanup of conflicting dashboard processes  
+    ✅ Intelligent port conflict detection and resolution
+    ✅ Process discovery across different startup methods
+    ✅ Graceful shutdown of competing instances
+    
+    The Dashboard Service Manager will:
+    - Detect all existing dashboard processes 
+    - Gracefully terminate conflicts with SIGTERM then SIGKILL if needed
+    - Use PortConflictManager for intelligent port selection
+    - Acquire exclusive locks to prevent race conditions
+    - Provide comprehensive logging of cleanup operations
+    """
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
 
@@ -113,10 +133,48 @@ def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestra
         config.dashboard.host = host
 
     if verbose:
-        server_addr = f"{dashboard_host}:{dashboard_port}"
-        click.echo(f"🌐 Starting dashboard server on {server_addr}")
+        click.echo(f"🔒 Starting Context Cleaner Dashboard (singleton mode)")
+        click.echo(f"🌐 Requested: {dashboard_host}:{dashboard_port}")
 
     try:
+        # Initialize Dashboard Service Manager for singleton enforcement
+        dashboard_manager = None
+        actual_port = dashboard_port
+        actual_url = f"http://{dashboard_host}:{dashboard_port}"
+        
+        if not no_singleton:
+            try:
+                from ..services.dashboard_service_manager import ensure_singleton_dashboard
+                import asyncio
+                
+                if verbose:
+                    click.echo("🔧 Enforcing dashboard singleton pattern...")
+                
+                # Ensure singleton dashboard - this handles discovery, cleanup, and port resolution
+                actual_port, actual_url = asyncio.run(ensure_singleton_dashboard(
+                    requested_port=dashboard_port,
+                    host=dashboard_host,
+                    config=config,
+                    verbose=verbose,
+                    force_cleanup=force_cleanup
+                ))
+                
+                if verbose:
+                    if actual_port != dashboard_port:
+                        click.echo(f"📍 Port resolved: {dashboard_port} → {actual_port} (conflict avoided)")
+                    click.echo("✅ Singleton dashboard enforcement completed")
+                    
+            except ImportError:
+                if verbose:
+                    click.echo("⚠️  Dashboard Service Manager not available, proceeding without singleton enforcement...")
+            except Exception as e:
+                click.echo(f"❌ Dashboard singleton enforcement failed: {e}", err=True)
+                if not force_cleanup:
+                    click.echo("💡 Try using --force-cleanup to resolve conflicts", err=True)
+                    sys.exit(1)
+                else:
+                    click.echo("⚠️  Continuing despite singleton enforcement failure...")
+
         # Start service orchestration unless explicitly disabled
         if not no_orchestration:
             try:
@@ -129,8 +187,8 @@ def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestra
                 
                 orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
                 
-                # Start all required services
-                success = asyncio.run(orchestrator.start_all_services(dashboard_port))
+                # Start all required services with the resolved port
+                success = asyncio.run(orchestrator.start_all_services(actual_port))
                 
                 if not success:
                     click.echo("❌ Failed to start required services", err=True)
@@ -162,6 +220,7 @@ def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestra
             
             dashboard = ComprehensiveHealthDashboard(config=config)
 
+            # Browser handling with resolved URL
             if not no_browser:
                 import webbrowser
                 import threading
@@ -170,24 +229,58 @@ def dashboard(ctx, port, host, no_browser, interactive, operations, no_orchestra
                 def open_browser():
                     time.sleep(2)
                     try:
-                        url = f"http://{dashboard_host}:{dashboard_port}"
-                        webbrowser.open(url)
+                        webbrowser.open(actual_url)
                     except Exception:
                         pass
                 
                 threading.Thread(target=open_browser, daemon=True).start()
 
-            dashboard_url = f"http://{dashboard_host}:{dashboard_port}"
-            click.echo(f"📊 Dashboard running at: {dashboard_url}")
+            # Update dashboard service manager with running status
+            if not no_singleton and dashboard_manager:
+                try:
+                    from ..services.dashboard_service_manager import get_dashboard_service_manager
+                    manager = get_dashboard_service_manager(config=config, verbose=verbose)
+                    manager.mark_dashboard_running(actual_port, dashboard_host)
+                except Exception as e:
+                    if verbose:
+                        click.echo(f"⚠️  Failed to mark dashboard as running: {e}")
+
+            click.echo(f"🚀 Context Cleaner Dashboard running at: {actual_url}")
+            if actual_port != dashboard_port:
+                click.echo(f"📍 Note: Port changed from {dashboard_port} to {actual_port} to avoid conflicts")
+            click.echo("🔒 Singleton mode active - only one dashboard instance allowed")
             click.echo("Press Ctrl+C to stop the server")
 
-            # Start server (blocking)
-            dashboard.start_server(host=dashboard_host, port=dashboard_port, debug=False, open_browser=False)
+            # Start server (blocking) - use actual resolved port and host
+            dashboard.start_server(host=dashboard_host, port=actual_port, debug=False, open_browser=False)
 
     except KeyboardInterrupt:
         click.echo("\n👋 Dashboard server stopped")
+        
+        # Clean up singleton lock if we were managing it
+        if not no_singleton:
+            try:
+                from ..services.dashboard_service_manager import get_dashboard_service_manager
+                manager = get_dashboard_service_manager()
+                manager.release_dashboard_lock()
+                if verbose:
+                    click.echo("🔓 Released dashboard singleton lock")
+            except Exception as e:
+                if verbose:
+                    click.echo(f"⚠️  Lock cleanup warning: {e}")
+                    
     except Exception as e:
         click.echo(f"❌ Failed to start dashboard: {e}", err=True)
+        
+        # Clean up singleton lock on failure
+        if not no_singleton:
+            try:
+                from ..services.dashboard_service_manager import get_dashboard_service_manager
+                manager = get_dashboard_service_manager()
+                manager.release_dashboard_lock()
+            except Exception:
+                pass  # Ignore cleanup errors on failure
+        
         sys.exit(1)
 
 
@@ -1574,6 +1667,207 @@ async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_on
             click.echo(f"   ✅ {service}")
     else:
         click.echo("🤷 No services were found running")
+
+
+# Add dashboard service management commands
+@main.group(name="dashboard-mgr")
+def dashboard_manager_group():
+    """Dashboard Service Manager commands for singleton enforcement and process cleanup."""
+
+
+@dashboard_manager_group.command("status")
+@click.option("--format", type=click.Choice(["text", "json"]), default="text", help="Output format")
+@click.pass_context
+def dashboard_manager_status(ctx, format):
+    """Show Dashboard Service Manager status and discovered processes."""
+    verbose = ctx.obj["verbose"]
+    
+    try:
+        from ..services.dashboard_service_manager import get_dashboard_service_manager
+        
+        manager = get_dashboard_service_manager(verbose=verbose)
+        status = manager.get_dashboard_status()
+        
+        if format == "json":
+            import json
+            click.echo(json.dumps(status, indent=2, default=str))
+        else:
+            click.echo("\n🔒 DASHBOARD SERVICE MANAGER STATUS")
+            click.echo("=" * 50)
+            
+            # Singleton manager status
+            mgr_status = status["singleton_manager"]
+            state_icon = {
+                "stopped": "🔴",
+                "starting": "🟡", 
+                "running": "🟢",
+                "stopping": "🟡",
+                "failed": "❌",
+                "conflict_detected": "⚠️",
+                "cleanup_in_progress": "🧹"
+            }.get(mgr_status["state"], "⚪")
+            
+            click.echo(f"{state_icon} Manager State: {mgr_status['state'].title()}")
+            click.echo(f"🔒 Lock File: {mgr_status['lock_file']}")
+            click.echo(f"🔑 Lock Acquired: {'✅' if mgr_status['lock_acquired'] else '❌'}")
+            
+            if mgr_status["last_cleanup_time"]:
+                click.echo(f"🧹 Last Cleanup: {mgr_status['last_cleanup_time']}")
+            
+            # Current dashboard
+            current = status["current_dashboard"]
+            click.echo("\n📊 CURRENT DASHBOARD:")
+            if current:
+                access_icon = "✅" if current["is_accessible"] else "❌"
+                click.echo(f"   {access_icon} PID {current['pid']} on {current['host']}:{current['port']}")
+                click.echo(f"   🌐 URL: {current['url']}")
+                click.echo(f"   🏷️  Type: {current['process_type']}")
+                click.echo(f"   ⏰ Started: {current['start_time']}")
+                
+                if current["accessibility_error"]:
+                    click.echo(f"   ⚠️  Error: {current['accessibility_error']}")
+            else:
+                click.echo("   No active dashboard")
+            
+            # Discovered processes
+            discovered = status["discovered_processes"]
+            click.echo(f"\n🔍 DISCOVERED PROCESSES ({len(discovered)}):")
+            
+            if discovered:
+                for proc in discovered:
+                    access_icon = "✅" if proc["is_accessible"] else "❌"
+                    cleanup_icon = "🧹" if proc["cleanup_attempted"] else "⚪"
+                    success_icon = "✅" if proc.get("cleanup_success", False) else "❌" if proc["cleanup_attempted"] else "⚪"
+                    
+                    click.echo(f"   {access_icon}{cleanup_icon}{success_icon} PID {proc['pid']} on {proc['host']}:{proc['port']} ({proc['process_type']})")
+                    
+                    if proc["accessibility_error"]:
+                        click.echo(f"      ⚠️  Access Error: {proc['accessibility_error']}")
+                    
+                    if proc["cleanup_error"]:
+                        click.echo(f"      ❌ Cleanup Error: {proc['cleanup_error']}")
+            else:
+                click.echo("   No processes discovered")
+            
+            # Cleanup summary
+            cleanup = status["cleanup_summary"]
+            click.echo(f"\n🧹 CLEANUP SUMMARY:")
+            click.echo(f"   📊 Total Discovered: {cleanup['total_discovered']}")
+            click.echo(f"   🔄 Cleanup Attempted: {cleanup['cleanup_attempted']}")
+            click.echo(f"   ✅ Successful: {cleanup['cleanup_successful']}")
+            click.echo(f"   ❌ Failed: {cleanup['cleanup_failed']}")
+            
+            # Port conflict manager
+            pcm_status = status["port_conflict_manager"]
+            if "error" not in pcm_status:
+                click.echo(f"\n🔌 PORT CONFLICT MANAGER:")
+                click.echo(f"   📊 Total Sessions: {pcm_status.get('total_sessions', 0)}")
+                click.echo(f"   ✅ Successful: {pcm_status.get('successful_sessions', 0)}")
+                click.echo(f"   ❌ Failed: {pcm_status.get('failed_sessions', 0)}")
+            
+    except Exception as e:
+        click.echo(f"❌ Failed to get dashboard manager status: {e}", err=True)
+        sys.exit(1)
+
+
+@dashboard_manager_group.command("cleanup")
+@click.option("--exclude-current", is_flag=True, default=True, help="Exclude current process from cleanup")
+@click.option("--force", is_flag=True, help="Skip confirmation prompt")
+@click.pass_context
+def dashboard_manager_cleanup(ctx, exclude_current, force):
+    """Clean up all discovered dashboard processes."""
+    verbose = ctx.obj["verbose"]
+    
+    if not force:
+        click.echo("🧹 This will terminate all discovered dashboard processes.")
+        if exclude_current:
+            click.echo("ℹ️  Current process will be excluded from cleanup.")
+        else:
+            click.echo("⚠️  Current process will be included in cleanup!")
+        
+        if not click.confirm("Continue with cleanup?"):
+            click.echo("❌ Cleanup cancelled")
+            return
+    
+    try:
+        from ..services.dashboard_service_manager import get_dashboard_service_manager
+        
+        manager = get_dashboard_service_manager(verbose=verbose)
+        
+        if verbose:
+            click.echo("🧹 Starting comprehensive dashboard cleanup...")
+        
+        results = manager.cleanup_all_dashboards(exclude_current=exclude_current)
+        
+        if "error" in results:
+            click.echo(f"❌ Cleanup failed: {results['error']}", err=True)
+            if "details" in results:
+                click.echo(f"Details: {results['details']}", err=True)
+            sys.exit(1)
+        
+        # Display results
+        click.echo(f"\n🎯 CLEANUP RESULTS:")
+        click.echo(f"   🔄 Requested: {results.get('cleanup_requested', 0)}")
+        click.echo(f"   ✅ Successful: {results.get('cleanup_successful', 0)}")
+        click.echo(f"   ❌ Failed: {results.get('cleanup_failed', 0)}")
+        click.echo(f"   🎯 Overall: {'✅ Success' if results.get('overall_success', False) else '❌ Some failures'}")
+        
+        if verbose and "processes" in results:
+            click.echo(f"\n📋 Process Details:")
+            for proc in results["processes"]:
+                status_icon = "✅" if proc["cleanup_success"] else "❌"
+                click.echo(f"   {status_icon} PID {proc['pid']} on port {proc['port']}")
+                if proc["cleanup_error"]:
+                    click.echo(f"      Error: {proc['cleanup_error']}")
+        
+    except Exception as e:
+        click.echo(f"❌ Cleanup operation failed: {e}", err=True)
+        sys.exit(1)
+
+
+@dashboard_manager_group.command("discover")
+@click.option("--show-commands", is_flag=True, help="Show full command lines")
+@click.pass_context
+def dashboard_manager_discover(ctx, show_commands):
+    """Discover all running dashboard processes."""
+    verbose = ctx.obj["verbose"]
+    
+    try:
+        from ..services.dashboard_service_manager import get_dashboard_service_manager
+        import asyncio
+        
+        manager = get_dashboard_service_manager(verbose=verbose)
+        
+        if verbose:
+            click.echo("🔍 Discovering dashboard processes...")
+        
+        discovered = asyncio.run(manager._discover_dashboard_processes())
+        
+        click.echo(f"\n🔍 DASHBOARD PROCESS DISCOVERY")
+        click.echo("=" * 40)
+        click.echo(f"📊 Found {len(discovered)} dashboard processes")
+        
+        if discovered:
+            for i, proc in enumerate(discovered, 1):
+                access_icon = "✅" if proc.is_accessible else "❌"
+                click.echo(f"\n{i}. {access_icon} PID {proc.pid} ({proc.process_type})")
+                click.echo(f"   🌐 Address: {proc.host}:{proc.port}")
+                click.echo(f"   ⏰ Started: {proc.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                if proc.accessibility_error:
+                    click.echo(f"   ⚠️  Issue: {proc.accessibility_error}")
+                
+                if show_commands:
+                    cmd_line = proc.command_line
+                    if len(cmd_line) > 100:
+                        cmd_line = cmd_line[:97] + "..."
+                    click.echo(f"   💻 Command: {cmd_line}")
+        else:
+            click.echo("✅ No dashboard processes found")
+        
+    except Exception as e:
+        click.echo(f"❌ Discovery failed: {e}", err=True)
+        sys.exit(1)
 
 
 # Add the comprehensive run command for service orchestration

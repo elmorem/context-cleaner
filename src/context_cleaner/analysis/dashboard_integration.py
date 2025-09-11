@@ -321,15 +321,22 @@ def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, A
         
         def run_async_analysis():
             """Run the async analysis in a separate thread with its own event loop."""
-            # Create a new event loop in this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             try:
-                return loop.run_until_complete(
-                    analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
-                )
-            finally:
-                loop.close()
+                # Always create a new event loop in this thread since we're in ThreadPoolExecutor
+                logger.debug("Creating new event loop for async analysis in thread")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
+                    )
+                finally:
+                    loop.close()
+                    # Clear the loop from the thread-local storage
+                    asyncio.set_event_loop(None)
+            except Exception as e:
+                logger.error(f"Error in run_async_analysis: {e}")
+                raise
         
         # Run the async function in a separate thread to avoid event loop conflicts
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:

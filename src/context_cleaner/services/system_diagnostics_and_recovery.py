@@ -395,13 +395,13 @@ class SystemDiagnosticsAndRecovery:
         problem_queries = [
             {
                 "name": "content_column_reference",
-                "query": "SELECT file_path, length(content) as file_size FROM otel.claude_file_content LIMIT 1",
+                "query": "SELECT file_path, length(file_content) as file_size FROM otel.claude_file_content LIMIT 1",
                 "expected_error": "Unknown expression or function identifier `content`",
                 "correct_column": "file_content"
             },
             {
                 "name": "message_content_reference", 
-                "query": "SELECT session_id, substring(content, 1, 100) FROM otel.claude_message_content LIMIT 1",
+                "query": "SELECT session_id, substring(message_content, 1, 100) FROM otel.claude_message_content LIMIT 1",
                 "expected_error": "Unknown expression or function identifier `content`",
                 "correct_column": "message_content"
             }

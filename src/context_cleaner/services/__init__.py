@@ -7,6 +7,7 @@ including dependency management, health monitoring, and graceful shutdown.
 
 from .service_orchestrator import ServiceOrchestrator, ServiceStatus, ServiceDefinition, ServiceState
 from .api_ui_consistency_checker import APIUIConsistencyChecker, ConsistencyStatus
+from .port_conflict_manager import PortConflictManager, PortConflictStrategy, PortConflictSession
 
 __all__ = [
     'ServiceOrchestrator',
@@ -14,5 +15,8 @@ __all__ = [
     'ServiceDefinition',
     'ServiceState',
     'APIUIConsistencyChecker',
-    'ConsistencyStatus'
+    'ConsistencyStatus',
+    'PortConflictManager',
+    'PortConflictStrategy',
+    'PortConflictSession'
 ]
