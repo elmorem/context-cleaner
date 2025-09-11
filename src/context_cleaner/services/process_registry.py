@@ -21,6 +21,8 @@ import platform
 import logging
 import threading
 import time
+import re
+import subprocess
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Dict, Any
@@ -463,20 +465,69 @@ class ProcessDiscoveryEngine:
     
     def __init__(self):
         """Initialize the process discovery engine."""
+        # Enhanced patterns to catch ALL Context Cleaner process variations
         self.context_cleaner_patterns = [
+            # Original patterns
             'context_cleaner',
             'context-cleaner',
             'python.*context_cleaner',
             'python.*context-cleaner',
+            
+            # CLI module patterns - catches most common invocation patterns
+            'python.*src.context_cleaner.cli',
+            'python.*src/context_cleaner/cli',
+            'python.*-m.*src.context_cleaner',
+            
+            # Direct dashboard imports - catches python -c invocations  
+            'comprehensivehealthdashboard',
+            'comprehensive_health_dashboard',
+            'src.context_cleaner.dashboard',
+            
+            # Bridge service patterns - catches monitoring processes
+            'bridge.*sync.*--start-monitoring',
+            'context_cleaner.*bridge',
+            'bridge.*sync.*interval',
+            
+            # Shell compound commands - catches delayed execution
+            'sleep.*context_cleaner',
+            '&&.*context_cleaner',
+            
+            # Additional CLI patterns that were missed
+            'python.*context_cleaner.*dashboard',
+            'python.*context_cleaner.*bridge',
+            'python.*context_cleaner.*run',
         ]
         
-        # Known ports for Context Cleaner services
+        # Expanded known ports covering all discovered active ports
         self.known_ports = {
+            # Core dashboard ports (commonly used)
             8080: 'dashboard',
-            8888: 'dashboard',
-            8110: 'dashboard', 
+            8888: 'dashboard', 
+            8110: 'dashboard',
+            
+            # Extended dashboard port range (discovered running)
+            7777: 'dashboard',
+            8050: 'dashboard',
+            8055: 'dashboard', 
+            8060: 'dashboard',
+            8081: 'dashboard',
+            8082: 'dashboard',
+            8083: 'dashboard',
+            8084: 'dashboard',
+            8088: 'dashboard',
+            8099: 'dashboard',
+            8100: 'dashboard',
+            8200: 'dashboard',
+            8333: 'dashboard',
+            9000: 'dashboard',
+            9001: 'dashboard', 
+            9002: 'dashboard',
+            
+            # Service ports
             8090: 'telemetry_collector',
             8091: 'bridge_sync',
+            4317: 'otel_collector',
+            4318: 'otel_collector',
         }
     
     def discover_all_processes(self) -> List[ProcessEntry]:
@@ -491,6 +542,9 @@ class ProcessDiscoveryEngine:
         
         # Method 3: Process tree discovery (find children of known processes)
         discovered.extend(self._discover_by_process_tree())
+        
+        # Method 4: Enhanced shell command discovery (catches compound commands like sleep && python)
+        discovered.extend(self._discover_by_shell_commands())
         
         # Deduplicate by PID
         unique_processes = {}
@@ -627,6 +681,93 @@ class ProcessDiscoveryEngine:
             logger.error(f"Error in process tree discovery: {e}")
         
         return discovered
+    
+    def _discover_by_shell_commands(self) -> List[ProcessEntry]:
+        """Enhanced discovery for shell compound commands and direct invocations."""
+        discovered = []
+        
+        try:
+            # Look for shell processes that contain Context Cleaner commands
+            for process in psutil.process_iter(['pid', 'name', 'cmdline', 'create_time', 'cwd']):
+                try:
+                    # Check if this is a shell process
+                    if process.info['name'] not in ['bash', 'sh', 'zsh', 'python', 'python3']:
+                        continue
+                    
+                    cmdline = ' '.join(process.info['cmdline'] or [])
+                    cmdline_lower = cmdline.lower()
+                    
+                    # Enhanced pattern matching for shell commands
+                    is_context_cleaner = False
+                    for pattern in self.context_cleaner_patterns:
+                        if re.search(pattern, cmdline_lower, re.IGNORECASE):
+                            is_context_cleaner = True
+                            break
+                    
+                    if not is_context_cleaner:
+                        continue
+                    
+                    # Determine service type with enhanced pattern matching
+                    service_type = self._determine_service_type_enhanced(cmdline)
+                    
+                    # Extract port with enhanced methods
+                    port = self._extract_port_from_cmdline(cmdline)
+                    
+                    entry = ProcessEntry(
+                        pid=process.info['pid'],
+                        command_line=cmdline,
+                        service_type=service_type,
+                        start_time=datetime.fromtimestamp(process.info['create_time']),
+                        registration_time=datetime.now(),
+                        port=port,
+                        working_directory=process.info.get('cwd', ''),
+                        registration_source='shell_discovery',
+                        host_identifier=platform.node(),
+                        status='running'
+                    )
+                    
+                    discovered.append(entry)
+                        
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error in shell command discovery: {e}")
+        
+        return discovered
+    
+    def _determine_service_type_enhanced(self, cmdline: str) -> str:
+        """Enhanced service type determination with expanded patterns."""
+        cmdline_lower = cmdline.lower()
+        
+        # Direct dashboard invocations (most common)
+        if 'dashboard' in cmdline_lower:
+            return 'dashboard'
+        
+        # ComprehensiveHealthDashboard direct imports
+        if 'comprehensivehealthdashboard' in cmdline_lower:
+            return 'dashboard'
+        
+        # Bridge sync services
+        if 'bridge' in cmdline_lower and 'sync' in cmdline_lower:
+            return 'bridge_sync'
+        
+        # Full orchestrator runs
+        if 'run' in cmdline_lower and '--dashboard-port' in cmdline_lower:
+            return 'orchestrator'
+            
+        # Telemetry services
+        if 'telemetry' in cmdline_lower or 'otel' in cmdline_lower:
+            return 'telemetry_collector'
+        
+        # Sleep compound commands - classify by the python part
+        if 'sleep' in cmdline_lower and '&&' in cmdline_lower:
+            if 'dashboard' in cmdline_lower:
+                return 'dashboard'
+            elif 'bridge' in cmdline_lower:
+                return 'bridge_sync'
+        
+        return 'unknown'
     
     def _determine_service_type(self, cmdline: str) -> str:
         """Determine the service type from command line."""
