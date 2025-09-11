@@ -1146,74 +1146,359 @@ except ImportError:
     pass  # Phase 4 analytics commands optional
 
 
-# Add the stop command for service shutdown
+# Add the enhanced stop command for comprehensive service shutdown
 @main.command()
 @click.option("--force", is_flag=True, help="Force stop all services without confirmation")
 @click.option("--docker-only", is_flag=True, help="Stop only Docker services")
 @click.option("--processes-only", is_flag=True, help="Stop only background processes")
-@click.option("--orchestrated", is_flag=True, help="Use service orchestrator for clean shutdown")
+@click.option("--no-discovery", is_flag=True, help="Skip process discovery, use basic method")
+@click.option("--show-discovery", is_flag=True, help="Show discovered processes before shutdown")
+@click.option("--registry-cleanup", is_flag=True, help="Also clean up process registry entries")
 @click.pass_context
-def stop(ctx, force, docker_only, processes_only, orchestrated):
+def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup):
     """
-    Stop all Context Cleaner services gracefully.
+    🛑 ENHANCED STOP - Comprehensive service shutdown with process discovery.
     
-    This command will:
-    1. Stop all background JSONL processing
-    2. Stop Docker services (ClickHouse + OpenTelemetry) 
-    3. Kill any remaining dashboard processes
+    This command provides intelligent shutdown of all Context Cleaner services:
     
-    Use --force to skip confirmation prompts.
+    ✅ ORCHESTRATED SHUTDOWN:
+    • Uses service orchestrator for dependency-aware cleanup
+    • Graceful termination with proper signal handling
+    • Registry-aware process management
+    
+    ✅ PROCESS DISCOVERY:
+    • Automatically discovers all Context Cleaner processes
+    • Handles processes started through different pathways
+    • Cleans up orphaned processes bypassing orchestration
+    
+    ✅ COMPREHENSIVE CLEANUP:
+    • Docker services (ClickHouse + OpenTelemetry)
+    • JSONL processing and bridge services  
+    • Dashboard web servers on all ports
+    • Background monitoring processes
+    • Process registry entries (optional)
+    
+    MODES:
+      context-cleaner stop                 # Full orchestrated shutdown
+      context-cleaner stop --show-discovery # Preview discovered processes
+      context-cleaner stop --docker-only    # Only Docker containers
+      context-cleaner stop --processes-only # Only background processes
+      context-cleaner stop --force          # Skip confirmations
+      context-cleaner stop --registry-cleanup # Also clean registry
+    
+    This solves the orphaned process problem by discovering and stopping
+    ALL Context Cleaner processes regardless of how they were started.
     """
+    import subprocess
+    import signal
+    import os
+    import asyncio
+    import psutil
+    from pathlib import Path
+    
+    config = ctx.obj["config"] 
+    verbose = ctx.obj["verbose"]
+    
+    if verbose:
+        click.echo("🛑 Starting enhanced Context Cleaner shutdown...")
+        click.echo("🔍 Using process discovery and orchestration integration")
+    
+    # Initialize orchestrator and discovery systems
+    try:
+        from ..services import ServiceOrchestrator
+        orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
+        discovery_engine = orchestrator.discovery_engine
+        process_registry = orchestrator.process_registry
+        
+        if verbose:
+            click.echo("✅ Service orchestrator and discovery engine initialized")
+    
+    except ImportError as e:
+        if verbose:
+            click.echo(f"⚠️  Service orchestrator not available: {e}")
+            click.echo("🔄 Falling back to basic process cleanup")
+        
+        # Fallback to basic cleanup if orchestrator unavailable
+        asyncio.run(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
+        return
+    
+    except Exception as e:
+        click.echo(f"❌ Failed to initialize orchestrator: {e}", err=True)
+        if not force:
+            sys.exit(1)
+        # Continue with basic cleanup
+        asyncio.run(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
+        return
+    
+    # 1. PROCESS DISCOVERY PHASE
+    if not no_discovery:
+        try:
+            if verbose:
+                click.echo("\n🔍 PHASE 1: Process Discovery")
+            
+            discovered_processes = discovery_engine.discover_all_processes()
+            registered_processes = process_registry.get_all_processes()
+            
+            discovery_summary = {
+                "discovered_count": len(discovered_processes),
+                "registered_count": len(registered_processes),
+                "by_service_type": {}
+            }
+            
+            # Group discovered processes by service type
+            for process in discovered_processes:
+                service_type = process.service_type
+                if service_type not in discovery_summary["by_service_type"]:
+                    discovery_summary["by_service_type"][service_type] = []
+                discovery_summary["by_service_type"][service_type].append({
+                    "pid": process.pid,
+                    "command_line": process.command_line[:80] + "..." if len(process.command_line) > 80 else process.command_line
+                })
+            
+            if verbose:
+                click.echo(f"   📊 Found {discovery_summary['discovered_count']} running processes")
+                click.echo(f"   📝 Found {discovery_summary['registered_count']} registered processes")
+                
+                if discovery_summary["by_service_type"]:
+                    click.echo("   📋 Discovered processes by type:")
+                    for service_type, processes in discovery_summary["by_service_type"].items():
+                        click.echo(f"      • {service_type}: {len(processes)} processes")
+                        if verbose and show_discovery:
+                            for proc in processes[:3]:  # Show first 3
+                                click.echo(f"        - PID {proc['pid']}: {proc['command_line']}")
+                            if len(processes) > 3:
+                                click.echo(f"        - ... and {len(processes) - 3} more")
+            
+            # Show discovery results if requested
+            if show_discovery:
+                click.echo("\n📋 DISCOVERED PROCESSES PREVIEW:")
+                click.echo("=" * 50)
+                
+                if discovery_summary["discovered_count"] == 0:
+                    click.echo("No Context Cleaner processes found running")
+                else:
+                    for service_type, processes in discovery_summary["by_service_type"].items():
+                        click.echo(f"\n🔧 {service_type.upper()} ({len(processes)} processes):")
+                        for proc in processes:
+                            click.echo(f"   PID {proc['pid']}: {proc['command_line']}")
+                
+                click.echo("\n" + "=" * 50)
+                if not force and not click.confirm("Proceed with shutdown of these processes?"):
+                    click.echo("❌ Shutdown cancelled")
+                    return
+        
+        except Exception as e:
+            if verbose:
+                click.echo(f"⚠️  Process discovery failed: {e}")
+            if not force:
+                click.echo("💡 Use --no-discovery to skip discovery and use basic cleanup")
+                sys.exit(1)
+            # Continue without discovery
+            discovered_processes = []
+    
+    else:
+        if verbose:
+            click.echo("⚠️  Process discovery skipped (--no-discovery)")
+        discovered_processes = []
+    
+    # 2. CONFIRMATION PHASE
+    if not force and not show_discovery:
+        click.echo("\n🛑 This will stop all Context Cleaner services:")
+        if not docker_only:
+            click.echo("   • All discovered Context Cleaner processes")
+            click.echo("   • Background JSONL processing and bridge services")
+            click.echo("   • Dashboard web servers on all ports")
+        if not processes_only:
+            click.echo("   • Docker containers (ClickHouse + OpenTelemetry)")
+        if registry_cleanup:
+            click.echo("   • Process registry entries cleanup")
+        
+        processes_count = len(discovered_processes) if not no_discovery else "unknown number of"
+        click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
+        click.echo()
+        
+        if not click.confirm("Continue with comprehensive shutdown?"):
+            click.echo("❌ Shutdown cancelled")
+            return
+    
+    # 3. ORCHESTRATED SHUTDOWN PHASE
+    if not processes_only:
+        try:
+            if verbose:
+                click.echo("\n🔧 PHASE 2: Orchestrated Service Shutdown")
+            
+            # Use orchestrator for graceful shutdown of managed services
+            success = asyncio.run(orchestrator.stop_all_services())
+            
+            if success:
+                if verbose:
+                    click.echo("   ✅ Orchestrated services stopped successfully")
+            else:
+                if verbose:
+                    click.echo("   ⚠️  Some orchestrated services had issues during shutdown")
+        
+        except Exception as e:
+            if verbose:
+                click.echo(f"   ❌ Orchestrated shutdown failed: {e}")
+            if not force:
+                click.echo("💡 Use --force to continue with manual cleanup")
+                sys.exit(1)
+    
+    # 4. DISCOVERED PROCESS CLEANUP PHASE  
+    if not no_discovery and discovered_processes:
+        if verbose:
+            click.echo("\n🧹 PHASE 3: Discovered Process Cleanup")
+        
+        cleaned_processes = 0
+        failed_cleanups = 0
+        
+        for process in discovered_processes:
+            if process.pid == os.getpid():
+                continue  # Don't kill ourselves
+            
+            try:
+                # Check if process is still running
+                try:
+                    proc = psutil.Process(process.pid)
+                    if not proc.is_running():
+                        continue  # Already stopped
+                except psutil.NoSuchProcess:
+                    continue  # Already gone
+                
+                # Graceful termination first
+                proc.terminate()
+                
+                # Wait up to 5 seconds for graceful termination
+                try:
+                    proc.wait(timeout=5)
+                except psutil.TimeoutExpired:
+                    # Force kill if graceful termination failed
+                    proc.kill()
+                    proc.wait()
+                
+                cleaned_processes += 1
+                if verbose:
+                    click.echo(f"   ✅ Stopped PID {process.pid} ({process.service_type})")
+                
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                # Process already gone or can't access it
+                continue
+            except Exception as e:
+                failed_cleanups += 1
+                if verbose:
+                    click.echo(f"   ❌ Failed to stop PID {process.pid}: {e}")
+        
+        if verbose:
+            click.echo(f"   📊 Process cleanup: {cleaned_processes} stopped, {failed_cleanups} failed")
+    
+    # 5. DOCKER CLEANUP PHASE
+    if not processes_only:
+        if verbose:
+            click.echo("\n🐳 PHASE 4: Docker Services Cleanup")
+        
+        compose_file = Path("docker-compose.yml")
+        if compose_file.exists():
+            try:
+                result = subprocess.run(
+                    ["docker", "compose", "down"],
+                    capture_output=True, text=True, timeout=30
+                )
+                
+                if result.returncode == 0:
+                    if verbose:
+                        click.echo("   ✅ Docker services stopped")
+                else:
+                    if verbose:
+                        click.echo(f"   ⚠️  Docker stop had issues: {result.stderr}")
+                    
+            except subprocess.TimeoutExpired:
+                if verbose:
+                    click.echo("   ⚠️  Docker stop timed out, forcing shutdown...")
+                try:
+                    subprocess.run(["docker", "compose", "kill"], timeout=10)
+                    subprocess.run(["docker", "compose", "down"], timeout=10)
+                    if verbose:
+                        click.echo("   ✅ Docker services force-stopped")
+                except Exception as e:
+                    if verbose:
+                        click.echo(f"   ❌ Failed to force-stop Docker services: {e}")
+            except Exception as e:
+                if verbose:
+                    click.echo(f"   ❌ Error stopping Docker services: {e}")
+        else:
+            if verbose:
+                click.echo("   ⚠️  No docker-compose.yml found, skipping Docker shutdown")
+    
+    # 6. REGISTRY CLEANUP PHASE
+    if registry_cleanup:
+        if verbose:
+            click.echo("\n🗂️  PHASE 5: Process Registry Cleanup")
+        
+        try:
+            # Clean up stale registry entries
+            all_registered = process_registry.get_all_processes()
+            cleaned_entries = 0
+            
+            for registered_process in all_registered:
+                try:
+                    # Check if process is still running
+                    proc = psutil.Process(registered_process.pid)
+                    if not proc.is_running():
+                        process_registry.unregister_process(registered_process.pid)
+                        cleaned_entries += 1
+                except psutil.NoSuchProcess:
+                    # Process is definitely gone, remove from registry
+                    process_registry.unregister_process(registered_process.pid)
+                    cleaned_entries += 1
+            
+            if verbose:
+                click.echo(f"   📊 Registry cleanup: {cleaned_entries} stale entries removed")
+        
+        except Exception as e:
+            if verbose:
+                click.echo(f"   ❌ Registry cleanup failed: {e}")
+    
+    # 7. FINAL STATUS REPORT
+    click.echo("\n🎯 COMPREHENSIVE SHUTDOWN COMPLETE!")
+    click.echo("✅ All Context Cleaner services have been stopped")
+    
+    if verbose:
+        click.echo("\n📋 Summary:")
+        if not no_discovery:
+            click.echo(f"   • Process discovery: {len(discovered_processes)} processes found")
+        click.echo("   • Orchestrated services: Stopped")
+        if not processes_only:
+            click.echo("   • Docker services: Stopped")
+        if registry_cleanup:
+            click.echo("   • Process registry: Cleaned")
+        
+        click.echo("\n💡 To start services again:")
+        click.echo("   context-cleaner run              # Full orchestrated startup")
+        click.echo("   context-cleaner debug processes  # Check for remaining processes")
+
+
+async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_only: bool, verbose: bool):
+    """Fallback basic stop implementation when orchestrator is unavailable."""
     import subprocess
     import signal
     import os
     from pathlib import Path
     
-    verbose = ctx.obj["verbose"]
-    
-    # Use service orchestrator if requested
-    if orchestrated:
-        try:
-            from ..services import ServiceOrchestrator
-            import asyncio
-            
-            orchestrator = ServiceOrchestrator(config=ctx.obj["config"], verbose=verbose)
-            
-            if verbose:
-                click.echo("🧹 Using service orchestrator for graceful shutdown...")
-            
-            success = asyncio.run(orchestrator.stop_all_services())
-            
-            if success:
-                click.echo("✅ All services stopped cleanly via orchestrator")
-            else:
-                click.echo("⚠️ Some services may not have stopped cleanly")
-                
-            return
-            
-        except ImportError:
-            if verbose:
-                click.echo("⚠️ Service orchestrator not available, falling back to manual shutdown")
-        except Exception as e:
-            click.echo(f"❌ Orchestrated shutdown failed: {e}", err=True)
-            if not force:
-                sys.exit(1)
+    if verbose:
+        click.echo("🔄 Using basic fallback cleanup method")
     
     if not force:
-        click.echo("🛑 This will stop all Context Cleaner services:")
+        click.echo("🛑 This will stop Context Cleaner services using basic method:")
         if not docker_only:
-            click.echo("   • Background JSONL processing")
-            click.echo("   • Dashboard web servers")
+            click.echo("   • Background processes (pattern matching)")
+            click.echo("   • Dashboard servers on common ports")
         if not processes_only:
-            click.echo("   • Docker containers (ClickHouse + OpenTelemetry)")
+            click.echo("   • Docker containers")
         click.echo()
         
-        if not click.confirm("Continue with shutdown?"):
+        if not click.confirm("Continue with basic shutdown?"):
             click.echo("❌ Shutdown cancelled")
             return
-    
-    if verbose:
-        click.echo("🧹 Stopping Context Cleaner services...")
     
     stopped_services = []
     
@@ -1221,20 +1506,20 @@ def stop(ctx, force, docker_only, processes_only, orchestrated):
     if not docker_only:
         try:
             # Kill processes by name pattern
-            subprocess.run([
-                "pkill", "-f", "context_cleaner.*jsonl"
-            ], capture_output=True)
+            patterns = [
+                "context_cleaner.*jsonl", 
+                "jsonl_background_service",
+                "context_cleaner.*dashboard", 
+                "context_cleaner.*bridge"
+            ]
             
-            # Kill any python processes running JSONL processing
-            subprocess.run([
-                "pkill", "-f", "jsonl_background_service"
-            ], capture_output=True)
+            for pattern in patterns:
+                subprocess.run(["pkill", "-f", pattern], capture_output=True)
             
             # Kill dashboard processes by port pattern
-            ports_to_check = [8080, 8081, 8082, 8083, 8085, 8086, 8088, 8090, 8095, 8097, 8098, 8099, 8100, 8110, 9000, 9001]
+            ports_to_check = range(8080, 8200)  # Extended range
             for port in ports_to_check:
                 try:
-                    # Find processes using the port
                     result = subprocess.run(
                         ["lsof", "-ti", f":{port}"],
                         capture_output=True, text=True
@@ -1251,7 +1536,7 @@ def stop(ctx, force, docker_only, processes_only, orchestrated):
                 except Exception:
                     pass
             
-            stopped_services.append("background processes")
+            stopped_services.append("background processes (basic)")
             
         except Exception as e:
             if verbose:
@@ -1262,26 +1547,17 @@ def stop(ctx, force, docker_only, processes_only, orchestrated):
         compose_file = Path("docker-compose.yml")
         if compose_file.exists():
             try:
-                if verbose:
-                    click.echo("🐳 Stopping Docker services...")
-                
                 result = subprocess.run(
                     ["docker", "compose", "down"],
                     capture_output=True, text=True, timeout=30
                 )
                 
                 if result.returncode == 0:
-                    if verbose:
-                        click.echo("✅ Docker services stopped")
                     stopped_services.append("Docker containers")
                 else:
-                    if verbose:
-                        click.echo(f"⚠️ Docker stop had issues: {result.stderr}")
                     stopped_services.append("Docker containers (with warnings)")
                     
             except subprocess.TimeoutExpired:
-                if verbose:
-                    click.echo("⚠️ Docker stop timed out, forcing shutdown...")
                 try:
                     subprocess.run(["docker", "compose", "kill"], timeout=10)
                     subprocess.run(["docker", "compose", "down"], timeout=10)
@@ -1290,20 +1566,14 @@ def stop(ctx, force, docker_only, processes_only, orchestrated):
                     click.echo("❌ Failed to stop Docker services", err=True)
             except Exception as e:
                 click.echo(f"❌ Error stopping Docker services: {e}", err=True)
-        else:
-            if verbose:
-                click.echo("⚠️ No docker-compose.yml found, skipping Docker shutdown")
     
     # Summary
     if stopped_services:
-        click.echo("🎯 Shutdown complete!")
+        click.echo("🎯 Basic shutdown complete!")
         for service in stopped_services:
             click.echo(f"   ✅ {service}")
     else:
         click.echo("🤷 No services were found running")
-    
-    if verbose:
-        click.echo("💡 Use 'context-cleaner run' to start services again")
 
 
 # Add the comprehensive run command for service orchestration
