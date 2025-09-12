@@ -20,7 +20,9 @@ from .models import (
     MessageType,
     FileAccessPattern,
     CacheConfig,
+    FileType,
 )
+from .summary_parser import ProjectSummaryParser
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +33,13 @@ class SessionCacheParser:
     def __init__(self, config: Optional[CacheConfig] = None):
         """Initialize parser with optional configuration."""
         self.config = config or CacheConfig()
+        self.summary_parser = ProjectSummaryParser()
         self.stats = {
             "files_parsed": 0,
             "messages_parsed": 0,
             "errors_encountered": 0,
             "parse_time_seconds": 0.0,
+            "summary_files_skipped": 0,
         }
 
     def parse_session_file(self, file_path: Path) -> Optional[SessionAnalysis]:
@@ -55,6 +59,18 @@ class SessionCacheParser:
                 logger.warning(f"Session file not found: {file_path}")
                 return None
 
+            # Detect file type before parsing
+            file_metadata = self.summary_parser.detect_file_type(file_path)
+            
+            # Skip summary files gracefully without warnings
+            if file_metadata.file_type == FileType.SUMMARY:
+                logger.debug(f"Skipping summary file (not a conversation): {file_path}")
+                self.stats["summary_files_skipped"] += 1
+                return None
+            elif file_metadata.file_type == FileType.UNKNOWN:
+                logger.debug(f"Skipping unknown file type: {file_path}")
+                return None
+
             # Check file size
             file_size_mb = file_path.stat().st_size / (1024 * 1024)
             if file_size_mb > self.config.max_file_size_mb:
@@ -63,7 +79,7 @@ class SessionCacheParser:
                 )
                 return None
 
-            logger.info(f"Parsing session file: {file_path}")
+            logger.info(f"Parsing conversation file: {file_path}")
 
             messages = list(self._parse_messages(file_path))
             if not messages:

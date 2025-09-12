@@ -154,12 +154,14 @@ class ClickHouseClient(TelemetryClient):
     
     async def close(self):
         """Clean shutdown of client and resources."""
-        if self._health_check_task and not self._health_check_task.done():
+        if self._health_check_task and not self._health_check_task.cancelled():
             self._health_check_task.cancel()
             try:
-                await self._health_check_task
-            except asyncio.CancelledError:
+                await asyncio.wait_for(self._health_check_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
                 pass
+            finally:
+                self._health_check_task = None
         
         async with self._lock_context():
             self._is_initialized = False

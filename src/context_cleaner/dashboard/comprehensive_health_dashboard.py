@@ -71,6 +71,26 @@ except ImportError:
                 'directory_breakdown': {}
             }
 
+# Project Summary Analytics imports
+try:
+    from ..analysis.project_summary_analytics import ProjectSummaryAnalytics
+    PROJECT_SUMMARY_ANALYTICS_AVAILABLE = True
+except ImportError:
+    PROJECT_SUMMARY_ANALYTICS_AVAILABLE = False
+    
+    class ProjectSummaryAnalytics:
+        def __init__(self):
+            pass
+        
+        def get_project_categories_summary(self):
+            return {"categories": [], "total": 0}
+        
+        def get_completion_metrics(self):
+            return {"completed": 0, "in_progress": 0, "completion_rate": 0}
+        
+        def get_recent_projects(self, limit=10):
+            return []
+
 # Telemetry dashboard imports  
 try:
     from ..telemetry.clients.clickhouse_client import ClickHouseClient
@@ -777,6 +797,9 @@ class ComprehensiveHealthDashboard:
         
         # Context Window Analysis
         self.context_analyzer = ContextWindowAnalyzer() if CONTEXT_ANALYZER_AVAILABLE else None
+        
+        # Project Summary Analytics
+        self.project_summary_analytics = ProjectSummaryAnalytics() if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else None
 
         # Flask application setup for web dashboard
         self.app = Flask(__name__, template_folder=self._get_templates_dir())
@@ -1617,6 +1640,23 @@ class ComprehensiveHealthDashboard:
                         "impact": "medium"
                     })
                 
+                # Get project summary widgets
+                project_widgets = {}
+                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+                    try:
+                        categories_data = self.project_summary_analytics.get_project_categories_summary()
+                        completion_data = self.project_summary_analytics.get_completion_metrics()
+                        recent_projects_data = self.project_summary_analytics.get_recent_projects(limit=3)
+                        
+                        project_widgets = {
+                            'project_categories': categories_data,
+                            'completion_metrics': completion_data,
+                            'recent_projects': recent_projects_data
+                        }
+                    except Exception as e:
+                        logger.warning(f"Error loading project widgets: {e}")
+                        project_widgets = {}
+
                 # Format for frontend expectations
                 dashboard_data = {
                     "summary": {
@@ -1624,6 +1664,11 @@ class ComprehensiveHealthDashboard:
                         "avg_productivity": avg_prod,
                         "avg_health_score": summary_data.get("avg_health_score", 0),
                         "active_recommendations": len(recommendations),
+                        "project_summary": {
+                            "total_projects": project_widgets.get('project_categories', {}).get('total', 0),
+                            "completion_rate": project_widgets.get('completion_metrics', {}).get('completion_rate', 0),
+                            "recent_count": len(project_widgets.get('recent_projects', []))
+                        }
                     },
                     "trends": {
                         "productivity": {"direction": "stable" if len(productivity_scores) < 2 else ("upward" if productivity_scores[-1] > productivity_scores[0] else "downward")},
@@ -1639,6 +1684,7 @@ class ComprehensiveHealthDashboard:
                             "data": health_scores
                         }
                     },
+                    "project_widgets": project_widgets,
                     "recommendations": recommendations,
                     "insights": self._generate_insights(dates, productivity_scores, health_scores, total_sessions, avg_prod),
                     "patterns": self._generate_patterns(dates, productivity_scores, health_scores, total_sessions),
@@ -1899,9 +1945,7 @@ class ComprehensiveHealthDashboard:
                     logger.info(f"Context Rot Meter API called: hasattr={hasattr(self, 'telemetry_widgets')}, telemetry_widgets={getattr(self, 'telemetry_widgets', None) is not None}")
                 
                 if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
-                    # Use asyncio to run async widget data retrieval
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
+                    # Use thread-safe async widget data retrieval
                     
                     widget_map = {
                         'error-monitor': 'ERROR_MONITOR',
@@ -1926,10 +1970,21 @@ class ComprehensiveHealthDashboard:
                                 logger.info(f"Context Rot Meter: widget_enum={widget_enum}, type={type(widget_enum)}")
                                 logger.info(f"Context Rot Meter: calling get_widget_data with session_id={session_id}, time_range_days={time_range_days}")
                             
-                            data = loop.run_until_complete(
-                                self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
-                            )
-                            loop.close()
+                            # Use thread-safe async execution instead of event loop
+                            try:
+                                data = asyncio.run(
+                                    self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
+                                )
+                            except RuntimeError:
+                                # If we're in an async context, use thread executor
+                                import concurrent.futures
+                                with concurrent.futures.ThreadPoolExecutor() as executor:
+                                    future = executor.submit(
+                                        lambda: asyncio.run(
+                                            self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
+                                        )
+                                    )
+                                    data = future.result(timeout=30)
                             return jsonify({
                                 'widget_type': data.widget_type.value,
                                 'title': data.title,
@@ -2566,6 +2621,177 @@ class ComprehensiveHealthDashboard:
                 
             except Exception as e:
                 logger.error(f"Error in code patterns analytics endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        # ==================== PROJECT SUMMARY ANALYTICS API ENDPOINTS ====================
+
+        @self.app.route('/api/project-summary/categories')
+        def get_project_categories():
+            """Get project categories distribution from summary analytics."""
+            try:
+                if self.project_summary_analytics:
+                    data = self.project_summary_analytics.get_project_categories_summary()
+                    return jsonify({
+                        'success': True,
+                        'data': data
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Project summary analytics not available',
+                        'data': {'categories': [], 'total': 0}
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error in project categories endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/project-summary/completion-metrics')
+        def get_project_completion_metrics():
+            """Get project completion metrics from summary analytics."""
+            try:
+                if self.project_summary_analytics:
+                    data = self.project_summary_analytics.get_completion_metrics()
+                    return jsonify({
+                        'success': True,
+                        'data': data
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Project summary analytics not available',
+                        'data': {'completed': 0, 'in_progress': 0, 'completion_rate': 0}
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error in completion metrics endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/project-summary/recent-projects')
+        def get_recent_projects():
+            """Get recent projects from summary analytics."""
+            try:
+                limit = request.args.get('limit', 10, type=int)
+                limit = min(50, max(1, limit))  # Clamp between 1-50
+                
+                if self.project_summary_analytics:
+                    data = self.project_summary_analytics.get_recent_projects(limit=limit)
+                    return jsonify({
+                        'success': True,
+                        'data': data,
+                        'limit': limit
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Project summary analytics not available',
+                        'data': []
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error in recent projects endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/project-summary/full-analytics')
+        def get_full_project_analytics():
+            """Get comprehensive project summary analytics."""
+            try:
+                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+                    # Get cache discovery paths to analyze
+                    search_paths = []
+                    if hasattr(self, 'cache_discovery') and self.cache_discovery:
+                        try:
+                            cache_stats = self.cache_discovery.get_discovery_stats()
+                            for path_str in cache_stats.get('search_paths', []):
+                                search_paths.append(Path(path_str))
+                        except Exception as e:
+                            logger.warning(f"Error getting cache discovery paths: {e}")
+                    
+                    # If no paths from cache discovery, use default
+                    if not search_paths:
+                        search_paths = [Path.home() / ".claude" / "projects"]
+                    
+                    # Run full analytics
+                    analytics_data = self.project_summary_analytics.analyze_project_summaries(search_paths)
+                    
+                    return jsonify({
+                        'success': True,
+                        'data': analytics_data
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Project summary analytics not available',
+                        'data': {
+                            'overview': {'total_projects': 0},
+                            'categories': {},
+                            'completion_status': {},
+                            'timeline': {},
+                            'technology_trends': {},
+                            'productivity_insights': {},
+                            'metadata': {'total_summaries': 0}
+                        }
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error in full project analytics endpoint: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/project-summary-widgets')
+        def get_project_summary_widgets():
+            """Get project summary widgets for dashboard."""
+            try:
+                widgets = {}
+                
+                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+                    # Project Categories Widget
+                    categories_data = self.project_summary_analytics.get_project_categories_summary()
+                    widgets['project_categories'] = {
+                        'widget_type': 'project_categories',
+                        'title': 'Project Categories',
+                        'status': 'healthy',
+                        'data': categories_data,
+                        'last_updated': datetime.now().isoformat(),
+                        'alerts': []
+                    }
+                    
+                    # Completion Metrics Widget  
+                    completion_data = self.project_summary_analytics.get_completion_metrics()
+                    widgets['completion_metrics'] = {
+                        'widget_type': 'completion_metrics',
+                        'title': 'Project Completion',
+                        'status': 'healthy' if completion_data.get('completion_rate', 0) > 50 else 'warning',
+                        'data': completion_data,
+                        'last_updated': datetime.now().isoformat(),
+                        'alerts': [] if completion_data.get('completion_rate', 0) > 30 else ['Low completion rate']
+                    }
+                    
+                    # Recent Projects Widget
+                    recent_data = self.project_summary_analytics.get_recent_projects(limit=5)
+                    widgets['recent_projects'] = {
+                        'widget_type': 'recent_projects', 
+                        'title': 'Recent Projects',
+                        'status': 'healthy',
+                        'data': {'projects': recent_data, 'count': len(recent_data)},
+                        'last_updated': datetime.now().isoformat(),
+                        'alerts': []
+                    }
+                    
+                else:
+                    # Fallback widgets when analytics not available
+                    widgets['project_categories'] = {
+                        'widget_type': 'project_categories',
+                        'title': 'Project Categories',
+                        'status': 'unavailable',
+                        'data': {'categories': [], 'total': 0},
+                        'last_updated': datetime.now().isoformat(),
+                        'alerts': ['Project analytics not available']
+                    }
+                
+                return jsonify(widgets)
+                
+            except Exception as e:
+                logger.error(f"Error in project summary widgets endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/api/content-search', methods=['GET', 'POST'])

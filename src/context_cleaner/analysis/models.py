@@ -25,6 +25,28 @@ class MessageType(Enum):
     USER = "user"
     ASSISTANT = "assistant"
     TOOL_RESULT = "tool_result"
+    SYSTEM = "system"
+    MESSAGE = "message"
+    TEXT = "text"
+    TOOL_USE = "tool_use"
+    CREATE = "create"
+
+
+class FileType(Enum):
+    """Types of JSONL files we can encounter."""
+    
+    CONVERSATION = "conversation"
+    SUMMARY = "summary"
+    UNKNOWN = "unknown"
+
+
+class SummaryType(Enum):
+    """Types of project summary metadata."""
+    
+    SUMMARY = "summary"
+    PROJECT_STATUS = "project_status"
+    COMPLETION = "completion"
+    PROGRESS = "progress"
 
 
 @dataclass
@@ -353,6 +375,67 @@ Cache Analysis Summary:
 - {len(self.optimization_opportunities)} optimization opportunities found
 - Analysis completed in {self.analysis_duration:.2f}s
         """.strip()
+
+
+@dataclass
+class ProjectSummary:
+    """Project summary metadata from Claude Code projects."""
+    
+    uuid: str
+    leaf_uuid: str
+    summary_type: SummaryType
+    title: str
+    description: str
+    timestamp: datetime
+    project_path: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    completion_status: Optional[str] = None
+    
+    @property
+    def is_completed(self) -> bool:
+        """Check if project appears to be completed."""
+        completed_keywords = ["completed", "finished", "done", "fixed", "implemented"]
+        return any(keyword in self.description.lower() for keyword in completed_keywords)
+    
+    @property
+    def project_category(self) -> str:
+        """Categorize project based on description."""
+        desc_lower = self.description.lower()
+        
+        if any(word in desc_lower for word in ["bug", "fix", "error", "issue"]):
+            return "Bug Fix"
+        elif any(word in desc_lower for word in ["feature", "implement", "add", "new"]):
+            return "Feature Development"
+        elif any(word in desc_lower for word in ["refactor", "optimize", "improve"]):
+            return "Enhancement"
+        elif any(word in desc_lower for word in ["telemetry", "analytics", "monitoring"]):
+            return "Analytics"
+        elif any(word in desc_lower for word in ["auth", "login", "security"]):
+            return "Security"
+        else:
+            return "General"
+
+
+@dataclass
+class FileMetadata:
+    """Metadata about a JSONL file and its content type."""
+    
+    file_path: str
+    file_type: FileType
+    first_line_content: Dict[str, Any]
+    line_count: int
+    file_size_bytes: int
+    last_modified: datetime
+    
+    @property
+    def is_conversation_file(self) -> bool:
+        """Check if this is a conversation file."""
+        return self.file_type == FileType.CONVERSATION
+    
+    @property
+    def is_summary_file(self) -> bool:
+        """Check if this is a summary metadata file."""
+        return self.file_type == FileType.SUMMARY
 
 
 @dataclass

@@ -1037,10 +1037,18 @@ class ServiceOrchestrator:
                         (now - state.last_health_check).seconds >= service.health_check_interval):
                         
                         # Run health check
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        healthy = loop.run_until_complete(self._run_health_check(service_name))
-                        loop.close()
+                        try:
+                            healthy = asyncio.run(self._run_health_check(service_name))
+                        except RuntimeError:
+                            # If we're in an async context, try different approach
+                            try:
+                                import concurrent.futures
+                                with concurrent.futures.ThreadPoolExecutor() as executor:
+                                    future = executor.submit(lambda: asyncio.run(self._run_health_check(service_name)))
+                                    healthy = future.result(timeout=30)
+                            except Exception as health_error:
+                                self.logger.warning(f"Health check failed for {service_name}: {health_error}")
+                                healthy = False
                         
                         state.last_health_check = now
                         state.health_status = healthy
@@ -1052,10 +1060,17 @@ class ServiceOrchestrator:
                                 print(f"⚠️ Restarting unhealthy service: {service.description}")
                             
                             # Restart service
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            loop.run_until_complete(self._restart_service(service_name))
-                            loop.close()
+                            try:
+                                asyncio.run(self._restart_service(service_name))
+                            except RuntimeError:
+                                # If we're in an async context, use thread executor
+                                try:
+                                    import concurrent.futures
+                                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                                        future = executor.submit(lambda: asyncio.run(self._restart_service(service_name)))
+                                        future.result(timeout=30)
+                                except Exception as restart_error:
+                                    self.logger.error(f"Failed to restart service {service_name}: {restart_error}")
                 
                 # Sleep before next check
                 time.sleep(10)
