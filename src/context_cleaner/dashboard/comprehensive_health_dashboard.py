@@ -8,6 +8,7 @@ formatting with color-coded health indicators.
 
 import asyncio
 import json
+import os
 import time
 import statistics
 import re
@@ -780,6 +781,9 @@ class ComprehensiveHealthDashboard:
         # Flask application setup for web dashboard
         self.app = Flask(__name__, template_folder=self._get_templates_dir())
         self.app.config["SECRET_KEY"] = "context-cleaner-comprehensive-dashboard"
+        # Disable template caching for development to ensure fresh reloads
+        self.app.config["TEMPLATES_AUTO_RELOAD"] = True
+        self.app.jinja_env.auto_reload = True
 
         # SocketIO for real-time updates
         self.socketio = SocketIO(
@@ -2834,6 +2838,8 @@ class ComprehensiveHealthDashboard:
         port: int = 8080,
         debug: bool = False,
         open_browser: bool = True,
+        production: bool = False,
+        gunicorn_workers: Optional[int] = None,
     ):
         """
         Start the comprehensive dashboard server.
@@ -2843,6 +2849,8 @@ class ComprehensiveHealthDashboard:
             port: Port to bind to
             debug: Enable debug mode
             open_browser: Whether to open browser automatically
+            production: Use production server (Gunicorn) instead of dev server
+            gunicorn_workers: Number of Gunicorn workers (defaults to CPU count * 2 + 1)
         """
         self.host = host
         self.port = port
@@ -2860,8 +2868,15 @@ class ComprehensiveHealthDashboard:
             )
             self._update_thread.start()
 
-        logger.info(f"Starting comprehensive dashboard on http://{host}:{port}")
+        if production:
+            logger.info(f"Starting comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
+            self._start_production_server(host, port, gunicorn_workers, open_browser)
+        else:
+            logger.info(f"Starting comprehensive dashboard with Flask dev server on http://{host}:{port}")
+            self._start_development_server(host, port, debug, open_browser)
 
+    def _start_development_server(self, host: str, port: int, debug: bool, open_browser: bool):
+        """Start Flask development server with Werkzeug."""
         if open_browser:
             # Open browser after a short delay
             threading.Timer(
@@ -2877,11 +2892,130 @@ class ComprehensiveHealthDashboard:
                 use_reloader=False,  # Disable reloader to prevent threading issues
                 allow_unsafe_werkzeug=True,  # Allow development server for testing
             )
+        except KeyboardInterrupt:
+            logger.info("Shutting down development server...")
+            self.stop()
         except Exception as e:
-            logger.error(f"Dashboard server error: {e}")
+            logger.error(f"Development server error: {e}")
             raise
-        finally:
-            self.stop_server()
+
+    def _start_production_server(self, host: str, port: int, workers: Optional[int], open_browser: bool):
+        """Start production server using Gunicorn."""
+        import subprocess
+        import multiprocessing
+        import os
+        from pathlib import Path
+        
+        try:
+            # Set workers count
+            if workers is None:
+                workers = multiprocessing.cpu_count() * 2 + 1
+            
+            # Create WSGI application entry point
+            self._create_wsgi_entry_point()
+            
+            # Set environment variables
+            env = os.environ.copy()
+            env.update({
+                'FLASK_ENV': 'production',
+                'CLAUDE_CODE_ENABLE_TELEMETRY': '1',
+                'PYTHONPATH': str(Path(__file__).parent.parent.parent),
+            })
+            
+            # Open browser if requested
+            if open_browser:
+                threading.Timer(
+                    2.0, lambda: webbrowser.open(f"http://{host}:{port}")
+                ).start()
+            
+            # Gunicorn command
+            cmd = [
+                'gunicorn',
+                '--bind', f'{host}:{port}',
+                '--workers', str(workers),
+                '--worker-class', 'gevent',
+                '--worker-connections', '1000',
+                '--timeout', '30',
+                '--keepalive', '2',
+                '--max-requests', '1000',
+                '--max-requests-jitter', '50',
+                '--access-logfile', '-',
+                '--error-logfile', '-',
+                '--log-level', 'info',
+                '--preload-app',
+                'context_cleaner_wsgi:application'
+            ]
+            
+            logger.info(f"🚀 Starting Gunicorn with {workers} workers")
+            logger.info(f"📊 Dashboard URL: http://{host}:{port}")
+            logger.info("🔄 Press Ctrl+C to stop")
+            
+            # Start Gunicorn process
+            subprocess.run(cmd, env=env, check=True)
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Gunicorn failed to start: {e}")
+            logger.info("Falling back to development server...")
+            self._start_development_server(host, port, False, open_browser)
+        except FileNotFoundError:
+            logger.warning("Gunicorn not found. Install with: pip install gunicorn")
+            logger.info("Falling back to development server...")
+            self._start_development_server(host, port, False, open_browser)
+        except KeyboardInterrupt:
+            logger.info("Shutting down production server...")
+            self.stop()
+        except Exception as e:
+            logger.error(f"Production server error: {e}")
+            logger.info("Falling back to development server...")
+            self._start_development_server(host, port, False, open_browser)
+
+    def _create_wsgi_entry_point(self):
+        """Create WSGI entry point for Gunicorn."""
+        wsgi_content = '''#!/usr/bin/env python3
+"""
+WSGI entry point for Context Cleaner Dashboard (Gunicorn)
+"""
+import sys
+import os
+from pathlib import Path
+
+# Add src directory to Python path
+src_path = Path(__file__).parent / "src"
+if src_path.exists():
+    sys.path.insert(0, str(src_path))
+
+try:
+    from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+    from context_cleaner.config.settings import ContextCleanerConfig
+    
+    # Load configuration
+    config = ContextCleanerConfig.default()
+    
+    # Create dashboard instance
+    dashboard = ComprehensiveHealthDashboard(config=config)
+    
+    # Export WSGI application
+    application = dashboard.app
+    
+    # Initialize SocketIO for production
+    socketio = dashboard.socketio
+    
+    if __name__ == "__main__":
+        # Fallback to development server if run directly
+        dashboard.start_server(host="0.0.0.0", port=8081, production=False)
+        
+except Exception as e:
+    print(f"Error creating WSGI application: {e}")
+    sys.exit(1)
+'''
+        
+        wsgi_path = Path("context_cleaner_wsgi.py")
+        with open(wsgi_path, "w") as f:
+            f.write(wsgi_content)
+        
+        # Make executable
+        os.chmod(wsgi_path, 0o755)
+        logger.info(f"✅ Created WSGI entry point: {wsgi_path}")
 
     def stop_server(self):
         """Stop the dashboard server."""

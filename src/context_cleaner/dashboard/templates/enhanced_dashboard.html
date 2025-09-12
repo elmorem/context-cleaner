@@ -1569,22 +1569,15 @@
             <div class="widget-grid">
                 <div class="widget-card">
                     <div class="widget-header">
-                        <h3 class="widget-title">System Resources</h3>
-                        <div class="status-indicator status-healthy"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="system-resources" class="loading">Loading system resources...</div>
-                    </div>
-                </div>
-
-                <div class="widget-card">
-                    <div class="widget-header">
                         <h3 class="widget-title">Response Time Trends</h3>
                         <div class="status-indicator status-healthy"></div>
                     </div>
                     <div class="widget-content">
                         <div style="position: relative; height: 300px; width: 100%;">
                             <canvas id="response-time-chart"></canvas>
+                            <div id="response-time-fallback" style="display: none; text-align: center; padding: 50px; color: #6b7280;">
+                                📈 Response Time Chart Loading...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1607,6 +1600,9 @@
                     <div class="widget-content">
                         <div style="position: relative; height: 300px; width: 100%;">
                             <canvas id="system-resources-chart"></canvas>
+                            <div id="system-resources-fallback" style="display: none; text-align: center; padding: 50px; color: #6b7280;">
+                                💻 System Resources Chart Loading...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2079,6 +2075,11 @@ LIMIT 20</textarea>
                 setTimeout(function() {
                     loadAnalyticsWidgets();
                 }, 50);
+            } else if (section === 'performance') {
+                // Add small delay to ensure DOM is ready for performance widgets
+                setTimeout(function() {
+                    loadPerformanceWidgets();
+                }, 50);
             }
         }
 
@@ -2112,12 +2113,11 @@ LIMIT 20</textarea>
 
         // Load telemetry widgets
         function loadTelemetryWidgets(timeRange = '7days') {
-            // Use actual working telemetry widget endpoints
+            // Use actual working telemetry widget endpoints mapped to correct widget types
             const workingWidgets = [
-                { endpoint: 'code-pattern-analysis', elementId: 'error-monitor-widget', title: 'API Error Monitor - Code Patterns' },
-                { endpoint: 'conversation-timeline', elementId: 'cost-tracker-widget', title: 'Cost Burn Rate - Conversation Timeline' },
-                { endpoint: 'content-search-widget', elementId: 'timeout-risk-widget', title: 'Timeout Risk - Content Search' },
-                { endpoint: 'context-rot-meter', elementId: 'context-rot-meter-widget', title: 'Context Rot Meter' }
+                { endpoint: 'error-monitor', elementId: 'error-monitor-widget', title: 'API Error Monitor' },
+                { endpoint: 'cost-tracker', elementId: 'cost-tracker-widget', title: 'Cost Burn Rate Tracker' },
+                { endpoint: 'timeout-risk', elementId: 'timeout-risk-widget', title: 'Timeout Risk Assessment' }
             ];
             
             workingWidgets.forEach(widgetConfig => {
@@ -2128,21 +2128,11 @@ LIMIT 20</textarea>
                     fetch(`/api/telemetry-widget/${widgetConfig.endpoint}?timeRange=${timeRange}`)
                         .then(response => response.json())
                         .then(data => {
-                            // Render working telemetry data
-                            element.innerHTML = `
-                                <div style="padding: 1rem;">
-                                    <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem;">${widgetConfig.title}</h4>
-                                    <div style="background: #f8fafc; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                                        <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">✅ ${data.status || 'Active'}</div>
-                                        <div style="font-size: 0.875rem; color: #6b7280;">
-                                            Last updated: ${data.last_updated || 'Unknown'}
-                                        </div>
-                                    </div>
-                                    <div style="font-size: 0.875rem; color: #374151;">
-                                        ${data.data ? Object.keys(data.data).length + ' data points available' : 'Data loading...'}
-                                    </div>
-                                </div>
-                            `;
+                            console.log(`Loading enhanced widget for endpoint: ${widgetConfig.endpoint}`, data);
+                            
+                            // Use the endpoint name directly as the widget type for enhanced rendering
+                            console.log('Calling renderTelemetryWidget with:', widgetConfig.endpoint, data);
+                            renderTelemetryWidget(widgetConfig.endpoint, data);
                         })
                         .catch(error => {
                             console.error(`Error loading ${widgetConfig.endpoint}:`, error);
@@ -2152,19 +2142,36 @@ LIMIT 20</textarea>
                 }
             });
             
-            // Handle remaining widgets that don't have working endpoints
-            const remainingWidgets = ['tool-optimizer-widget', 'model-efficiency-widget'];
-            remainingWidgets.forEach(elementId => {
-                const element = document.getElementById(elementId);
+            // Handle remaining widgets with their actual endpoints
+            const remainingWidgets = [
+                { endpoint: 'tool-optimizer', elementId: 'tool-optimizer-widget' },
+                { endpoint: 'model-efficiency', elementId: 'model-efficiency-widget' }
+            ];
+            
+            remainingWidgets.forEach(widgetConfig => {
+                const element = document.getElementById(widgetConfig.elementId);
                 if (element) {
-                    element.innerHTML = `
-                        <div style="padding: 1rem; color: #6b7280; font-style: italic;">
-                            📊 Widget data not yet available
-                            <div style="font-size: 0.75rem; margin-top: 0.5rem;">
-                                This widget will show data once telemetry endpoints are configured.
-                            </div>
-                        </div>
-                    `;
+                    element.innerHTML = '<div class="loading">🔄 Loading enhanced telemetry data...</div>';
+                    
+                    fetch(`/api/telemetry-widget/${widgetConfig.endpoint}?timeRange=${timeRange}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log(`Loading enhanced widget for endpoint: ${widgetConfig.endpoint}`, data);
+                            // Use enhanced renderTelemetryWidget function for these widgets too
+                            renderTelemetryWidget(widgetConfig.endpoint, data);
+                        })
+                        .catch(error => {
+                            console.error(`Error loading ${widgetConfig.endpoint}:`, error);
+                            // If endpoint fails, show that data is not available
+                            element.innerHTML = `
+                                <div style="padding: 1rem; color: #6b7280; font-style: italic;">
+                                    📊 Widget data not yet available
+                                    <div style="font-size: 0.75rem; margin-top: 0.5rem;">
+                                        This widget will show data once telemetry endpoints are configured.
+                                    </div>
+                                </div>
+                            `;
+                        });
                 }
             });
         }
@@ -3077,7 +3084,8 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
 
         // Initialize real-time response time chart
         function initializeResponseTimeChart() {
-            const ctx = document.getElementById('response-time-chart').getContext('2d');
+            try {
+                const ctx = document.getElementById('response-time-chart').getContext('2d');
             
             // Generate sample time-series data
             const now = new Date();
@@ -3174,11 +3182,16 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                     }
                 }
             });
+            } catch (error) {
+                console.error('Error initializing response time chart:', error);
+                document.getElementById('response-time-fallback').style.display = 'block';
+            }
         }
 
         // Initialize system resources donut chart
         function initializeSystemResourcesChart() {
-            const ctx = document.getElementById('system-resources-chart').getContext('2d');
+            try {
+                const ctx = document.getElementById('system-resources-chart').getContext('2d');
             
             // Generate realistic system resource data
             const cpuUsage = Math.round(Math.random() * 30 + 15);
@@ -3228,6 +3241,10 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                     }
                 }
             });
+            } catch (error) {
+                console.error('Error initializing system resources chart:', error);
+                document.getElementById('system-resources-fallback').style.display = 'block';
+            }
         }
 
         // Load cache performance data (text-based widget)
@@ -3256,537 +3273,553 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             }
         }
 
-        // Render telemetry widget with detailed formatting
+        // Render telemetry widget with enhanced visualization
         function renderTelemetryWidget(widgetType, data) {
+            console.log(`Rendering telemetry widget: ${widgetType}`, data);
             const container = document.getElementById(`${widgetType}-widget`);
             
-            let statusIcon = '✅';
-            let statusColor = '#059669';
-            let statusText = 'Healthy';
-            
-            if (data.status === 'warning') {
-                statusIcon = '⚠️';
-                statusColor = '#d97706'; 
-                statusText = 'Warning';
-            } else if (data.status === 'critical') {
-                statusIcon = '🚨';
-                statusColor = '#dc2626';
-                statusText = 'Critical';
+            if (!container) {
+                console.error(`Container not found for widget: ${widgetType}`);
+                return;
             }
             
-            let contentHtml = '';
-            
-            // Format content based on widget type
-            if (widgetType === 'error-monitor') {
-                const errorData = data.data || {};
-                contentHtml = `
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Error Rate:</strong> ${errorData.current_error_rate || 0} errors/hour
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Trend:</strong> ${errorData.error_trend || 'stable'}
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Recovery Rate:</strong> ${(errorData.recovery_success_rate || 0) * 100}%
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Recent Errors:</strong> ${(errorData.recent_errors || []).length} in last hour
-                    </div>
-                    <button onclick="showErrorDetails()" style="
-                        background: #2563eb;
-                        color: white;
-                        border: none;
-                        padding: 0.5rem 1rem;
-                        border-radius: 0.375rem;
-                        cursor: pointer;
-                        font-size: 0.875rem;
-                        margin-top: 0.5rem;
-                        transition: background 0.2s;
-                    " onmouseover="this.style.background='#1d4ed8'" 
-                       onmouseout="this.style.background='#2563eb'">
-                        View Error Details
-                    </button>
-                `;
-            } else if (widgetType === 'cost-tracker') {
-                const costData = data.data || {};
-                contentHtml = `
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Burn Rate:</strong> $${costData.burn_rate_per_hour || 0}/hour
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Budget Remaining:</strong> ${costData.budget_remaining || 0}%
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Cost Trend:</strong> ${costData.cost_trend || 'stable'}
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Session Cost:</strong> $${costData.current_session_cost || 0}
-                    </div>
-                `;
-            } else if (widgetType === 'timeout-risk') {
-                const timeoutData = data.data || {};
-                const avgTime = timeoutData.avg_response_time || 0;
-                const slowRequests = timeoutData.slow_requests_count || 0;
-                const riskFactors = timeoutData.risk_factors || [];
-                const recommendations = timeoutData.recommended_actions || [];
-                
-                contentHtml = `
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Risk Level:</strong> <span style="color: ${getRiskLevelColor(timeoutData.risk_level)}; font-weight: 600;">${(timeoutData.risk_level || 'Low').toUpperCase()}</span>
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Avg Response Time:</strong> ${avgTime > 0 ? (avgTime/1000).toFixed(1) + 's' : 'N/A'}
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Slow Requests:</strong> ${slowRequests} (>10s)
-                    </div>
-                `;
-                
-                // Add risk factors if available
-                if (riskFactors.length > 0) {
-                    contentHtml += `
-                        <div style="margin-bottom: 0.75rem;">
-                            <strong>Risk Factors:</strong>
-                            <ul style="margin: 0.25rem 0 0 1.25rem; padding: 0; font-size: 0.875rem;">
-                                ${riskFactors.slice(0, 3).map(factor => `<li style="margin-bottom: 0.25rem;">${factor}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                // Add recommendations if available
-                if (recommendations.length > 0) {
-                    contentHtml += `
-                        <div style="margin-top: 1rem; padding: 0.75rem; background: #f0f9ff; border: 1px solid #0369a1; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #0369a1; margin-bottom: 0.5rem;">💡 Recommendations:</div>
-                            <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #1e40af;">
-                                ${recommendations.slice(0, 2).map(rec => `<li style="margin-bottom: 0.25rem;">${rec}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                contentHtml += '';
-            } else if (widgetType === 'tool-optimizer') {
-                const toolData = data.data || {};
-                const toolStats = toolData.tool_usage_stats || {};
-                const commonSeqs = toolData.common_sequences || [];
-                const suggestions = toolData.optimization_suggestions || [];
-                
-                // Get top tools by usage
-                const topTools = Object.entries(toolStats)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5);
-                
-                const totalCalls = Object.values(toolStats).reduce((sum, count) => sum + count, 0);
-                const efficiencyScore = (toolData.efficiency_score || 0) * 100;
-                
-                contentHtml = `
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Tool Efficiency Score:</strong> ${efficiencyScore.toFixed(1)}%
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Total Tool Calls:</strong> ${totalCalls.toLocaleString()}
-                    </div>
-                `;
-                
-                // Top tools section
-                if (topTools.length > 0) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem;">
-                            <strong>Top Tools (7 days):</strong>
-                            <div style="margin-top: 0.5rem; font-size: 0.875rem;">
-                                ${topTools.map(([tool, count]) => {
-                                    const percentage = totalCalls > 0 ? ((count / totalCalls) * 100).toFixed(1) : 0;
-                                    return `<div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                                        <span>${tool}:</span>
-                                        <span>${count} (${percentage}%)</span>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Common sequences section
-                if (commonSeqs.length > 0) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem;">
-                            <strong>Common Tool Patterns:</strong>
-                            <div style="margin-top: 0.5rem; font-size: 0.875rem;">
-                                ${commonSeqs.slice(0, 3).map(seq => `
-                                    <div style="margin-bottom: 0.5rem; padding: 0.375rem; background: #f8fafc; border-radius: 0.25rem; border-left: 3px solid #10b981;">
-                                        <div style="font-weight: 500;">${seq.sequence.join(' → ')}</div>
-                                        <div style="color: #6b7280; font-size: 0.8rem; margin-top: 0.25rem;">
-                                            Used ${seq.count} times • ${(seq.efficiency * 100).toFixed(0)}% efficiency
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Optimization suggestions
-                if (suggestions.length > 0) {
-                    contentHtml += `
-                        <div style="margin-top: 1rem; padding: 0.75rem; background: #fff7ed; border: 1px solid #f59e0b; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #d97706; margin-bottom: 0.5rem;">🔧 Optimization Tips:</div>
-                            <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #92400e;">
-                                ${suggestions.slice(0, 3).map(suggestion => `<li style="margin-bottom: 0.25rem;">${suggestion}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                contentHtml += `
-                    <div style="margin-top: 1rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.375rem; text-align: center;">
-                        <button onclick="showToolDetailsModal()" style="background: #10b981; color: white; border: none; padding: 0.375rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer;">
-                            View Detailed Analytics
-                        </button>
-                    </div>
-                `;
-            } else if (widgetType === 'model-efficiency') {
-                const modelData = data.data || {};
-                const models = modelData.models || {};
-                const recommendations = modelData.recommendations || [];
-                
-                const efficiencyScore = ((modelData.efficiency_score || 0) * 100).toFixed(1);
-                const avgResponseTime = (modelData.avg_response_time || 0);
-                const totalRequests = modelData.total_requests || 0;
-                const totalCost = modelData.total_cost || 0;
-                const haikuUsage = (modelData.haiku_usage_percentage || 0).toFixed(1);
-                
-                contentHtml = `
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Primary Model:</strong> ${modelData.primary_model || 'Unknown'}
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Efficiency Score:</strong> ${efficiencyScore}%
-                    </div>
-                    <div style="margin-bottom: 0.75rem;">
-                        <strong>Total Requests:</strong> ${totalRequests.toLocaleString()}
-                    </div>
-                `;
-                
-                // Show model comparison if we have multiple models
-                const modelList = Object.keys(models);
-                if (modelList.length > 1) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem;">
-                            <strong>Model Usage (7 days):</strong>
-                            <div style="margin-top: 0.5rem; font-size: 0.875rem;">
-                                ${modelList.map(modelKey => {
-                                    const model = models[modelKey];
-                                    const percentage = ((model.request_count / totalRequests) * 100).toFixed(1);
-                                    return `
-                                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                                            <span>${model.display_name}:</span>
-                                            <span>${model.request_count} (${percentage}%)</span>
-                                        </div>
-                                        <div style="margin-bottom: 0.5rem;">
-                                            <div style="font-size: 0.8rem; color: #6b7280;">
-                                                Avg: $${model.avg_cost.toFixed(4)} • ${(model.avg_duration/1000).toFixed(1)}s
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Show cost efficiency comparison
-                    if (modelData.cost_efficiency_ratio > 1) {
-                        contentHtml += `
-                            <div style="margin-bottom: 1rem;">
-                                <strong>Cost Efficiency:</strong>
-                                <div style="font-size: 0.875rem; margin-top: 0.25rem;">
-                                    Haiku is ${modelData.cost_efficiency_ratio.toFixed(0)}x more cost-effective
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    // Show speed comparison
-                    if (modelData.speed_efficiency_ratio > 1) {
-                        contentHtml += `
-                            <div style="margin-bottom: 1rem;">
-                                <strong>Speed Advantage:</strong>
-                                <div style="font-size: 0.875rem; margin-top: 0.25rem;">
-                                    Haiku is ${modelData.speed_efficiency_ratio.toFixed(1)}x faster
-                                </div>
-                            </div>
-                        `;
-                    }
-                } else if (modelList.length === 1) {
-                    // Single model info
-                    const singleModel = models[modelList[0]];
-                    contentHtml += `
-                        <div style="margin-bottom: 0.75rem;">
-                            <strong>Avg Cost:</strong> $${singleModel.avg_cost.toFixed(4)}
-                        </div>
-                        <div style="margin-bottom: 0.75rem;">
-                            <strong>Avg Duration:</strong> ${(singleModel.avg_duration/1000).toFixed(1)}s
-                        </div>
-                    `;
-                }
-                
-                // Show potential savings
-                if (modelData.potential_savings > 1) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #10b981; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #059669; font-size: 0.875rem;">💰 Potential Savings</div>
-                            <div style="color: #047857; font-size: 0.8rem; margin-top: 0.25rem;">
-                                $${modelData.potential_savings.toFixed(2)}/week with better model selection
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Show recommendations
-                if (recommendations.length > 0) {
-                    contentHtml += `
-                        <div style="margin-top: 1rem; padding: 0.75rem; background: #fff7ed; border: 1px solid #f59e0b; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #d97706; margin-bottom: 0.5rem;">🎯 Recommendations:</div>
-                            <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #92400e;">
-                                ${recommendations.slice(0, 3).map(rec => `<li style="margin-bottom: 0.25rem;">${rec}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                // Add detailed analytics cards if available
-                if (modelData.query_type_distribution && Object.keys(modelData.query_type_distribution).length > 0) {
-                    const topQueryTypes = Object.entries(modelData.query_type_distribution)
-                        .sort(([,a], [,b]) => b - a)
-                        .slice(0, 3);
-                    
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #475569; font-size: 0.875rem; margin-bottom: 0.5rem;">📊 Top Query Types</div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
-                                ${topQueryTypes.map(([type, percentage]) => `
-                                    <div style="text-align: center; padding: 0.5rem; background: white; border-radius: 0.25rem; border: 1px solid #e5e7eb;">
-                                        <div style="font-size: 0.75rem; color: #6b7280; text-transform: capitalize;">${type.replace('_', ' ')}</div>
-                                        <div style="font-size: 1rem; font-weight: 600; color: #374151;">${percentage.toFixed(1)}%</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Add model specializations if available
-                if (modelData.model_specializations && Object.keys(modelData.model_specializations).length > 0) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #92400e; font-size: 0.875rem; margin-bottom: 0.5rem;">🎯 Model Specializations</div>
-                            <div style="font-size: 0.8rem; color: #78350f; line-height: 1.4;">
-                                ${Object.entries(modelData.model_specializations).map(([model, specialization]) => `
-                                    <div style="margin-bottom: 0.25rem;"><strong>${model}:</strong> ${specialization}</div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                contentHtml += `
-                    <div style="margin-top: 1rem; padding: 0.5rem; background: #f0fdf4; border-radius: 0.375rem; text-align: center;">
-                        <button onclick="showModelDetailsModal()" style="background: #10b981; color: white; border: none; padding: 0.375rem 0.75rem; border-radius: 0.25rem; font-size: 0.875rem; cursor: pointer;">
-                            View Model Analytics
-                        </button>
-                    </div>
-                `;
-            } else if (widgetType === 'context-rot-meter') {
-                const contextRotData = data.data || {};
-                const contextRot = contextRotData.context_rot || {};
-                
-                // Helper function to get explanation for rot score
-                function getRotScoreExplanation(score) {
-                    const scorePercent = (score * 100).toFixed(1);
-                    if (score < 0.3) return `${scorePercent}% - Excellent! Your conversation is focused and efficient with minimal repetition.`;
-                    if (score < 0.5) return `${scorePercent}% - Good conversation quality with some minor repetitive patterns.`;
-                    if (score < 0.7) return `${scorePercent}% - Moderate issues detected. Consider clarifying context or avoiding circular discussions.`;
-                    return `${scorePercent}% - High rot detected. The conversation may be stuck in loops or losing focus.`;
-                }
-                
-                // Helper function to get confidence explanation  
-                function getConfidenceExplanation(confidence) {
-                    const confPercent = (confidence * 100).toFixed(0);
-                    if (confidence > 0.8) return `${confPercent}% - High confidence. Analysis based on substantial conversation data.`;
-                    if (confidence > 0.6) return `${confPercent}% - Good confidence. Sufficient data for reliable analysis.`;
-                    if (confidence > 0.4) return `${confPercent}% - Moderate confidence. Limited data may affect accuracy.`;
-                    return `${confPercent}% - Low confidence. Analysis based on minimal data - consider longer time window.`;
-                }
-                
-                // Helper function to get trend explanation
-                function getTrendExplanation(trend) {
-                    if (trend === 'improving') return 'Your conversation quality is getting better over time! 📈';
-                    if (trend === 'degrading') return 'Conversation quality is declining. Consider refocusing or taking a break. 📉';
-                    return 'Conversation quality is stable with no significant changes. ➡️';
-                }
-
-                // Enhanced display with explanations
-                contentHtml = `
-                    <!-- Context Rot Score Explanation -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${contextRot.current_rot_score < 0.3 ? '#f0fdf4' : contextRot.current_rot_score < 0.7 ? '#fffbeb' : '#fef2f2'}; border-radius: 0.375rem; border: 1px solid ${contextRot.current_rot_score < 0.3 ? '#10b981' : contextRot.current_rot_score < 0.7 ? '#f59e0b' : '#ef4444'};">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <div style="font-weight: 600; color: #374151;">🎯 Context Rot Score</div>
-                            <div style="color: ${contextRot.session_health_status === 'healthy' ? '#059669' : contextRot.session_health_status === 'degraded' ? '#d97706' : '#dc2626'}; font-weight: 600; text-transform: capitalize;">
-                                ${contextRot.session_health_status || 'Unknown'}
-                            </div>
-                        </div>
-                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
-                            ${contextRot.current_rot_score ? getRotScoreExplanation(contextRot.current_rot_score) : 'N/A - No data available for analysis'}
-                        </div>
-                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
-                            💡 Context Rot measures conversation efficiency by detecting repetitive patterns, circular discussions, and focus drift.
-                        </div>
-                    </div>
-                    
-                    <!-- Confidence Level Explanation -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.375rem; border: 1px solid #e2e8f0;">
-                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">🎯 Analysis Confidence</div>
-                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
-                            ${contextRot.confidence_level ? getConfidenceExplanation(contextRot.confidence_level) : 'N/A - Insufficient data for confidence assessment'}
-                        </div>
-                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
-                            💡 Confidence reflects the reliability of our analysis based on conversation length and data quality.
-                        </div>
-                    </div>
-                    
-                    <!-- Trend Analysis Explanation -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${contextRot.trend_direction === 'improving' ? '#f0fdf4' : contextRot.trend_direction === 'degrading' ? '#fef2f2' : '#f8fafc'}; border-radius: 0.375rem; border: 1px solid ${contextRot.trend_direction === 'improving' ? '#10b981' : contextRot.trend_direction === 'degrading' ? '#ef4444' : '#e2e8f0'};">
-                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">📈 Quality Trend</div>
-                        <div style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem;">
-                            ${contextRot.trend_direction ? getTrendExplanation(contextRot.trend_direction) : 'Stable - No significant trend detected ➡️'}
-                        </div>
-                        <div style="font-size: 0.75rem; color: #9ca3af; font-style: italic;">
-                            💡 Trend analysis compares recent conversation quality with earlier patterns to show improvement or decline.
-                        </div>
-                    </div>
-
-                    <!-- Measurement Summary -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fafafa; border-radius: 0.375rem; border: 1px solid #e5e5e5;">
-                        <div style="font-weight: 600; color: #374151; margin-bottom: 0.5rem;">📊 Analysis Summary</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem;">
-                            <div><strong>Measurements:</strong> ${contextRot.measurements_count || 0}</div>
-                            <div><strong>Alerts:</strong> ${contextRot.attention_alerts || 0}</div>
-                        </div>
-                        <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.5rem; font-style: italic;">
-                            📋 Based on ${contextRot.time_window_minutes || 30} minutes of conversation data
-                        </div>
-                    </div>
-                `;
-                
-                // Add User Activation Interface
-                contentHtml += `
-                    <!-- User Activation Interface -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.375rem;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem; color: #374151;">🔍 Analyze Your Conversation</div>
-                        
-                        <!-- Session ID Input -->
-                        <div style="margin-bottom: 0.75rem;">
-                            <label style="display: block; font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem;">
-                                Session ID (optional - leave blank for current session):
-                            </label>
-                            <input type="text" id="context-rot-session-id" placeholder="e.g., abc123def456..." 
-                                style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;">
-                        </div>
-                        
-                        <!-- Time Window Selection -->
-                        <div style="margin-bottom: 0.75rem;">
-                            <label style="display: block; font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem;">
-                                Analysis Time Window:
-                            </label>
-                            <select id="context-rot-time-window" 
-                                style="width: 100%; padding: 0.375rem; border: 1px solid #d1d5db; border-radius: 0.25rem; font-size: 0.875rem;">
-                                <option value="30">Last 30 minutes</option>
-                                <option value="60">Last 1 hour</option>
-                                <option value="180">Last 3 hours</option>
-                                <option value="360">Last 6 hours</option>
-                                <option value="720">Last 12 hours</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Action Buttons -->
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button onclick="analyzeContextRot()" id="analyze-context-rot-btn"
-                                style="background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; flex: 1; min-width: 120px;"
-                                onmouseover="this.style.background='#1d4ed8'" 
-                                onmouseout="this.style.background='#2563eb'">
-                                🔍 Analyze Now
-                            </button>
-                            <button onclick="startLiveMonitoring()" id="live-monitoring-btn"
-                                style="background: #059669; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; flex: 1; min-width: 120px;"
-                                onmouseover="this.style.background='#047857'" 
-                                onmouseout="this.style.background='#059669'">
-                                📊 Live Monitor
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                // Show recommendations if available
-                if (contextRot.recommendations && contextRot.recommendations.length > 0) {
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #fff7ed; border: 1px solid #f59e0b; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #d97706; margin-bottom: 0.5rem;">💡 Recommendations:</div>
-                            <ul style="margin: 0; padding: 0 0 0 1.25rem; font-size: 0.875rem; color: #92400e;">
-                                ${contextRot.recommendations.slice(0, 3).map(rec => `<li style="margin-bottom: 0.25rem;">${rec}</li>`).join('')}
-                            </ul>
-                        </div>
-                    `;
-                }
-                
-                // Show historical data if available  
-                if (contextRot.hourly_averages && contextRot.hourly_averages.length > 0) {
-                    const recentHours = contextRot.hourly_averages.slice(-6);
-                    contentHtml += `
-                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: #f0fdf4; border: 1px solid #10b981; border-radius: 0.375rem;">
-                            <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">📈 Recent Trends (Last 6 Hours):</div>
-                            <div style="font-size: 0.8rem; color: #047857;">
-                                ${recentHours.map((hour, idx) => `
-                                    <div style="display: inline-block; margin-right: 1rem; margin-bottom: 0.25rem;">
-                                        ${idx + 1}: ${(hour.avg_rot * 100).toFixed(0)}%
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                contentHtml += `
-                    <div style="margin-top: 1rem; font-size: 0.75rem; color: #9ca3af; text-align: center;">
-                        💡 Tip: Context Rot Meter analyzes conversation quality, repetition patterns, and efficiency metrics
-                    </div>
-                `;
-            } else {
-                // Fallback for unknown widget types
-                contentHtml = `
-                    <div style="font-size: 0.875rem; color: #64748b;">
-                        Status: ${data.status}<br>
-                        ${data.alerts ? 'Alerts: ' + data.alerts.join(', ') : 'No alerts'}
-                    </div>
-                `;
+            // Enhanced widget rendering based on widget type
+            switch(widgetType) {
+                case 'error-monitor':
+                    console.log('Using enhanced renderErrorMonitorWidget');
+                    renderErrorMonitorWidget(container, data);
+                    break;
+                case 'cost-tracker':
+                    console.log('Using enhanced renderCostTrackerWidget');
+                    renderCostTrackerWidget(container, data);
+                    break;
+                case 'timeout-risk':
+                    console.log('Using enhanced renderTimeoutRiskWidget');
+                    renderTimeoutRiskWidget(container, data);
+                    break;
+                case 'tool-optimizer':
+                    console.log('Using enhanced renderToolOptimizerWidget');
+                    renderToolOptimizerWidget(container, data);
+                    break;
+                case 'model-efficiency':
+                    console.log('Using enhanced renderModelEfficiencyWidget');
+                    renderModelEfficiencyWidget(container, data);
+                    break;
+                case 'code-pattern-analysis':
+                    console.log('Using enhanced renderCodePatternWidget');
+                    renderCodePatternWidget(container, data);
+                    break;
+                case 'context-rot-meter':
+                    console.log('Using enhanced renderContextRotWidget');
+                    renderContextRotWidget(container, data);
+                    break;
+                case 'content-search-widget':
+                    console.log('Using enhanced renderContentSearchWidget');
+                    renderContentSearchWidget(container, data);
+                    break;
+                default:
+                    console.log('Using default widget renderer');
+                    renderDefaultWidget(container, data, widgetType);
             }
+        }
+
+        function renderErrorMonitorWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show count of recent errors instead of meaningless data_points
+            const dataPoints = (data.data && data.data.recent_errors && data.data.recent_errors.length) || 
+                              (data.recent_errors && data.recent_errors.length) || 0;
             
             container.innerHTML = `
-                <div style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
-                    ${statusIcon} ${data.title || widgetType} - ${statusText}
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
                 </div>
-                <div style="font-size: 0.875rem; color: #374151;">
-                    ${contentHtml}
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Current Error Rate:</span>
+                        <span class="metric-value">${(data.data && data.data.current_error_rate) || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Recovery Success:</span>
+                        <span class="metric-value">${(data.data && data.data.recovery_success_rate) || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Recent Errors:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
                 </div>
-                ${data.alerts && data.alerts.length > 0 ? 
-                    `<div style="margin-top: 0.75rem; padding: 0.5rem; background: #fef3c7; border-radius: 0.375rem; font-size: 0.75rem;">
-                        <strong>Alerts:</strong> ${data.alerts.join(', ')}
-                    </div>` : ''
-                }
-                <div style="margin-top: 0.75rem; font-size: 0.75rem; color: #9ca3af;">
-                    Last updated: ${data.last_updated ? new Date(data.last_updated).toLocaleTimeString() : 'Never'}
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                            📊 Explore ${dataPoints} Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Monitors API error rates and recovery patterns in real-time. 
+                    Tracks failed requests, timeout incidents, and automatic recovery attempts to ensure system reliability.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
                 </div>
             `;
+        }
+
+        function renderCostTrackerWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show number of cost measurements or billing records
+            const dataPoints = (data.data && data.data.total_transactions) || 
+                              (data.data && data.data.cost_measurements) ||
+                              (data.data && data.data.billing_records && data.data.billing_records.length) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Current Session Cost:</span>
+                        <span class="metric-value">$${(data.data && data.data.current_session_cost) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Burn Rate/Hour:</span>
+                        <span class="metric-value">$${(data.data && data.data.burn_rate_per_hour) || 0}/hr</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Budget Remaining:</span>
+                        <span class="metric-value">$${(data.data && data.data.budget_remaining) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Cost Measurements:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                            💰 Explore ${dataPoints} Cost Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Tracks real-time costs for AI model usage across all conversations. 
+                    Monitors token consumption, calculates burn rates, and provides budget projections to optimize spending.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderTimeoutRiskWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : data.status === 'warning' ? '#d97706' : '#dc2626';
+            const statusIcon = data.status === 'healthy' ? '✅' : data.status === 'warning' ? '⚠️' : '🚨';
+            // Show count of response time measurements or slow requests
+            const dataPoints = (data.data && data.data.response_time_samples) || 
+                              (data.data && data.data.slow_requests_count) ||
+                              (data.data && data.data.timeout_measurements) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Timeout Risk Score:</span>
+                        <span class="metric-value">${(data.data && data.data.timeout_risk_score) || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Avg Response Time:</span>
+                        <span class="metric-value">${(data.data && data.data.avg_response_time_ms) || 0}ms</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Slow Requests:</span>
+                        <span class="metric-value">${(data.data && data.data.slow_requests_count) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Response Samples:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                            ⏱️ Explore ${dataPoints} Timeout Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Analyzes response times and identifies potential timeout risks in API calls. 
+                    Tracks slow requests, monitors latency patterns, and predicts timeout probability to prevent service interruptions.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderToolOptimizerWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show count of common sequences analyzed for tool optimization
+            const dataPoints = (data.data && data.data.common_sequences && data.data.common_sequences.length) || 
+                              (data.common_sequences && data.common_sequences.length) ||
+                              (data.data && data.data.sequences_count) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Efficiency Score:</span>
+                        <span class="metric-value">${(data.data && data.data.efficiency_score) || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Most Used Tool:</span>
+                        <span class="metric-value">${(data.data && data.data.most_used_tool) || 'N/A'}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Sequences Analyzed:</span>
+                        <span class="metric-value">${(data.data && data.data.sequences_count) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Common Sequences:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                            🔧 Explore ${dataPoints} Tool Usage Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Analyzes tool usage patterns and identifies optimization opportunities. 
+                    Tracks command sequences, measures efficiency, and suggests workflow improvements for better productivity.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderModelEfficiencyWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show count of model efficiency comparisons or usage samples
+            const dataPoints = (data.data && data.data.model_comparisons) || 
+                              (data.data && data.data.usage_samples) ||
+                              (data.data && data.data.efficiency_measurements) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Efficiency Score:</span>
+                        <span class="metric-value">${(data.data && data.data.efficiency_score) || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Token Usage:</span>
+                        <span class="metric-value">${(data.data && data.data.total_tokens) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Cost Per Token:</span>
+                        <span class="metric-value">$${(data.data && data.data.cost_per_token) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Model Comparisons:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'model-efficiency')">
+                            🤖 Explore ${dataPoints} Model Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Tracks AI model performance and cost efficiency across different tasks. 
+                    Analyzes token consumption, response quality, and cost-effectiveness to optimize model selection.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderCodePatternWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show count of detected code patterns
+            const dataPoints = (data.data && data.data.patterns_count) || 
+                              (data.data && data.data.detected_patterns && data.data.detected_patterns.length) ||
+                              (data.patterns_detected) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Patterns Detected:</span>
+                        <span class="metric-value">${(data.data && data.data.patterns_count) || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Code Quality:</span>
+                        <span class="metric-value">${data.data?.quality_score || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Languages:</span>
+                        <span class="metric-value">${data.data?.languages_count || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Patterns Detected:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'code-pattern-analysis')">
+                            💻 Explore ${dataPoints} Code Pattern Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Analyzes code patterns and programming practices from conversation content. 
+                    Identifies common coding patterns, tracks language usage, and provides insights into development practices.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderContextRotWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : data.status === 'warning' ? '#d97706' : '#dc2626';
+            const statusIcon = data.status === 'healthy' ? '✅' : data.status === 'warning' ? '⚠️' : '🚨';
+            // Show measurements_count from performance feedback integration
+            const dataPoints = (data.data && data.data.measurements_count) || 
+                              (data.data && data.data.context_measurements) ||
+                              (data.data && data.data.session_count) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Context Rot Score:</span>
+                        <span class="metric-value">${data.data?.rot_score || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Stale Sessions:</span>
+                        <span class="metric-value">${data.data?.stale_sessions || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Avg Session Age:</span>
+                        <span class="metric-value">${data.data?.avg_session_age_hours || 0}h</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Measurements:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'context-rot-meter')">
+                            🗂️ Explore ${dataPoints} Context Rot Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Measures context deterioration in long-running conversations. 
+                    Identifies when context becomes stale, tracks session aging patterns, and recommends cleanup strategies.
+                    Essential for maintaining conversation quality and preventing context pollution.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderContentSearchWidget(container, data) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            // Show count of search operations or indexed content
+            const dataPoints = (data.data && data.data.search_queries) || 
+                              (data.data && data.data.content_indexed) ||
+                              (data.data && data.data.search_operations) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Search Efficiency:</span>
+                        <span class="metric-value">${data.data?.search_efficiency || 0}%</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Content Indexed:</span>
+                        <span class="metric-value">${data.data?.content_indexed || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Search Queries:</span>
+                        <span class="metric-value">${data.data?.search_queries || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Search Operations:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'content-search-widget')">
+                            🔍 Explore ${dataPoints} Content Search Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Analyzes content search patterns and indexing performance. 
+                    Tracks search query effectiveness, monitors content accessibility, and optimizes information retrieval.
+                    Crucial for improving user experience and content discoverability.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        function renderDefaultWidget(container, data, widgetType) {
+            const statusColor = data.status === 'healthy' ? '#059669' : '#d97706';
+            const statusIcon = data.status === 'healthy' ? '✅' : '⚠️';
+            const dataPoints = data.data_points || (data.data && data.data.data_points) || 0;
+            
+            container.innerHTML = `
+                <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
+                    ${statusIcon} ${data.title}
+                </div>
+                
+                <div class="widget-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">Status:</span>
+                        <span class="metric-value">${data.status}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Data Points:</span>
+                        <span class="metric-value">${dataPoints}</span>
+                    </div>
+                </div>
+
+                <div class="widget-status-info">
+                    <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
+                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                </div>
+
+                ${dataPoints > 0 ? `
+                    <div class="data-exploration">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', '${widgetType}')">
+                            📊 Explore ${dataPoints} Data Points
+                        </button>
+                    </div>
+                ` : ''}
+
+                <div class="explanatory-text">
+                    <strong>About this widget:</strong> Provides telemetry data and insights for the ${widgetType} component.
+                    ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
+                </div>
+            `;
+        }
+
+        // Data point exploration function
+        function showDataPoints(title, widgetType) {
+            // Create modal or expanded view for data points
+            const modal = document.createElement('div');
+            modal.className = 'data-exploration-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🔍 ${title} - Detailed Data</h3>
+                        <button class="close-modal" onclick="this.closest('.data-exploration-modal').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading">Loading detailed data...</div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Load detailed data
+            fetch(`/api/telemetry-widget/${widgetType}?detailed=true`)
+                .then(response => response.json())
+                .then(data => {
+                    const modalBody = modal.querySelector('.modal-body');
+                    modalBody.innerHTML = `
+                        <div class="detailed-data">
+                            <h4>Raw Data Points:</h4>
+                            <pre>${JSON.stringify(data.data, null, 2)}</pre>
+                        </div>
+                    `;
+                })
+                .catch(error => {
+                    const modalBody = modal.querySelector('.modal-body');
+                    modalBody.innerHTML = `<div class="error">Error loading detailed data: ${error}</div>`;
+                });
         }
 
         // Render orchestration widget with real data

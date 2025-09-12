@@ -3,6 +3,7 @@
 import os
 import asyncio
 import time
+import threading
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 import subprocess
@@ -100,11 +101,28 @@ class ClickHouseClient(TelemetryClient):
         # Connection state
         self._is_initialized = False
         self._health_check_task: Optional[asyncio.Task] = None
-        self._connection_lock = asyncio.Lock()
+        self._thread_local = threading.local()
         
         logger.info(f"Initialized ClickHouseClient with enhanced features: "
                    f"host={host}, port={port}, database={database}, "
                    f"max_connections={max_connections}")
+    
+    def _get_lock(self):
+        """Get appropriate lock for current execution context."""
+        if not hasattr(self._thread_local, 'lock'):
+            # Always use threading lock - simpler and works across contexts
+            self._thread_local.lock = threading.Lock()
+        return self._thread_local.lock
+    
+    @contextlib.asynccontextmanager
+    async def _lock_context(self):
+        """Async context manager for thread lock."""
+        lock = self._get_lock()
+        await asyncio.get_event_loop().run_in_executor(None, lock.acquire)
+        try:
+            yield
+        finally:
+            lock.release()
     
     async def initialize(self) -> bool:
         """Initialize the client with connection pooling and health monitoring."""
@@ -112,7 +130,7 @@ class ClickHouseClient(TelemetryClient):
             return True
         
         try:
-            async with self._connection_lock:
+            async with self._lock_context():
                 if self._is_initialized:
                     return True
                 
@@ -143,7 +161,7 @@ class ClickHouseClient(TelemetryClient):
             except asyncio.CancelledError:
                 pass
         
-        async with self._connection_lock:
+        async with self._lock_context():
             self._is_initialized = False
             logger.info("ClickHouseClient closed successfully")
     
