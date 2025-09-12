@@ -667,7 +667,73 @@
         .metric-change.positive { color: var(--success-color); }
         .metric-change.negative { color: var(--danger-color); }
         .metric-change.neutral { color: var(--text-secondary); }
+        .metric-change.warning { color: var(--warning-color); }
 
+        /* Project Summary Widget Styles */
+        .project-summary-section {
+            margin: 2rem 0;
+        }
+
+        .project-summary-section h2 {
+            margin: 0 0 1.5rem 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .category-item {
+            padding: 0.25rem 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: background-color 0.2s;
+        }
+
+        .category-item:hover {
+            background-color: rgba(37, 99, 235, 0.05);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            margin: 0 -0.5rem;
+        }
+
+        .category-item:last-child {
+            border-bottom: none;
+        }
+
+        .project-item {
+            transition: background-color 0.2s;
+            border-radius: 4px;
+        }
+
+        .project-item:hover {
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+
+        .project-item:last-child {
+            border-bottom: none !important;
+        }
+
+        .completion-bar {
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .completion-progress {
+            height: 4px;
+            background: linear-gradient(90deg, var(--success-color) 0%, #10b981 100%);
+            border-radius: 2px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        /* Status indicators for project items */
+        .project-status-completed {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+
+        .project-status-progress {
+            color: var(--warning-color);
+            font-weight: 600;
+        }
 
         .stat-label {
             display: block;
@@ -1027,6 +1093,42 @@
                 </div>
             </div>
 
+            <!-- Project Summary Section -->
+            <div class="project-summary-section">
+                <h2>🎯 Project Analytics Overview</h2>
+                <div class="metrics-grid">
+                    <!-- Project Completion Widget -->
+                    <div class="metric-card" id="project-completion-widget">
+                        <h3>Project Completion</h3>
+                        <div class="metric-value" id="project-completion-rate">Loading...</div>
+                        <div class="metric-change" id="project-completion-change">
+                            <span id="project-completed-count">-</span> completed, 
+                            <span id="project-in-progress-count">-</span> in progress
+                        </div>
+                        <div class="completion-bar" style="margin-top: 0.5rem;">
+                            <div class="completion-progress" id="completion-progress-bar" style="width: 0%; background: var(--success-color); height: 4px; border-radius: 2px; transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Project Categories Widget -->
+                    <div class="metric-card" id="project-categories-widget">
+                        <h3>Project Categories</h3>
+                        <div class="metric-value" id="project-total-count">Loading...</div>
+                        <div id="project-categories-list" style="margin-top: 0.5rem;">
+                            <div class="category-item">Loading categories...</div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Projects Widget -->
+                    <div class="metric-card" id="recent-projects-widget">
+                        <h3>Recent Projects</h3>
+                        <div class="metric-value" id="recent-projects-count">Loading...</div>
+                        <div id="recent-projects-list" style="margin-top: 0.5rem; max-height: 200px; overflow-y: auto;">
+                            <div class="project-item">Loading recent projects...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Context Window Usage Section -->
             <div class="context-window-section">
@@ -2064,6 +2166,7 @@ LIMIT 20</textarea>
             
             if (section === 'overview') {
                 loadOverviewMetrics();
+                loadProjectSummaryWidgets();
             } else if (section === 'conversations') {
                 loadConversationAnalytics();
             } else if (section === 'telemetry') {
@@ -2110,6 +2213,90 @@ LIMIT 20</textarea>
                 });
         };
 
+        // Load project summary widgets
+        window.loadProjectSummaryWidgets = function() {
+            console.log('loadProjectSummaryWidgets called');
+            fetch('/api/project-summary-widgets')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Project summary widgets loaded:', data);
+                    
+                    // Update Project Completion Widget
+                    if (data.completion_metrics && data.completion_metrics.data) {
+                        const completion = data.completion_metrics.data;
+                        const completionRate = Math.round(completion.completion_rate || 0);
+                        document.getElementById('project-completion-rate').textContent = completionRate + '%';
+                        document.getElementById('project-completed-count').textContent = completion.completed || 0;
+                        document.getElementById('project-in-progress-count').textContent = completion.in_progress || 0;
+                        
+                        // Update progress bar
+                        const progressBar = document.getElementById('completion-progress-bar');
+                        if (progressBar) {
+                            progressBar.style.width = completionRate + '%';
+                        }
+                        
+                        // Update status styling based on completion rate
+                        const changeElement = document.getElementById('project-completion-change');
+                        if (changeElement) {
+                            changeElement.className = 'metric-change ' + (completionRate < 50 ? 'warning' : 'positive');
+                        }
+                    }
+                    
+                    // Update Project Categories Widget
+                    if (data.project_categories && data.project_categories.data) {
+                        const categories = data.project_categories.data;
+                        document.getElementById('project-total-count').textContent = categories.total || 0;
+                        
+                        const categoriesList = document.getElementById('project-categories-list');
+                        if (categoriesList && categories.categories) {
+                            let categoriesHtml = '';
+                            categories.categories.slice(0, 3).forEach(category => {
+                                const percentage = Math.round(category.percentage || 0);
+                                categoriesHtml += `
+                                    <div class="category-item" style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.85rem;">
+                                        <span>${category.name}</span>
+                                        <span style="color: var(--text-secondary);">${category.count} (${percentage}%)</span>
+                                    </div>
+                                `;
+                            });
+                            categoriesList.innerHTML = categoriesHtml || '<div class="category-item">No categories found</div>';
+                        }
+                    }
+                    
+                    // Update Recent Projects Widget  
+                    if (data.recent_projects && data.recent_projects.data) {
+                        const recentData = data.recent_projects.data;
+                        document.getElementById('recent-projects-count').textContent = recentData.count || 0;
+                        
+                        const projectsList = document.getElementById('recent-projects-list');
+                        if (projectsList && recentData.projects) {
+                            let projectsHtml = '';
+                            recentData.projects.forEach(project => {
+                                const status = project.completed ? '✅' : '🔄';
+                                const statusText = project.completed ? 'completed' : 'in progress';
+                                projectsHtml += `
+                                    <div class="project-item" style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">
+                                        <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                                            ${status} ${project.title || project.description}
+                                        </div>
+                                        <div style="color: var(--text-secondary); font-size: 0.75rem;">
+                                            ${project.category} • ${statusText}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            projectsList.innerHTML = projectsHtml || '<div class="project-item">No recent projects</div>';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading project summary widgets:', error);
+                    // Set error states
+                    document.getElementById('project-completion-rate').textContent = 'Error';
+                    document.getElementById('project-total-count').textContent = 'Error';
+                    document.getElementById('recent-projects-count').textContent = 'Error';
+                });
+        };
 
         // Load telemetry widgets
         function loadTelemetryWidgets(timeRange = '7days') {
@@ -4083,6 +4270,13 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                 console.error('loadOverviewMetrics function not found in DOMContentLoaded');
             }
             
+            // Load project summary widgets immediately
+            console.log('DOMContentLoaded - calling loadProjectSummaryWidgets');
+            if (typeof window.loadProjectSummaryWidgets === 'function') {
+                window.loadProjectSummaryWidgets();
+            } else {
+                console.error('loadProjectSummaryWidgets function not found in DOMContentLoaded');
+            }
             
             // Load JSONL analytics widgets immediately  
             console.log('DOMContentLoaded - calling loadAnalyticsWidgets');
@@ -4108,6 +4302,9 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             setInterval(function() {
                 if (typeof window.loadOverviewMetrics === 'function') {
                     window.loadOverviewMetrics();
+                }
+                if (typeof window.loadProjectSummaryWidgets === 'function') {
+                    window.loadProjectSummaryWidgets();
                 }
             }, 60000); // Refresh every 60 seconds
             
