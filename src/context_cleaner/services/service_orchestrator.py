@@ -249,7 +249,7 @@ class ServiceOrchestrator:
     def _initialize_service_definitions(self):
         """Initialize all service definitions for Context Cleaner."""
         
-        # 1. ClickHouse Database (highest priority)
+        # 1. ClickHouse Database (highest priority) - Enhanced with adaptive timeouts
         self.services["clickhouse"] = ServiceDefinition(
             name="clickhouse",
             description="ClickHouse database for telemetry and analytics",
@@ -258,27 +258,27 @@ class ServiceOrchestrator:
             health_check=self._check_clickhouse_health,
             health_check_interval=30,
             restart_on_failure=True,
-            startup_timeout=120,
+            startup_timeout=180,  # Increased to handle 212-line DDL initialization
             shutdown_timeout=60,
             dependencies=[],
             required=True,
             startup_delay=0
         )
         
-        # 2. OTEL Collector (if applicable)
+        # 2. OTEL Collector (if applicable) - Enhanced with ClickHouse dependency awareness
         self.services["otel"] = ServiceDefinition(
             name="otel",
             description="OpenTelemetry collector for metrics gathering",
             start_command=["docker", "compose", "up", "-d", "otel-collector"],
             stop_command=["docker", "compose", "stop", "otel-collector"],
             health_check=self._check_otel_health,
-            health_check_interval=60,
-            restart_on_failure=False,  # Optional service
-            startup_timeout=60,
+            health_check_interval=45,  # Reduced for faster feedback
+            restart_on_failure=True,  # Changed to True for better reliability
+            startup_timeout=90,  # Increased to handle ClickHouse connection retries
             shutdown_timeout=30,
             dependencies=["clickhouse"],
             required=False,
-            startup_delay=5
+            startup_delay=10  # Increased to allow ClickHouse DDL completion
         )
         
         # 3. JSONL Bridge Service
@@ -366,8 +366,12 @@ class ServiceOrchestrator:
             print(f"📊 Dashboard port: {dashboard_port}")
         
         # Port conflict detection and resolution
+        if self.verbose:
+            print("🔍 DEBUG: Starting port conflict detection...")
         service_ports = {"dashboard": dashboard_port}
         conflicts = await self.port_conflict_manager.detect_port_conflicts(service_ports)
+        if self.verbose:
+            print(f"✅ DEBUG: Port conflict detection completed. Conflicts: {conflicts}")
         
         # Resolve dashboard port conflicts if detected
         if conflicts.get("dashboard", False):
@@ -394,10 +398,18 @@ class ServiceOrchestrator:
                 return False
         
         # Clean up any existing processes to ensure singleton operation
+        if self.verbose:
+            print("🔍 DEBUG: Starting process cleanup...")
         self._cleanup_existing_processes()
+        if self.verbose:
+            print("✅ DEBUG: Process cleanup completed")
         
         # Ensure Docker daemon is running and containers are in proper state
+        if self.verbose:
+            print("🔍 DEBUG: Checking Docker environment...")
         if not await self._ensure_docker_environment():
+            if self.verbose:
+                print("❌ DEBUG: Docker environment check failed")
             if self.verbose:
                 print("❌ Failed to ensure Docker environment is ready")
             return False
@@ -669,17 +681,27 @@ class ServiceOrchestrator:
             return False
 
     async def _get_container_state(self, container_name: str) -> ContainerState:
-        """Get the current state of a container."""
+        """Get the current state of a container with enhanced error handling."""
         try:
-            result = await asyncio.create_subprocess_exec(
-                "docker", "inspect", container_name, "--format", "{{.State.Status}}",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+            result = await self._run_docker_command(
+                ["inspect", container_name, "--format", "{{.State.Status}}"],
+                timeout=5
             )
-            stdout, stderr = await result.communicate()
             
-            if result.returncode == 0:
-                status = stdout.decode().strip().lower()
+            if result and isinstance(result, str):
+                status = result.strip().lower()
+                status_mapping = {
+                    "running": ContainerState.RUNNING,
+                    "stopped": ContainerState.STOPPED,
+                    "paused": ContainerState.PAUSED,
+                    "restarting": ContainerState.RESTARTING,
+                    "removing": ContainerState.REMOVING,
+                    "exited": ContainerState.EXITED,
+                    "dead": ContainerState.DEAD
+                }
+                return status_mapping.get(status, ContainerState.NOT_FOUND)
+            elif hasattr(result, 'success') and result.success and result.stdout:
+                status = result.stdout.strip().lower()
                 status_mapping = {
                     "running": ContainerState.RUNNING,
                     "stopped": ContainerState.STOPPED,
@@ -691,7 +713,7 @@ class ServiceOrchestrator:
                 }
                 return status_mapping.get(status, ContainerState.NOT_FOUND)
             else:
-                # Container not found
+                # Container not found or command failed
                 return ContainerState.NOT_FOUND
                 
         except Exception as e:
@@ -791,8 +813,8 @@ class ServiceOrchestrator:
                         
                         # Get container ID for tracking
                         result = await self._run_docker_command(["ps", "-q", "--filter", f"name={container_name}"])
-                        if result and result.returncode == 0:
-                            container_id = result.stdout.strip()
+                        if result and isinstance(result, str) and result:
+                            container_id = result.strip()
                             state.container_id = container_id
                             state.container_state = ContainerState.RUNNING
                             state.was_attached = True
@@ -810,7 +832,7 @@ class ServiceOrchestrator:
                             print(f"   🔄 Restarting stopped {service_name} container")
                         
                         restart_result = await self._run_docker_command(["restart", container_name])
-                        if restart_result and restart_result.returncode == 0:
+                        if restart_result and (isinstance(restart_result, str) or (hasattr(restart_result, 'success') and restart_result.success)):
                             state.container_state = ContainerState.RUNNING
                             state.start_time = datetime.now()
                             if self.verbose:
@@ -818,7 +840,8 @@ class ServiceOrchestrator:
                         else:
                             if self.verbose:
                                 print(f"   ❌ Failed to restart {service_name} container")
-                            state.last_error = f"Failed to restart container: {restart_result.stderr if restart_result else 'Unknown error'}"
+                            error_msg = restart_result.stderr if hasattr(restart_result, 'stderr') else 'Unknown error'
+                            state.last_error = f"Failed to restart container: {error_msg}"
                             state.status = ServiceStatus.FAILED
                             return False
             
@@ -860,8 +883,8 @@ class ServiceOrchestrator:
                         await asyncio.sleep(3)
                         
                         result = await self._run_docker_command(["ps", "-q", "--filter", f"name={container_name}"])
-                        if result and result.returncode == 0 and result.stdout.strip():
-                            state.container_id = result.stdout.strip()
+                        if result and isinstance(result, str) and result.strip():
+                            state.container_id = result.strip()
                             state.container_state = ContainerState.RUNNING
             
             # Wait for service to become healthy (skip for attached services)
@@ -1000,19 +1023,34 @@ class ServiceOrchestrator:
         return order
 
     async def _run_health_check(self, service_name: str) -> bool:
-        """Run health check for a service."""
+        """Run health check for a service with aggressive timeout controls."""
         service = self.services[service_name]
         if not service.health_check:
             return True
             
         try:
-            # Run health check in executor to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                self.executor,
-                service.health_check
-            )
+            # Apply aggressive 10-second timeout to health check
+            # Handle both sync and async health check functions
+            import inspect
+            if inspect.iscoroutinefunction(service.health_check):
+                # Async health check function
+                result = await asyncio.wait_for(
+                    service.health_check(),
+                    timeout=10.0
+                )
+            else:
+                # Sync health check function - run in thread pool to avoid blocking
+                result = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, service.health_check
+                    ),
+                    timeout=10.0
+                )
             return bool(result)
+            
+        except asyncio.TimeoutError:
+            self.logger.warning(f"Health check timeout for {service_name} after 10s")
+            return False
         except Exception as e:
             self.logger.error(f"Health check failed for {service_name}: {e}")
             return False
@@ -1036,19 +1074,33 @@ class ServiceOrchestrator:
                     if (state.last_health_check is None or 
                         (now - state.last_health_check).seconds >= service.health_check_interval):
                         
-                        # Run health check
+                        # Run health check using event loop safe approach
                         try:
-                            healthy = asyncio.run(self._run_health_check(service_name))
-                        except RuntimeError:
-                            # If we're in an async context, try different approach
+                            # Get or create event loop for this thread
                             try:
+                                loop = asyncio.get_event_loop()
+                                if loop.is_closed():
+                                    raise RuntimeError("Event loop is closed")
+                            except RuntimeError:
+                                # Create new event loop for this thread
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                            
+                            # Run health check with timeout in thread's event loop
+                            if loop.is_running():
+                                # If loop is running, we need to run in executor
                                 import concurrent.futures
                                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                                    future = executor.submit(lambda: asyncio.run(self._run_health_check(service_name)))
+                                    future = executor.submit(self._run_health_check_sync, service_name)
                                     healthy = future.result(timeout=30)
-                            except Exception as health_error:
-                                self.logger.warning(f"Health check failed for {service_name}: {health_error}")
-                                healthy = False
+                            else:
+                                # Loop not running, safe to use run_until_complete
+                                healthy = loop.run_until_complete(
+                                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                                )
+                        except Exception as health_error:
+                            self.logger.warning(f"Health check failed for {service_name}: {health_error}")
+                            healthy = False
                         
                         state.last_health_check = now
                         state.health_status = healthy
@@ -1059,18 +1111,32 @@ class ServiceOrchestrator:
                             if self.verbose:
                                 print(f"⚠️ Restarting unhealthy service: {service.description}")
                             
-                            # Restart service
+                            # Restart service using event loop safe approach
                             try:
-                                asyncio.run(self._restart_service(service_name))
-                            except RuntimeError:
-                                # If we're in an async context, use thread executor
+                                # Get or create event loop for this thread
                                 try:
+                                    loop = asyncio.get_event_loop()
+                                    if loop.is_closed():
+                                        raise RuntimeError("Event loop is closed")
+                                except RuntimeError:
+                                    # Create new event loop for this thread
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                                
+                                # Run restart with timeout in thread's event loop
+                                if loop.is_running():
+                                    # If loop is running, we need to run in executor
                                     import concurrent.futures
                                     with concurrent.futures.ThreadPoolExecutor() as executor:
-                                        future = executor.submit(lambda: asyncio.run(self._restart_service(service_name)))
-                                        future.result(timeout=30)
-                                except Exception as restart_error:
-                                    self.logger.error(f"Failed to restart service {service_name}: {restart_error}")
+                                        future = executor.submit(self._restart_service_sync, service_name)
+                                        future.result(timeout=60)
+                                else:
+                                    # Loop not running, safe to use run_until_complete
+                                    loop.run_until_complete(
+                                        asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                                    )
+                            except Exception as restart_error:
+                                self.logger.error(f"Failed to restart service {service_name}: {restart_error}")
                 
                 # Sleep before next check
                 time.sleep(10)
@@ -1452,10 +1518,13 @@ class ServiceOrchestrator:
             # Use docker ps to find containers with specific image
             result = await self._run_docker_command([
                 "ps", "--filter", f"ancestor={image_name}", "--format", "{{.Names}}"
-            ])
+            ], timeout=10)
             
-            if result:
+            if result and isinstance(result, str):
                 containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+            elif hasattr(result, 'success') and result.success and result.stdout:
+                containers = [name.strip() for name in result.stdout.split('\n') if name.strip()]
                 return containers
                 
         except Exception as e:
@@ -1470,10 +1539,13 @@ class ServiceOrchestrator:
             # Use docker ps to find containers exposing specific port
             result = await self._run_docker_command([
                 "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"
-            ])
+            ], timeout=10)
             
-            if result:
+            if result and isinstance(result, str):
                 containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+            elif hasattr(result, 'success') and result.success and result.stdout:
+                containers = [name.strip() for name in result.stdout.split('\n') if name.strip()]
                 return containers
                 
         except Exception as e:
@@ -1488,10 +1560,13 @@ class ServiceOrchestrator:
             # Use docker ps to find containers matching pattern
             result = await self._run_docker_command([
                 "ps", "--filter", f"name={pattern}", "--format", "{{.Names}}"
-            ])
+            ], timeout=10)
             
-            if result:
+            if result and isinstance(result, str):
                 containers = [name.strip() for name in result.split('\n') if name.strip()]
+                return containers
+            elif hasattr(result, 'success') and result.success and result.stdout:
+                containers = [name.strip() for name in result.stdout.split('\n') if name.strip()]
                 return containers
                 
         except Exception as e:
@@ -1500,57 +1575,594 @@ class ServiceOrchestrator:
         
         return []
     
-    async def _run_docker_command(self, args: List[str]) -> Optional[str]:
-        """Run a docker command and return the output."""
+    async def _run_docker_command(self, args: List[str], timeout: int = 8) -> Optional[Any]:
+        """Run a docker command with unified event loop management and adaptive timeouts."""
+        
+        @dataclass
+        class DockerCommandResult:
+            stdout: str = ""
+            stderr: str = ""
+            returncode: int = -1
+            success: bool = False
+            execution_time_ms: int = 0
+            retry_count: int = 0
+            
+        # Adaptive timeout based on command type
+        adaptive_timeout = self._calculate_adaptive_timeout(args, timeout)
+        
+        start_time = time.time()
+        max_retries = 3 if any(cmd in ' '.join(args) for cmd in ['start', 'up', 'restart']) else 1
+        
+        for retry in range(max_retries):
+            try:
+                cmd = ["docker"] + args
+                
+                if self.verbose:
+                    print(f"   🐳 Running Docker command (attempt {retry + 1}/{max_retries}, timeout: {adaptive_timeout}s): {' '.join(cmd)}")
+                
+                # Enhanced event loop detection and handling
+                current_loop = None
+                try:
+                    current_loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    current_loop = None
+                
+                if current_loop is None:
+                    # No event loop running, create new one
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
+                        return result
+                    finally:
+                        loop.close()
+                else:
+                    # Event loop is running, execute directly
+                    result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
+                    return result
+                    
+            except asyncio.TimeoutError:
+                execution_time = int((time.time() - start_time) * 1000)
+                if retry < max_retries - 1:
+                    if self.verbose:
+                        print(f"   ⏰ Docker command timed out (attempt {retry + 1}), retrying in 2s...")
+                    await asyncio.sleep(2)
+                    adaptive_timeout = min(adaptive_timeout * 1.5, 60)  # Increase timeout for retry
+                    continue
+                else:
+                    if self.verbose:
+                        print(f"   ❌ Docker command failed after {max_retries} attempts")
+                    return DockerCommandResult(
+                        stderr=f"Command timed out after {max_retries} attempts",
+                        execution_time_ms=execution_time,
+                        retry_count=retry + 1
+                    )
+                    
+            except Exception as e:
+                execution_time = int((time.time() - start_time) * 1000)
+                if retry < max_retries - 1 and self._is_retryable_error(e):
+                    if self.verbose:
+                        print(f"   ⚠️  Retryable error (attempt {retry + 1}): {str(e)}")
+                    await asyncio.sleep(2)
+                    continue
+                else:
+                    error_msg = f"Docker command execution error: {str(e)}"
+                    if self.verbose:
+                        print(f"   ❌ {error_msg}")
+                    return DockerCommandResult(
+                        stderr=error_msg,
+                        execution_time_ms=execution_time,
+                        retry_count=retry + 1
+                    )
+        
+        # Should not reach here
+        return DockerCommandResult(stderr="Unexpected error in retry loop")
+    
+    def _calculate_adaptive_timeout(self, args: List[str], base_timeout: int) -> int:
+        """Calculate adaptive timeout based on command complexity and system load."""
+        command_str = ' '.join(args).lower()
+        
+        # Base timeout adjustments
+        if 'up' in command_str or 'start' in command_str:
+            return max(base_timeout * 2, 30)  # Container startup needs more time
+        elif 'build' in command_str:
+            return max(base_timeout * 4, 120)  # Image builds need much more time
+        elif 'pull' in command_str:
+            return max(base_timeout * 3, 60)  # Image pulls need more time
+        elif any(check in command_str for check in ['ps', 'inspect', 'logs']):
+            return max(base_timeout // 2, 5)  # Query operations can be faster
+        else:
+            return base_timeout
+    
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Determine if a Docker command error is retryable."""
+        error_str = str(error).lower()
+        retryable_patterns = [
+            'connection refused',
+            'timeout',
+            'temporary failure',
+            'network error',
+            'docker daemon',
+            'resource temporarily unavailable'
+        ]
+        return any(pattern in error_str for pattern in retryable_patterns)
+    
+    async def _execute_docker_command_core(self, cmd: List[str], timeout: int, retry_count: int) -> 'DockerCommandResult':
+        """Core Docker command execution with circuit breaker pattern."""
+        
+        @dataclass
+        class DockerCommandResult:
+            stdout: str = ""
+            stderr: str = ""
+            returncode: int = -1
+            success: bool = False
+            execution_time_ms: int = 0
+            retry_count: int = 0
+        
+        start_time = time.time()
+        
         try:
-            cmd = ["docker"] + args
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=10
+            # Use async subprocess execution with enhanced error handling
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                limit=1024 * 1024  # 1MB limit for output
             )
             
-            if result.returncode == 0:
-                return result.stdout.strip()
-            else:
-                if self.verbose:
-                    print(f"   ⚠️  Docker command failed: {' '.join(cmd)} - {result.stderr}")
-                return None
+            # Wait for command completion with configurable timeout
+            try:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    proc.communicate(), timeout=timeout
+                )
                 
-        except subprocess.TimeoutExpired:
+                execution_time = int((time.time() - start_time) * 1000)
+                
+                result = DockerCommandResult(
+                    stdout=stdout_bytes.decode('utf-8', errors='ignore').strip(),
+                    stderr=stderr_bytes.decode('utf-8', errors='ignore').strip(),
+                    returncode=proc.returncode,
+                    success=(proc.returncode == 0),
+                    execution_time_ms=execution_time,
+                    retry_count=retry_count
+                )
+                
+                if result.success:
+                    if self.verbose and result.stdout:
+                        print(f"   ✅ Docker command succeeded ({execution_time}ms): {result.stdout[:100]}{'...' if len(result.stdout) > 100 else ''}")
+                    return result.stdout if result.stdout else result
+                else:
+                    if self.verbose:
+                        print(f"   ❌ Docker command failed (code {result.returncode}, {execution_time}ms): {' '.join(cmd)}")
+                        if result.stderr:
+                            print(f"   📝 Error output: {result.stderr[:200]}{'...' if len(result.stderr) > 200 else ''}")
+                    return result
+                    
+            except asyncio.TimeoutError:
+                # Enhanced timeout handling with process cleanup
+                execution_time = int((time.time() - start_time) * 1000)
+                try:
+                    proc.terminate()
+                    await asyncio.wait_for(proc.wait(), timeout=2)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                
+                if self.verbose:
+                    print(f"   ⏰ Docker command timed out after {timeout}s ({execution_time}ms): {' '.join(cmd)}")
+                raise asyncio.TimeoutError(f"Command timed out after {timeout}s")
+                
+        except FileNotFoundError:
+            error_msg = "Docker command not found - ensure Docker is installed and in PATH"
             if self.verbose:
-                print(f"   ⚠️  Docker command timed out: {' '.join(args)}")
-            return None
+                print(f"   🚫 {error_msg}")
+            execution_time = int((time.time() - start_time) * 1000)
+            return DockerCommandResult(
+                stderr=error_msg,
+                execution_time_ms=execution_time,
+                retry_count=retry_count
+            )
+            
+        except Exception as e:
+            error_msg = f"Docker command execution error: {str(e)}"
+            if self.verbose:
+                print(f"   ⚠️  {error_msg}")
+            execution_time = int((time.time() - start_time) * 1000)
+            raise e
+
+    # Health check implementations with multi-stage validation
+    async def _check_clickhouse_health(self) -> bool:
+        """Multi-stage ClickHouse health check with DDL readiness validation and timeout."""
+        try:
+            # Apply aggressive 8-second timeout to the entire health check
+            await asyncio.wait_for(
+                self._check_clickhouse_health_async(), 
+                timeout=8.0
+            )
+            return True
+        except asyncio.TimeoutError:
+            if self.verbose:
+                print("   ⏰ ClickHouse health check timeout after 8s")
+            return False
         except Exception as e:
             if self.verbose:
-                print(f"   ⚠️  Docker command error: {e}")
-            return None
-
-    # Health check implementations
-    def _check_clickhouse_health(self) -> bool:
-        """Check if ClickHouse is healthy."""
-        try:
-            result = subprocess.run(
-                ["docker", "exec", "clickhouse-otel", "clickhouse-client", "--query", "SELECT 1"],
-                capture_output=True,
-                timeout=10
-            )
-            return result.returncode == 0
-        except:
+                print(f"   ❌ ClickHouse health check error: {e}")
             return False
-
-    def _check_otel_health(self) -> bool:
-        """Check if OTEL collector is healthy."""
+    
+    async def _check_clickhouse_health_async(self) -> bool:
+        """Async multi-stage ClickHouse health check with circuit breaker pattern."""
+        
+        # Stage 1: Container existence and running state
+        if not await self._check_clickhouse_container_running():
+            if self.verbose:
+                print("   ❌ ClickHouse container not running")
+            return False
+        
+        # Stage 2: Port accessibility check
+        if not await self._check_clickhouse_port_accessible():
+            if self.verbose:
+                print("   ❌ ClickHouse ports not accessible")
+            return False
+        
+        # Stage 3: Basic connectivity and ping
+        if not await self._check_clickhouse_basic_connectivity():
+            if self.verbose:
+                print("   ❌ ClickHouse basic connectivity failed")
+            return False
+        
+        # Stage 4: Database readiness (DDL completion check)
+        if not await self._check_clickhouse_ddl_readiness():
+            if self.verbose:
+                print("   ❌ ClickHouse DDL initialization not complete")
+            return False
+        
+        # Stage 5: Query execution capability
+        if not await self._check_clickhouse_query_capability():
+            if self.verbose:
+                print("   ❌ ClickHouse query execution failed")
+            return False
+        
+        if self.verbose:
+            print("   ✅ ClickHouse multi-stage health check passed")
+        return True
+    
+    async def _check_clickhouse_container_running(self) -> bool:
+        """Check if ClickHouse container is running."""
         try:
-            result = subprocess.run(
-                ["docker", "ps", "--filter", "name=otel-collector", "--filter", "status=running"],
-                capture_output=True,
+            result = await self._run_docker_command(
+                ["ps", "--filter", "name=clickhouse-otel", "--filter", "status=running", "--format", "{{.Names}}"],
                 timeout=5
             )
-            return "otel-collector" in result.stdout.decode()
-        except:
+            
+            if isinstance(result, str):
+                return "clickhouse-otel" in result.lower()
+            elif hasattr(result, 'success') and result.success:
+                return "clickhouse-otel" in result.stdout.lower()
             return False
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Container check failed: {e}")
+            return False
+    
+    async def _check_clickhouse_port_accessible(self) -> bool:
+        """Check if ClickHouse ports are accessible."""
+        import socket
+        ports = [8123, 9000]  # HTTP and Native interfaces
+        
+        for port in ports:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(3)
+                    result = sock.connect_ex(('127.0.0.1', port))
+                    if result != 0:
+                        if self.verbose:
+                            print(f"   ⚠️  ClickHouse port {port} not accessible")
+                        return False
+            except Exception as e:
+                if self.verbose:
+                    print(f"   ⚠️  Port {port} check failed: {e}")
+                return False
+        
+        return True
+    
+    async def _check_clickhouse_basic_connectivity(self) -> bool:
+        """Check basic ClickHouse connectivity via HTTP ping."""
+        import urllib.request
+        import urllib.error
+        
+        try:
+            req = urllib.request.Request(
+                'http://127.0.0.1:8123/ping', 
+                headers={'User-Agent': 'ContextCleaner-HealthCheck/1.0'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                response_text = response.read().decode('utf-8').strip()
+                return response_text == "Ok."
+                
+        except urllib.error.HTTPError as e:
+            if self.verbose:
+                print(f"   ⚠️  ClickHouse HTTP ping failed: HTTP {e.code}")
+            return False
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  ClickHouse connectivity check failed: {e}")
+            return False
+    
+    async def _check_clickhouse_ddl_readiness(self) -> bool:
+        """Check if ClickHouse DDL initialization is complete by verifying key tables exist."""
+        max_retries = 5
+        retry_delay = 2
+        
+        # Key tables that must exist after DDL initialization
+        required_tables = [
+            'otel.traces',
+            'otel.metrics', 
+            'otel.logs',
+            'otel.claude_message_content'
+        ]
+        
+        for attempt in range(max_retries):
+            try:
+                if self.verbose and attempt > 0:
+                    print(f"   🔄 DDL readiness check (attempt {attempt + 1}/{max_retries})")
+                
+                # Use docker exec to run ClickHouse client query
+                cmd = [
+                    "exec", "clickhouse-otel", "clickhouse-client", 
+                    "--query", "SHOW TABLES FROM otel FORMAT TabSeparated"
+                ]
+                
+                result = await self._run_docker_command(cmd, timeout=10)
+                
+                if isinstance(result, str):
+                    existing_tables = set(f"otel.{line.strip()}" for line in result.split('\n') if line.strip())
+                elif hasattr(result, 'success') and result.success:
+                    existing_tables = set(f"otel.{line.strip()}" for line in result.stdout.split('\n') if line.strip())
+                else:
+                    if self.verbose:
+                        print(f"   ⚠️  DDL check command failed: {getattr(result, 'stderr', 'Unknown error')}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return False
+                
+                missing_tables = set(required_tables) - existing_tables
+                
+                if not missing_tables:
+                    if self.verbose:
+                        print(f"   ✅ DDL initialization complete ({len(existing_tables)} tables found)")
+                    return True
+                else:
+                    if self.verbose:
+                        print(f"   ⏳ DDL still initializing, missing: {', '.join(missing_tables)}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    else:
+                        if self.verbose:
+                            print(f"   ❌ DDL initialization incomplete after {max_retries} attempts")
+                        return False
+                        
+            except Exception as e:
+                if self.verbose:
+                    print(f"   ⚠️  DDL readiness check failed (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                return False
+        
+        return False
+    
+    async def _check_clickhouse_query_capability(self) -> bool:
+        """Test ClickHouse query execution capability."""
+        try:
+            # Simple query that exercises the database
+            cmd = [
+                "exec", "clickhouse-otel", "clickhouse-client", 
+                "--query", "SELECT count() FROM system.tables WHERE database = 'otel'"
+            ]
+            
+            result = await self._run_docker_command(cmd, timeout=8)
+            
+            if isinstance(result, str):
+                try:
+                    table_count = int(result.strip())
+                    if self.verbose:
+                        print(f"   📊 ClickHouse operational with {table_count} tables in otel database")
+                    return table_count > 0
+                except ValueError:
+                    return False
+            elif hasattr(result, 'success') and result.success:
+                try:
+                    table_count = int(result.stdout.strip())
+                    if self.verbose:
+                        print(f"   📊 ClickHouse operational with {table_count} tables in otel database")
+                    return table_count > 0
+                except ValueError:
+                    return False
+            else:
+                if self.verbose:
+                    print(f"   ❌ Query capability test failed: {getattr(result, 'stderr', 'Unknown error')}")
+                return False
+                
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  Query capability test failed: {e}")
+            return False
+
+    async def _check_otel_health(self) -> bool:
+        """Enhanced OTEL collector health check with retry mechanism."""
+        try:
+            return await asyncio.wait_for(
+                self._check_otel_health_async(),
+                timeout=8.0
+            )
+        except asyncio.TimeoutError:
+            if self.verbose:
+                print("   ⏰ OTEL health check timeout after 8s")
+            return False
+        except Exception as e:
+            if self.verbose:
+                print(f"   ❌ OTEL health check error: {e}")
+            return False
+    
+    async def _check_otel_health_async(self) -> bool:
+        """Async OTEL collector health check with circuit breaker and retry logic."""
+        
+        # Stage 1: Container running check
+        if not await self._check_otel_container_running():
+            if self.verbose:
+                print("   ❌ OTEL collector container not running")
+            return False
+        
+        # Stage 2: Port accessibility
+        if not await self._check_otel_ports_accessible():
+            if self.verbose:
+                print("   ❌ OTEL collector ports not accessible")
+            return False
+        
+        # Stage 3: ZPages endpoint health (optional but preferred)
+        zpages_healthy = await self._check_otel_zpages_health()
+        if not zpages_healthy:
+            if self.verbose:
+                print("   ⚠️  OTEL ZPages endpoint not accessible (collector may still be starting)")
+            # Don't fail on ZPages, as it's not critical for basic operation
+        
+        # Stage 4: ClickHouse connectivity check (since OTEL depends on ClickHouse)
+        if not await self._check_otel_clickhouse_connectivity():
+            if self.verbose:
+                print("   ❌ OTEL collector cannot connect to ClickHouse")
+            return False
+        
+        if self.verbose:
+            zpages_status = "with ZPages" if zpages_healthy else "without ZPages"
+            print(f"   ✅ OTEL collector healthy {zpages_status}")
+        return True
+    
+    async def _check_otel_container_running(self) -> bool:
+        """Check if OTEL collector container is running."""
+        try:
+            result = await self._run_docker_command(
+                ["ps", "--filter", "name=otel-collector", "--filter", "status=running", "--format", "{{.Names}}"],
+                timeout=5
+            )
+            
+            if isinstance(result, str):
+                return "otel-collector" in result.lower()
+            elif hasattr(result, 'success') and result.success:
+                return "otel-collector" in result.stdout.lower()
+            return False
+            
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  OTEL container check failed: {e}")
+            return False
+    
+    async def _check_otel_ports_accessible(self) -> bool:
+        """Check if OTEL collector ports are accessible."""
+        import socket
+        ports = [4317, 4318]  # OTLP gRPC and HTTP receivers
+        
+        for port in ports:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(3)
+                    result = sock.connect_ex(('127.0.0.1', port))
+                    if result != 0:
+                        if self.verbose:
+                            print(f"   ⚠️  OTEL port {port} not accessible")
+                        return False
+            except Exception as e:
+                if self.verbose:
+                    print(f"   ⚠️  OTEL port {port} check failed: {e}")
+                return False
+        
+        return True
+    
+    async def _check_otel_zpages_health(self) -> bool:
+        """Check OTEL collector ZPages health endpoint (optional)."""
+        import urllib.request
+        import urllib.error
+        
+        try:
+            req = urllib.request.Request(
+                'http://127.0.0.1:55679/debug/tracez',
+                headers={'User-Agent': 'ContextCleaner-HealthCheck/1.0'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return response.status == 200
+                
+        except urllib.error.HTTPError as e:
+            if self.verbose:
+                print(f"   ⚠️  OTEL ZPages check failed: HTTP {e.code}")
+            return False
+        except Exception as e:
+            if self.verbose:
+                print(f"   ⚠️  OTEL ZPages connectivity failed: {e}")
+            return False
+    
+    async def _check_otel_clickhouse_connectivity(self) -> bool:
+        """Check if OTEL collector can connect to ClickHouse (dependency check)."""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                # Check OTEL collector logs for ClickHouse connection issues
+                cmd = [
+                    "logs", "--tail", "50", "otel-collector"
+                ]
+                
+                result = await self._run_docker_command(cmd, timeout=8)
+                
+                if isinstance(result, str):
+                    logs = result.lower()
+                elif hasattr(result, 'success') and result.success:
+                    logs = result.stdout.lower()
+                else:
+                    if self.verbose:
+                        print(f"   ⚠️  Failed to retrieve OTEL logs (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return False
+                
+                # Check for common ClickHouse connection error patterns
+                error_patterns = [
+                    'connection refused',
+                    'failed to connect to clickhouse',
+                    'clickhouse.*error',
+                    'exporter.*failed',
+                    'dial tcp.*8123.*connection refused'
+                ]
+                
+                has_connection_errors = any(pattern in logs for pattern in error_patterns)
+                
+                if has_connection_errors:
+                    if self.verbose:
+                        print(f"   ⚠️  OTEL logs show ClickHouse connection issues (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return False
+                else:
+                    # No obvious connection errors found
+                    if self.verbose:
+                        print(f"   ✅ OTEL-ClickHouse connectivity appears healthy")
+                    return True
+                    
+            except Exception as e:
+                if self.verbose:
+                    print(f"   ⚠️  OTEL-ClickHouse connectivity check failed (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                return False
+        
+        return False
 
     def _check_jsonl_bridge_health(self) -> bool:
         """Check if JSONL bridge service is healthy."""
@@ -1921,4 +2533,25 @@ class ServiceOrchestrator:
         except Exception as e:
             discovery_results["error"] = str(e)
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
-            return discovery_results
+    
+    def _run_health_check_sync(self, service_name: str) -> bool:
+        """Synchronous wrapper for _run_health_check method."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(
+                asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+            )
+        finally:
+            loop.close()
+    
+    def _restart_service_sync(self, service_name: str) -> None:
+        """Synchronous wrapper for _restart_service method."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(
+                asyncio.wait_for(self._restart_service(service_name), timeout=60)
+            )
+        finally:
+            loop.close()

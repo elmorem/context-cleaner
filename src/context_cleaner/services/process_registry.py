@@ -473,6 +473,12 @@ class ProcessDiscoveryEngine:
             'python.*context_cleaner',
             'python.*context-cleaner',
             
+            # CRITICAL: Direct script invocation patterns (MISSING FROM ORIGINAL)
+            'start_context_cleaner',
+            'start_context_cleaner_production',
+            'python.*start_context_cleaner',
+            'python.*start_context_cleaner_production',
+            
             # CLI module patterns - catches most common invocation patterns
             'python.*src.context_cleaner.cli',
             'python.*src/context_cleaner/cli',
@@ -491,11 +497,17 @@ class ProcessDiscoveryEngine:
             # Shell compound commands - catches delayed execution
             'sleep.*context_cleaner',
             '&&.*context_cleaner',
+            'sleep.*start_context_cleaner',
+            '&&.*start_context_cleaner',
             
             # Additional CLI patterns that were missed
             'python.*context_cleaner.*dashboard',
             'python.*context_cleaner.*bridge',
             'python.*context_cleaner.*run',
+            
+            # Environment variable patterns (for PYTHONPATH usage)
+            'pythonpath.*context_cleaner',
+            'pythonpath.*start_context_cleaner',
         ]
         
         # Expanded known ports covering all discovered active ports

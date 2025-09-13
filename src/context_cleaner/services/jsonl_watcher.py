@@ -10,6 +10,8 @@ import asyncio
 import os
 import time
 import logging
+import threading
+import queue
 from pathlib import Path
 from typing import Set, Dict
 from watchdog.observers import Observer
@@ -28,12 +30,14 @@ class JSONLFileHandler(FileSystemEventHandler):
         self.processor = processor
         self.processed_files: Set[str] = set()
         self.processing_queue: asyncio.Queue = asyncio.Queue()
+        self.thread_safe_queue: queue.Queue = queue.Queue()
+        self.event_loop = None
         
     def on_created(self, event):
         """Handle file creation events."""
         if not event.is_directory and event.src_path.endswith('.jsonl'):
             logger.info(f"New JSONL file detected: {event.src_path}")
-            asyncio.create_task(self._queue_file_for_processing(event.src_path))
+            self._queue_file_thread_safe(event.src_path)
     
     def on_modified(self, event):
         """Handle file modification events."""
@@ -41,7 +45,27 @@ class JSONLFileHandler(FileSystemEventHandler):
             # Only process if file hasn't been processed recently
             if event.src_path not in self.processed_files:
                 logger.info(f"Modified JSONL file detected: {event.src_path}")
-                asyncio.create_task(self._queue_file_for_processing(event.src_path))
+                self._queue_file_thread_safe(event.src_path)
+    
+    def _queue_file_thread_safe(self, file_path: str):
+        """Thread-safe method to queue file for processing."""
+        try:
+            self.thread_safe_queue.put_nowait(file_path)
+            # Use call_soon_threadsafe if event loop is available
+            if self.event_loop and not self.event_loop.is_closed():
+                self.event_loop.call_soon_threadsafe(self._notify_async_queue)
+        except Exception as e:
+            logger.error(f"Error queuing file {file_path}: {e}")
+    
+    def _notify_async_queue(self):
+        """Notify the async queue that new items are available."""
+        try:
+            while not self.thread_safe_queue.empty():
+                file_path = self.thread_safe_queue.get_nowait()
+                # Use asyncio.create_task safely from the correct event loop context
+                asyncio.create_task(self._queue_file_for_processing(file_path))
+        except Exception as e:
+            logger.error(f"Error in async queue notification: {e}")
     
     async def _queue_file_for_processing(self, file_path: str):
         """Queue a file for processing."""
@@ -107,6 +131,9 @@ class JSONLWatcherService:
             logger.warning(f"Claude projects directory not found: {self.claude_projects_dir}")
             return
             
+        # Set event loop reference for thread-safe operations
+        self.handler.event_loop = asyncio.get_running_loop()
+        
         # Process any existing unprocessed files
         await self._process_existing_files()
         

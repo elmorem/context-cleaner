@@ -294,13 +294,32 @@ def sync_command(clickhouse_url, watch_directory, interval, once, start_monitori
                 await sync_service.start_file_monitoring()
                 
                 try:
-                    # Keep running until interrupted
+                    # Keep running until interrupted with timeout controls
+                    monitoring_timeout = 300  # 5 minutes timeout for monitoring loop
+                    start_time = asyncio.get_event_loop().time()
+                    
                     while True:
-                        await asyncio.sleep(10)
-                        # Show periodic status
-                        status = sync_service.get_sync_status()
-                        if status['stats']['last_sync_time']:
-                            click.echo(f"   Last sync: {status['stats']['last_sync_time']}")
+                        try:
+                            # Check for timeout to prevent infinite hanging
+                            current_time = asyncio.get_event_loop().time()
+                            if current_time - start_time > monitoring_timeout:
+                                click.echo(f"\n⏰ Monitoring timeout reached ({monitoring_timeout}s), stopping gracefully...")
+                                break
+                            
+                            # Use timeout for sleep to make it interruptible
+                            await asyncio.wait_for(asyncio.sleep(10), timeout=30.0)
+                            
+                            # Show periodic status
+                            status = sync_service.get_sync_status()
+                            if status['stats']['last_sync_time']:
+                                click.echo(f"   Last sync: {status['stats']['last_sync_time']}")
+                                
+                        except asyncio.TimeoutError:
+                            # Sleep timeout - continue loop but check for overall timeout
+                            continue
+                        except Exception as e:
+                            click.echo(f"⚠️  Error in monitoring loop: {e}")
+                            await asyncio.sleep(5)  # Brief pause before retrying
                             
                 except KeyboardInterrupt:
                     click.echo("\n🛑 Stopping file monitoring...")

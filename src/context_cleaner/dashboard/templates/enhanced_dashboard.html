@@ -1108,6 +1108,16 @@
                         <div class="completion-bar" style="margin-top: 0.5rem;">
                             <div class="completion-progress" id="completion-progress-bar" style="width: 0%; background: var(--success-color); height: 4px; border-radius: 2px; transition: width 0.3s;"></div>
                         </div>
+                        <div class="completion-criteria-info" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                            <details>
+                                <summary style="cursor: pointer; user-select: none;">How is completion calculated?</summary>
+                                <div style="margin-top: 0.25rem; padding: 0.5rem; background: #f8fafc; border-radius: 0.25rem; border-left: 3px solid var(--primary-color);">
+                                    <p style="margin: 0; line-height: 1.4;">Projects are marked complete if their descriptions contain completion keywords like:</p>
+                                    <p style="margin: 0.25rem 0; font-family: monospace; font-size: 0.7rem;">"completed", "finished", "done", "fixed", "implemented", "resolved", "delivered", "shipped", "closed", "merged", "deployed", "released", "solved", "accomplished", "achieved"</p>
+                                    <p style="margin: 0; line-height: 1.4; font-size: 0.7rem;">Projects with incomplete indicators ("todo", "pending", "in progress") are excluded even if they have completion keywords.</p>
+                                </div>
+                            </details>
+                        </div>
                     </div>
 
                     <!-- Project Categories Widget -->

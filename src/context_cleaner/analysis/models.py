@@ -393,9 +393,27 @@ class ProjectSummary:
     
     @property
     def is_completed(self) -> bool:
-        """Check if project appears to be completed."""
-        completed_keywords = ["completed", "finished", "done", "fixed", "implemented"]
-        return any(keyword in self.description.lower() for keyword in completed_keywords)
+        """Check if project appears to be completed with enhanced detection."""
+        completed_keywords = [
+            "completed", "finished", "done", "fixed", "implemented", 
+            "resolved", "delivered", "shipped", "closed", "merged",
+            "deployed", "released", "solved", "accomplished", "achieved",
+            "finalized", "wrapped up", "complete", "success", "successful"
+        ]
+        
+        # Also check for negative indicators that suggest incomplete work
+        incomplete_keywords = ["todo", "pending", "in progress", "working on", "needs", "wip", "draft"]
+        
+        desc_lower = self.description.lower()
+        
+        # Check for completion indicators
+        has_completion = any(keyword in desc_lower for keyword in completed_keywords)
+        
+        # Check for incomplete indicators  
+        has_incomplete = any(keyword in desc_lower for keyword in incomplete_keywords)
+        
+        # Prefer explicit completion over incomplete indicators
+        return has_completion and not has_incomplete
     
     @property
     def project_category(self) -> str:
