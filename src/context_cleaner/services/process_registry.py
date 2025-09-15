@@ -637,11 +637,16 @@ class ProcessDiscoveryEngine:
                                 
                                 discovered.append(entry)
                                 
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError) as e:
+                        logger.debug(f"Process access error during port discovery (pid={conn.pid if hasattr(conn, 'pid') and conn.pid else 'unknown'}): {e}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"Unexpected error during port discovery for pid={conn.pid if hasattr(conn, 'pid') and conn.pid else 'unknown'}: {e}")
                         continue
                         
         except Exception as e:
-            logger.error(f"Error in port discovery: {e}")
+            logger.error(f"Error in port discovery (general): {e}")
+            logger.debug(f"Port discovery error details", exc_info=True)
         
         return discovered
     

@@ -90,7 +90,13 @@ class ContextWindowAnalyzer:
                     estimated_tokens = session_analysis.total_tokens
                     logger.debug(f"Parsed {estimated_tokens} actual tokens from {session_file}")
                 else:
-                    logger.warning(f"Could not parse session file: {session_file}")
+                    # Check if it's a summary file (which is expected to return None)
+                    with open(session_file, 'r') as f:
+                        first_line = f.readline().strip()
+                        if first_line and '"type":"summary"' in first_line:
+                            logger.debug(f"Skipping summary file: {session_file}")
+                        else:
+                            logger.warning(f"Could not parse session file: {session_file}")
             except Exception as e:
                 logger.error(f"Error parsing tokens from {session_file}: {e}")
                 # No fallback estimation - maintain accuracy by returning 0

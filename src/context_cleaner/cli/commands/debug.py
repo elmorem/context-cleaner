@@ -35,13 +35,8 @@ def debug():
     pass
 
 
-@debug.command("list-processes")
-@click.option("--format", "-f", type=click.Choice(["table", "json"]), default="table", help="Output format")
-@click.option("--service-type", "-t", help="Filter by service type")
-@click.option("--status", "-s", help="Filter by status")
-@click.pass_context
-def list_processes(ctx, format, service_type, status):
-    """List all registered processes in the process registry."""
+def _list_processes_impl(ctx, format, service_type, status):
+    """Implementation for listing processes."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
     
@@ -96,6 +91,26 @@ def list_processes(ctx, format, service_type, status):
     except Exception as e:
         click.echo(f"❌ Error listing processes: {e}", err=True)
         sys.exit(1)
+
+
+@debug.command("list-processes")
+@click.option("--format", "-f", type=click.Choice(["table", "json"]), default="table", help="Output format")
+@click.option("--service-type", help="Filter by service type")
+@click.option("--status", help="Filter by status")
+@click.pass_context
+def list_processes(ctx, format, service_type, status):
+    """List running processes and their Context Cleaner status."""
+    _list_processes_impl(ctx, format, service_type, status)
+
+
+@debug.command("processes")
+@click.option("--format", "-f", type=click.Choice(["table", "json"]), default="table", help="Output format")
+@click.option("--service-type", help="Filter by service type")
+@click.option("--status", help="Filter by status")
+@click.pass_context
+def processes(ctx, format, service_type, status):
+    """List running processes and their Context Cleaner status (alias for list-processes)."""
+    _list_processes_impl(ctx, format, service_type, status)
 
 
 @debug.command("discover-services")

@@ -294,17 +294,9 @@ def sync_command(clickhouse_url, watch_directory, interval, once, start_monitori
                 await sync_service.start_file_monitoring()
                 
                 try:
-                    # Keep running until interrupted with timeout controls
-                    monitoring_timeout = 300  # 5 minutes timeout for monitoring loop
-                    start_time = asyncio.get_event_loop().time()
-                    
+                    # Keep running until interrupted - no timeout for service mode
                     while True:
                         try:
-                            # Check for timeout to prevent infinite hanging
-                            current_time = asyncio.get_event_loop().time()
-                            if current_time - start_time > monitoring_timeout:
-                                click.echo(f"\n⏰ Monitoring timeout reached ({monitoring_timeout}s), stopping gracefully...")
-                                break
                             
                             # Use timeout for sleep to make it interruptible
                             await asyncio.wait_for(asyncio.sleep(10), timeout=30.0)

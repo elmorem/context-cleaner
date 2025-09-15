@@ -1660,6 +1660,10 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         success = False
         
         # Try to handle event loops more robustly
+        # Import threading modules at the top to avoid scoping issues
+        import threading
+        import queue
+        
         try:
             # Check if there's already a running event loop
             current_loop = None
@@ -1671,8 +1675,6 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
             if current_loop is not None:
                 click.echo("🔍 DEBUG: Found running event loop, using threaded execution...")
                 # If we get here, there's an active loop - run in new thread
-                import threading
-                import queue
                 
                 result_queue = queue.Queue()
                 exception_occurred = threading.Event()

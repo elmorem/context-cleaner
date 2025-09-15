@@ -30,7 +30,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Import conversation processing
-from ...telemetry.jsonl_enhancement.full_content_processor import FullContentBatchProcessor
+from ..telemetry.jsonl_enhancement.full_content_processor import FullContentBatchProcessor
 
 # Optional dependency for file system monitoring
 try:
@@ -266,14 +266,24 @@ class IncrementalSyncService:
             
             # Read new lines only
             new_lines = []
+            malformed_lines = 0
             with open(file_path, 'r', encoding='utf-8') as f:
                 for i, line in enumerate(f):
                     if i >= start_line:  # Only process new lines
-                        try:
-                            entry = json.loads(line.strip())
-                            new_lines.append(entry)
-                        except json.JSONDecodeError:
+                        line_content = line.strip()
+                        if not line_content:  # Skip empty lines
                             continue
+                        try:
+                            entry = json.loads(line_content)
+                            new_lines.append(entry)
+                        except json.JSONDecodeError as e:
+                            malformed_lines += 1
+                            logger.warning(f"Malformed JSON at line {i+1} in {file_path}: {e}")
+                            logger.debug(f"Problematic line content: {line_content[:200]}{'...' if len(line_content) > 200 else ''}")
+                            continue
+            
+            if malformed_lines > 0:
+                logger.warning(f"Skipped {malformed_lines} malformed JSON lines in {file_path}")
                             
             if not new_lines:
                 logger.debug(f"No new lines in {file_path}")

@@ -286,7 +286,7 @@ class ServiceOrchestrator:
             name="jsonl_bridge",
             description="Real-time JSONL file monitoring and processing",
             start_command=[
-                sys.executable, "-m", "src.context_cleaner.cli.main",
+                sys.executable, "-m", "context_cleaner.cli.main",
                 "bridge", "sync", "--start-monitoring", "--interval", "15"
             ],
             stop_command=None,  # Handled via process termination
@@ -297,7 +297,8 @@ class ServiceOrchestrator:
             shutdown_timeout=15,
             dependencies=["clickhouse"],
             required=True,
-            startup_delay=10
+            startup_delay=10,
+            environment_vars={"PYTHONPATH": os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src")}
         )
         
         # 4. Dashboard Web Server
@@ -1040,12 +1041,18 @@ class ServiceOrchestrator:
                 )
             else:
                 # Sync health check function - run in thread pool to avoid blocking
-                result = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None, service.health_check
-                    ),
-                    timeout=10.0
-                )
+                # Handle case where health_check might return bool directly
+                health_func = service.health_check
+                if callable(health_func):
+                    result = await asyncio.wait_for(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, health_func
+                        ),
+                        timeout=10.0
+                    )
+                else:
+                    # Handle case where health_check is already a bool value
+                    result = bool(health_func)
             return bool(result)
             
         except asyncio.TimeoutError:
