@@ -1553,23 +1553,27 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                     if pattern.lower() in cmdline.lower():
                         # EXCLUDE management commands that shouldn't be killed
                         # These are CLI commands that manage the system, not runtime services
-                        excluded_commands = [
-                            "context-cleaner stop",
-                            "context-cleaner debug",
-                            "context-cleaner status",
-                            "context-cleaner --help",
-                            "context_cleaner.cli.main stop",
-                            "context_cleaner.cli.main debug",
-                            "context_cleaner.cli.main status",
-                            "context_cleaner stop",
-                            "context_cleaner debug",
-                            "context_cleaner status"
-                        ]
 
-                        # Skip if this is a management command
-                        is_management_command = any(excluded_cmd.lower() in cmdline.lower()
-                                                  for excluded_cmd in excluded_commands)
+                        # Check for management subcommands (stop, debug, status, help)
+                        management_subcommands = ["stop", "debug", "status", "--help", "help"]
+                        is_management_command = False
+
+                        # Look for context-cleaner or context_cleaner followed by management commands
+                        cmdline_lower = cmdline.lower()
+                        if any(f"context-cleaner {cmd}" in cmdline_lower or
+                               f"context_cleaner {cmd}" in cmdline_lower or
+                               f"context_cleaner.cli.main {cmd}" in cmdline_lower
+                               for cmd in management_subcommands):
+                            is_management_command = True
+
+                        # Also exclude the current process (self-exclusion)
+                        current_pid = os.getpid()
+                        if proc.info['pid'] == current_pid:
+                            is_management_command = True
+
                         if is_management_command:
+                            if verbose:
+                                print(f"   🚫 Excluding management command: PID {proc.info['pid']}")
                             continue
 
                         # Determine service type from command line

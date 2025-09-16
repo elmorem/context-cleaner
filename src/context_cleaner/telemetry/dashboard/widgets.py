@@ -323,6 +323,10 @@ class TelemetryWidgetManager:
         # Cache for widget data to reduce database queries
         self._widget_cache: Dict[TelemetryWidgetType, WidgetData] = {}
         self._cache_timestamps: Dict[TelemetryWidgetType, datetime] = {}
+
+        # Cache invalidation tracking
+        self._last_service_restart_check = datetime.now()
+        self._cache_invalidation_callbacks = []
     
     async def get_widget_data(self, widget_type: TelemetryWidgetType, 
                             session_id: Optional[str] = None, 
@@ -1284,6 +1288,107 @@ class TelemetryWidgetManager:
         self._widget_cache.clear()
         self._cache_timestamps.clear()
         logger.info("Telemetry widget cache cleared")
+
+    def invalidate_cache_for_service_restart(self, service_name: str):
+        """Invalidate cache when a specific service restarts"""
+        cache_keys_to_clear = []
+
+        # Map service names to widget types that depend on them
+        service_widget_dependencies = {
+            'clickhouse': [
+                TelemetryWidgetType.ERROR_MONITOR,
+                TelemetryWidgetType.COST_TRACKER,
+                TelemetryWidgetType.TIMEOUT_RISK,
+                TelemetryWidgetType.TOOL_OPTIMIZER,
+                TelemetryWidgetType.MODEL_EFFICIENCY,
+                TelemetryWidgetType.ORCHESTRATION_STATUS,
+                TelemetryWidgetType.AGENT_UTILIZATION,
+                TelemetryWidgetType.CONVERSATION_TIMELINE,
+                TelemetryWidgetType.CODE_PATTERN_ANALYSIS,
+                TelemetryWidgetType.CLAUDE_MD_ANALYTICS,
+                TelemetryWidgetType.CONTEXT_ROT_METER
+            ],
+            'otel': [
+                TelemetryWidgetType.ERROR_MONITOR,
+                TelemetryWidgetType.COST_TRACKER,
+                TelemetryWidgetType.MODEL_EFFICIENCY
+            ],
+            'jsonl_bridge': [
+                TelemetryWidgetType.CONVERSATION_TIMELINE,
+                TelemetryWidgetType.CODE_PATTERN_ANALYSIS,
+                TelemetryWidgetType.CONTENT_SEARCH_WIDGET
+            ],
+            'dashboard': [
+                # All widgets depend on dashboard service
+                TelemetryWidgetType.ERROR_MONITOR,
+                TelemetryWidgetType.COST_TRACKER,
+                TelemetryWidgetType.TIMEOUT_RISK,
+                TelemetryWidgetType.TOOL_OPTIMIZER,
+                TelemetryWidgetType.MODEL_EFFICIENCY,
+                TelemetryWidgetType.ORCHESTRATION_STATUS,
+                TelemetryWidgetType.AGENT_UTILIZATION,
+                TelemetryWidgetType.CONVERSATION_TIMELINE,
+                TelemetryWidgetType.CODE_PATTERN_ANALYSIS,
+                TelemetryWidgetType.CONTENT_SEARCH_WIDGET,
+                TelemetryWidgetType.CLAUDE_MD_ANALYTICS,
+                TelemetryWidgetType.CONTEXT_ROT_METER
+            ]
+        }
+
+        if service_name in service_widget_dependencies:
+            cache_keys_to_clear = service_widget_dependencies[service_name]
+
+            # Clear cache for affected widgets
+            for widget_type in cache_keys_to_clear:
+                if widget_type in self._widget_cache:
+                    del self._widget_cache[widget_type]
+                if widget_type in self._cache_timestamps:
+                    del self._cache_timestamps[widget_type]
+
+            logger.info(f"Invalidated cache for {len(cache_keys_to_clear)} widgets due to {service_name} restart")
+
+        # Update restart check timestamp
+        self._last_service_restart_check = datetime.now()
+
+        # Trigger callbacks
+        for callback in self._cache_invalidation_callbacks:
+            try:
+                callback(service_name, cache_keys_to_clear)
+            except Exception as e:
+                logger.error(f"Cache invalidation callback error: {e}")
+
+    def register_cache_invalidation_callback(self, callback):
+        """Register a callback to be called when cache is invalidated"""
+        self._cache_invalidation_callbacks.append(callback)
+
+    def check_cache_health(self) -> Dict[str, Any]:
+        """Check the health of the widget cache system"""
+        now = datetime.now()
+        cache_health = {
+            "cached_widgets": len(self._widget_cache),
+            "cache_entries": list(self._widget_cache.keys()),
+            "oldest_cache_entry": None,
+            "stale_entries": [],
+            "last_service_restart_check": self._last_service_restart_check.isoformat()
+        }
+
+        if self._cache_timestamps:
+            oldest_time = min(self._cache_timestamps.values())
+            cache_health["oldest_cache_entry"] = oldest_time.isoformat()
+
+            # Check for stale entries (older than 2x their normal TTL)
+            for widget_type, timestamp in self._cache_timestamps.items():
+                age = now - timestamp
+                max_age = timedelta(seconds=self.update_intervals.get(widget_type, 60))
+
+                if age > max_age * 2:  # Stale if older than 2x normal TTL
+                    cache_health["stale_entries"].append({
+                        "widget_type": widget_type.value,
+                        "age_seconds": age.total_seconds(),
+                        "expected_max_age": max_age.total_seconds()
+                    })
+
+        return cache_health
     
     # Phase 3: Orchestration widget data generation methods
     

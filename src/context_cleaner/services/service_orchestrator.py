@@ -326,9 +326,9 @@ class ServiceOrchestrator:
             description="API/UI consistency monitoring for dashboard health",
             start_command=None,  # Handled internally
             stop_command=None,  # Handled internally
-            health_check=self._check_consistency_checker_health,
+            health_check=None,  # Disabled to prevent task cancellation
             health_check_interval=120,
-            restart_on_failure=True,
+            restart_on_failure=False,  # Disabled to prevent task cancellation every 120s
             startup_timeout=15,
             shutdown_timeout=5,
             dependencies=["dashboard"],
