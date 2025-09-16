@@ -1,0 +1,1 @@
+- never run any context-clear commands within claude.  they should always be run directy from a shell

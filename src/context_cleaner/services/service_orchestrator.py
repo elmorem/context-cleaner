@@ -253,8 +253,8 @@ class ServiceOrchestrator:
         self.services["clickhouse"] = ServiceDefinition(
             name="clickhouse",
             description="ClickHouse database for telemetry and analytics",
-            start_command=["docker", "compose", "up", "-d", "clickhouse-otel"],
-            stop_command=["docker", "compose", "stop", "clickhouse-otel"],
+            start_command=["docker", "compose", "up", "-d", "clickhouse"],
+            stop_command=["docker", "compose", "stop", "clickhouse"],
             health_check=self._check_clickhouse_health,
             health_check_interval=30,
             restart_on_failure=True,

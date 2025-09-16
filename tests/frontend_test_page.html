@@ -128,7 +128,7 @@
     <script>
         // Real API endpoints for testing with context-cleaner server
         const realApiClient = new EnhancedAPIClient({
-            baseURL: 'http://localhost:8250',  // Use real context-cleaner server
+            baseURL: 'http://localhost:8110',  // Use real context-cleaner server
             timeout: 15000,
             maxRetries: 3,
             retryDelay: 1000
@@ -168,7 +168,7 @@
             logToArea('api-log', 'Testing timeout request (15s)...', 'info');
             try {
                 // Use httpbin's delay endpoint that takes longer than our timeout
-                const response = await mockApiClient.get('/delay/20', {}, { timeout: 5000 });
+                const response = await realApiClient.get('/api/health', {}, { timeout: 5000 });
                 logToArea('api-log', 'Unexpected success on timeout test', 'warning');
             } catch (error) {
                 logToArea('api-log', `Expected timeout: ${error.message}`, 'success');
@@ -184,7 +184,7 @@
             logToArea('api-log', 'Testing retry logic with 500 error...', 'info');
             try {
                 // Use httpbin's status endpoint to simulate server errors
-                const response = await mockApiClient.get('/status/500', {}, { retries: 2 });
+                const response = await realApiClient.get('/status/500', {}, { retries: 2 });
                 logToArea('api-log', 'Unexpected success on retry test', 'warning');
             } catch (error) {
                 logToArea('api-log', `Expected failure after retries: ${error.message}`, 'success');
@@ -199,9 +199,9 @@
         async function testConcurrentRequests() {
             logToArea('api-log', 'Testing concurrent requests...', 'info');
             const promises = [
-                mockApiClient.get('/json'),
-                mockApiClient.get('/uuid'),
-                mockApiClient.get('/ip')
+                realApiClient.get('/json'),
+                realApiClient.get('/uuid'),
+                realApiClient.get('/ip')
             ];
             
             try {
@@ -219,7 +219,7 @@
         async function testHealthCheck() {
             logToArea('api-log', 'Testing health check...', 'info');
             try {
-                const health = await mockApiClient.healthCheck();
+                const health = await realApiClient.healthCheck();
                 logToArea('api-log', `Health check result: ${JSON.stringify(health)}`, 'info');
                 document.getElementById('api-test-area').innerHTML = `
                     <h4>Health Check Result:</h4>
@@ -362,7 +362,7 @@
                     showSpinner: true
                 });
                 
-                const response = await mockApiClient.get('/json');
+                const response = await realApiClient.get('/json');
                 
                 window.loadingManager.completeLoading(elementId, `
                     <h4>✅ API + Loading Integration Success</h4>
@@ -391,7 +391,7 @@
                     showSpinner: true
                 });
                 
-                await mockApiClient.get('/status/500', {}, { retries: 1 });
+                await realApiClient.get('/status/500', {}, { retries: 1 });
                 
             } catch (error) {
                 logToArea('integration-log', 'First attempt failed as expected', 'info');
@@ -408,7 +408,7 @@
                             showSpinner: true
                         });
                         
-                        const response = await mockApiClient.get('/json');
+                        const response = await realApiClient.get('/json');
                         
                         window.loadingManager.completeLoading(elementId, `
                             <h4>✅ Error Recovery Success</h4>

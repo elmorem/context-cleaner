@@ -27,6 +27,9 @@ from flask_socketio import SocketIO, emit
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+# API Response Formatting
+from ..core.api_response_formatter import APIResponseFormatter
+
 # Optional cache dashboard imports
 try:
     from ..optimization.cache_dashboard import (
@@ -808,9 +811,17 @@ class ComprehensiveHealthDashboard:
         self.app.config["TEMPLATES_AUTO_RELOAD"] = True
         self.app.jinja_env.auto_reload = True
 
+        # Add CORS headers for API access from test pages
+        @self.app.after_request
+        def after_request(response):
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+
         # SocketIO for real-time updates
         self.socketio = SocketIO(
-            self.app, cors_allowed_origins="*", async_mode="threading"
+            self.app, cors_allowed_origins="*", async_mode="gevent"
         )
 
         # Dashboard configuration
@@ -858,8 +869,7 @@ class ComprehensiveHealthDashboard:
             dashboard_metrics_config = CircuitBreakerConfig(
                 name="dashboard_metrics",
                 failure_threshold=3,
-                recovery_timeout=30,
-                half_open_max_calls=1
+                recovery_timeout=30
             )
             self.dashboard_metrics_breaker = CircuitBreaker(dashboard_metrics_config)
             
@@ -2272,7 +2282,6 @@ class ComprehensiveHealthDashboard:
         def get_dashboard_metrics():
             """Enhanced dashboard metrics with health monitoring, circuit breaker protection, and graceful degradation"""
             import asyncio
-            from context_cleaner.core.api_response_formatter import APIResponseFormatter
             
             start_time = datetime.now()
             
@@ -2319,8 +2328,7 @@ class ComprehensiveHealthDashboard:
                             return jsonify(APIResponseFormatter.error(
                                 "Dashboard metrics temporarily unavailable due to dependency failures",
                                 "CIRCUIT_BREAKER_OPEN",
-                                status_code=503,
-                                details={
+                                data={
                                     "clickhouse_status": clickhouse_health.status.value,
                                     "telemetry_status": telemetry_health.status.value,
                                     "response_time_ms": response_time,
@@ -2334,149 +2342,178 @@ class ComprehensiveHealthDashboard:
                 critical_services_failing = False
                 services_degraded = True
             
-            # Apply circuit breaker protection
+            # Apply circuit breaker protection with safer error handling
             try:
-                if hasattr(self, 'dashboard_metrics_breaker'):
-                    return self.dashboard_metrics_breaker.call(self._get_dashboard_metrics_data)()
-                else:
-                    return self._get_dashboard_metrics_data()
-                    
-            except Exception as e:
-                response_time = (datetime.now() - start_time).total_seconds() * 1000
-                logger.error(f"Dashboard metrics circuit breaker failed: {e}")
-                
-                # Graceful degradation - return minimal viable data
-                return jsonify(APIResponseFormatter.degraded(
-                    {
-                        'total_tokens': 'Unavailable',
-                        'total_sessions': '0',
-                        'success_rate': 'N/A',
-                        'active_agents': '0',
-                        'orchestration_status': 'degraded',
-                        'telemetry_status': 'unavailable',
-                        'total_cost': '$0.00',
-                        'total_errors': 0,
-                        'last_updated': datetime.now().isoformat(),
-                        'response_time_ms': response_time
-                    },
-                    "Dashboard metrics operating in degraded mode due to dependency failures",
-                    "DEPENDENCY_FAILURE"
-                ))
-        
-        def _get_dashboard_metrics_data(self):
-            """Internal method to fetch dashboard metrics data with timeout protection"""
-            import asyncio
-            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-            
-            start_time = datetime.now()
-            
-            try:
-                # Try to get real telemetry data with timeout
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
-                    try:
-                        # Use timeout for telemetry operations
-                        with ThreadPoolExecutor() as executor:
-                            future = executor.submit(self._fetch_telemetry_stats, loop)
-                            stats = future.result(timeout=10)  # 10 second timeout
-                        
-                        # Get model efficiency data with timeout
-                        model_efficiency_data = None
-                        if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
-                            try:
-                                with ThreadPoolExecutor() as executor:
-                                    future = executor.submit(self._fetch_model_efficiency, loop)
-                                    model_efficiency_data = future.result(timeout=5)  # 5 second timeout
-                            except (FuturesTimeoutError, Exception) as e:
-                                logger.warning(f"Model efficiency data timeout: {e}")
-                        
-                        loop.close()
-                        
+                if hasattr(self, 'dashboard_metrics_breaker') and self.dashboard_metrics_breaker:
+                    # Check circuit breaker state manually (synchronous approach)
+                    if self.dashboard_metrics_breaker.is_open:
                         response_time = (datetime.now() - start_time).total_seconds() * 1000
-                        
-                        response_data = {
-                            'total_tokens': stats['total_tokens'],
-                            'total_sessions': stats['total_sessions'],
-                            'success_rate': stats['success_rate'],
-                            'active_agents': stats['active_agents'],
-                            'orchestration_status': 'operational',
-                            'telemetry_status': 'monitoring',
-                            'total_cost': stats['total_cost'],
-                            'total_errors': stats['total_errors'],
-                            'last_updated': datetime.now().isoformat(),
-                            'response_time_ms': response_time
-                        }
-                        
-                        # Add model efficiency data if available
-                        if model_efficiency_data:
-                            response_data['model_efficiency'] = model_efficiency_data
-                        
-                        return jsonify(APIResponseFormatter.success(
-                            response_data,
-                            "Dashboard metrics retrieved successfully"
+                        return jsonify(APIResponseFormatter.error(
+                            "Dashboard metrics temporarily unavailable due to circuit breaker",
+                            "CIRCUIT_BREAKER_OPEN",
+                            data={
+                                "response_time_ms": response_time,
+                                "retry_after": 30
+                            }
                         ))
-                        
-                    except FuturesTimeoutError:
-                        loop.close()
-                        logger.warning("Telemetry data fetch timeout - falling back to local data")
-                        # Fall through to local JSONL fallback
+                    
+                    # Execute with manual circuit breaker logic
+                    try:
+                        result = self._get_dashboard_metrics_data_safe()
+                        # Manually record success
+                        self.dashboard_metrics_breaker._on_success()
+                        return result
                     except Exception as e:
-                        loop.close()
-                        logger.warning(f"Error getting real telemetry stats: {e}")
-                        # Fall through to local JSONL fallback
-                        
-                # Fallback to local JSONL data when telemetry is unavailable or times out
-                local_stats = self._get_local_jsonl_stats()
-                response_time = (datetime.now() - start_time).total_seconds() * 1000
-                
-                return jsonify(APIResponseFormatter.degraded(
-                    {
-                        'total_tokens': local_stats['total_tokens'],
-                        'total_sessions': local_stats['total_sessions'],
-                        'success_rate': local_stats['success_rate'],
-                        'active_agents': local_stats['active_agents'],
-                        'orchestration_status': 'local-mode',
-                        'telemetry_status': 'using-local-data',
-                        'total_cost': local_stats['total_cost'],
-                        'total_errors': local_stats['total_errors'],
-                        'last_updated': datetime.now().isoformat(),
-                        'response_time_ms': response_time
-                    },
-                    "Using local data due to telemetry service unavailability",
-                    "TELEMETRY_FALLBACK"
-                ))
-                
+                        # Manually record failure
+                        self.dashboard_metrics_breaker._on_failure()
+                        logger.error(f"Dashboard metrics failed, circuit breaker updated: {e}")
+                        return self._get_fallback_metrics_response(start_time, str(e))
+                else:
+                    # Direct call with safety wrapper
+                    return self._get_dashboard_metrics_data_safe()
+                    
             except Exception as e:
                 response_time = (datetime.now() - start_time).total_seconds() * 1000
-                logger.error(f"Critical error in dashboard metrics: {e}")
+                logger.error(f"Dashboard metrics circuit breaker failed: {e}", exc_info=True)
                 
-                return jsonify(APIResponseFormatter.error(
-                    f"Dashboard metrics service error: {str(e)}",
-                    "DASHBOARD_METRICS_ERROR",
-                    status_code=500,
-                    details={
-                        'response_time_ms': response_time,
-                        'last_updated': datetime.now().isoformat()
+                # Enhanced graceful degradation
+                return self._get_fallback_metrics_response(start_time, str(e))
+        
+        # Setup additional routes that were missing from main setup
+        self._setup_jsonl_processing_routes()
+        
+    def _get_dashboard_metrics_data(self):
+        """Internal method to fetch dashboard metrics data with timeout protection"""
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+        
+        start_time = datetime.now()
+        
+        try:
+            # Try to get real telemetry data with timeout
+            if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    # Use timeout for telemetry operations
+                    with ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._fetch_telemetry_stats, loop)
+                        stats = future.result(timeout=10)  # 10 second timeout
+                    
+                    # Get model efficiency data with timeout
+                    model_efficiency_data = None
+                    if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
+                        try:
+                            with ThreadPoolExecutor() as executor:
+                                future = executor.submit(self._fetch_model_efficiency, loop)
+                                model_efficiency_data = future.result(timeout=5)  # 5 second timeout
+                        except (FuturesTimeoutError, Exception) as e:
+                            logger.warning(f"Model efficiency data timeout: {e}")
+                    
+                    loop.close()
+                    
+                    response_time = (datetime.now() - start_time).total_seconds() * 1000
+                    
+                    response_data = {
+                        'total_tokens': stats['total_tokens'],
+                        'total_sessions': stats['total_sessions'],
+                        'success_rate': stats['success_rate'],
+                        'active_agents': stats['active_agents'],
+                        'orchestration_status': 'operational',
+                        'telemetry_status': 'monitoring',
+                        'total_cost': stats['total_cost'],
+                        'total_errors': stats['total_errors'],
+                        'last_updated': datetime.now().isoformat(),
+                        'response_time_ms': response_time
                     }
-                ))
-        
-        def _fetch_telemetry_stats(self, loop):
-            """Helper method to fetch telemetry stats in separate thread"""
-            asyncio.set_event_loop(loop)
-            return loop.run_until_complete(
-                self.telemetry_client.get_total_aggregated_stats()
-            )
+                    
+                    # Add model efficiency data if available
+                    if model_efficiency_data:
+                        response_data['model_efficiency'] = model_efficiency_data
+                    
+                    return jsonify(APIResponseFormatter.success(
+                        response_data,
+                        "Dashboard metrics retrieved successfully"
+                    ))
+                    
+                except FuturesTimeoutError:
+                    loop.close()
+                    logger.warning("Telemetry data fetch timeout - falling back to local data")
+                    # Fall through to local JSONL fallback
+                except Exception as e:
+                    loop.close()
+                    logger.warning(f"Error getting real telemetry stats: {e}")
+                    # Fall through to local JSONL fallback
+                    
+            # Fallback to local JSONL data when telemetry is unavailable or times out
+            local_stats = self._get_local_jsonl_stats()
+            response_time = (datetime.now() - start_time).total_seconds() * 1000
             
-        def _fetch_model_efficiency(self, loop):
-            """Helper method to fetch model efficiency data in separate thread"""
-            asyncio.set_event_loop(loop)
-            model_widget = loop.run_until_complete(
-                self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
-            )
-            return model_widget.data if model_widget else None
+            return jsonify(APIResponseFormatter.degraded(
+                {
+                    'total_tokens': local_stats['total_tokens'],
+                    'total_sessions': local_stats['total_sessions'],
+                    'success_rate': local_stats['success_rate'],
+                    'active_agents': local_stats['active_agents'],
+                    'orchestration_status': 'local-mode',
+                    'telemetry_status': 'using-local-data',
+                    'total_cost': local_stats['total_cost'],
+                    'total_errors': local_stats['total_errors'],
+                    'last_updated': datetime.now().isoformat(),
+                    'response_time_ms': response_time
+                },
+                "Using local data due to telemetry service unavailability",
+                "TELEMETRY_FALLBACK"
+            ))
+            
+        except Exception as e:
+            response_time = (datetime.now() - start_time).total_seconds() * 1000
+            logger.error(f"Critical error in dashboard metrics: {e}")
+            
+            return jsonify(APIResponseFormatter.error(
+                f"Dashboard metrics service error: {str(e)}",
+                "DASHBOARD_METRICS_ERROR",
+                data={
+                    'response_time_ms': response_time,
+                    'last_updated': datetime.now().isoformat()
+                }
+            ))
+    
+    def _get_dashboard_metrics_data_safe(self):
+        """Safe wrapper for dashboard metrics data with improved error handling"""
+        try:
+            # Try the original method but with better exception handling
+            return self._get_dashboard_metrics_data()
+        except Exception as e:
+            logger.error(f"Dashboard metrics data fetch failed: {e}", exc_info=True)
+            # Return fallback response instead of raising
+            return self._get_fallback_metrics_response(datetime.now(), str(e))
+    
+    def _get_fallback_metrics_response(self, start_time, error_message=None):
+        """Generate a fallback metrics response when telemetry services are unavailable"""
+        response_time = (datetime.now() - start_time).total_seconds() * 1000
         
+        return jsonify(APIResponseFormatter.degraded(
+            {
+                'total_tokens': 'Service Unavailable',
+                'total_sessions': '0',
+                'success_rate': 'N/A',
+                'active_agents': '0',
+                'orchestration_status': 'degraded',
+                'telemetry_status': 'unavailable',
+                'total_cost': '$0.00',
+                'total_errors': 0,
+                'last_updated': datetime.now().isoformat(),
+                'response_time_ms': response_time,
+                'fallback_reason': error_message or 'Service temporarily unavailable'
+            },
+            "Dashboard metrics operating in degraded mode - service temporarily unavailable",
+            "SERVICE_DEGRADED"
+        ))
+    
+    def _setup_jsonl_processing_routes(self):
+        """Setup JSONL processing related routes"""
         @self.app.route('/api/jsonl-processing-status')
         def get_jsonl_processing_status():
             """Get JSONL processing system status and metrics"""
@@ -2486,7 +2523,7 @@ class ComprehensiveHealthDashboard:
                     "message": "JSONL processing service not available",
                     "last_updated": datetime.now().isoformat()
                 })
-            
+        
             try:
                 import asyncio
                 loop = asyncio.new_event_loop()
@@ -2507,51 +2544,53 @@ class ComprehensiveHealthDashboard:
                     
                     # Combine status and stats for comprehensive dashboard view
                     return jsonify({
-                        "processing_status": status_data.get('status', 'unknown'),
-                        "database_healthy": status_data.get('database_connection', False),
-                        "tables_ready": status_data.get('content_tables_available', False),
-                        "privacy_level": status_data.get('privacy_level', 'standard'),
-                        
-                        # Content metrics for dashboard  
-                        "total_messages": content_stats.get('messages', {}).get('total_messages', 0),
-                        "total_files": content_stats.get('files', {}).get('unique_files', 0),
-                        "total_tools": content_stats.get('tools', {}).get('total_tool_executions', 0),
-                        "recent_activity": content_stats.get('entries_last_hour', 0),
-                        "storage_size_mb": round(content_stats.get('files', {}).get('total_file_bytes', 0) / 1024 / 1024, 2),
-                        
-                        # Processing performance metrics
-                        "processing_rate": "High",  # Will be enhanced with real metrics
-                        "error_rate": "Low",        # Will be enhanced with real metrics
-                        "system_load": "Normal",    # Will be enhanced with real metrics
-                        
-                        "last_updated": datetime.now().isoformat()
-                    })
+                    "processing_status": status_data.get('status', 'unknown'),
+                    "database_healthy": status_data.get('database_connection', False),
+                    "tables_ready": status_data.get('content_tables_available', False),
+                    "privacy_level": status_data.get('privacy_level', 'standard'),
                     
+                    # Content metrics for dashboard  
+                    "total_messages": content_stats.get('messages', {}).get('total_messages', 0),
+                    "total_files": content_stats.get('files', {}).get('unique_files', 0),
+                    "total_tools": content_stats.get('tools', {}).get('total_tool_executions', 0),
+                    "recent_activity": content_stats.get('entries_last_hour', 0),
+                    "storage_size_mb": round(content_stats.get('files', {}).get('total_file_bytes', 0) / 1024 / 1024, 2),
+                    
+                    # Processing performance metrics
+                    "processing_rate": "High",  # Will be enhanced with real metrics
+                    "error_rate": "Low",        # Will be enhanced with real metrics
+                    "system_load": "Normal",    # Will be enhanced with real metrics
+                    
+                    "last_updated": datetime.now().isoformat()
+                })
+                
                 except Exception as e:
-                    loop.close()
-                    logger.error(f"Error getting JSONL processing status: {e}")
-                    return jsonify({
-                        "status": "error",
-                        "error": str(e),
-                        "processing_status": "error",
-                        "database_healthy": False,
-                        "tables_ready": False,
-                        "total_messages": 0,
-                        "total_files": 0, 
-                        "total_tools": 0,
-                        "recent_activity": 0,
-                        "storage_size_mb": 0,
-                        "processing_rate": "Unknown",
-                        "error_rate": "Unknown",
-                        "system_load": "Unknown",
-                        "last_updated": datetime.now().isoformat()
-                    })
-                    
+                    try:
+                        loop.close()
+                    except:
+                        pass
+                    raise e
+                
             except Exception as e:
-                logger.error(f"Error in JSONL processing status endpoint: {e}")
+                try:
+                    loop.close()
+                except:
+                    pass
+                logger.error(f"Error getting JSONL processing status: {e}")
                 return jsonify({
                     "status": "error",
-                    "message": f"Error: {str(e)}",
+                    "error": str(e),
+                    "processing_status": "error",
+                    "database_healthy": False,
+                    "tables_ready": False,
+                    "total_messages": 0,
+                    "total_files": 0, 
+                    "total_tools": 0,
+                    "recent_activity": 0,
+                    "storage_size_mb": 0,
+                    "processing_rate": "Unknown",
+                    "error_rate": "Unknown",
+                    "system_load": "Unknown",
                     "last_updated": datetime.now().isoformat()
                 }), 500
 
@@ -2776,9 +2815,9 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in code patterns analytics endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
-        # ==================== PROJECT SUMMARY ANALYTICS API ENDPOINTS ====================
-
+    
+            # ==================== PROJECT SUMMARY ANALYTICS API ENDPOINTS ====================
+    
         @self.app.route('/api/project-summary/categories')
         def get_project_categories():
             """Get project categories distribution from summary analytics."""
@@ -2799,7 +2838,7 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in project categories endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
+    
         @self.app.route('/api/project-summary/completion-metrics')
         def get_project_completion_metrics():
             """Get project completion metrics from summary analytics."""
@@ -2820,7 +2859,7 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in completion metrics endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
+    
         @self.app.route('/api/project-summary/recent-projects')
         def get_recent_projects():
             """Get recent projects from summary analytics."""
@@ -2845,7 +2884,7 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in recent projects endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
+    
         @self.app.route('/api/project-summary/full-analytics')
         def get_full_project_analytics():
             """Get comprehensive project summary analytics."""
@@ -2890,7 +2929,7 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in full project analytics endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
+    
         @self.app.route('/api/project-summary-widgets')
         def get_project_summary_widgets():
             """Get project summary widgets for dashboard."""
@@ -2947,7 +2986,7 @@ class ComprehensiveHealthDashboard:
             except Exception as e:
                 logger.error(f"Error in project summary widgets endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
-
+    
         @self.app.route('/api/content-search', methods=['GET', 'POST'])
         def search_content():
             """Search across conversation content, files, and tool outputs."""
@@ -3284,15 +3323,38 @@ class ComprehensiveHealthDashboard:
         import subprocess
         import multiprocessing
         import os
+        import shutil
         from pathlib import Path
         
         try:
+            logger.info("🔧 === GUNICORN STARTUP DIAGNOSTICS ===")
+            
             # Set workers count
             if workers is None:
                 workers = multiprocessing.cpu_count() * 2 + 1
+            logger.info(f"📊 Workers configuration: {workers} (CPU count: {multiprocessing.cpu_count()})")
+            
+            # Check if Gunicorn is installed
+            gunicorn_path = shutil.which('gunicorn')
+            if gunicorn_path:
+                logger.info(f"✅ Gunicorn found at: {gunicorn_path}")
+            else:
+                logger.error("❌ Gunicorn not found in PATH")
+                logger.info("💡 Install with: pip install gunicorn")
+                raise FileNotFoundError("gunicorn not found")
             
             # Create WSGI application entry point
+            logger.info("📝 Creating WSGI entry point...")
             self._create_wsgi_entry_point()
+            logger.info("✅ WSGI entry point created successfully")
+            
+            # Check if WSGI file exists
+            wsgi_file = Path.cwd() / "context_cleaner_wsgi.py"
+            if wsgi_file.exists():
+                logger.info(f"✅ WSGI file exists: {wsgi_file}")
+                logger.info(f"📏 WSGI file size: {wsgi_file.stat().st_size} bytes")
+            else:
+                logger.error(f"❌ WSGI file not found: {wsgi_file}")
             
             # Set environment variables
             env = os.environ.copy()
@@ -3301,9 +3363,32 @@ class ComprehensiveHealthDashboard:
                 'CLAUDE_CODE_ENABLE_TELEMETRY': '1',
                 'PYTHONPATH': str(Path(__file__).parent.parent.parent),
             })
+            logger.info(f"🌍 Environment variables set:")
+            logger.info(f"   FLASK_ENV: {env.get('FLASK_ENV')}")
+            logger.info(f"   CLAUDE_CODE_ENABLE_TELEMETRY: {env.get('CLAUDE_CODE_ENABLE_TELEMETRY')}")
+            logger.info(f"   PYTHONPATH: {env.get('PYTHONPATH')}")
+            
+            # Test WSGI application import
+            logger.info("🧪 Testing WSGI application import...")
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("context_cleaner_wsgi", wsgi_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    if hasattr(module, 'application'):
+                        logger.info("✅ WSGI application import test successful")
+                    else:
+                        logger.error("❌ WSGI application has no 'application' attribute")
+                else:
+                    logger.error("❌ Failed to create WSGI module spec")
+            except Exception as import_error:
+                logger.error(f"❌ WSGI application import test failed: {import_error}")
+                logger.error(f"🔍 Import error type: {type(import_error).__name__}")
             
             # Open browser if requested
             if open_browser:
+                logger.info("🌐 Browser will open in 2 seconds...")
                 threading.Timer(
                     2.0, lambda: webbrowser.open(f"http://{host}:{port}")
                 ).start()
@@ -3326,27 +3411,56 @@ class ComprehensiveHealthDashboard:
                 'context_cleaner_wsgi:application'
             ]
             
-            logger.info(f"🚀 Starting Gunicorn with {workers} workers")
+            logger.info("🚀 === GUNICORN STARTUP COMMAND ===")
+            logger.info(f"📋 Full command: {' '.join(cmd)}")
+            logger.info(f"🔗 Binding to: {host}:{port}")
+            logger.info(f"👥 Workers: {workers}")
+            logger.info(f"⚡ Worker class: gevent")
+            logger.info(f"🔌 Worker connections: 1000")
+            logger.info(f"⏱️ Timeout: 30 seconds")
+            logger.info(f"💓 Keep-alive: 2 seconds")
+            logger.info(f"📄 Max requests per worker: 1000")
+            logger.info(f"🎲 Max requests jitter: 50")
+            logger.info(f"📊 Log level: info")
+            logger.info(f"🚀 Preload app: enabled")
+            logger.info(f"📦 WSGI module: context_cleaner_wsgi:application")
+            
+            logger.info("🔄 === STARTING GUNICORN SERVER ===")
             logger.info(f"📊 Dashboard URL: http://{host}:{port}")
             logger.info("🔄 Press Ctrl+C to stop")
             
             # Start Gunicorn process
-            subprocess.run(cmd, env=env, check=True)
+            logger.info("🎬 Executing Gunicorn command...")
+            result = subprocess.run(cmd, env=env, check=True, capture_output=False)
+            logger.info(f"✅ Gunicorn process completed with return code: {result.returncode}")
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Gunicorn failed to start: {e}")
-            logger.info("Falling back to development server...")
+            logger.error("❌ === GUNICORN STARTUP FAILED ===")
+            logger.error(f"💥 CalledProcessError: {e}")
+            logger.error(f"📊 Return code: {e.returncode}")
+            if hasattr(e, 'stdout') and e.stdout:
+                logger.error(f"📤 Stdout: {e.stdout}")
+            if hasattr(e, 'stderr') and e.stderr:
+                logger.error(f"📥 Stderr: {e.stderr}")
+            logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
-        except FileNotFoundError:
-            logger.warning("Gunicorn not found. Install with: pip install gunicorn")
-            logger.info("Falling back to development server...")
+        except FileNotFoundError as e:
+            logger.error("❌ === GUNICORN NOT FOUND ===")
+            logger.error(f"💥 FileNotFoundError: {e}")
+            logger.warning("🚨 Gunicorn not found. Install with: pip install gunicorn")
+            logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
         except KeyboardInterrupt:
-            logger.info("Shutting down production server...")
+            logger.info("🛑 === GUNICORN SHUTDOWN ===")
+            logger.info("⚡ Shutting down production server...")
             self.stop()
         except Exception as e:
-            logger.error(f"Production server error: {e}")
-            logger.info("Falling back to development server...")
+            logger.error("❌ === GUNICORN UNEXPECTED ERROR ===")
+            logger.error(f"💥 Exception type: {type(e).__name__}")
+            logger.error(f"💥 Exception message: {e}")
+            import traceback
+            logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+            logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
 
     def _create_wsgi_entry_point(self):
@@ -3355,39 +3469,79 @@ class ComprehensiveHealthDashboard:
         wsgi_content = '''#!/usr/bin/env python3
 """
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
+Application Factory Pattern for Production Deployment
 """
 import sys
 import os
+import logging
 from pathlib import Path
+
+# Configure logging early
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Add src directory to Python path
 src_path = Path(__file__).parent / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
 
-try:
-    from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-    from context_cleaner.config.settings import ContextCleanerConfig
-    
-    # Load configuration
-    config = ContextCleanerConfig.default()
-    
-    # Create dashboard instance
-    dashboard = ComprehensiveHealthDashboard(config=config)
-    
-    # Export WSGI application
-    application = dashboard.app
-    
-    # Initialize SocketIO for production
-    socketio = dashboard.socketio
-    
-    if __name__ == "__main__":
-        # Fallback to development server if run directly
-        dashboard.start_server(host="0.0.0.0", port=8081, production=False)
+logger.info("🔧 WSGI Application Factory Starting...")
+
+def create_app():
+    """Application factory for creating Flask app instance."""
+    try:
+        logger.info("📦 Loading Context Cleaner modules...")
+        from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+        from context_cleaner.config.settings import ContextCleanerConfig
         
-except Exception as e:
-    print(f"Error creating WSGI application: {e}")
-    sys.exit(1)
+        logger.info("⚙️ Loading configuration...")
+        config = ContextCleanerConfig.default()
+        
+        logger.info("🏗️ Creating dashboard instance...")
+        dashboard = ComprehensiveHealthDashboard(config=config)
+        
+        logger.info("✅ Dashboard created successfully")
+        logger.info("📡 Initializing SocketIO for production...")
+        
+        # Ensure SocketIO is properly configured for gevent
+        if dashboard.socketio.async_mode != 'gevent':
+            logger.warning(f"⚠️ SocketIO async_mode is {dashboard.socketio.async_mode}, expected 'gevent'")
+        else:
+            logger.info("✅ SocketIO configured with gevent async mode")
+        
+        logger.info("🎯 WSGI application ready")
+        return dashboard.app, dashboard.socketio
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating WSGI application: {e}")
+        import traceback
+        logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+        raise
+
+# Create application using factory pattern
+logger.info("🏭 Invoking application factory...")
+app, socketio = create_app()
+
+# Export WSGI application for Gunicorn
+application = app
+
+# For compatibility with some WSGI servers
+wsgi_app = app
+
+logger.info("🚀 WSGI application exported successfully")
+logger.info(f"📊 Flask app: {app}")
+logger.info(f"📡 SocketIO: {socketio}")
+
+if __name__ == "__main__":
+    # Fallback to development server if run directly
+    logger.info("🔧 Running in development mode (direct execution)")
+    import socketio as sio_module
+    
+    # Use SocketIO's run method for development
+    socketio.run(app, host="0.0.0.0", port=8081, debug=False)
 '''
         
         wsgi_path = Path("context_cleaner_wsgi.py")
@@ -3461,6 +3615,23 @@ except Exception as e:
             except Exception as e:
                 logger.warning(f"Real-time update loop error: {e}")
                 self._stop_event.wait(timeout=10.0)
+
+    def _fetch_telemetry_stats(self, loop):
+        """Helper method to fetch telemetry stats in separate thread"""
+        import asyncio
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(
+            self.telemetry_client.get_total_aggregated_stats()
+        )
+    
+    def _fetch_model_efficiency(self, loop):
+        """Helper method to fetch model efficiency data in separate thread"""
+        import asyncio
+        asyncio.set_event_loop(loop)
+        model_widget = loop.run_until_complete(
+            self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
+        )
+        return model_widget.data if model_widget else None
 
     def _get_local_jsonl_stats(self) -> Dict[str, Any]:
         """Get dashboard metrics from local JSONL files when telemetry is unavailable."""

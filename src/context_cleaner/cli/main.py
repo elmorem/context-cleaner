@@ -1121,14 +1121,36 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         asyncio.run(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
         return
     
-    # 1. PROCESS DISCOVERY PHASE
+    # 1. ENHANCED PROCESS DISCOVERY PHASE
     if not no_discovery:
         try:
             if verbose:
-                click.echo("\n🔍 PHASE 1: Process Discovery")
+                click.echo("\n🔍 PHASE 1: Enhanced Process Discovery")
             
+            # Use both the orchestrator discovery engine AND manual discovery
             discovered_processes = discovery_engine.discover_all_processes()
             registered_processes = process_registry.get_all_processes()
+            
+            # Add comprehensive manual discovery for processes the orchestrator misses
+            manual_processes = _discover_all_context_cleaner_processes(verbose)
+            
+            # Combine and deduplicate processes
+            all_pids = set()
+            combined_processes = []
+            
+            # Add orchestrator-discovered processes
+            for proc in discovered_processes:
+                if proc.pid not in all_pids:
+                    combined_processes.append(proc)
+                    all_pids.add(proc.pid)
+            
+            # Add manually discovered processes
+            for proc in manual_processes:
+                if proc.pid not in all_pids:
+                    combined_processes.append(proc)
+                    all_pids.add(proc.pid)
+            
+            discovered_processes = combined_processes
             
             discovery_summary = {
                 "discovered_count": len(discovered_processes),
@@ -1138,7 +1160,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             
             # Group discovered processes by service type
             for process in discovered_processes:
-                service_type = process.service_type
+                service_type = getattr(process, 'service_type', 'unknown')
                 if service_type not in discovery_summary["by_service_type"]:
                     discovery_summary["by_service_type"][service_type] = []
                 discovery_summary["by_service_type"][service_type].append({
@@ -1256,20 +1278,18 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 except psutil.NoSuchProcess:
                     continue  # Already gone
                 
-                # Graceful termination first
-                proc.terminate()
+                # Enhanced termination with signal escalation
+                success = _terminate_process_with_escalation(proc, verbose)
                 
-                # Wait up to 5 seconds for graceful termination
-                try:
-                    proc.wait(timeout=5)
-                except psutil.TimeoutExpired:
-                    # Force kill if graceful termination failed
-                    proc.kill()
-                    proc.wait()
-                
-                cleaned_processes += 1
-                if verbose:
-                    click.echo(f"   ✅ Stopped PID {process.pid} ({process.service_type})")
+                if success:
+                    cleaned_processes += 1
+                    service_type = getattr(process, 'service_type', 'unknown')
+                    if verbose:
+                        click.echo(f"   ✅ Stopped PID {process.pid} ({service_type})")
+                else:
+                    failed_cleanups += 1
+                    if verbose:
+                        click.echo(f"   ❌ Failed to stop PID {process.pid} after escalation")
                 
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 # Process already gone or can't access it
@@ -1353,19 +1373,49 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     if verbose:
         click.echo("\n🔍 Verifying shutdown completeness...")
     
-    # Re-discover processes to verify they're actually stopped
+    # Enhanced verification with retry mechanism
+    verification_attempts = 3
     verification_processes = []
-    try:
-        verification_processes = discovery_engine.discover_all_processes()
-        if verbose:
-            click.echo(f"   Found {len(verification_processes)} remaining processes after shutdown")
-    except Exception as e:
-        if verbose:
-            click.echo(f"   ⚠️  Verification discovery failed: {e}")
     
-    # Check if common ports are still bound
+    for attempt in range(verification_attempts):
+        try:
+            # Use both discovery methods for verification
+            orchestrator_processes = discovery_engine.discover_all_processes()
+            manual_processes = _discover_all_context_cleaner_processes(verbose=False)
+            
+            # Combine processes for verification
+            all_verification_pids = set()
+            verification_processes = []
+            
+            for proc in orchestrator_processes + manual_processes:
+                if proc.pid not in all_verification_pids:
+                    verification_processes.append(proc)
+                    all_verification_pids.add(proc.pid)
+            
+            if len(verification_processes) == 0:
+                break  # All processes stopped
+            
+            if attempt < verification_attempts - 1:
+                if verbose:
+                    click.echo(f"   🔄 Verification attempt {attempt + 1}: {len(verification_processes)} processes still running, retrying...")
+                import time
+                time.sleep(2)  # Wait before retry
+            else:
+                if verbose:
+                    click.echo(f"   Found {len(verification_processes)} remaining processes after {verification_attempts} attempts")
+                    
+        except Exception as e:
+            if verbose:
+                click.echo(f"   ⚠️  Verification discovery failed (attempt {attempt + 1}): {e}")
+    
+    # Check if common ports are still bound (expanded range)
     remaining_ports = []
-    common_ports = [8081, 8082, 8083, 8084, 8088, 8110]
+    common_ports = list(range(8050, 8110)) + list(range(8200, 8210)) + list(range(8300, 8310)) + \
+                   list(range(8400, 8410)) + list(range(8500, 8510)) + list(range(8600, 8610)) + \
+                   list(range(8700, 8710)) + list(range(8800, 8810)) + list(range(8900, 8910)) + \
+                   list(range(9000, 9010)) + list(range(9100, 9110)) + list(range(9200, 9210)) + \
+                   list(range(9900, 10000))
+    
     for port in common_ports:
         try:
             import socket
@@ -1414,11 +1464,172 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         click.echo("   context-cleaner debug processes  # Check for remaining processes")
 
 
+def _discover_all_context_cleaner_processes(verbose: bool = False):
+    """Comprehensive manual process discovery for all Context Cleaner processes.
+    
+    This function uses multiple discovery methods to find all Context Cleaner processes,
+    including those started by different methods that the orchestrator might miss.
+    """
+    import psutil
+    from collections import namedtuple
+    
+    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'command_line', 'service_type'])
+    found_processes = []
+    
+    # Comprehensive patterns based on all Context Cleaner startup methods
+    search_patterns = [
+        # Direct script invocations
+        "python start_context_cleaner.py",
+        "python start_context_cleaner_production.py", 
+        "start_context_cleaner.py",
+        "start_context_cleaner_production.py",
+        
+        # CLI module invocations
+        "python -m context_cleaner.cli.main run",
+        "context_cleaner run",
+        "context_cleaner.cli.main run",
+        
+        # WSGI/production deployments
+        "context_cleaner_wsgi",
+        "gunicorn.*context_cleaner",
+        
+        # Dashboard services
+        "ComprehensiveHealthDashboard",
+        "context_cleaner.*dashboard",
+        
+        # Background services
+        "context_cleaner.*jsonl",
+        "jsonl_background_service",
+        "context_cleaner.*bridge",
+        "context_cleaner.*monitor",
+        
+        # Python path variations
+        "PYTHONPATH.*context-cleaner",
+        "PYTHONPATH.*context_cleaner",
+    ]
+    
+    try:
+        # Iterate through all running processes
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if not proc.info['cmdline']:
+                    continue
+                    
+                cmdline = ' '.join(proc.info['cmdline'])
+                
+                # Check against all search patterns
+                for pattern in search_patterns:
+                    if pattern.lower() in cmdline.lower():
+                        # Determine service type from command line
+                        service_type = "dashboard"
+                        if "jsonl" in cmdline.lower():
+                            service_type = "jsonl_processing"
+                        elif "bridge" in cmdline.lower():
+                            service_type = "bridge_service"
+                        elif "monitor" in cmdline.lower():
+                            service_type = "monitoring"
+                        elif "production" in cmdline.lower():
+                            service_type = "production_dashboard"
+                        elif "gunicorn" in cmdline.lower() or "wsgi" in cmdline.lower():
+                            service_type = "wsgi_server"
+                        
+                        process_info = ProcessInfo(
+                            pid=proc.info['pid'],
+                            command_line=cmdline,
+                            service_type=service_type
+                        )
+                        found_processes.append(process_info)
+                        
+                        if verbose:
+                            print(f"   🔍 Found PID {proc.info['pid']}: {service_type} - {cmdline[:60]}...")
+                        break  # Found match, move to next process
+                        
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                # Process disappeared or we can't access it
+                continue
+                
+    except Exception as e:
+        if verbose:
+            print(f"   ⚠️  Process discovery error: {e}")
+    
+    if verbose:
+        print(f"   📊 Manual discovery found {len(found_processes)} Context Cleaner processes")
+    
+    return found_processes
+
+
+def _terminate_process_with_escalation(proc, verbose: bool = False):
+    """Terminate a process with signal escalation and timeout handling.
+    
+    Uses a progressive approach:
+    1. SIGTERM (graceful termination)
+    2. Wait with timeout
+    3. SIGKILL (force kill)
+    4. Process group cleanup if needed
+    """
+    import signal
+    import time
+    
+    try:
+        # First, try graceful termination
+        proc.terminate()
+        
+        # Wait up to 5 seconds for graceful termination
+        try:
+            proc.wait(timeout=5)
+            return True  # Successfully terminated
+        except psutil.TimeoutExpired:
+            if verbose:
+                print(f"   ⏱️  PID {proc.pid} didn't respond to SIGTERM, escalating to SIGKILL")
+        
+        # If still running, force kill
+        if proc.is_running():
+            proc.kill()
+            
+            # Wait up to 3 more seconds for force kill
+            try:
+                proc.wait(timeout=3)
+                return True
+            except psutil.TimeoutExpired:
+                if verbose:
+                    print(f"   ⚠️  PID {proc.pid} didn't respond to SIGKILL, trying process group cleanup")
+        
+        # If STILL running, try process group termination
+        if proc.is_running():
+            try:
+                # Try to kill the entire process group
+                import os
+                pgid = os.getpgid(proc.pid)
+                os.killpg(pgid, signal.SIGTERM)
+                time.sleep(2)
+                
+                if proc.is_running():
+                    os.killpg(pgid, signal.SIGKILL)
+                    time.sleep(1)
+                    
+                return not proc.is_running()
+                
+            except (ProcessLookupError, OSError):
+                # Process group doesn't exist or we can't access it
+                pass
+        
+        return not proc.is_running()
+        
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        # Process is gone or we can't access it - consider this success
+        return True
+    except Exception as e:
+        if verbose:
+            print(f"   ❌ Process termination error for PID {proc.pid}: {e}")
+        return False
+
+
 async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_only: bool, verbose: bool):
     """Fallback basic stop implementation when orchestrator is unavailable."""
     import subprocess
     import signal
     import os
+    import psutil
     from pathlib import Path
     
     if verbose:
@@ -1442,12 +1653,31 @@ async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_on
     # Stop background processes if requested
     if not docker_only:
         try:
-            # Kill processes by name pattern
+            # Use comprehensive process discovery for fallback as well
+            manual_processes = _discover_all_context_cleaner_processes(verbose)
+            
+            for process in manual_processes:
+                try:
+                    proc = psutil.Process(process.pid)
+                    if proc.is_running():
+                        success = _terminate_process_with_escalation(proc, verbose)
+                        if success and verbose:
+                            click.echo(f"   ✅ Stopped PID {process.pid} ({process.service_type})")
+                        elif not success and verbose:
+                            click.echo(f"   ❌ Failed to stop PID {process.pid}")
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue  # Process already gone or inaccessible
+            
+            # Also try pattern-based killing as backup
             patterns = [
+                "start_context_cleaner",
+                "context_cleaner.*run", 
                 "context_cleaner.*jsonl", 
                 "jsonl_background_service",
                 "context_cleaner.*dashboard", 
-                "context_cleaner.*bridge"
+                "context_cleaner.*bridge",
+                "ComprehensiveHealthDashboard",
+                "context_cleaner_wsgi"
             ]
             
             for pattern in patterns:

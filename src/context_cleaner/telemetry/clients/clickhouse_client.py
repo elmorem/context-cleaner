@@ -225,9 +225,17 @@ class ClickHouseClient(TelemetryClient):
         metrics.failed_queries += 1
         metrics.consecutive_failures += 1
         metrics.last_failure_timestamp = datetime.now()
-        
+
         logger.warning(f"Query failed: {error_message}")
-        
+
+        # Check if this is a "container not found" error - don't trip circuit breaker for this
+        if self._is_container_not_found_error(error_message):
+            logger.info("Container not found - this is expected during startup, not tripping circuit breaker")
+            # Reset consecutive failures for container not found errors
+            # as this is a startup condition, not a service failure
+            metrics.consecutive_failures = 0
+            return
+
         # Trip circuit breaker if too many consecutive failures
         if metrics.consecutive_failures >= self.pool.max_consecutive_failures:
             self._trip_circuit_breaker()
@@ -269,7 +277,24 @@ class ClickHouseClient(TelemetryClient):
             return False
         
         return True
-    
+
+    def _is_container_not_found_error(self, error_message: str) -> bool:
+        """Check if the error is due to container not being found/running."""
+        container_not_found_patterns = [
+            "No such container",
+            "container not found",
+            "Cannot connect to the Docker daemon",
+            "container.*not running",
+            "Container .* is not running"
+        ]
+
+        error_lower = error_message.lower()
+        for pattern in container_not_found_patterns:
+            import re
+            if re.search(pattern.lower(), error_lower):
+                return True
+        return False
+
     async def get_connection_status(self) -> ConnectionStatus:
         """Get current connection status."""
         if self._is_circuit_breaker_open():

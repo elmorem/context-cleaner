@@ -64,8 +64,12 @@ class APIUIConsistencyChecker:
     that the UI is properly consuming and displaying the data.
     """
     
-    def __init__(self, config: ContextCleanerConfig, dashboard_host: str = "127.0.0.1", dashboard_port: int = 8080):
-        self.config = config
+    def __init__(self, config: Optional[ContextCleanerConfig] = None, dashboard_host: str = "127.0.0.1", dashboard_port: int = 8080):
+        # Use default config if none provided
+        if config is None and ContextCleanerConfig is not None:
+            self.config = ContextCleanerConfig.default()
+        else:
+            self.config = config
         self.dashboard_host = dashboard_host
         self.dashboard_port = dashboard_port
         self.base_url = f"http://{dashboard_host}:{dashboard_port}"
@@ -81,6 +85,7 @@ class APIUIConsistencyChecker:
         # Check intervals
         self.check_interval = 30.0  # seconds
         self.ui_check_timeout = 10.0  # seconds
+        self.startup_delay = 15.0  # seconds - wait for dashboard to be ready
         
     def _define_api_endpoints(self) -> List[APIEndpointTest]:
         """Define all API endpoints that should be tested - these are the ACTUAL endpoints discovered from dashboard HTML"""
@@ -183,6 +188,29 @@ class APIUIConsistencyChecker:
                         
         except Exception as e:
             return "error", str(e)
+
+    async def wait_for_dashboard_ready(self, max_wait: float = 60.0, check_interval: float = 2.0) -> bool:
+        """Wait for the dashboard to be ready before starting consistency checks"""
+        self.logger.info(f"Waiting for dashboard at {self.base_url} to be ready...")
+
+        start_time = time.time()
+        while (time.time() - start_time) < max_wait:
+            try:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5.0)) as session:
+                    async with session.get(self.base_url) as response:
+                        if response.status == 200:
+                            html_content = await response.text()
+                            if len(html_content) > 1000:  # Basic check that we got a real dashboard
+                                self.logger.info("✅ Dashboard is ready for consistency monitoring")
+                                return True
+
+            except Exception as e:
+                self.logger.debug(f"Dashboard not ready yet: {e}")
+
+            await asyncio.sleep(check_interval)
+
+        self.logger.warning(f"Dashboard not ready after {max_wait}s, proceeding anyway")
+        return False
     
     def determine_consistency_status(self, api_status: str, ui_status: str, api_data_size: int) -> ConsistencyStatus:
         """Determine the overall consistency status"""
@@ -362,7 +390,10 @@ class APIUIConsistencyChecker:
     async def start_monitoring(self):
         """Start continuous monitoring of API/UI consistency"""
         self.logger.info("Starting API/UI consistency monitoring...")
-        
+
+        # Wait for dashboard to be ready before starting checks
+        await self.wait_for_dashboard_ready()
+
         while True:
             try:
                 await self.run_consistency_check()
