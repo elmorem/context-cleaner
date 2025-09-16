@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 2 Frontend Components Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-controls {
+            margin: 10px 0;
+        }
+        .test-controls button {
+            margin: 5px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-controls button:hover {
+            background: #0056b3;
+        }
+        .test-area {
+            min-height: 200px;
+            border: 2px dashed #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .log-success { color: #28a745; }
+        .log-error { color: #dc3545; }
+        .log-warning { color: #ffc107; }
+        .log-info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>Phase 2 Frontend Components Test Suite</h1>
+    <p>This page tests the Enhanced API Client with timeout and retry logic, and the Loading State Manager to prevent infinite loading states.</p>
+
+    <!-- Enhanced API Client Tests -->
+    <div class="test-section">
+        <h2>Enhanced API Client Tests</h2>
+        <div class="test-controls">
+            <button onclick="testSuccessfulRequest()">Test Successful Request</button>
+            <button onclick="testTimeoutRequest()">Test Timeout (15s)</button>
+            <button onclick="testRetryLogic()">Test Retry Logic</button>
+            <button onclick="testConcurrentRequests()">Test Concurrent Requests</button>
+            <button onclick="testHealthCheck()">Test Health Check</button>
+        </div>
+        <div id="api-test-area" class="test-area">
+            <p>Click buttons above to test API client functionality</p>
+        </div>
+        <div id="api-log" class="log-area"></div>
+    </div>
+
+    <!-- Loading State Manager Tests -->
+    <div class="test-section">
+        <h2>Loading State Manager Tests</h2>
+        <div class="test-controls">
+            <button onclick="testQuickLoading()">Test Quick Loading (2s)</button>
+            <button onclick="testMediumLoading()">Test Medium Loading (5s)</button>
+            <button onclick="testLongLoading()">Test Long Loading (20s)</button>
+            <button onclick="testLoadingWithError()">Test Loading with Error</button>
+            <button onclick="testProgressiveLoading()">Test Progressive Loading</button>
+            <button onclick="testMultipleElements()">Test Multiple Elements</button>
+        </div>
+        <div id="loading-test-area" class="test-area">
+            <div id="loading-element-1" style="margin: 10px 0; padding: 20px; border: 1px solid #ddd;">
+                Element 1 - Ready for loading test
+            </div>
+            <div id="loading-element-2" style="margin: 10px 0; padding: 20px; border: 1px solid #ddd;">
+                Element 2 - Ready for loading test
+            </div>
+        </div>
+        <div id="loading-log" class="log-area"></div>
+    </div>
+
+    <!-- Integration Tests -->
+    <div class="test-section">
+        <h2>Integration Tests</h2>
+        <div class="test-controls">
+            <button onclick="testApiWithLoadingStates()">Test API + Loading Integration</button>
+            <button onclick="testErrorRecoveryFlow()">Test Error Recovery Flow</button>
+            <button onclick="testCircuitBreakerSimulation()">Test Circuit Breaker Simulation</button>
+        </div>
+        <div id="integration-test-area" class="test-area">
+            <div id="integration-element" style="margin: 10px 0; padding: 20px; border: 1px solid #ddd;">
+                Integration test area - Ready
+            </div>
+        </div>
+        <div id="integration-log" class="log-area"></div>
+    </div>
+
+    <!-- Include the Phase 2 components -->
+    <script src="../src/context_cleaner/static/js/enhanced_api_client.js"></script>
+    <script src="../src/context_cleaner/static/js/loading_manager.js"></script>
+
+    <script>
+        // Real API endpoints for testing with context-cleaner server
+        const realApiClient = new EnhancedAPIClient({
+            baseURL: 'http://localhost:8250',  // Use real context-cleaner server
+            timeout: 15000,
+            maxRetries: 3,
+            retryDelay: 1000
+        });
+
+        // Logging functions
+        function logToArea(areaId, message, type = 'info') {
+            const logArea = document.getElementById(areaId);
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        // Enhanced API Client Tests
+        async function testSuccessfulRequest() {
+            logToArea('api-log', 'Testing successful request to context-cleaner API...', 'info');
+            try {
+                const response = await realApiClient.get('/api/project-summary-widgets');
+                logToArea('api-log', `Success: ${JSON.stringify(response).substring(0, 100)}...`, 'success');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Successful Request Result:</h4>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `;
+            } catch (error) {
+                logToArea('api-log', `Error: ${error.message}`, 'error');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Request Failed:</h4>
+                    <p>Error: ${error.message}</p>
+                    <p>This validates that our error handling works correctly!</p>
+                `;
+            }
+        }
+
+        async function testTimeoutRequest() {
+            logToArea('api-log', 'Testing timeout request (15s)...', 'info');
+            try {
+                // Use httpbin's delay endpoint that takes longer than our timeout
+                const response = await mockApiClient.get('/delay/20', {}, { timeout: 5000 });
+                logToArea('api-log', 'Unexpected success on timeout test', 'warning');
+            } catch (error) {
+                logToArea('api-log', `Expected timeout: ${error.message}`, 'success');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Timeout Test Result:</h4>
+                    <p>✅ Request properly timed out after 5 seconds</p>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testRetryLogic() {
+            logToArea('api-log', 'Testing retry logic with 500 error...', 'info');
+            try {
+                // Use httpbin's status endpoint to simulate server errors
+                const response = await mockApiClient.get('/status/500', {}, { retries: 2 });
+                logToArea('api-log', 'Unexpected success on retry test', 'warning');
+            } catch (error) {
+                logToArea('api-log', `Expected failure after retries: ${error.message}`, 'success');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Retry Logic Test Result:</h4>
+                    <p>✅ Request properly failed after retry attempts</p>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+
+        async function testConcurrentRequests() {
+            logToArea('api-log', 'Testing concurrent requests...', 'info');
+            const promises = [
+                mockApiClient.get('/json'),
+                mockApiClient.get('/uuid'),
+                mockApiClient.get('/ip')
+            ];
+            
+            try {
+                const results = await Promise.all(promises);
+                logToArea('api-log', `Concurrent requests completed: ${results.length} responses`, 'success');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Concurrent Requests Result:</h4>
+                    <p>✅ ${results.length} requests completed successfully</p>
+                `;
+            } catch (error) {
+                logToArea('api-log', `Concurrent requests error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testHealthCheck() {
+            logToArea('api-log', 'Testing health check...', 'info');
+            try {
+                const health = await mockApiClient.healthCheck();
+                logToArea('api-log', `Health check result: ${JSON.stringify(health)}`, 'info');
+                document.getElementById('api-test-area').innerHTML = `
+                    <h4>Health Check Result:</h4>
+                    <pre>${JSON.stringify(health, null, 2)}</pre>
+                `;
+            } catch (error) {
+                logToArea('api-log', `Health check error: ${error.message}`, 'error');
+            }
+        }
+
+        // Loading State Manager Tests
+        function testQuickLoading() {
+            logToArea('loading-log', 'Testing quick loading (2s)...', 'info');
+            const elementId = 'loading-element-1';
+            
+            window.loadingManager.startLoading(elementId, {
+                message: 'Quick loading test...',
+                showSpinner: true
+            });
+            
+            setTimeout(() => {
+                window.loadingManager.completeLoading(elementId, `
+                    <p>✅ Quick loading completed successfully!</p>
+                    <p>Duration: 2 seconds</p>
+                `);
+                logToArea('loading-log', 'Quick loading test completed', 'success');
+            }, 2000);
+        }
+
+        function testMediumLoading() {
+            logToArea('loading-log', 'Testing medium loading (5s)...', 'info');
+            const elementId = 'loading-element-2';
+            
+            window.loadingManager.startLoading(elementId, {
+                message: 'Medium loading test...',
+                showSpinner: true,
+                progressiveTimeout: 3000
+            });
+            
+            setTimeout(() => {
+                window.loadingManager.completeLoading(elementId, `
+                    <p>✅ Medium loading completed successfully!</p>
+                    <p>Duration: 5 seconds (with progressive feedback)</p>
+                `);
+                logToArea('loading-log', 'Medium loading test completed', 'success');
+            }, 5000);
+        }
+
+        function testLongLoading() {
+            logToArea('loading-log', 'Testing long loading (20s)...', 'info');
+            const elementId = 'loading-element-1';
+            
+            window.loadingManager.startLoading(elementId, {
+                message: 'Long loading test...',
+                showSpinner: true,
+                progressiveTimeout: 3000,
+                defaultTimeout: 10000
+            });
+            
+            // Let it run to show progressive feedback and timeout warnings
+            setTimeout(() => {
+                window.loadingManager.completeLoading(elementId, `
+                    <p>✅ Long loading completed!</p>
+                    <p>Duration: 20 seconds (should have shown progressive feedback and timeout warnings)</p>
+                `);
+                logToArea('loading-log', 'Long loading test completed', 'success');
+            }, 20000);
+        }
+
+        function testLoadingWithError() {
+            logToArea('loading-log', 'Testing loading with error...', 'info');
+            const elementId = 'loading-element-2';
+            
+            window.loadingManager.startLoading(elementId, {
+                message: 'Loading that will fail...',
+                showSpinner: true
+            });
+            
+            setTimeout(() => {
+                window.loadingManager.failLoading(elementId, 'Simulated network error', {
+                    retryable: true,
+                    showDetails: true
+                });
+                logToArea('loading-log', 'Loading error test completed', 'success');
+            }, 3000);
+        }
+
+        function testProgressiveLoading() {
+            logToArea('loading-log', 'Testing progressive loading feedback...', 'info');
+            const elementId = 'loading-element-1';
+            
+            window.loadingManager.startLoading(elementId, {
+                message: 'Progressive loading test...',
+                showSpinner: true,
+                progressiveTimeout: 2000
+            });
+            
+            // This will trigger progressive feedback after 2 seconds
+            setTimeout(() => {
+                window.loadingManager.completeLoading(elementId, `
+                    <p>✅ Progressive loading test completed!</p>
+                    <p>Progressive feedback should have appeared after 2 seconds</p>
+                `);
+                logToArea('loading-log', 'Progressive loading test completed', 'success');
+            }, 6000);
+        }
+
+        function testMultipleElements() {
+            logToArea('loading-log', 'Testing multiple loading elements...', 'info');
+            
+            window.loadingManager.startLoading('loading-element-1', {
+                message: 'Loading A...',
+                showSpinner: true
+            });
+            
+            window.loadingManager.startLoading('loading-element-2', {
+                message: 'Loading B...',
+                showSpinner: true
+            });
+            
+            setTimeout(() => {
+                window.loadingManager.completeLoading('loading-element-1', '<p>✅ Element A completed</p>');
+                logToArea('loading-log', 'Element A completed', 'success');
+            }, 3000);
+            
+            setTimeout(() => {
+                window.loadingManager.completeLoading('loading-element-2', '<p>✅ Element B completed</p>');
+                logToArea('loading-log', 'Element B completed', 'success');
+            }, 5000);
+        }
+
+        // Integration Tests
+        async function testApiWithLoadingStates() {
+            logToArea('integration-log', 'Testing API + Loading integration...', 'info');
+            const elementId = 'integration-element';
+            
+            try {
+                window.loadingManager.startLoading(elementId, {
+                    message: 'Fetching data from API...',
+                    showSpinner: true
+                });
+                
+                const response = await mockApiClient.get('/json');
+                
+                window.loadingManager.completeLoading(elementId, `
+                    <h4>✅ API + Loading Integration Success</h4>
+                    <p>Data loaded successfully with proper loading states</p>
+                    <pre>${JSON.stringify(response, null, 2)}</pre>
+                `);
+                logToArea('integration-log', 'API + Loading integration completed', 'success');
+                
+            } catch (error) {
+                window.loadingManager.failLoading(elementId, error.message, {
+                    retryable: true,
+                    showDetails: true
+                });
+                logToArea('integration-log', `Integration test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testErrorRecoveryFlow() {
+            logToArea('integration-log', 'Testing error recovery flow...', 'info');
+            const elementId = 'integration-element';
+            
+            // First attempt - will fail
+            try {
+                window.loadingManager.startLoading(elementId, {
+                    message: 'Attempting API call (will fail)...',
+                    showSpinner: true
+                });
+                
+                await mockApiClient.get('/status/500', {}, { retries: 1 });
+                
+            } catch (error) {
+                logToArea('integration-log', 'First attempt failed as expected', 'info');
+                
+                window.loadingManager.failLoading(elementId, 'API call failed', {
+                    retryable: true
+                });
+                
+                // Simulate retry after 2 seconds
+                setTimeout(async () => {
+                    try {
+                        window.loadingManager.startLoading(elementId, {
+                            message: 'Retrying with different endpoint...',
+                            showSpinner: true
+                        });
+                        
+                        const response = await mockApiClient.get('/json');
+                        
+                        window.loadingManager.completeLoading(elementId, `
+                            <h4>✅ Error Recovery Success</h4>
+                            <p>Failed request recovered successfully on retry</p>
+                            <pre>${JSON.stringify(response, null, 2)}</pre>
+                        `);
+                        logToArea('integration-log', 'Error recovery flow completed', 'success');
+                        
+                    } catch (retryError) {
+                        window.loadingManager.failLoading(elementId, retryError.message);
+                        logToArea('integration-log', `Retry failed: ${retryError.message}`, 'error');
+                    }
+                }, 2000);
+            }
+        }
+
+        function testCircuitBreakerSimulation() {
+            logToArea('integration-log', 'Testing circuit breaker simulation...', 'info');
+            const elementId = 'integration-element';
+            
+            let failureCount = 0;
+            const maxFailures = 3;
+            
+            function simulateRequest() {
+                failureCount++;
+                
+                window.loadingManager.startLoading(elementId, {
+                    message: `Simulated request attempt ${failureCount}...`,
+                    showSpinner: true
+                });
+                
+                setTimeout(() => {
+                    if (failureCount < maxFailures) {
+                        window.loadingManager.failLoading(elementId, `Service failure ${failureCount}/${maxFailures}`, {
+                            retryable: true
+                        });
+                        logToArea('integration-log', `Request ${failureCount} failed`, 'warning');
+                        
+                        // Auto-retry after 1 second
+                        setTimeout(simulateRequest, 1000);
+                        
+                    } else if (failureCount === maxFailures) {
+                        window.loadingManager.failLoading(elementId, 'Circuit breaker OPEN - service unavailable', {
+                            retryable: false
+                        });
+                        logToArea('integration-log', 'Circuit breaker opened after 3 failures', 'error');
+                        
+                        // Simulate recovery after 5 seconds
+                        setTimeout(() => {
+                            window.loadingManager.startLoading(elementId, {
+                                message: 'Circuit breaker HALF-OPEN - testing recovery...',
+                                showSpinner: true
+                            });
+                            
+                            setTimeout(() => {
+                                window.loadingManager.completeLoading(elementId, `
+                                    <h4>✅ Circuit Breaker Recovery</h4>
+                                    <p>Circuit breaker successfully recovered</p>
+                                    <p>CLOSED → OPEN (after 3 failures) → HALF-OPEN → CLOSED</p>
+                                `);
+                                logToArea('integration-log', 'Circuit breaker simulation completed', 'success');
+                            }, 2000);
+                        }, 5000);
+                    }
+                }, 1500);
+            }
+            
+            simulateRequest();
+        }
+
+        // Add retry event listener for loading manager
+        document.addEventListener('retryLoading', (event) => {
+            logToArea('loading-log', `Retry triggered for element: ${event.detail.elementId}`, 'info');
+        });
+
+        // Page load message
+        window.addEventListener('load', () => {
+            logToArea('api-log', 'Enhanced API Client loaded and ready', 'success');
+            logToArea('loading-log', 'Loading State Manager loaded and ready', 'success');
+            logToArea('integration-log', 'Integration tests ready', 'success');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,482 @@
+/**
+ * Real-time Dashboard Styles
+ * Connection status, notifications, and real-time updates
+ */
+
+/* Connection Status */
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    margin-left: 10px;
+    position: relative;
+}
+
+.connection-status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+}
+
+.connection-connecting {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.connection-connecting::before {
+    background-color: #fff;
+    animation: connecting-pulse 1s infinite;
+}
+
+.connection-connected {
+    background-color: #28a745;
+    color: white;
+}
+
+.connection-connected::before {
+    background-color: #fff;
+    animation: none;
+}
+
+.connection-disconnected {
+    background-color: #6c757d;
+    color: white;
+}
+
+.connection-disconnected::before {
+    background-color: #fff;
+    animation: none;
+}
+
+.connection-error {
+    background-color: #dc3545;
+    color: white;
+}
+
+.connection-error::before {
+    background-color: #fff;
+    animation: error-pulse 0.5s infinite;
+}
+
+.connection-fallback {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.connection-fallback::before {
+    background-color: #212529;
+    animation: pulse 2s infinite;
+}
+
+/* Animations */
+@keyframes connecting-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+@keyframes error-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Notifications Container */
+.notifications-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.notification {
+    display: flex;
+    align-items: flex-start;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-bottom: 12px;
+    padding: 16px;
+    border-left: 4px solid;
+    pointer-events: auto;
+    animation: slideIn 0.3s ease-out;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.notification-info {
+    border-left-color: #17a2b8;
+}
+
+.notification-success {
+    border-left-color: #28a745;
+}
+
+.notification-warning {
+    border-left-color: #ffc107;
+}
+
+.notification-error {
+    border-left-color: #dc3545;
+}
+
+.notification-content {
+    flex: 1;
+    margin-right: 12px;
+}
+
+.notification-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.notification-info .notification-content h4 {
+    color: #17a2b8;
+}
+
+.notification-success .notification-content h4 {
+    color: #28a745;
+}
+
+.notification-warning .notification-content h4 {
+    color: #856404;
+}
+
+.notification-error .notification-content h4 {
+    color: #721c24;
+}
+
+.notification-content p {
+    margin: 0;
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.notification-close:hover {
+    background-color: #f8f9fa;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Real-time Update Indicators */
+.realtime-indicator {
+    position: relative;
+}
+
+.realtime-indicator::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #28a745;
+    animation: realtime-pulse 2s infinite;
+}
+
+.realtime-indicator.updating::after {
+    background-color: #007bff;
+    animation: updating-pulse 1s infinite;
+}
+
+.realtime-indicator.error::after {
+    background-color: #dc3545;
+    animation: error-pulse 0.5s infinite;
+}
+
+@keyframes realtime-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.2); }
+}
+
+@keyframes updating-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Enhanced Component States */
+.dashboard-component.real-time {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-component.real-time::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #007bff, transparent);
+    animation: scan 3s infinite;
+    opacity: 0;
+}
+
+.dashboard-component.real-time.updating::before {
+    opacity: 1;
+}
+
+@keyframes scan {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Data freshness indicators */
+.data-freshness {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    color: #6c757d;
+    margin-left: 8px;
+}
+
+.data-freshness::before {
+    content: '●';
+    margin-right: 4px;
+    font-size: 8px;
+}
+
+.data-fresh::before {
+    color: #28a745;
+}
+
+.data-stale::before {
+    color: #ffc107;
+}
+
+.data-old::before {
+    color: #dc3545;
+}
+
+/* WebSocket status in header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: white;
+    border-bottom: 1px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.dashboard-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.dashboard-status {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Real-time metrics */
+.realtime-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.realtime-metric {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    text-align: center;
+    position: relative;
+}
+
+.realtime-metric.updating {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.metric-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #6c757d;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.metric-change {
+    font-size: 10px;
+    margin-top: 2px;
+}
+
+.metric-change.positive {
+    color: #28a745;
+}
+
+.metric-change.negative {
+    color: #dc3545;
+}
+
+.metric-change.neutral {
+    color: #6c757d;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .notifications-container {
+        left: 20px;
+        right: 20px;
+        max-width: none;
+    }
+    
+    .notification {
+        padding: 12px;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    
+    .dashboard-status {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .realtime-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .realtime-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .connection-status {
+        font-size: 10px;
+        padding: 2px 8px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .notification {
+        background: #2d3748;
+        color: #e2e8f0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .notification-content p {
+        color: #a0aec0;
+    }
+    
+    .notification-close {
+        color: #a0aec0;
+    }
+    
+    .notification-close:hover {
+        background-color: #4a5568;
+    }
+    
+    .dashboard-header {
+        background: #2d3748;
+        border-bottom-color: #4a5568;
+    }
+    
+    .dashboard-title {
+        color: #e2e8f0;
+    }
+    
+    .realtime-metric {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .metric-title {
+        color: #a0aec0;
+    }
+    
+    .metric-value {
+        color: #e2e8f0;
+    }
+}
+
+/* Accessibility */
+.notification {
+    role: alert;
+}
+
+.connection-status {
+    role: status;
+    aria-live: polite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .notification {
+        animation: none;
+    }
+    
+    .connection-status::before,
+    .realtime-indicator::after,
+    .dashboard-component.real-time::before {
+        animation: none;
+    }
+    
+    @keyframes connecting-pulse,
+    @keyframes error-pulse,
+    @keyframes pulse,
+    @keyframes realtime-pulse,
+    @keyframes updating-pulse,
+    @keyframes scan {
+        0%, 100% { opacity: 1; }
+    }
+}

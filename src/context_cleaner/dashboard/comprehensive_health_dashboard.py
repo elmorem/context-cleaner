@@ -846,6 +846,29 @@ class ComprehensiveHealthDashboard:
             "tasks": TaskDataSource("tasks", {}),
         }
         
+        # Phase 3: Enhanced reliability infrastructure
+        try:
+            from ..core.enhanced_health_monitor import EnhancedHealthMonitor
+            from ..core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+            
+            # Initialize health monitor for dependency checking
+            self.health_monitor = EnhancedHealthMonitor()
+            
+            # Initialize circuit breaker for dashboard metrics endpoint
+            dashboard_metrics_config = CircuitBreakerConfig(
+                name="dashboard_metrics",
+                failure_threshold=3,
+                recovery_timeout=30,
+                half_open_max_calls=1
+            )
+            self.dashboard_metrics_breaker = CircuitBreaker(dashboard_metrics_config)
+            
+            logger.info("Enhanced reliability infrastructure initialized for dashboard")
+        except ImportError as e:
+            logger.warning(f"Enhanced reliability features not available: {e}")
+            self.health_monitor = None
+            self.dashboard_metrics_breaker = None
+        
         # Session analytics cache for performance optimization
         self._session_analytics_cache: Optional[List[Dict[str, Any]]] = None
         self._session_analytics_cache_time: Optional[datetime] = None
@@ -2247,31 +2270,131 @@ class ComprehensiveHealthDashboard:
 
         @self.app.route('/api/dashboard-metrics')
         def get_dashboard_metrics():
-            """Get overall dashboard metrics from real telemetry data"""
+            """Enhanced dashboard metrics with health monitoring, circuit breaker protection, and graceful degradation"""
+            import asyncio
+            from context_cleaner.core.api_response_formatter import APIResponseFormatter
+            
+            start_time = datetime.now()
+            
+            # Check system health first
             try:
-                # Get real aggregated statistics from telemetry database
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
-                    import asyncio
+                if hasattr(self, 'health_monitor') and self.health_monitor:
+                    # Create event loop for health checks
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     
                     try:
-                        stats = loop.run_until_complete(
-                            self.telemetry_client.get_total_aggregated_stats()
+                        # Check dashboard dependencies health
+                        dashboard_health = loop.run_until_complete(
+                            self.health_monitor.check_service_health("dashboard_metrics")
                         )
+                        clickhouse_health = loop.run_until_complete(
+                            self.health_monitor.check_service_health("clickhouse")
+                        )
+                        telemetry_health = loop.run_until_complete(
+                            self.health_monitor.check_service_health("telemetry_service")
+                        )
+                    finally:
+                        loop.close()
                         
-                        # Get model efficiency data from telemetry widgets
+                    # Determine overall health status
+                    critical_services_failing = (
+                        clickhouse_health.status.value == "failing" or 
+                        telemetry_health.status.value == "failing"
+                    )
+                    services_degraded = (
+                        clickhouse_health.status.value == "degraded" or 
+                        telemetry_health.status.value == "degraded"
+                    )
+                    
+                    # Apply circuit breaker logic
+                    if hasattr(self, 'dashboard_metrics_breaker'):
+                        if critical_services_failing:
+                            # Force circuit open if critical services are down
+                            self.dashboard_metrics_breaker._failure_count = self.dashboard_metrics_breaker.config.failure_threshold
+                        
+                        # Check circuit breaker state
+                        if self.dashboard_metrics_breaker.state.value == "open":
+                            response_time = (datetime.now() - start_time).total_seconds() * 1000
+                            return jsonify(APIResponseFormatter.error(
+                                "Dashboard metrics temporarily unavailable due to dependency failures",
+                                "CIRCUIT_BREAKER_OPEN",
+                                status_code=503,
+                                details={
+                                    "clickhouse_status": clickhouse_health.status.value,
+                                    "telemetry_status": telemetry_health.status.value,
+                                    "response_time_ms": response_time,
+                                    "retry_after": 30
+                                }
+                            ))
+                
+            except Exception as health_error:
+                logger.warning(f"Health check failed in dashboard-metrics: {health_error}")
+                # Continue with degraded mode if health monitoring fails
+                critical_services_failing = False
+                services_degraded = True
+            
+            # Apply circuit breaker protection
+            try:
+                if hasattr(self, 'dashboard_metrics_breaker'):
+                    return self.dashboard_metrics_breaker.call(self._get_dashboard_metrics_data)()
+                else:
+                    return self._get_dashboard_metrics_data()
+                    
+            except Exception as e:
+                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                logger.error(f"Dashboard metrics circuit breaker failed: {e}")
+                
+                # Graceful degradation - return minimal viable data
+                return jsonify(APIResponseFormatter.degraded(
+                    {
+                        'total_tokens': 'Unavailable',
+                        'total_sessions': '0',
+                        'success_rate': 'N/A',
+                        'active_agents': '0',
+                        'orchestration_status': 'degraded',
+                        'telemetry_status': 'unavailable',
+                        'total_cost': '$0.00',
+                        'total_errors': 0,
+                        'last_updated': datetime.now().isoformat(),
+                        'response_time_ms': response_time
+                    },
+                    "Dashboard metrics operating in degraded mode due to dependency failures",
+                    "DEPENDENCY_FAILURE"
+                ))
+        
+        def _get_dashboard_metrics_data(self):
+            """Internal method to fetch dashboard metrics data with timeout protection"""
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+            
+            start_time = datetime.now()
+            
+            try:
+                # Try to get real telemetry data with timeout
+                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    try:
+                        # Use timeout for telemetry operations
+                        with ThreadPoolExecutor() as executor:
+                            future = executor.submit(self._fetch_telemetry_stats, loop)
+                            stats = future.result(timeout=10)  # 10 second timeout
+                        
+                        # Get model efficiency data with timeout
                         model_efficiency_data = None
                         if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
                             try:
-                                model_widget = loop.run_until_complete(
-                                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
-                                )
-                                model_efficiency_data = model_widget.data if model_widget else None
-                            except Exception as e:
-                                logger.warning(f"Error getting model efficiency data: {e}")
+                                with ThreadPoolExecutor() as executor:
+                                    future = executor.submit(self._fetch_model_efficiency, loop)
+                                    model_efficiency_data = future.result(timeout=5)  # 5 second timeout
+                            except (FuturesTimeoutError, Exception) as e:
+                                logger.warning(f"Model efficiency data timeout: {e}")
                         
                         loop.close()
+                        
+                        response_time = (datetime.now() - start_time).total_seconds() * 1000
                         
                         response_data = {
                             'total_tokens': stats['total_tokens'],
@@ -2282,46 +2405,77 @@ class ComprehensiveHealthDashboard:
                             'telemetry_status': 'monitoring',
                             'total_cost': stats['total_cost'],
                             'total_errors': stats['total_errors'],
-                            'last_updated': datetime.now().isoformat()
+                            'last_updated': datetime.now().isoformat(),
+                            'response_time_ms': response_time
                         }
                         
                         # Add model efficiency data if available
                         if model_efficiency_data:
                             response_data['model_efficiency'] = model_efficiency_data
                         
-                        return jsonify(response_data)
+                        return jsonify(APIResponseFormatter.success(
+                            response_data,
+                            "Dashboard metrics retrieved successfully"
+                        ))
+                        
+                    except FuturesTimeoutError:
+                        loop.close()
+                        logger.warning("Telemetry data fetch timeout - falling back to local data")
+                        # Fall through to local JSONL fallback
                     except Exception as e:
                         loop.close()
                         logger.warning(f"Error getting real telemetry stats: {e}")
-                        # Fall back to static values if telemetry fails
+                        # Fall through to local JSONL fallback
                         
-                # Fallback to local JSONL data when telemetry client not available
+                # Fallback to local JSONL data when telemetry is unavailable or times out
                 local_stats = self._get_local_jsonl_stats()
-                return jsonify({
-                    'total_tokens': local_stats['total_tokens'],
-                    'total_sessions': local_stats['total_sessions'],
-                    'success_rate': local_stats['success_rate'],
-                    'active_agents': local_stats['active_agents'],
-                    'orchestration_status': 'local-mode',
-                    'telemetry_status': 'using-local-data',
-                    'total_cost': local_stats['total_cost'],
-                    'total_errors': local_stats['total_errors'],
-                    'last_updated': datetime.now().isoformat()
-                })
+                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                
+                return jsonify(APIResponseFormatter.degraded(
+                    {
+                        'total_tokens': local_stats['total_tokens'],
+                        'total_sessions': local_stats['total_sessions'],
+                        'success_rate': local_stats['success_rate'],
+                        'active_agents': local_stats['active_agents'],
+                        'orchestration_status': 'local-mode',
+                        'telemetry_status': 'using-local-data',
+                        'total_cost': local_stats['total_cost'],
+                        'total_errors': local_stats['total_errors'],
+                        'last_updated': datetime.now().isoformat(),
+                        'response_time_ms': response_time
+                    },
+                    "Using local data due to telemetry service unavailability",
+                    "TELEMETRY_FALLBACK"
+                ))
                 
             except Exception as e:
-                logger.error(f"Error in get_dashboard_metrics: {e}")
-                return jsonify({
-                    'total_tokens': 'Error loading',
-                    'total_sessions': '0',
-                    'success_rate': '0%',
-                    'active_agents': '0',
-                    'orchestration_status': 'error',
-                    'telemetry_status': 'error',
-                    'total_cost': '$0.00',
-                    'total_errors': 0,
-                    'last_updated': datetime.now().isoformat()
-                })
+                response_time = (datetime.now() - start_time).total_seconds() * 1000
+                logger.error(f"Critical error in dashboard metrics: {e}")
+                
+                return jsonify(APIResponseFormatter.error(
+                    f"Dashboard metrics service error: {str(e)}",
+                    "DASHBOARD_METRICS_ERROR",
+                    status_code=500,
+                    details={
+                        'response_time_ms': response_time,
+                        'last_updated': datetime.now().isoformat()
+                    }
+                ))
+        
+        def _fetch_telemetry_stats(self, loop):
+            """Helper method to fetch telemetry stats in separate thread"""
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(
+                self.telemetry_client.get_total_aggregated_stats()
+            )
+            
+        def _fetch_model_efficiency(self, loop):
+            """Helper method to fetch model efficiency data in separate thread"""
+            asyncio.set_event_loop(loop)
+            model_widget = loop.run_until_complete(
+                self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
+            )
+            return model_widget.data if model_widget else None
         
         @self.app.route('/api/jsonl-processing-status')
         def get_jsonl_processing_status():
