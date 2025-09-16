@@ -40,12 +40,65 @@
             top: 0;
             z-index: 100;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header h1 {
             margin: 0;
             font-size: 1.5rem;
             font-weight: 600;
+        }
+
+        .connection-status {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s;
+        }
+
+        .connection-status.connecting {
+            background: #fbbf24;
+            color: #92400e;
+            animation: pulse 2s infinite;
+        }
+
+        .connection-status.connected {
+            background: #10b981;
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: #f87171;
+            color: white;
+        }
+
+        .connection-status.error {
+            background: #ef4444;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        .realtime-disabled {
+            opacity: 0.6;
+            position: relative;
+        }
+
+        .realtime-disabled::after {
+            content: '⚠️ Real-time updates disabled';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            padding: 0.25rem;
+            font-size: 0.75rem;
+            text-align: center;
         }
 
 
@@ -1020,6 +1073,7 @@
 <body>
     <div class="header">
         <h1>🚀 Context Cleaner - Real World Dashboard</h1>
+        <div id="connection-status" class="connection-status connecting" title="Connection status">CONNECTING</div>
     </div>
 
     <nav class="nav-tabs">
@@ -2152,8 +2206,141 @@ LIMIT 20</textarea>
             });
         });
 
-        // Initialize socket connection for real-time updates
-        const socket = io();
+        // Initialize socket connection for real-time updates with proper fallback
+        const socket = io({
+            transports: ['websocket', 'polling'],
+            timeout: 20000,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+
+        // Track connection status for UI updates
+        let connectionStatus = 'connecting';
+        let apiPollingFallback = false;
+
+        // Add connection event handlers
+        socket.on('connect', () => {
+            console.log('🔗 WebSocket connected successfully');
+            connectionStatus = 'connected';
+            updateConnectionStatus('connected');
+
+            // Disable API polling fallback when WebSocket is connected
+            if (apiPollingFallback) {
+                console.log('🔗 WebSocket reconnected, disabling API polling fallback');
+                apiPollingFallback = false;
+                clearInterval(window.apiPollingInterval);
+            }
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.warn('🔗 WebSocket disconnected:', reason);
+            connectionStatus = 'disconnected';
+            updateConnectionStatus('disconnected');
+
+            // Trigger fallback to API polling if disconnection wasn't intentional
+            if (reason !== 'io client disconnect') {
+                console.log('🔄 WebSocket disconnected unexpectedly, enabling API polling fallback');
+                enableAPIPollingFallback();
+            }
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('🔗 WebSocket connection error:', error.message);
+            connectionStatus = 'error';
+            updateConnectionStatus('error');
+
+            // Enable fallback immediately on connection errors
+            console.log('🔄 WebSocket connection failed, enabling API polling fallback');
+            enableAPIPollingFallback();
+        });
+
+        // Update connection status indicator in UI
+        function updateConnectionStatus(status) {
+            const indicator = document.getElementById('connection-status');
+            if (indicator) {
+                indicator.className = `connection-status ${status}`;
+                indicator.textContent = status.toUpperCase();
+                indicator.title = `Connection status: ${status}`;
+            }
+
+            // Toggle real-time features based on connection
+            toggleRealtimeFeatures(status === 'connected');
+        }
+
+        // Enable/disable real-time features based on connection
+        function toggleRealtimeFeatures(enabled) {
+            const realtimeElements = document.querySelectorAll('[data-realtime]');
+            realtimeElements.forEach(el => {
+                if (enabled) {
+                    el.classList.remove('realtime-disabled');
+                } else {
+                    el.classList.add('realtime-disabled');
+                }
+            });
+        }
+
+        // API Polling Fallback System
+        function enableAPIPollingFallback() {
+            if (apiPollingFallback) {
+                return; // Already enabled
+            }
+
+            apiPollingFallback = true;
+            console.log('🔄 Enabling API polling fallback every 5 seconds');
+
+            // Poll for real-time events endpoint
+            window.apiPollingInterval = setInterval(async () => {
+                if (socket.connected) {
+                    // WebSocket reconnected, stop polling
+                    console.log('🔗 WebSocket reconnected, stopping API polling');
+                    clearInterval(window.apiPollingInterval);
+                    apiPollingFallback = false;
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/realtime/events');
+                    const data = await response.json();
+
+                    // Process events similar to WebSocket events
+                    if (data.events && Array.isArray(data.events)) {
+                        data.events.forEach(event => {
+                            processRealtimeEvent(event);
+                        });
+                    }
+                } catch (error) {
+                    console.error('API polling fallback failed:', error);
+                }
+            }, 5000); // Poll every 5 seconds
+        }
+
+        // Process real-time events (works for both WebSocket and API polling)
+        function processRealtimeEvent(event) {
+            switch (event.type) {
+                case 'dashboard_metrics':
+                    // Update dashboard metrics
+                    if (event.data) {
+                        console.log('📊 Received dashboard metrics update:', event.data);
+                        // Update relevant UI elements
+                    }
+                    break;
+                case 'health_status':
+                    // Update health status
+                    if (event.data) {
+                        console.log('💊 Received health status update:', event.data);
+                    }
+                    break;
+                case 'context_usage':
+                    // Update context usage data
+                    if (event.data) {
+                        console.log('📈 Received context usage update:', event.data);
+                    }
+                    break;
+                default:
+                    console.log('📨 Received real-time event:', event);
+            }
+        }
 
         // Track loading state to prevent duplicate calls
         let currentlyLoadingSection = null;
@@ -4296,15 +4483,38 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                 console.error('loadAnalyticsWidgets function not found in DOMContentLoaded');
             }
             
-            // Set up real-time updates
+            // Set up real-time updates using the standardized event processing
             socket.on('telemetry_update', function(data) {
-                console.log('Received telemetry update:', data);
-                // Update relevant widgets
+                processRealtimeEvent({
+                    type: 'telemetry_update',
+                    timestamp: new Date().toISOString(),
+                    data: data
+                });
             });
-            
+
             socket.on('orchestration_update', function(data) {
-                console.log('Received orchestration update:', data);
-                // Update orchestration widgets
+                processRealtimeEvent({
+                    type: 'orchestration_update',
+                    timestamp: new Date().toISOString(),
+                    data: data
+                });
+            });
+
+            // Add handlers for new real-time event types
+            socket.on('dashboard_metrics_update', function(data) {
+                processRealtimeEvent({
+                    type: 'dashboard_metrics',
+                    timestamp: new Date().toISOString(),
+                    data: data
+                });
+            });
+
+            socket.on('health_status_update', function(data) {
+                processRealtimeEvent({
+                    type: 'health_status',
+                    timestamp: new Date().toISOString(),
+                    data: data
+                });
             });
             
             

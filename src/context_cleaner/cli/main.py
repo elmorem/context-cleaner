@@ -1302,43 +1302,61 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if verbose:
             click.echo(f"   📊 Process cleanup: {cleaned_processes} stopped, {failed_cleanups} failed")
     
-    # 5. DOCKER CLEANUP PHASE
+    # 5. DOCKER CLEANUP PHASE - Enhanced with robust ClickHouse shutdown
     if not processes_only:
         if verbose:
-            click.echo("\n🐳 PHASE 4: Docker Services Cleanup")
-        
+            click.echo("\n🐳 PHASE 4: Enhanced Docker Services Cleanup")
+
+        # First, use our robust ClickHouse shutdown function
+        clickhouse_results = _shutdown_clickhouse_containers_robust(verbose)
+
+        # Report ClickHouse shutdown results
+        if verbose:
+            if clickhouse_results["containers_stopped"]:
+                click.echo(f"   📊 ClickHouse containers stopped: {', '.join(clickhouse_results['containers_stopped'])}")
+            if clickhouse_results["processes_terminated"]:
+                click.echo(f"   📊 ClickHouse processes terminated: {len(clickhouse_results['processes_terminated'])} PIDs")
+            if clickhouse_results["remaining_issues"]:
+                click.echo(f"   ⚠️  ClickHouse shutdown issues: {len(clickhouse_results['remaining_issues'])}")
+                for issue in clickhouse_results["remaining_issues"]:
+                    click.echo(f"      - {issue}")
+
+        # Traditional compose cleanup as fallback/supplement
         compose_file = Path("docker-compose.yml")
         if compose_file.exists():
             try:
+                if verbose:
+                    click.echo("   🔄 Running traditional docker-compose down for cleanup...")
+
                 result = subprocess.run(
                     ["docker", "compose", "down"],
                     capture_output=True, text=True, timeout=30
                 )
-                
+
                 if result.returncode == 0:
                     if verbose:
-                        click.echo("   ✅ Docker services stopped")
+                        click.echo("   ✅ Docker compose down completed")
                 else:
                     if verbose:
-                        click.echo(f"   ⚠️  Docker stop had issues: {result.stderr}")
-                    
+                        click.echo(f"   ⚠️  Docker compose down had issues: {result.stderr}")
+
             except subprocess.TimeoutExpired:
                 if verbose:
-                    click.echo("   ⚠️  Docker stop timed out, forcing shutdown...")
+                    click.echo("   ⚠️  Docker compose down timed out, trying force methods...")
                 try:
                     subprocess.run(["docker", "compose", "kill"], timeout=10)
                     subprocess.run(["docker", "compose", "down"], timeout=10)
                     if verbose:
-                        click.echo("   ✅ Docker services force-stopped")
+                        click.echo("   ✅ Docker services force-stopped with compose")
                 except Exception as e:
                     if verbose:
                         click.echo(f"   ❌ Failed to force-stop Docker services: {e}")
             except Exception as e:
                 if verbose:
-                    click.echo(f"   ❌ Error stopping Docker services: {e}")
+                    click.echo(f"   ❌ Error with docker compose: {e}")
         else:
             if verbose:
-                click.echo("   ⚠️  No docker-compose.yml found, skipping Docker shutdown")
+                click.echo("   ⚠️  No docker-compose.yml found, relying on direct container shutdown")
     
     # 6. REGISTRY CLEANUP PHASE
     if registry_cleanup:
@@ -1480,32 +1498,45 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     search_patterns = [
         # Direct script invocations
         "python start_context_cleaner.py",
-        "python start_context_cleaner_production.py", 
+        "python start_context_cleaner_production.py",
         "start_context_cleaner.py",
         "start_context_cleaner_production.py",
-        
+
         # CLI module invocations
         "python -m context_cleaner.cli.main run",
         "context_cleaner run",
         "context_cleaner.cli.main run",
-        
+
         # WSGI/production deployments
         "context_cleaner_wsgi",
         "gunicorn.*context_cleaner",
-        
+
         # Dashboard services
         "ComprehensiveHealthDashboard",
         "context_cleaner.*dashboard",
-        
+
         # Background services
         "context_cleaner.*jsonl",
         "jsonl_background_service",
         "context_cleaner.*bridge",
         "context_cleaner.*monitor",
-        
+
         # Python path variations
         "PYTHONPATH.*context-cleaner",
         "PYTHONPATH.*context_cleaner",
+
+        # Docker container processes - ClickHouse and OpenTelemetry
+        "clickhouse-server",
+        "/usr/bin/clickhouse-server",
+        "clickhouse-otel",
+        "otel-collector",
+        "otel/opentelemetry-collector",
+        "docker.*clickhouse",
+        "containerd-shim.*clickhouse",
+
+        # Docker compose processes
+        "docker-compose.*clickhouse",
+        "docker compose.*clickhouse",
     ]
     
     try:
@@ -1520,9 +1551,36 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                 # Check against all search patterns
                 for pattern in search_patterns:
                     if pattern.lower() in cmdline.lower():
+                        # EXCLUDE management commands that shouldn't be killed
+                        # These are CLI commands that manage the system, not runtime services
+                        excluded_commands = [
+                            "context-cleaner stop",
+                            "context-cleaner debug",
+                            "context-cleaner status",
+                            "context-cleaner --help",
+                            "context_cleaner.cli.main stop",
+                            "context_cleaner.cli.main debug",
+                            "context_cleaner.cli.main status",
+                            "context_cleaner stop",
+                            "context_cleaner debug",
+                            "context_cleaner status"
+                        ]
+
+                        # Skip if this is a management command
+                        is_management_command = any(excluded_cmd.lower() in cmdline.lower()
+                                                  for excluded_cmd in excluded_commands)
+                        if is_management_command:
+                            continue
+
                         # Determine service type from command line
                         service_type = "dashboard"
-                        if "jsonl" in cmdline.lower():
+                        if "clickhouse" in cmdline.lower():
+                            service_type = "clickhouse_database"
+                        elif "otel" in cmdline.lower() or "opentelemetry" in cmdline.lower():
+                            service_type = "otel_collector"
+                        elif "containerd-shim" in cmdline.lower():
+                            service_type = "docker_container_process"
+                        elif "jsonl" in cmdline.lower():
                             service_type = "jsonl_processing"
                         elif "bridge" in cmdline.lower():
                             service_type = "bridge_service"
@@ -1560,7 +1618,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
 
 def _terminate_process_with_escalation(proc, verbose: bool = False):
     """Terminate a process with signal escalation and timeout handling.
-    
+
     Uses a progressive approach:
     1. SIGTERM (graceful termination)
     2. Wait with timeout
@@ -1569,11 +1627,11 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
     """
     import signal
     import time
-    
+
     try:
         # First, try graceful termination
         proc.terminate()
-        
+
         # Wait up to 5 seconds for graceful termination
         try:
             proc.wait(timeout=5)
@@ -1581,11 +1639,11 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
         except psutil.TimeoutExpired:
             if verbose:
                 print(f"   ⏱️  PID {proc.pid} didn't respond to SIGTERM, escalating to SIGKILL")
-        
+
         # If still running, force kill
         if proc.is_running():
             proc.kill()
-            
+
             # Wait up to 3 more seconds for force kill
             try:
                 proc.wait(timeout=3)
@@ -1593,7 +1651,7 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
             except psutil.TimeoutExpired:
                 if verbose:
                     print(f"   ⚠️  PID {proc.pid} didn't respond to SIGKILL, trying process group cleanup")
-        
+
         # If STILL running, try process group termination
         if proc.is_running():
             try:
@@ -1602,19 +1660,19 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
                 pgid = os.getpgid(proc.pid)
                 os.killpg(pgid, signal.SIGTERM)
                 time.sleep(2)
-                
+
                 if proc.is_running():
                     os.killpg(pgid, signal.SIGKILL)
                     time.sleep(1)
-                    
+
                 return not proc.is_running()
-                
+
             except (ProcessLookupError, OSError):
                 # Process group doesn't exist or we can't access it
                 pass
-        
+
         return not proc.is_running()
-        
+
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         # Process is gone or we can't access it - consider this success
         return True
@@ -1622,6 +1680,265 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
         if verbose:
             print(f"   ❌ Process termination error for PID {proc.pid}: {e}")
         return False
+
+
+def _shutdown_clickhouse_containers_robust(verbose: bool = False):
+    """Robust ClickHouse container shutdown with multiple fallback methods.
+
+    This function ensures ClickHouse containers are completely stopped using:
+    1. Docker compose stop/down (if compose file exists)
+    2. Direct docker container stop (by name and ID)
+    3. Process-level termination of clickhouse-server processes
+    4. Verification and cleanup of persistent processes
+
+    Returns: dict with shutdown results and any remaining issues
+    """
+    import subprocess
+    import time
+    import os
+    from pathlib import Path
+
+    shutdown_results = {
+        "compose_shutdown": False,
+        "direct_container_shutdown": False,
+        "process_termination": False,
+        "containers_stopped": [],
+        "processes_terminated": [],
+        "remaining_issues": [],
+        "success": True
+    }
+
+    if verbose:
+        print("   🐳 Starting robust ClickHouse container shutdown...")
+
+    # Method 1: Docker Compose shutdown (standard approach)
+    compose_file = Path("docker-compose.yml")
+    if compose_file.exists():
+        try:
+            if verbose:
+                print("   📁 Found docker-compose.yml, attempting compose shutdown...")
+
+            # Stop ClickHouse service specifically first
+            result = subprocess.run(
+                ["docker", "compose", "stop", "clickhouse"],
+                capture_output=True, text=True, timeout=15
+            )
+
+            if result.returncode == 0:
+                shutdown_results["compose_shutdown"] = True
+                if verbose:
+                    print("   ✅ Docker compose stop clickhouse succeeded")
+
+                # Also stop otel-collector which depends on ClickHouse
+                subprocess.run(
+                    ["docker", "compose", "stop", "otel-collector"],
+                    capture_output=True, text=True, timeout=10
+                )
+
+                # Full compose down for cleanup
+                subprocess.run(
+                    ["docker", "compose", "down"],
+                    capture_output=True, text=True, timeout=20
+                )
+
+            else:
+                if verbose:
+                    print(f"   ⚠️  Docker compose stop failed: {result.stderr}")
+
+        except subprocess.TimeoutExpired:
+            if verbose:
+                print("   ⚠️  Docker compose stop timed out, trying force methods...")
+        except Exception as e:
+            if verbose:
+                print(f"   ❌ Docker compose error: {e}")
+
+    # Method 2: Direct Docker container shutdown by name and discovery
+    # First, discover ClickHouse containers by image
+    discovered_containers = []
+
+    try:
+        # Find containers by ClickHouse image pattern
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}", "--filter", "ancestor=clickhouse/clickhouse-server"],
+            capture_output=True, text=True, timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            image_containers = result.stdout.strip().split('\n')
+            discovered_containers.extend(image_containers)
+            if verbose:
+                print(f"   🔍 Found ClickHouse containers by image: {image_containers}")
+    except:
+        pass
+
+    # Add known container names
+    container_names = ["clickhouse-otel", "otel-collector"] + discovered_containers
+    # Remove duplicates while preserving order
+    container_names = list(dict.fromkeys(container_names))
+
+    for container_name in container_names:
+        try:
+            if verbose:
+                print(f"   🔍 Checking container {container_name}...")
+
+            # Check if container exists and is running
+            result = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
+                capture_output=True, text=True, timeout=5
+            )
+
+            if result.returncode == 0 and result.stdout.strip().lower() == "true":
+                if verbose:
+                    print(f"   🛑 Stopping running container {container_name}...")
+
+                # Try graceful stop first
+                stop_result = subprocess.run(
+                    ["docker", "stop", "-t", "10", container_name],
+                    capture_output=True, text=True, timeout=15
+                )
+
+                if stop_result.returncode == 0:
+                    shutdown_results["containers_stopped"].append(container_name)
+                    shutdown_results["direct_container_shutdown"] = True
+                    if verbose:
+                        print(f"   ✅ Container {container_name} stopped gracefully")
+                else:
+                    # Force kill if graceful stop failed
+                    if verbose:
+                        print(f"   ⚠️  Graceful stop failed, force killing {container_name}...")
+
+                    kill_result = subprocess.run(
+                        ["docker", "kill", container_name],
+                        capture_output=True, text=True, timeout=5
+                    )
+
+                    if kill_result.returncode == 0:
+                        shutdown_results["containers_stopped"].append(f"{container_name} (forced)")
+                        shutdown_results["direct_container_shutdown"] = True
+                        if verbose:
+                            print(f"   ✅ Container {container_name} force killed")
+                    else:
+                        shutdown_results["remaining_issues"].append(f"Failed to stop container {container_name}")
+                        if verbose:
+                            print(f"   ❌ Failed to force kill {container_name}")
+
+        except subprocess.TimeoutExpired:
+            shutdown_results["remaining_issues"].append(f"Container {container_name} operations timed out")
+            if verbose:
+                print(f"   ⏱️  Operations for {container_name} timed out")
+        except Exception as e:
+            shutdown_results["remaining_issues"].append(f"Container {container_name} error: {str(e)}")
+            if verbose:
+                print(f"   ❌ Error with {container_name}: {e}")
+
+    # Method 3: Process-level termination of ClickHouse processes
+    # This catches processes that might be running outside Docker or stuck processes
+    try:
+        if verbose:
+            print("   🔍 Searching for ClickHouse server processes...")
+
+        import psutil
+        clickhouse_processes = []
+
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if not proc.info['cmdline']:
+                    continue
+
+                cmdline = ' '.join(proc.info['cmdline']).lower()
+
+                # Look for ClickHouse server processes
+                if any(pattern in cmdline for pattern in [
+                    'clickhouse-server',
+                    '/usr/bin/clickhouse-server',
+                    'clickhouse/clickhouse-server',
+                    '--daemon'  # ClickHouse daemon flag
+                ]):
+                    clickhouse_processes.append(proc.info['pid'])
+                    if verbose:
+                        print(f"   🔍 Found ClickHouse process PID {proc.info['pid']}")
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+        # Terminate discovered ClickHouse processes
+        for pid in clickhouse_processes:
+            try:
+                proc = psutil.Process(pid)
+                if proc.is_running():
+                    success = _terminate_process_with_escalation(proc, verbose)
+                    if success:
+                        shutdown_results["processes_terminated"].append(pid)
+                        shutdown_results["process_termination"] = True
+                        if verbose:
+                            print(f"   ✅ Terminated ClickHouse process PID {pid}")
+                    else:
+                        shutdown_results["remaining_issues"].append(f"Failed to terminate process PID {pid}")
+                        if verbose:
+                            print(f"   ❌ Failed to terminate PID {pid}")
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue  # Process already gone
+
+    except Exception as e:
+        shutdown_results["remaining_issues"].append(f"Process termination error: {str(e)}")
+        if verbose:
+            print(f"   ❌ Process termination phase error: {e}")
+
+    # Method 4: Final verification and cleanup
+    time.sleep(2)  # Give processes time to fully shutdown
+
+    try:
+        if verbose:
+            print("   🔍 Final verification of ClickHouse shutdown...")
+
+        # Check if ClickHouse port is still bound
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(1)
+                result = sock.connect_ex(('127.0.0.1', 8123))
+                if result == 0:
+                    shutdown_results["remaining_issues"].append("ClickHouse HTTP port 8123 still responding")
+                    shutdown_results["success"] = False
+                    if verbose:
+                        print("   ⚠️  ClickHouse HTTP port 8123 still responding")
+        except:
+            pass  # Port check failed, but that's okay
+
+        # Check if any containers are still running
+        for container_name in container_names:
+            try:
+                result = subprocess.run(
+                    ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
+                    capture_output=True, text=True, timeout=3
+                )
+
+                if result.returncode == 0 and result.stdout.strip().lower() == "true":
+                    shutdown_results["remaining_issues"].append(f"Container {container_name} still running")
+                    shutdown_results["success"] = False
+                    if verbose:
+                        print(f"   ⚠️  Container {container_name} still running after shutdown attempts")
+
+            except:
+                pass  # Container doesn't exist or Docker error
+
+    except Exception as e:
+        shutdown_results["remaining_issues"].append(f"Verification error: {str(e)}")
+
+    # Set overall success flag
+    if shutdown_results["remaining_issues"]:
+        shutdown_results["success"] = False
+
+    if verbose:
+        if shutdown_results["success"]:
+            print("   🎯 ClickHouse containers shutdown successfully!")
+        else:
+            print(f"   ⚠️  ClickHouse shutdown completed with {len(shutdown_results['remaining_issues'])} remaining issues")
+            for issue in shutdown_results["remaining_issues"]:
+                print(f"      - {issue}")
+
+    return shutdown_results
 
 
 async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_only: bool, verbose: bool):
@@ -1709,8 +2026,23 @@ async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_on
             if verbose:
                 click.echo(f"⚠️ Error stopping background processes: {e}")
     
-    # Stop Docker services if requested
+    # Stop Docker services if requested - using enhanced ClickHouse shutdown
     if not processes_only:
+        if verbose:
+            click.echo("🐳 Using enhanced ClickHouse shutdown in fallback mode...")
+
+        # Use robust ClickHouse shutdown even in fallback mode
+        clickhouse_results = _shutdown_clickhouse_containers_robust(verbose)
+
+        if clickhouse_results["success"]:
+            stopped_services.append("ClickHouse containers (robust shutdown)")
+        else:
+            stopped_services.append("ClickHouse containers (partial shutdown)")
+            if verbose:
+                for issue in clickhouse_results["remaining_issues"]:
+                    click.echo(f"   ⚠️  {issue}")
+
+        # Traditional compose cleanup
         compose_file = Path("docker-compose.yml")
         if compose_file.exists():
             try:
@@ -1718,17 +2050,17 @@ async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_on
                     ["docker", "compose", "down"],
                     capture_output=True, text=True, timeout=30
                 )
-                
+
                 if result.returncode == 0:
-                    stopped_services.append("Docker containers")
+                    stopped_services.append("Docker compose cleanup")
                 else:
-                    stopped_services.append("Docker containers (with warnings)")
-                    
+                    stopped_services.append("Docker compose cleanup (with warnings)")
+
             except subprocess.TimeoutExpired:
                 try:
                     subprocess.run(["docker", "compose", "kill"], timeout=10)
                     subprocess.run(["docker", "compose", "down"], timeout=10)
-                    stopped_services.append("Docker containers (forced)")
+                    stopped_services.append("Docker compose (forced)")
                 except:
                     click.echo("❌ Failed to stop Docker services", err=True)
             except Exception as e:

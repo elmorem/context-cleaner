@@ -838,6 +838,7 @@ class ComprehensiveHealthDashboard:
         self._stop_event = threading.Event()
         self._performance_history: List[Dict[str, Any]] = []
         self._max_history_points = 200  # 10 minutes at 3-second intervals
+        self._start_time = time.time()  # Track dashboard start time for uptime calculations
 
         # Alert system (from real-time performance dashboard)
         self._alerts_enabled = True
@@ -950,6 +951,37 @@ class ComprehensiveHealthDashboard:
     def _get_templates_dir(self) -> str:
         """Get templates directory path."""
         return str(Path(__file__).parent / "templates")
+
+    def _get_basic_dashboard_metrics(self) -> Dict[str, Any]:
+        """Get basic dashboard metrics for real-time events."""
+        try:
+            metrics = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "active_data_sources": len(self.data_sources),
+                "telemetry_enabled": self.telemetry_enabled,
+                "websocket_connected": hasattr(self, 'socketio') and self.socketio is not None,
+                "uptime_seconds": time.time() - getattr(self, '_start_time', time.time())
+            }
+
+            # Add basic counts if available
+            try:
+                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    metrics["database_connected"] = True
+                else:
+                    metrics["database_connected"] = False
+            except Exception:
+                metrics["database_connected"] = False
+
+            return metrics
+        except Exception as e:
+            logger.error(f"Failed to get basic dashboard metrics: {e}")
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "active_data_sources": 0,
+                "telemetry_enabled": False,
+                "websocket_connected": False,
+                "error": str(e)
+            }
 
     def _setup_routes(self):
         """Setup Flask routes for the comprehensive dashboard."""
@@ -1951,6 +1983,93 @@ class ComprehensiveHealthDashboard:
                     ],
                 }
             )
+
+        @self.app.route("/api/health/detailed")
+        def health_detailed():
+            """Detailed health endpoint for consistency checker."""
+            try:
+                # Get service health status
+                services_health = {
+                    "dashboard": True,
+                    "websocket": hasattr(self, 'socketio') and self.socketio is not None,
+                    "data_sources": len(self.data_sources) > 0,
+                    "cache_intelligence": CACHE_DASHBOARD_AVAILABLE,
+                    "telemetry": hasattr(self, 'telemetry_client') and self.telemetry_client is not None
+                }
+
+                return jsonify({
+                    "status": "healthy",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "services": services_health,
+                    "websocket_available": hasattr(self, 'socketio') and self.socketio is not None,
+                    "uptime_seconds": time.time() - getattr(self, '_start_time', time.time()),
+                    "dashboard_port": getattr(self, '_current_port', 8080)
+                })
+            except Exception as e:
+                logger.error(f"Detailed health check failed: {e}")
+                return jsonify({
+                    "status": "unhealthy",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "error": str(e),
+                    "services": {},
+                    "websocket_available": False
+                }), 500
+
+        @self.app.route("/api/realtime/events")
+        def realtime_events():
+            """Real-time events endpoint for WebSocket fallback."""
+            try:
+                # Get recent events/updates for polling fallback
+                events = []
+
+                # Add dashboard metrics update event
+                try:
+                    metrics = self._get_basic_dashboard_metrics()
+                    events.append({
+                        "type": "dashboard_metrics",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "data": metrics
+                    })
+                except Exception:
+                    pass
+
+                # Add health status event
+                events.append({
+                    "type": "health_status",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": {
+                        "status": "healthy",
+                        "services_active": len(self.data_sources)
+                    }
+                })
+
+                # Add context window usage event if available
+                try:
+                    if CONTEXT_ANALYZER_AVAILABLE:
+                        analyzer = ContextWindowAnalyzer()
+                        usage_data = analyzer.get_total_context_usage()
+                        events.append({
+                            "type": "context_usage",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "data": usage_data
+                        })
+                except Exception:
+                    pass
+
+                return jsonify({
+                    "events": events,
+                    "last_update": datetime.utcnow().isoformat(),
+                    "polling_interval": 5000,  # 5 seconds
+                    "total_events": len(events)
+                })
+            except Exception as e:
+                logger.error(f"Real-time events endpoint failed: {e}")
+                return jsonify({
+                    "events": [],
+                    "last_update": datetime.utcnow().isoformat(),
+                    "polling_interval": 10000,  # Fallback to 10 seconds
+                    "error": str(e)
+                }), 500
 
         # Enhanced Dashboard API Endpoints for Phase 1-3 Features
         @self.app.route('/api/telemetry-widget/<widget_type>')
