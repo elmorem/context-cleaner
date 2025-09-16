@@ -144,7 +144,10 @@ class ServiceOrchestrator:
         
         # API/UI Consistency Checker
         self.consistency_checker: Optional[APIUIConsistencyChecker] = None
-        
+
+        # Widget cache invalidation callbacks
+        self._cache_invalidation_callbacks = []
+
         # Telemetry Collector
         self.telemetry_collector = None
         
@@ -1078,9 +1081,15 @@ class ServiceOrchestrator:
                     
                     # Check if health check is due
                     now = datetime.now()
-                    if (state.last_health_check is None or 
-                        (now - state.last_health_check).seconds >= service.health_check_interval):
-                        
+                    time_since_last_check = None
+                    if state.last_health_check:
+                        time_since_last_check = (now - state.last_health_check).seconds
+
+                    if (state.last_health_check is None or
+                        time_since_last_check >= service.health_check_interval):
+
+                        self.logger.debug(f"🏥 HEALTH_MONITOR: Running health check for {service_name} (last check: {time_since_last_check}s ago)")
+
                         # Run health check using event loop safe approach
                         try:
                             # Get or create event loop for this thread
@@ -1106,15 +1115,34 @@ class ServiceOrchestrator:
                                     asyncio.wait_for(self._run_health_check(service_name), timeout=30)
                                 )
                         except Exception as health_error:
-                            self.logger.warning(f"Health check failed for {service_name}: {health_error}")
+                            self.logger.error(f"🏥 HEALTH_MONITOR: Health check exception for {service_name}: {health_error}")
+                            import traceback
+                            self.logger.error(f"🏥 HEALTH_MONITOR: Health check traceback:\n{traceback.format_exc()}")
                             healthy = False
-                        
+
                         state.last_health_check = now
+                        previous_health_status = state.health_status
                         state.health_status = healthy
-                        
+
+                        # Log health status changes
+                        if previous_health_status != healthy:
+                            status_change = "healthy" if healthy else "unhealthy"
+                            self.logger.info(f"🏥 HEALTH_MONITOR: {service_name} changed from {previous_health_status} to {status_change}")
+                        else:
+                            self.logger.debug(f"🏥 HEALTH_MONITOR: {service_name} health status remains {healthy}")
+
                         # Handle unhealthy service
                         if not healthy and service.restart_on_failure:
-                            self.logger.warning(f"Service {service_name} is unhealthy, restarting...")
+                            restart_count = state.restart_count
+                            last_restart = getattr(state, 'last_restart_time', None)
+                            time_since_restart = None
+                            if last_restart:
+                                time_since_restart = (now - last_restart).total_seconds()
+
+                            self.logger.warning(f"🔄 RESTART_TRIGGER: Service {service_name} is unhealthy, triggering restart #{restart_count + 1}")
+                            self.logger.warning(f"🔄 RESTART_TRIGGER: Time since last restart: {time_since_restart}s")
+                            self.logger.warning(f"🔄 RESTART_TRIGGER: Service details - Status: {state.status}, Health: {healthy}")
+
                             if self.verbose:
                                 print(f"⚠️ Restarting unhealthy service: {service.description}")
                             
@@ -1154,26 +1182,73 @@ class ServiceOrchestrator:
 
     async def _restart_service(self, service_name: str):
         """Restart a specific service."""
+        restart_start_time = datetime.now()
         state = self.service_states[service_name]
+        old_restart_count = state.restart_count
         state.restart_count += 1
-        
-        # Stop the service
-        await self._stop_service(service_name)
-        
-        # Wait a moment
-        await asyncio.sleep(5)
-        
-        # Start the service
-        if service_name == "dashboard":
-            port = state.metrics.get("port", 8110)
-            await self._start_dashboard_service(port)
-        elif service_name == "consistency_checker":
-            port = state.metrics.get("port", 8110)
-            await self._start_consistency_checker_service(port)
-        elif service_name == "telemetry_collector":
-            await self._start_telemetry_collector_service()
-        else:
-            await self._start_service(service_name)
+        state.last_restart_time = restart_start_time
+
+        self.logger.info(f"🔄 RESTART_START: Beginning restart of {service_name} service")
+        self.logger.info(f"🔄 RESTART_START: Restart #{state.restart_count}, previous restarts: {old_restart_count}")
+        self.logger.info(f"🔄 RESTART_START: Service state before restart - Status: {state.status}, Health: {state.health_status}")
+
+        if self.verbose:
+            print(f"   🔄 Restarting {service_name} service (restart #{state.restart_count})")
+
+        try:
+            # Trigger cache invalidation before restart
+            self.logger.info(f"🔄 RESTART_STEP: Triggering cache invalidation for {service_name}")
+            self._trigger_cache_invalidation(service_name)
+
+            # Stop the service
+            self.logger.info(f"🔄 RESTART_STEP: Stopping {service_name} service")
+            stop_start = datetime.now()
+            await self._stop_service(service_name)
+            stop_duration = (datetime.now() - stop_start).total_seconds()
+            self.logger.info(f"🔄 RESTART_STEP: Service {service_name} stopped in {stop_duration:.2f}s")
+
+            # Wait a moment
+            self.logger.debug(f"🔄 RESTART_STEP: Waiting 5s before restart of {service_name}")
+            await asyncio.sleep(5)
+
+            # Start the service
+            self.logger.info(f"🔄 RESTART_STEP: Starting {service_name} service")
+            start_start = datetime.now()
+
+            if service_name == "dashboard":
+                port = state.metrics.get("port", 8110)
+                self.logger.info(f"🔄 RESTART_STEP: Starting dashboard on port {port}")
+                success = await self._start_dashboard_service(port)
+            elif service_name == "consistency_checker":
+                port = state.metrics.get("port", 8110)
+                self.logger.info(f"🔄 RESTART_STEP: Starting consistency_checker on port {port}")
+                success = await self._start_consistency_checker_service(port)
+            elif service_name == "telemetry_collector":
+                self.logger.info(f"🔄 RESTART_STEP: Starting telemetry_collector")
+                success = await self._start_telemetry_collector_service()
+            else:
+                self.logger.info(f"🔄 RESTART_STEP: Starting generic service {service_name}")
+                success = await self._start_service(service_name)
+
+            start_duration = (datetime.now() - start_start).total_seconds()
+            total_duration = (datetime.now() - restart_start_time).total_seconds()
+
+            if success:
+                self.logger.info(f"🔄 RESTART_SUCCESS: Service {service_name} restarted successfully")
+                self.logger.info(f"🔄 RESTART_SUCCESS: Start took {start_duration:.2f}s, total restart took {total_duration:.2f}s")
+                if self.verbose:
+                    print(f"   ✅ Service {service_name} restarted successfully")
+            else:
+                self.logger.error(f"🔄 RESTART_FAILED: Service {service_name} failed to start after restart")
+                self.logger.error(f"🔄 RESTART_FAILED: Start took {start_duration:.2f}s, total restart took {total_duration:.2f}s")
+
+        except Exception as e:
+            total_duration = (datetime.now() - restart_start_time).total_seconds()
+            self.logger.error(f"🔄 RESTART_EXCEPTION: Exception during {service_name} restart: {e}")
+            self.logger.error(f"🔄 RESTART_EXCEPTION: Total time before exception: {total_duration:.2f}s")
+            import traceback
+            self.logger.error(f"🔄 RESTART_EXCEPTION: Traceback:\n{traceback.format_exc()}")
+            raise
 
     def get_service_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all services with process registry integration."""
@@ -1281,19 +1356,57 @@ class ServiceOrchestrator:
                 dashboard_port=dashboard_port
             )
             
-            # Start the monitoring in the background
+            # Start the monitoring in the background with proper task tracking
             loop = asyncio.get_event_loop()
-            loop.create_task(self.consistency_checker.start_monitoring())
-            
+
+            # Create monitoring task without timeout - this is meant to run forever
+            self.consistency_checker.monitoring_task = loop.create_task(
+                self.consistency_checker.start_monitoring()
+            )
+
+            # Add task done callback for error handling
+            def on_task_done(task):
+                if task.cancelled():
+                    self.logger.info("Consistency checker task was cancelled")
+                    # Don't mark as failed if cancelled - this is expected during shutdown
+                    return
+
+                try:
+                    exception = task.exception()
+                    if exception:
+                        self.logger.error(f"Consistency checker task failed: {exception}")
+                        state.status = ServiceStatus.FAILED
+                        state.health_status = False
+                        # The service orchestrator will restart it on next health check
+                    else:
+                        self.logger.info("Consistency checker task completed normally")
+                except Exception as e:
+                    # Handle any other exceptions when checking task status
+                    self.logger.error(f"Error in consistency checker task callback: {e}")
+                    state.status = ServiceStatus.FAILED
+                    state.health_status = False
+
+            self.consistency_checker.monitoring_task.add_done_callback(on_task_done)
+
+            # Wait a moment to ensure task is actually running and not immediately cancelled
+            await asyncio.sleep(0.5)
+
+            # Check if task was cancelled immediately (would indicate a startup problem)
+            if self.consistency_checker.monitoring_task.cancelled():
+                self.logger.error("Consistency checker task was cancelled immediately after creation")
+                state.status = ServiceStatus.FAILED
+                state.health_status = False
+                return False
+
             state.status = ServiceStatus.RUNNING
             state.start_time = datetime.now()
             state.metrics["port"] = dashboard_port
             state.health_status = True
             state.last_health_check = datetime.now()
-            
+
             if self.verbose:
                 print(f"   ✅ API/UI consistency checker started on dashboard port {dashboard_port}")
-            
+
             return True
             
         except Exception as e:
@@ -1306,19 +1419,32 @@ class ServiceOrchestrator:
         """Stop the API/UI consistency checker service."""
         state = self.service_states["consistency_checker"]
         state.status = ServiceStatus.STOPPING
-        
+
         try:
-            # The consistency checker monitoring loop should stop when self.running becomes False
+            if self.consistency_checker:
+                # Gracefully stop the monitoring loop
+                if hasattr(self.consistency_checker, 'stop_monitoring'):
+                    await self.consistency_checker.stop_monitoring()
+
+                # Cancel the monitoring task if it exists
+                if hasattr(self.consistency_checker, 'monitoring_task') and self.consistency_checker.monitoring_task:
+                    if not self.consistency_checker.monitoring_task.done():
+                        self.consistency_checker.monitoring_task.cancel()
+                        try:
+                            await self.consistency_checker.monitoring_task
+                        except asyncio.CancelledError:
+                            pass  # Expected when cancelling
+
             self.consistency_checker = None
-            
+
             state.status = ServiceStatus.STOPPED
             state.health_status = False
-            
+
             if self.verbose:
-                print("   ✅ API/UI consistency checker stopped")
-            
+                print("   ✅ API/UI consistency checker stopped gracefully")
+
             return True
-            
+
         except Exception as e:
             state.last_error = str(e)
             self.logger.error(f"Failed to stop consistency checker: {e}")
@@ -2227,26 +2353,119 @@ class ServiceOrchestrator:
             return False
     
     def _check_consistency_checker_health(self) -> bool:
-        """Check if the API/UI consistency checker is healthy."""
+        """Check if the API/UI consistency checker is healthy with relaxed requirements."""
+        health_check_start = datetime.now()
+        check_details = {
+            "timestamp": health_check_start.isoformat(),
+            "instance_exists": False,
+            "has_monitoring_health": False,
+            "monitoring_health_result": None,
+            "has_results": False,
+            "results_count": 0,
+            "recent_results": 0,
+            "is_running": None,
+            "task_status": None,
+            "consecutive_failures": None,
+            "final_result": False
+        }
+
         try:
-            # Check if consistency checker instance exists and has recent results
+            # Check if consistency checker instance exists
             if self.consistency_checker is None:
+                self.logger.warning("🔍 HEALTH_CHECK: Consistency checker instance is None")
+                check_details["final_result"] = False
                 return False
-            
-            # Check if we have recent consistency check results (within last 5 minutes)
+
+            check_details["instance_exists"] = True
+
+            # Get additional diagnostic info
+            if hasattr(self.consistency_checker, 'consecutive_failures'):
+                check_details["consecutive_failures"] = self.consistency_checker.consecutive_failures
+
+            if hasattr(self.consistency_checker, 'monitoring_task'):
+                task = self.consistency_checker.monitoring_task
+                if task:
+                    check_details["task_status"] = {
+                        "done": task.done(),
+                        "cancelled": task.cancelled(),
+                        "has_exception": None
+                    }
+                    if task.done() and not task.cancelled():
+                        try:
+                            check_details["task_status"]["has_exception"] = task.exception() is not None
+                        except:
+                            check_details["task_status"]["has_exception"] = "unknown"
+
+            # Use the new monitoring health check if available
+            if hasattr(self.consistency_checker, 'is_monitoring_healthy'):
+                check_details["has_monitoring_health"] = True
+                health_result = self.consistency_checker.is_monitoring_healthy()
+                check_details["monitoring_health_result"] = health_result
+
+                self.logger.info(f"🔍 HEALTH_CHECK: Using is_monitoring_healthy() = {health_result}")
+                self.logger.info(f"🔍 HEALTH_CHECK: Details = {check_details}")
+
+                check_details["final_result"] = health_result
+                return health_result
+
+            # Fallback to the old method with relaxed timeouts
             if not self.consistency_checker.last_check_results:
-                return False
-            
-            # Check if any results have been generated recently
+                check_details["has_results"] = False
+                # Allow up to 10 minutes for initial results (startup grace period)
+                self.logger.info("🔍 HEALTH_CHECK: No results yet, allowing startup grace period")
+                self.logger.info(f"🔍 HEALTH_CHECK: Details = {check_details}")
+                check_details["final_result"] = True
+                return True
+
+            check_details["has_results"] = True
+            check_details["results_count"] = len(self.consistency_checker.last_check_results)
+
+            # Check if any results have been generated recently (relaxed from 5 to 10 minutes)
             from datetime import timedelta
             now = datetime.now()
+            recent_count = 0
+            oldest_result_age = None
+            newest_result_age = None
+
             for result in self.consistency_checker.last_check_results.values():
-                if now - result.timestamp < timedelta(minutes=5):
+                age = now - result.timestamp
+                if age < timedelta(minutes=10):
+                    recent_count += 1
+
+                if oldest_result_age is None or age > oldest_result_age:
+                    oldest_result_age = age
+                if newest_result_age is None or age < newest_result_age:
+                    newest_result_age = age
+
+            check_details["recent_results"] = recent_count
+
+            if recent_count > 0:
+                self.logger.info(f"🔍 HEALTH_CHECK: Found {recent_count} recent results (newest: {newest_result_age}, oldest: {oldest_result_age})")
+                self.logger.info(f"🔍 HEALTH_CHECK: Details = {check_details}")
+                check_details["final_result"] = True
+                return True
+
+            # Even if no recent results, check if the monitoring is running
+            # This prevents restarts during temporary API outages
+            if hasattr(self.consistency_checker, 'is_running'):
+                check_details["is_running"] = self.consistency_checker.is_running
+                if self.consistency_checker.is_running:
+                    self.logger.info(f"🔍 HEALTH_CHECK: No recent results but service is running, considering healthy")
+                    self.logger.info(f"🔍 HEALTH_CHECK: Details = {check_details}")
+                    check_details["final_result"] = True
                     return True
-            
+
+            self.logger.warning(f"🔍 HEALTH_CHECK: Service appears unhealthy - no recent results and not running")
+            self.logger.warning(f"🔍 HEALTH_CHECK: Details = {check_details}")
+            check_details["final_result"] = False
             return False
-        except:
-            return False
+
+        except Exception as e:
+            # Log the exception instead of silently failing
+            self.logger.error(f"🔍 HEALTH_CHECK: Exception during health check: {e}")
+            self.logger.error(f"🔍 HEALTH_CHECK: Details at exception = {check_details}")
+            check_details["final_result"] = True
+            return True  # Default to healthy during error conditions to prevent unnecessary restarts
     
     def _check_telemetry_collector_health(self) -> bool:
         """Check if the telemetry collector is healthy."""
@@ -2562,3 +2781,17 @@ class ServiceOrchestrator:
             )
         finally:
             loop.close()
+
+    def register_cache_invalidation_callback(self, callback):
+        """Register a callback for cache invalidation on service restarts"""
+        self._cache_invalidation_callbacks.append(callback)
+
+    def _trigger_cache_invalidation(self, service_name: str):
+        """Trigger cache invalidation for a specific service restart"""
+        for callback in self._cache_invalidation_callbacks:
+            try:
+                callback(service_name)
+                if self.verbose:
+                    print(f"   🗑️  Triggered cache invalidation for {service_name}")
+            except Exception as e:
+                self.logger.error(f"Cache invalidation callback error for {service_name}: {e}")
