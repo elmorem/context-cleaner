@@ -1574,9 +1574,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     
     # Import service orchestrator
     try:
-        click.echo("🔍 DEBUG: Importing ServiceOrchestrator...")
         from ..services import ServiceOrchestrator
-        click.echo("✅ DEBUG: ServiceOrchestrator imported successfully")
     except ImportError:
         click.echo("❌ Service orchestrator not available", err=True)
         sys.exit(1)

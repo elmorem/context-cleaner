@@ -610,9 +610,20 @@ class ProcessDiscoveryEngine:
         discovered = []
         
         try:
-            for conn in psutil.net_connections():
-                if conn.laddr and conn.laddr.port in self.known_ports:
-                    try:
+            # Get network connections with error handling for stale process access
+            try:
+                connections = psutil.net_connections()
+            except Exception as e:
+                logger.debug(f"Error getting network connections: {e}")
+                return discovered
+            
+            for conn in connections:
+                try:
+                    # Skip connections without local address or PID
+                    if not conn.laddr or not hasattr(conn, 'pid') or not conn.pid:
+                        continue
+                        
+                    if conn.laddr.port in self.known_ports:
                         if conn.pid:
                             process = psutil.Process(conn.pid)
                             cmdline = ' '.join(process.cmdline())
@@ -637,12 +648,14 @@ class ProcessDiscoveryEngine:
                                 
                                 discovered.append(entry)
                                 
-                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError) as e:
-                        logger.debug(f"Process access error during port discovery (pid={conn.pid if hasattr(conn, 'pid') and conn.pid else 'unknown'}): {e}")
-                        continue
-                    except Exception as e:
-                        logger.warning(f"Unexpected error during port discovery for pid={conn.pid if hasattr(conn, 'pid') and conn.pid else 'unknown'}: {e}")
-                        continue
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, AttributeError) as e:
+                    # Expected errors when process no longer exists or becomes inaccessible
+                    logger.debug(f"Process access error during port discovery (pid={getattr(conn, 'pid', 'unknown')}): {e}")
+                    continue
+                except Exception as e:
+                    # Log unexpected errors but don't let them stop the entire discovery process  
+                    logger.debug(f"Connection error during port discovery (pid={getattr(conn, 'pid', 'unknown')}): {e}")
+                    continue
                         
         except Exception as e:
             logger.error(f"Error in port discovery (general): {e}")

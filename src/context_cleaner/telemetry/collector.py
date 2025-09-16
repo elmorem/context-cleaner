@@ -58,6 +58,14 @@ class ClaudeCodeTelemetryCollector:
         self.collection_errors = 0
         
         logger.info(f"Telemetry collector initialized - enabled: {self.is_enabled}")
+    
+    async def close(self):
+        """Clean shutdown of the telemetry collector and ClickHouse client."""
+        try:
+            await self.clickhouse_client.close()
+            logger.info("Telemetry collector closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing telemetry collector: {e}")
         
     async def log_tool_usage(self, tool_result: ToolResult) -> bool:
         """
@@ -381,6 +389,13 @@ def get_collector() -> ClaudeCodeTelemetryCollector:
     if _collector is None:
         _collector = ClaudeCodeTelemetryCollector()
     return _collector
+
+async def cleanup_global_collector():
+    """Clean up the global telemetry collector instance."""
+    global _collector
+    if _collector is not None:
+        await _collector.close()
+        _collector = None
 
 
 async def log_tool_usage(tool_name: str, tool_input: str, tool_output: str, 

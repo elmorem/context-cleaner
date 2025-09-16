@@ -367,12 +367,8 @@ class ServiceOrchestrator:
             print(f"📊 Dashboard port: {dashboard_port}")
         
         # Port conflict detection and resolution
-        if self.verbose:
-            print("🔍 DEBUG: Starting port conflict detection...")
         service_ports = {"dashboard": dashboard_port}
         conflicts = await self.port_conflict_manager.detect_port_conflicts(service_ports)
-        if self.verbose:
-            print(f"✅ DEBUG: Port conflict detection completed. Conflicts: {conflicts}")
         
         # Resolve dashboard port conflicts if detected
         if conflicts.get("dashboard", False):
@@ -399,18 +395,10 @@ class ServiceOrchestrator:
                 return False
         
         # Clean up any existing processes to ensure singleton operation
-        if self.verbose:
-            print("🔍 DEBUG: Starting process cleanup...")
         self._cleanup_existing_processes()
-        if self.verbose:
-            print("✅ DEBUG: Process cleanup completed")
         
         # Ensure Docker daemon is running and containers are in proper state
-        if self.verbose:
-            print("🔍 DEBUG: Checking Docker environment...")
         if not await self._ensure_docker_environment():
-            if self.verbose:
-                print("❌ DEBUG: Docker environment check failed")
             if self.verbose:
                 print("❌ Failed to ensure Docker environment is ready")
             return False
@@ -428,13 +416,16 @@ class ServiceOrchestrator:
         
         # Determine startup order based on dependencies
         startup_order = self._calculate_startup_order()
+        if self.verbose:
+            print(f"🔍 DEBUG: Service startup order: {startup_order}")
+        # ALWAYS print this to test if the method is being called
+        print(f"🚨 TEST: start_all_services() reached! verbose={self.verbose}, startup_order={startup_order}")
         
         success = True
         for service_name in startup_order:
             service = self.services[service_name]
             
-            if self.verbose:
-                print(f"🔄 Starting {service.description}...")
+            print(f"🔄 Starting {service.description}...")
             
             # Wait for startup delay
             if service.startup_delay > 0:
@@ -442,18 +433,27 @@ class ServiceOrchestrator:
             
             # Start the service
             try:
+                
                 if service_name == "dashboard":
-                    success &= await self._start_dashboard_service(dashboard_port)
+                    result = await self._start_dashboard_service(dashboard_port)
+                    if service.required:
+                        success &= result
                 elif service_name == "consistency_checker":
-                    success &= await self._start_consistency_checker_service(dashboard_port)
+                    result = await self._start_consistency_checker_service(dashboard_port)
+                    if service.required:
+                        success &= result
                 elif service_name == "telemetry_collector":
-                    success &= await self._start_telemetry_collector_service()
+                    result = await self._start_telemetry_collector_service()
+                    if service.required:
+                        success &= result
                 else:
-                    success &= await self._start_service(service_name)
+                    result = await self._start_service(service_name)
+                    if service.required:
+                        success &= result
+                
                 
                 if not success and service.required:
-                    if self.verbose:
-                        print(f"❌ Failed to start required service: {service.description}")
+                    print(f"❌ Failed to start required service: {service.description}")
                     break
                     
             except Exception as e:

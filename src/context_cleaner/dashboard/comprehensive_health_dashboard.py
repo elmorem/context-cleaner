@@ -3197,6 +3197,7 @@ class ComprehensiveHealthDashboard:
 
     def _create_wsgi_entry_point(self):
         """Create WSGI entry point for Gunicorn."""
+        import os
         wsgi_content = '''#!/usr/bin/env python3
 """
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
