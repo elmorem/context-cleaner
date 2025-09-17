@@ -1122,6 +1122,65 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error monitor failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
+        @self.app.route("/api/telemetry/data-freshness")
+        def get_data_freshness():
+            """Get comprehensive data freshness report for debugging widget staleness."""
+            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
+                return jsonify({
+                    "error": "Telemetry not available",
+                    "telemetry_enabled": self.telemetry_enabled,
+                    "widgets_available": hasattr(self, 'telemetry_widgets'),
+                    "debug_info": {
+                        "clickhouse_available": TELEMETRY_DASHBOARD_AVAILABLE,
+                        "service_mode": "fallback"
+                    }
+                }), 404
+
+            try:
+                report = self.telemetry_widgets.get_data_freshness_report()
+                return jsonify(report)
+            except Exception as e:
+                logger.error(f"Data freshness report failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/widget-health")
+        def get_widget_health():
+            """Get widget health summary for quick debugging."""
+            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
+                return jsonify({
+                    "error": "Telemetry not available",
+                    "all_widgets_status": "offline",
+                    "reason": "no_telemetry"
+                }), 404
+
+            try:
+                summary = self.telemetry_widgets.get_widget_health_summary()
+                return jsonify({
+                    "widget_health": summary,
+                    "overall_status": "mixed" if any("Error" in status for status in summary.values()) else "healthy",
+                    "timestamp": datetime.now().isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Widget health summary failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/telemetry/clear-cache", methods=["POST"])
+        def clear_widget_cache():
+            """Clear widget cache to force fresh data retrieval."""
+            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
+                return jsonify({"error": "Telemetry not available"}), 404
+
+            try:
+                self.telemetry_widgets.clear_cache()
+                logger.info("Widget cache cleared via API")
+                return jsonify({
+                    "message": "Widget cache cleared successfully",
+                    "timestamp": datetime.now().isoformat()
+                })
+            except Exception as e:
+                logger.error(f"Cache clear failed: {e}")
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/telemetry/error-details")
         def get_error_details():
             """Get detailed error information for analysis."""

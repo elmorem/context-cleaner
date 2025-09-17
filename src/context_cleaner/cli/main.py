@@ -924,6 +924,275 @@ def health_check(ctx, detailed, fix_issues, format):
         sys.exit(1)
 
 
+@main.command("update-data")
+@click.option("--dashboard-port", "-p", type=int, default=8110, help="Dashboard port to check")
+@click.option("--host", default="localhost", help="Dashboard host")
+@click.option("--check-only", is_flag=True, help="Only diagnose issues, don't apply fixes")
+@click.option("--clear-cache", is_flag=True, help="Clear widget cache to force fresh data")
+@click.option("--output", type=click.Path(), help="Save detailed results to JSON file")
+@click.option(
+    "--format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format",
+)
+@click.pass_context
+def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, format):
+    """Diagnose and fix widget data staleness issues.
+
+    This command analyzes why dashboard widgets might be showing zeros or stale data
+    and provides clear guidance on how to resolve the issues. It detects common
+    problems like running with --no-docker flags that disable real telemetry data.
+
+    Examples:
+        context-cleaner update-data                    # Diagnose and fix issues
+        context-cleaner update-data --check-only       # Only diagnose, don't fix
+        context-cleaner update-data --clear-cache      # Force cache refresh
+        context-cleaner update-data --output report.json  # Save detailed report
+    """
+    import requests
+    import time
+    from datetime import datetime
+
+    verbose = ctx.obj.get("verbose", False) if ctx.obj else False
+    base_url = f"http://{host}:{dashboard_port}"
+
+    if verbose:
+        click.echo(f"🔍 Analyzing widget data staleness at {base_url}")
+
+    # Results dictionary for detailed reporting
+    results = {
+        "timestamp": datetime.now().isoformat(),
+        "dashboard_url": base_url,
+        "diagnosis": {},
+        "fixes_applied": [],
+        "recommendations": []
+    }
+
+    def output_result(message, level="info"):
+        """Output message based on format"""
+        if format == "json":
+            return  # Store in results, output at end
+
+        if level == "error":
+            click.echo(click.style(message, fg="red"), err=True)
+        elif level == "warning":
+            click.echo(click.style(message, fg="yellow"))
+        elif level == "success":
+            click.echo(click.style(message, fg="green"))
+        else:
+            click.echo(message)
+
+    # Step 1: Check dashboard connectivity
+    output_result("📡 Step 1: Testing dashboard connectivity...")
+
+    try:
+        response = requests.get(f"{base_url}/health", timeout=10)
+        response.raise_for_status()
+
+        health_data = response.json()
+        results["diagnosis"]["connectivity"] = {"success": True, "status": health_data.get("status", "unknown")}
+        output_result("✅ Dashboard is accessible", "success")
+
+    except Exception as e:
+        results["diagnosis"]["connectivity"] = {"success": False, "error": str(e)}
+        output_result(f"❌ Dashboard not accessible: {e}", "error")
+        output_result("\n💡 SOLUTION: Start Context Cleaner dashboard:", "warning")
+        output_result("   context-cleaner run --dashboard-port 8110")
+
+        if format == "json":
+            click.echo(json.dumps(results, indent=2))
+        elif output:
+            with open(output, 'w') as f:
+                json.dump(results, f, indent=2)
+            output_result(f"💾 Results saved to {output}")
+
+        sys.exit(1)
+
+    # Step 2: Check telemetry availability
+    output_result("\n🔧 Step 2: Checking telemetry system...")
+
+    try:
+        response = requests.get(f"{base_url}/api/telemetry/data-freshness", timeout=10)
+
+        if response.status_code == 404:
+            results["diagnosis"]["telemetry"] = {"available": False, "reason": "telemetry_disabled"}
+            output_result("❌ Telemetry system unavailable", "error")
+            output_result("   Reason: telemetry_disabled", "warning")
+            output_result("\n💡 ROOT CAUSE IDENTIFIED: Context Cleaner running with --no-docker flag", "warning")
+            output_result("\n🚀 SOLUTION:")
+            output_result("   1. Stop current Context Cleaner: context-cleaner stop")
+            output_result("   2. Start with full services: context-cleaner run")
+            output_result("   3. This will enable ClickHouse database for real telemetry data")
+
+            results["recommendations"].append("restart_with_full_services")
+
+            if format == "json":
+                click.echo(json.dumps(results, indent=2))
+            elif output:
+                with open(output, 'w') as f:
+                    json.dump(results, f, indent=2)
+                output_result(f"💾 Results saved to {output}")
+
+            sys.exit(1)
+
+        response.raise_for_status()
+        telemetry_data = response.json()
+
+        results["diagnosis"]["telemetry"] = {
+            "available": True,
+            "service_availability": telemetry_data.get("service_availability", {}),
+            "cache_status": telemetry_data.get("cache_status", {}),
+            "fallback_widgets": len(telemetry_data.get("fallback_detection", {}))
+        }
+
+        output_result("✅ Telemetry system is available", "success")
+
+    except Exception as e:
+        results["diagnosis"]["telemetry"] = {"available": False, "error": str(e)}
+        output_result(f"❌ Telemetry check failed: {e}", "error")
+        results["recommendations"].append("check_service_logs")
+
+    # Step 3: Test individual widgets
+    output_result("\n📊 Step 3: Testing individual widgets...")
+
+    widgets = ["error-monitor", "cost-tracker", "timeout-risk", "tool-optimizer", "model-efficiency", "context-rot-meter"]
+    widget_results = {}
+    problem_widgets = []
+
+    for widget in widgets:
+        if verbose:
+            output_result(f"   Testing {widget}...")
+
+        try:
+            response = requests.get(f"{base_url}/api/telemetry-widget/{widget}", timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                widget_data = data.get("data", {})
+
+                # Check for fallback indicators
+                is_fallback = widget_data.get("fallback_mode", False) or "Demo" in data.get("title", "")
+
+                # Check for zero values
+                zero_fields = [key for key, value in widget_data.items()
+                             if isinstance(value, (int, float)) and value == 0]
+
+                widget_results[widget] = {
+                    "success": True,
+                    "status": data.get("status", "unknown"),
+                    "title": data.get("title", ""),
+                    "is_fallback": is_fallback,
+                    "zero_fields": zero_fields,
+                    "alerts": data.get("alerts", [])
+                }
+
+                if not widget_results[widget]["success"] or is_fallback or zero_fields:
+                    problem_widgets.append(widget)
+
+            else:
+                widget_results[widget] = {
+                    "success": False,
+                    "error": f"HTTP {response.status_code}"
+                }
+                problem_widgets.append(widget)
+
+        except Exception as e:
+            widget_results[widget] = {
+                "success": False,
+                "error": str(e)
+            }
+            problem_widgets.append(widget)
+
+    results["diagnosis"]["widgets"] = widget_results
+
+    if problem_widgets:
+        output_result(f"⚠️  Found {len(problem_widgets)} widgets with issues:", "warning")
+        for widget in problem_widgets:
+            widget_data = widget_results[widget]
+            if not widget_data.get("success"):
+                output_result(f"   ❌ {widget}: Error - {widget_data.get('error', 'unknown')}", "error")
+            elif widget_data.get("is_fallback"):
+                output_result(f"   🔄 {widget}: Fallback mode", "warning")
+            elif widget_data.get("zero_fields"):
+                output_result(f"   🚫 {widget}: Zero values in {widget_data['zero_fields']}", "warning")
+    else:
+        output_result("✅ All widgets working correctly", "success")
+
+    # Step 4: Apply fixes if requested
+    fixes_applied = []
+
+    if not check_only and (clear_cache or problem_widgets):
+        output_result("\n🔧 Step 4: Applying fixes...")
+
+        if clear_cache or problem_widgets:
+            try:
+                output_result("   🔄 Clearing widget cache...")
+                response = requests.post(f"{base_url}/api/telemetry/clear-cache", timeout=10)
+
+                if response.status_code == 200:
+                    fixes_applied.append("cache_cleared")
+                    output_result("   ✅ Widget cache cleared successfully", "success")
+
+                    # Wait and re-test one widget
+                    time.sleep(2)
+                    test_response = requests.get(f"{base_url}/api/telemetry-widget/error-monitor", timeout=10)
+                    if test_response.status_code == 200:
+                        fixes_applied.append("widget_retested")
+                        output_result("   ✅ Widget data refreshed after cache clear", "success")
+                else:
+                    output_result(f"   ❌ Cache clear failed: HTTP {response.status_code}", "error")
+
+            except Exception as e:
+                output_result(f"   ❌ Cache clear error: {e}", "error")
+
+    results["fixes_applied"] = fixes_applied
+
+    # Generate recommendations
+    recommendations = []
+
+    if not results["diagnosis"]["telemetry"].get("available"):
+        if results["diagnosis"]["telemetry"].get("reason") == "telemetry_disabled":
+            recommendations.append("CRITICAL: Restart Context Cleaner without --no-docker flag to enable real data")
+        else:
+            recommendations.append("Check ClickHouse container status and telemetry service logs")
+
+    if problem_widgets:
+        recommendations.append(f"Investigate {len(problem_widgets)} problematic widgets")
+        recommendations.append("Monitor service logs during widget data generation")
+
+    if results["diagnosis"]["telemetry"].get("cache_status", {}).get("cached_widgets", 0) > 5:
+        recommendations.append("High cache usage detected - consider clearing cache periodically")
+
+    service_availability = results["diagnosis"]["telemetry"].get("service_availability", {})
+    unavailable_services = [name for name, available in service_availability.items() if not available]
+    if unavailable_services:
+        recommendations.append(f"Unavailable services detected: {', '.join(unavailable_services)}")
+
+    results["recommendations"] = recommendations
+
+    # Output final results
+    if recommendations:
+        output_result("\n💡 RECOMMENDATIONS:")
+        for i, rec in enumerate(recommendations, 1):
+            level = "error" if "CRITICAL" in rec else "warning"
+            output_result(f"   {i}. {rec}", level)
+    else:
+        output_result("\n✅ No issues detected", "success")
+
+    # Output in requested format
+    if format == "json":
+        click.echo(json.dumps(results, indent=2))
+    elif output:
+        with open(output, 'w') as f:
+            json.dump(results, f, indent=2)
+        output_result(f"\n💾 Results saved to {output}")
+
+    # Exit with appropriate code
+    critical_issues = any("CRITICAL" in rec for rec in recommendations)
+    sys.exit(1 if critical_issues else 0)
+
+
 @main.command("export-analytics")
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
 @click.option(

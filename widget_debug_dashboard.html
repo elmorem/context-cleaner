@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Data Flow Debug Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .debug-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .debug-card h3 {
+            margin: 0 0 15px 0;
+            color: #1f2937;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+        }
+
+        .status-indicator {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-healthy { background: #dcfce7; color: #166534; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        .status-error { background: #fecaca; color: #991b1b; }
+        .status-unknown { background: #f3f4f6; color: #374151; }
+
+        .widget-test {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .widget-test h4 {
+            margin: 0 0 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .test-result {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: pre-wrap;
+            background: #f9fafb;
+            padding: 8px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 4px;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+        }
+
+        .btn.secondary {
+            background: #6b7280;
+        }
+
+        .btn.danger {
+            background: #dc2626;
+        }
+
+        .loading {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .summary {
+            background: #fef9e7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .logs {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Widget Data Flow Debug Dashboard</h1>
+        <p>Debug Context Cleaner widget data staleness issues</p>
+        <div>
+            <button class="btn" onclick="runAllTests()">🧪 Run All Tests</button>
+            <button class="btn secondary" onclick="clearCache()">🗑️ Clear Cache</button>
+            <button class="btn danger" onclick="clearLogs()">📝 Clear Logs</button>
+        </div>
+    </div>
+
+    <div class="summary" id="summary" style="display: none;">
+        <h3>📊 Test Summary</h3>
+        <div id="summaryContent"></div>
+    </div>
+
+    <div class="debug-grid">
+        <div class="debug-card">
+            <h3>🔧 System Health</h3>
+            <div class="widget-test">
+                <h4>
+                    Dashboard Connectivity
+                    <span class="status-indicator status-unknown" id="dashboard-status">Unknown</span>
+                </h4>
+                <div class="test-result" id="dashboard-result">Not tested</div>
+                <button class="btn" onclick="testDashboardHealth()">Test</button>
+            </div>
+            <div class="widget-test">
+                <h4>
+                    Telemetry Availability
+                    <span class="status-indicator status-unknown" id="telemetry-status">Unknown</span>
+                </h4>
+                <div class="test-result" id="telemetry-result">Not tested</div>
+                <button class="btn" onclick="testTelemetryAvailability()">Test</button>
+            </div>
+        </div>
+
+        <div class="debug-card">
+            <h3>📊 Widget Endpoints</h3>
+            <div id="widget-tests">
+                <!-- Widget tests will be populated here -->
+            </div>
+            <button class="btn" onclick="testAllWidgets()">Test All Widgets</button>
+        </div>
+
+        <div class="debug-card">
+            <h3>🕐 Data Freshness</h3>
+            <div class="widget-test">
+                <h4>
+                    Freshness Report
+                    <span class="status-indicator status-unknown" id="freshness-status">Unknown</span>
+                </h4>
+                <div class="test-result" id="freshness-result">Not tested</div>
+                <button class="btn" onclick="testDataFreshness()">Test</button>
+            </div>
+            <div class="widget-test">
+                <h4>
+                    Widget Health Summary
+                    <span class="status-indicator status-unknown" id="health-status">Unknown</span>
+                </h4>
+                <div class="test-result" id="health-result">Not tested</div>
+                <button class="btn" onclick="testWidgetHealth()">Test</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="debug-card">
+        <h3>📝 Debug Logs</h3>
+        <div class="logs" id="logs"></div>
+    </div>
+
+    <script>
+        // Widget types to test
+        const WIDGET_TYPES = [
+            'error-monitor',
+            'cost-tracker',
+            'timeout-risk',
+            'tool-optimizer',
+            'model-efficiency',
+            'context-rot-meter'
+        ];
+
+        // Initialize widget tests
+        function initializeWidgetTests() {
+            const container = document.getElementById('widget-tests');
+            container.innerHTML = WIDGET_TYPES.map(widgetType => `
+                <div class="widget-test">
+                    <h4>
+                        ${widgetType.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        <span class="status-indicator status-unknown" id="${widgetType}-status">Unknown</span>
+                    </h4>
+                    <div class="test-result" id="${widgetType}-result">Not tested</div>
+                    <button class="btn" onclick="testWidget('${widgetType}')">Test</button>
+                </div>
+            `).join('');
+        }
+
+        // Logging function
+        function log(message, level = 'info') {
+            const timestamp = new Date().toISOString();
+            const logElement = document.getElementById('logs');
+            const levelEmoji = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'warning': '⚠️',
+                'error': '❌'
+            }[level] || 'ℹ️';
+
+            logElement.innerHTML += `${timestamp} ${levelEmoji} ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // Update status indicator
+        function updateStatus(elementId, status, message = '') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.className = `status-indicator status-${status}`;
+                element.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                if (message) element.title = message;
+            }
+        }
+
+        // Update test result
+        function updateResult(elementId, content) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = typeof content === 'object' ? JSON.stringify(content, null, 2) : content;
+            }
+        }
+
+        // API request helper
+        async function apiRequest(endpoint, options = {}) {
+            const url = endpoint.startsWith('http') ? endpoint : `/api/${endpoint.replace(/^\//, '')}`;
+
+            try {
+                log(`Making request to: ${url}`);
+                const response = await fetch(url, {
+                    timeout: 30000,
+                    ...options
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${data.error || response.statusText}`);
+                }
+
+                log(`✅ Request successful: ${url}`, 'success');
+                return { success: true, data, status: response.status };
+
+            } catch (error) {
+                log(`❌ Request failed: ${url} - ${error.message}`, 'error');
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Test dashboard health
+        async function testDashboardHealth() {
+            log('Testing dashboard health...');
+            const result = await apiRequest('health');
+
+            if (result.success) {
+                const status = result.data.status === 'healthy' ? 'healthy' : 'warning';
+                updateStatus('dashboard-status', status);
+                updateResult('dashboard-result', result.data);
+                log(`Dashboard health: ${result.data.status}`, status === 'healthy' ? 'success' : 'warning');
+            } else {
+                updateStatus('dashboard-status', 'error', result.error);
+                updateResult('dashboard-result', `Error: ${result.error}`);
+            }
+        }
+
+        // Test telemetry availability
+        async function testTelemetryAvailability() {
+            log('Testing telemetry availability...');
+            const result = await apiRequest('telemetry/data-freshness');
+
+            if (result.success) {
+                updateStatus('telemetry-status', 'healthy');
+                updateResult('telemetry-result', result.data);
+                log('Telemetry system is available', 'success');
+            } else if (result.error.includes('404')) {
+                updateStatus('telemetry-status', 'warning', 'Telemetry disabled (likely --no-docker flag)');
+                updateResult('telemetry-result', 'Telemetry not available - running in basic mode');
+                log('Telemetry disabled - likely running with --no-docker flag', 'warning');
+            } else {
+                updateStatus('telemetry-status', 'error', result.error);
+                updateResult('telemetry-result', `Error: ${result.error}`);
+            }
+        }
+
+        // Test individual widget
+        async function testWidget(widgetType) {
+            log(`Testing widget: ${widgetType}...`);
+            const result = await apiRequest(`telemetry-widget/${widgetType}?timeRange=7days`);
+
+            if (result.success) {
+                const data = result.data;
+                const widgetStatus = data.status || 'unknown';
+
+                // Check for fallback indicators
+                const isFallback = data.data?.fallback_mode || data.data?.error || data.title?.includes('Offline') || data.title?.includes('Demo');
+
+                // Check for zero values
+                const zeroFields = [];
+                if (data.data) {
+                    Object.entries(data.data).forEach(([key, value]) => {
+                        if (typeof value === 'number' && value === 0) {
+                            zeroFields.push(key);
+                        }
+                    });
+                }
+
+                let status = 'healthy';
+                if (isFallback) status = 'warning';
+                if (widgetStatus === 'error') status = 'error';
+
+                updateStatus(`${widgetType}-status`, status);
+
+                const resultSummary = {
+                    status: widgetStatus,
+                    title: data.title,
+                    lastUpdated: data.last_updated,
+                    alerts: data.alerts || [],
+                    isFallback: !!isFallback,
+                    zeroFields: zeroFields,
+                    dataKeys: Object.keys(data.data || {})
+                };
+
+                updateResult(`${widgetType}-result`, resultSummary);
+
+                if (isFallback) {
+                    log(`⚠️ Widget ${widgetType} is in fallback mode`, 'warning');
+                } else if (zeroFields.length > 0) {
+                    log(`🔄 Widget ${widgetType} has zero values: ${zeroFields.join(', ')}`, 'warning');
+                } else {
+                    log(`✅ Widget ${widgetType} is healthy`, 'success');
+                }
+
+            } else {
+                updateStatus(`${widgetType}-status`, 'error', result.error);
+                updateResult(`${widgetType}-result`, `Error: ${result.error}`);
+            }
+        }
+
+        // Test all widgets
+        async function testAllWidgets() {
+            log('Testing all widgets...');
+            for (const widgetType of WIDGET_TYPES) {
+                await testWidget(widgetType);
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+            }
+            log('All widget tests completed');
+        }
+
+        // Test data freshness
+        async function testDataFreshness() {
+            log('Testing data freshness...');
+            const result = await apiRequest('telemetry/data-freshness');
+
+            if (result.success) {
+                updateStatus('freshness-status', 'healthy');
+                updateResult('freshness-result', result.data);
+
+                const serviceAvailability = result.data.service_availability || {};
+                const unavailableServices = Object.entries(serviceAvailability)
+                    .filter(([_, available]) => !available)
+                    .map(([service, _]) => service);
+
+                if (unavailableServices.length > 0) {
+                    log(`⚠️ Unavailable services: ${unavailableServices.join(', ')}`, 'warning');
+                } else {
+                    log('All services are available', 'success');
+                }
+
+            } else {
+                updateStatus('freshness-status', 'error', result.error);
+                updateResult('freshness-result', `Error: ${result.error}`);
+            }
+        }
+
+        // Test widget health
+        async function testWidgetHealth() {
+            log('Testing widget health summary...');
+            const result = await apiRequest('telemetry/widget-health');
+
+            if (result.success) {
+                const overallStatus = result.data.overall_status || 'unknown';
+                updateStatus('health-status', overallStatus === 'healthy' ? 'healthy' : 'warning');
+                updateResult('health-result', result.data);
+
+                const widgetHealth = result.data.widget_health || {};
+                const errorWidgets = Object.entries(widgetHealth)
+                    .filter(([_, status]) => status.includes('Error'))
+                    .map(([widget, _]) => widget);
+
+                if (errorWidgets.length > 0) {
+                    log(`❌ Error widgets: ${errorWidgets.join(', ')}`, 'error');
+                } else {
+                    log('Widget health summary looks good', 'success');
+                }
+
+            } else {
+                updateStatus('health-status', 'error', result.error);
+                updateResult('health-result', `Error: ${result.error}`);
+            }
+        }
+
+        // Clear widget cache
+        async function clearCache() {
+            log('Clearing widget cache...');
+            const result = await apiRequest('telemetry/clear-cache', { method: 'POST' });
+
+            if (result.success) {
+                log('✅ Widget cache cleared successfully', 'success');
+                setTimeout(() => {
+                    log('Retesting widgets after cache clear...');
+                    testAllWidgets();
+                }, 1000);
+            } else {
+                log(`❌ Failed to clear cache: ${result.error}`, 'error');
+            }
+        }
+
+        // Run all tests
+        async function runAllTests() {
+            log('🧪 Running comprehensive test suite...');
+            clearLogs();
+
+            const startTime = Date.now();
+            const results = {};
+
+            // Test dashboard health
+            await testDashboardHealth();
+
+            // Test telemetry availability
+            await testTelemetryAvailability();
+
+            // Test all widgets
+            await testAllWidgets();
+
+            // Test data freshness
+            await testDataFreshness();
+
+            // Test widget health
+            await testWidgetHealth();
+
+            const endTime = Date.now();
+            const duration = endTime - startTime;
+
+            log(`🏁 Test suite completed in ${duration}ms`, 'success');
+
+            // Show summary
+            showTestSummary();
+        }
+
+        // Show test summary
+        function showTestSummary() {
+            const summaryDiv = document.getElementById('summary');
+            const contentDiv = document.getElementById('summaryContent');
+
+            // Collect status indicators
+            const statuses = {};
+            document.querySelectorAll('.status-indicator').forEach(el => {
+                const id = el.id.replace('-status', '');
+                const status = el.className.includes('status-healthy') ? 'healthy' :
+                             el.className.includes('status-warning') ? 'warning' :
+                             el.className.includes('status-error') ? 'error' : 'unknown';
+                statuses[id] = status;
+            });
+
+            const healthyCount = Object.values(statuses).filter(s => s === 'healthy').length;
+            const warningCount = Object.values(statuses).filter(s => s === 'warning').length;
+            const errorCount = Object.values(statuses).filter(s => s === 'error').length;
+            const totalCount = Object.keys(statuses).length;
+
+            contentDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #059669;">${healthyCount}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Healthy</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #d97706;">${warningCount}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Warnings</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #dc2626;">${errorCount}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Errors</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 24px; font-weight: bold; color: #4f46e5;">${totalCount}</div>
+                        <div style="font-size: 12px; color: #6b7280;">Total</div>
+                    </div>
+                </div>
+                <div style="font-size: 14px;">
+                    ${errorCount > 0 ? '❌ Critical issues detected. Check error details above.' :
+                      warningCount > 0 ? '⚠️ Some widgets showing warnings. May indicate --no-docker mode.' :
+                      '✅ All systems healthy!'}
+                </div>
+            `;
+
+            summaryDiv.style.display = 'block';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWidgetTests();
+            log('🔍 Widget Debug Dashboard initialized');
+            log('💡 Run "Run All Tests" to start comprehensive testing');
+        });
+    </script>
+</body>
+</html>

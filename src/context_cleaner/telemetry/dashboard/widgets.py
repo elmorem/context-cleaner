@@ -115,6 +115,21 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Enhanced logging configuration for widget data staleness debugging
+widget_logger = logging.getLogger(f"{__name__}.widgets")
+widget_logger.setLevel(logging.DEBUG)
+
+# Create console handler if it doesn't exist
+if not widget_logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+    )
+    console_handler.setFormatter(formatter)
+    widget_logger.addHandler(console_handler)
+    widget_logger.propagate = False
+
 
 class TelemetryWidgetType(Enum):
     """Types of telemetry widgets"""
@@ -270,9 +285,9 @@ class ContentSearchWidgetData:
 
 
 class TelemetryWidgetManager:
-    """Manages telemetry widgets for the dashboard"""
-    
-    def __init__(self, telemetry_client: ClickHouseClient, 
+    """Manages telemetry widgets for the dashboard with comprehensive logging and data freshness tracking"""
+
+    def __init__(self, telemetry_client: ClickHouseClient,
                  cost_engine: CostOptimizationEngine,
                  recovery_manager: ErrorRecoveryManager,
                  task_orchestrator: Optional[TaskOrchestrator] = None,
@@ -302,6 +317,34 @@ class TelemetryWidgetManager:
             self.context_rot_analyzer = ContextRotAnalyzer()
             self.context_rot_widget = ContextRotWidget()
         
+        # Data freshness tracking
+        self._data_freshness_tracker = {}
+        self._fallback_detection = {}
+
+        # Enhanced service availability detection for widget staleness debugging
+        self._service_availability = {
+            'telemetry_client': self._is_real_service(telemetry_client, 'ClickHouseClient'),
+            'cost_engine': self._is_real_service(cost_engine, 'CostOptimizationEngine'),
+            'recovery_manager': self._is_real_service(recovery_manager, 'ErrorRecoveryManager'),
+            'task_orchestrator': self._is_real_service(task_orchestrator, 'TaskOrchestrator'),
+            'workflow_learner': self._is_real_service(workflow_learner, 'WorkflowLearner'),
+            'agent_selector': self._is_real_service(agent_selector, 'AgentSelector')
+        }
+
+        # Detect if we're in fallback mode (--no-docker or similar flags)
+        self._fallback_mode = not self._service_availability['telemetry_client']
+        if self._fallback_mode:
+            widget_logger.warning("🔄 FALLBACK MODE DETECTED: Telemetry client unavailable - widgets will show demo/empty data")
+            widget_logger.warning("   This usually means Context Cleaner is running with --no-docker or --no-jsonl flags")
+            widget_logger.warning("   To get real data, restart without these flags to enable ClickHouse database")
+
+        # Log initialization state
+        widget_logger.info(f"TelemetryWidgetManager initialized with services: {self._service_availability}")
+        widget_logger.info(f"ClickHouse available: {self._service_availability['telemetry_client']}")
+        widget_logger.info(f"Context Rot available: {CONTEXT_ROT_AVAILABLE}")
+        widget_logger.info(f"JSONL Analytics available: {JSONL_ANALYTICS_AVAILABLE}")
+        widget_logger.info(f"Orchestration available: {ORCHESTRATION_AVAILABLE}")
+
         # Widget update intervals (in seconds)
         self.update_intervals = {
             TelemetryWidgetType.ERROR_MONITOR: 30,
@@ -327,58 +370,169 @@ class TelemetryWidgetManager:
         # Cache invalidation tracking
         self._last_service_restart_check = datetime.now()
         self._cache_invalidation_callbacks = []
+
+    def _is_real_service(self, service_instance, expected_class_name: str) -> bool:
+        """
+        Detect if a service is a real implementation or a stub class.
+        Returns False for None, stub classes, or services running in demo mode.
+        """
+        if service_instance is None:
+            return False
+
+        # Check if it's a stub class (usually defined locally in import fallback blocks)
+        class_name = service_instance.__class__.__name__
+        module_name = service_instance.__class__.__module__
+
+        # If the class is defined in this module, it's likely a stub
+        if module_name == __name__:
+            widget_logger.debug(f"Service {class_name} detected as stub (defined in {module_name})")
+            return False
+
+        # Check for common stub class patterns
+        if hasattr(service_instance, '_is_stub') and service_instance._is_stub:
+            widget_logger.debug(f"Service {class_name} marked as stub")
+            return False
+
+        # For ClickHouse client, try to detect if it's connected
+        if expected_class_name == 'ClickHouseClient':
+            try:
+                # Check if it has the basic methods we expect
+                if not (hasattr(service_instance, 'execute_query') and
+                       hasattr(service_instance, 'get_recent_errors')):
+                    widget_logger.debug(f"ClickHouse client missing expected methods")
+                    return False
+            except Exception:
+                return False
+
+        widget_logger.debug(f"Service {class_name} appears to be real implementation")
+        return True
     
-    async def get_widget_data(self, widget_type: TelemetryWidgetType, 
-                            session_id: Optional[str] = None, 
+    async def get_widget_data(self, widget_type: TelemetryWidgetType,
+                            session_id: Optional[str] = None,
                             time_range_days: int = 7) -> WidgetData:
-        """Get data for a specific widget type"""
-        
+        """Get data for a specific widget type with comprehensive logging and freshness tracking"""
+
+        widget_logger.debug(f"Requesting widget data for: {widget_type.value}")
+        widget_logger.debug(f"  Session ID: {session_id}")
+        widget_logger.debug(f"  Time range: {time_range_days} days")
+
         # Check cache first
         cache_key = widget_type
-        if (cache_key in self._widget_cache and 
+        if (cache_key in self._widget_cache and
             cache_key in self._cache_timestamps):
-            
+
             cache_age = datetime.now() - self._cache_timestamps[cache_key]
             max_age = timedelta(seconds=self.update_intervals[widget_type])
-            
+
+            widget_logger.debug(f"  Cache found - age: {cache_age.total_seconds():.1f}s, max_age: {max_age.total_seconds()}s")
+
             if cache_age < max_age:
+                widget_logger.debug(f"  Returning cached data for {widget_type.value}")
                 return self._widget_cache[cache_key]
-        
-        # Generate fresh data
-        if widget_type == TelemetryWidgetType.ERROR_MONITOR:
-            data = await self._get_error_monitor_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.COST_TRACKER:
-            data = await self._get_cost_tracker_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.TIMEOUT_RISK:
-            data = await self._get_timeout_risk_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.TOOL_OPTIMIZER:
-            data = await self._get_tool_optimizer_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.MODEL_EFFICIENCY:
-            data = await self._get_model_efficiency_data(session_id, time_range_days)
-        # Phase 3: Orchestration widgets
-        elif widget_type == TelemetryWidgetType.ORCHESTRATION_STATUS:
-            data = await self._get_orchestration_status_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.AGENT_UTILIZATION:
-            data = await self._get_agent_utilization_data(session_id, time_range_days)
-        # Phase 4: JSONL Analytics widgets
-        elif widget_type == TelemetryWidgetType.CONVERSATION_TIMELINE:
-            data = await self._get_conversation_timeline_data(session_id)
-        elif widget_type == TelemetryWidgetType.CODE_PATTERN_ANALYSIS:
-            data = await self._get_code_pattern_analysis_data(session_id)
-        elif widget_type == TelemetryWidgetType.CONTENT_SEARCH_WIDGET:
-            data = await self._get_content_search_widget_data(session_id)
-        elif widget_type == TelemetryWidgetType.CLAUDE_MD_ANALYTICS:
-            data = await self._get_claude_md_analytics_data(session_id, time_range_days)
-        elif widget_type == TelemetryWidgetType.CONTEXT_ROT_METER:
-            data = await self._get_context_rot_meter_data(session_id, time_range_days)
+            else:
+                widget_logger.debug(f"  Cache expired for {widget_type.value}, fetching fresh data")
         else:
-            raise ValueError(f"Unknown widget type: {widget_type}")
+            widget_logger.debug(f"  No cache found for {widget_type.value}, fetching fresh data")
         
-        # Cache the data
-        self._widget_cache[cache_key] = data
-        self._cache_timestamps[cache_key] = datetime.now()
-        
-        return data
+        # Track data freshness
+        start_time = datetime.now()
+
+        # Generate fresh data with service availability logging
+        widget_logger.info(f"Generating fresh data for {widget_type.value}")
+
+        try:
+            if widget_type == TelemetryWidgetType.ERROR_MONITOR:
+                widget_logger.debug(f"  Fetching error monitor data - telemetry available: {self._service_availability['telemetry_client']}")
+                data = await self._get_error_monitor_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.COST_TRACKER:
+                data = await self._get_cost_tracker_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.TIMEOUT_RISK:
+                data = await self._get_timeout_risk_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.TOOL_OPTIMIZER:
+                data = await self._get_tool_optimizer_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.MODEL_EFFICIENCY:
+                data = await self._get_model_efficiency_data(session_id, time_range_days)
+            # Phase 3: Orchestration widgets
+            elif widget_type == TelemetryWidgetType.ORCHESTRATION_STATUS:
+                data = await self._get_orchestration_status_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.AGENT_UTILIZATION:
+                data = await self._get_agent_utilization_data(session_id, time_range_days)
+            # Phase 4: JSONL Analytics widgets
+            elif widget_type == TelemetryWidgetType.CONVERSATION_TIMELINE:
+                data = await self._get_conversation_timeline_data(session_id)
+            elif widget_type == TelemetryWidgetType.CODE_PATTERN_ANALYSIS:
+                data = await self._get_code_pattern_analysis_data(session_id)
+            elif widget_type == TelemetryWidgetType.CONTENT_SEARCH_WIDGET:
+                data = await self._get_content_search_widget_data(session_id)
+            elif widget_type == TelemetryWidgetType.CLAUDE_MD_ANALYTICS:
+                data = await self._get_claude_md_analytics_data(session_id, time_range_days)
+            elif widget_type == TelemetryWidgetType.CONTEXT_ROT_METER:
+                data = await self._get_context_rot_meter_data(session_id, time_range_days)
+            else:
+                raise ValueError(f"Unknown widget type: {widget_type}")
+
+            # Track data freshness and generation time
+            generation_time = (datetime.now() - start_time).total_seconds()
+            data_source = 'live' if self._service_availability.get('telemetry_client') else 'fallback'
+
+            self._data_freshness_tracker[widget_type] = {
+                'last_generated': datetime.now(),
+                'generation_time_ms': generation_time * 1000,
+                'data_source': data_source,
+                'cache_used': False,
+                'service_availability': self._service_availability.copy()
+            }
+
+            # Enhance widget with fallback mode indicators
+            if self._fallback_mode and data_source == 'fallback':
+                widget_logger.info(f"🔄 FALLBACK: {widget_type.value} showing demo data (ClickHouse unavailable)")
+
+                # Add fallback indicators to widget title and data
+                if not data.title.endswith('(Demo)') and not data.title.endswith('(Offline)'):
+                    data.title = f"{data.title} (Demo)"
+
+                # Add fallback mode indicator to data
+                if isinstance(data.data, dict):
+                    data.data['fallback_mode'] = True
+                    data.data['fallback_reason'] = 'telemetry_disabled'
+                    data.data['data_source'] = 'demo'
+
+                # Add informative alert
+                fallback_alert = "Demo data - enable full services for real telemetry"
+                if fallback_alert not in data.alerts:
+                    data.alerts.append(fallback_alert)
+
+            widget_logger.info(f"Generated {widget_type.value} data in {generation_time*1000:.1f}ms - source: {data_source}")
+
+            # Cache the data
+            self._widget_cache[cache_key] = data
+            self._cache_timestamps[cache_key] = datetime.now()
+
+            return data
+
+        except Exception as e:
+            widget_logger.error(f"Failed to generate widget data for {widget_type.value}: {str(e)}")
+            widget_logger.exception(f"Full traceback for {widget_type.value} widget error:")
+
+            # Track fallback usage
+            self._fallback_detection[widget_type] = {
+                'last_error': datetime.now(),
+                'error_message': str(e),
+                'fallback_used': True
+            }
+
+            # Return error state widget
+            return WidgetData(
+                widget_type=widget_type,
+                title=f"{widget_type.value.replace('_', ' ').title()} (Error)",
+                status="error",
+                data={
+                    'error': str(e),
+                    'timestamp': datetime.now().isoformat(),
+                    'service_availability': self._service_availability
+                },
+                alerts=[f"Widget error: {str(e)}"]
+            )
     
     async def _get_error_monitor_data(self, session_id: Optional[str] = None, time_range_days: int = 7) -> WidgetData:
         """Generate error monitoring widget data"""
@@ -456,11 +610,20 @@ class TelemetryWidgetManager:
             )
             
         except Exception as e:
-            logger.error(f"Error generating error monitor data: {e}")
+            widget_logger.error(f"Error monitor data generation failed: {e}")
+            widget_logger.exception("Full traceback for error monitor failure:")
+
+            # Track fallback usage
+            self._fallback_detection[TelemetryWidgetType.ERROR_MONITOR] = {
+                'last_error': datetime.now(),
+                'error_message': str(e),
+                'fallback_used': True
+            }
+
             return WidgetData(
                 widget_type=TelemetryWidgetType.ERROR_MONITOR,
-                title="API Error Monitor",
-                status="warning",
+                title="API Error Monitor (Offline)",
+                status="error",
                 data={},
                 alerts=["Unable to fetch error data"]
             )
@@ -1288,6 +1451,55 @@ class TelemetryWidgetManager:
         self._widget_cache.clear()
         self._cache_timestamps.clear()
         logger.info("Telemetry widget cache cleared")
+
+    def get_data_freshness_report(self) -> Dict[str, Any]:
+        """Get comprehensive data freshness and service availability report"""
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'service_availability': self._service_availability.copy(),
+            'data_freshness': {},
+            'fallback_detection': {},
+            'cache_status': {
+                'cached_widgets': len(self._widget_cache),
+                'cache_timestamps': {}
+            }
+        }
+
+        # Add data freshness info
+        for widget_type, freshness_info in self._data_freshness_tracker.items():
+            report['data_freshness'][widget_type.value] = freshness_info.copy()
+
+        # Add fallback detection info
+        for widget_type, fallback_info in self._fallback_detection.items():
+            report['fallback_detection'][widget_type.value] = fallback_info.copy()
+
+        # Add cache timestamps
+        for widget_type, timestamp in self._cache_timestamps.items():
+            cache_age = (datetime.now() - timestamp).total_seconds()
+            report['cache_status']['cache_timestamps'][widget_type.value] = {
+                'cached_at': timestamp.isoformat(),
+                'age_seconds': cache_age,
+                'max_age_seconds': self.update_intervals.get(widget_type, 300)
+            }
+
+        return report
+
+    def get_widget_health_summary(self) -> Dict[str, str]:
+        """Get a summary of widget health status"""
+        summary = {}
+
+        for widget_type in TelemetryWidgetType:
+            if widget_type in self._fallback_detection:
+                fallback_info = self._fallback_detection[widget_type]
+                summary[widget_type.value] = f"Error: {fallback_info['error_message']}"
+            elif widget_type in self._data_freshness_tracker:
+                freshness_info = self._data_freshness_tracker[widget_type]
+                age_minutes = (datetime.now() - freshness_info['last_generated']).total_seconds() / 60
+                summary[widget_type.value] = f"Fresh ({age_minutes:.1f}m ago, {freshness_info['data_source']})"
+            else:
+                summary[widget_type.value] = "Not yet loaded"
+
+        return summary
 
     def invalidate_cache_for_service_restart(self, service_name: str):
         """Invalidate cache when a specific service restarts"""
