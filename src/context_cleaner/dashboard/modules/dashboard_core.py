@@ -44,7 +44,7 @@ class DashboardConfigurationManager:
 
     def __init__(self, config=None):
         # Create default config if None provided (backwards compatibility)
-        from ..config.settings import ContextCleanerConfig
+        from ...config.settings import ContextCleanerConfig
         self.config = config or ContextCleanerConfig.default()
 
         # Server configuration
