@@ -24,7 +24,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
-from threading import Timeout
+import concurrent.futures
 
 logger = logging.getLogger(__name__)
 
@@ -563,7 +563,7 @@ class TelemetryFallbackProcessor:
 
                 try:
                     return future.result(timeout=timeout_seconds)
-                except Timeout:
+                except concurrent.futures.TimeoutError:
                     logger.warning(f"Telemetry fetch timed out after {timeout_seconds}s")
                     return self.get_local_jsonl_stats()
 
