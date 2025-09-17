@@ -1434,7 +1434,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     discovery_summary["by_service_type"][service_type] = []
                 discovery_summary["by_service_type"][service_type].append({
                     "pid": process.pid,
-                    "command_line": process.command_line[:80] + "..." if len(process.command_line) > 80 else process.command_line
+                    "name": getattr(process, 'name', 'unknown'),
+                    "path": getattr(process, 'path', 'N/A'),
+                    "command_line": process.command_line[:60] + "..." if len(process.command_line) > 60 else process.command_line
                 })
             
             if verbose:
@@ -1447,7 +1449,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                         click.echo(f"      • {service_type}: {len(processes)} processes")
                         if verbose and show_discovery:
                             for proc in processes[:3]:  # Show first 3
-                                click.echo(f"        - PID {proc['pid']}: {proc['command_line']}")
+                                click.echo(f"        - PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
                             if len(processes) > 3:
                                 click.echo(f"        - ... and {len(processes) - 3} more")
             
@@ -1462,7 +1464,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     for service_type, processes in discovery_summary["by_service_type"].items():
                         click.echo(f"\n🔧 {service_type.upper()} ({len(processes)} processes):")
                         for proc in processes:
-                            click.echo(f"   PID {proc['pid']}: {proc['command_line']}")
+                            click.echo(f"   PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
                 
                 click.echo("\n" + "=" * 50)
                 if not force and not click.confirm("Proceed with shutdown of these processes?"):
@@ -1495,8 +1497,27 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if registry_cleanup:
             click.echo("   • Process registry entries cleanup")
         
-        processes_count = len(discovered_processes) if not no_discovery else "unknown number of"
-        click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
+        if not no_discovery and discovered_processes:
+            click.echo(f"\n📊 Processes to stop: {len(discovered_processes)} Context Cleaner processes")
+            # Show summary of what will be stopped
+            process_summary = {}
+            for proc in discovered_processes:
+                service_type = getattr(proc, 'service_type', 'unknown')
+                if service_type not in process_summary:
+                    process_summary[service_type] = []
+                process_summary[service_type].append(proc)
+
+            for service_type, processes in process_summary.items():
+                click.echo(f"   • {service_type}: {len(processes)} process(es)")
+                for proc in processes[:2]:  # Show first 2 per type
+                    proc_name = getattr(proc, 'name', 'unknown')
+                    proc_path = getattr(proc, 'path', 'N/A')
+                    click.echo(f"     - PID {proc.pid} ({proc_name}) [{proc_path}]")
+                if len(processes) > 2:
+                    click.echo(f"     - ... and {len(processes) - 2} more")
+        else:
+            processes_count = "unknown number of"
+            click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
         click.echo()
         
         if not click.confirm("Continue with comprehensive shutdown?"):
@@ -1726,15 +1747,33 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         click.echo("\n⚠️  SHUTDOWN INCOMPLETE!")
         if verification_processes:
             click.echo(f"❌ {len(verification_processes)} processes still running")
+            click.echo(f"\n📋 Remaining processes:")
+            for proc in verification_processes[:10]:  # Show up to 10
+                proc_name = getattr(proc, 'name', 'unknown')
+                proc_path = getattr(proc, 'path', 'N/A')
+                command_preview = proc.command_line[:60] + "..." if len(proc.command_line) > 60 else proc.command_line
+                click.echo(f"   • PID {proc.pid} ({proc_name}) [{proc_path}]: {command_preview}")
+            if len(verification_processes) > 10:
+                click.echo(f"   • ... and {len(verification_processes) - 10} more processes")
             if verbose:
-                for proc in verification_processes[:5]:  # Show first 5
-                    click.echo(f"   PID {proc.pid}: {proc.command_line[:80]}...")
+                for i, proc in enumerate(verification_processes[:5]):  # Show first 5 in verbose
+                    proc_name = getattr(proc, 'name', 'unknown')
+                    proc_path = getattr(proc, 'path', 'N/A')
+                    click.echo(f"   [{i+1}] PID {proc.pid} ({proc_name}) [{proc_path}]: {proc.command_line}")
         if remaining_ports:
             click.echo(f"❌ {len(remaining_ports)} ports still bound: {remaining_ports}")
         
         click.echo("\n💡 To force cleanup remaining processes:")
-        click.echo("   sudo pkill -f 'start_context_cleaner'")
-        click.echo("   context-cleaner debug processes  # Check what's still running")
+        if verification_processes:
+            # Show specific pkill commands for the remaining processes
+            unique_names = set(getattr(proc, 'name', 'unknown') for proc in verification_processes[:5])
+            for name in unique_names:
+                click.echo(f"   sudo pkill -f '{name}'")
+            if len(verification_processes) > 5:
+                click.echo("   sudo pkill -f 'start_context_cleaner'  # Catch-all for remaining")
+        else:
+            click.echo("   sudo pkill -f 'start_context_cleaner'")
+        click.echo("   context-cleaner debug processes  # Check what's still running (enhanced details above)")
     
     if verbose:
         click.echo("\n📋 Summary:")
@@ -1760,7 +1799,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     import psutil
     from collections import namedtuple
     
-    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'command_line', 'service_type'])
+    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'name', 'path', 'command_line', 'service_type'])
     found_processes = []
     
     # Comprehensive patterns based on all Context Cleaner startup methods
@@ -1810,7 +1849,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     
     try:
         # Iterate through all running processes
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'exe']):
             try:
                 if not proc.info['cmdline']:
                     continue
@@ -1864,15 +1903,24 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                         elif "gunicorn" in cmdline.lower() or "wsgi" in cmdline.lower():
                             service_type = "wsgi_server"
                         
+                        # Get process path safely
+                        try:
+                            process_path = proc.info.get('exe', 'N/A')
+                        except (psutil.AccessDenied, psutil.NoSuchProcess):
+                            process_path = 'N/A'
+
                         process_info = ProcessInfo(
                             pid=proc.info['pid'],
+                            name=proc.info.get('name', 'unknown'),
+                            path=process_path,
                             command_line=cmdline,
                             service_type=service_type
                         )
                         found_processes.append(process_info)
                         
                         if verbose:
-                            print(f"   🔍 Found PID {proc.info['pid']}: {service_type} - {cmdline[:60]}...")
+                            proc_name = proc.info.get('name', 'unknown')
+                            print(f"   🔍 Found PID {proc.info['pid']} ({proc_name}): {service_type} - {cmdline[:60]}...")
                         break  # Found match, move to next process
                         
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
