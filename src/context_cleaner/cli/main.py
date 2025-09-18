@@ -2615,7 +2615,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         # Start the dashboard (this is the main blocking operation)
         try:
             from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-            
+
             dashboard = ComprehensiveHealthDashboard(config=config)
             
             # Open browser if requested
@@ -2668,6 +2668,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         click.echo(f"❌ Service orchestration failed: {e}", err=True)
         asyncio.run(orchestrator.stop_all_services())
         sys.exit(1)
+
 
 
 if __name__ == "__main__":

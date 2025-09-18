@@ -355,23 +355,27 @@ class ServiceOrchestrator:
     async def start_all_services(self, dashboard_port: int = 8110) -> bool:
         """
         Start all services in dependency order.
-        
+
         Args:
             dashboard_port: Port for the dashboard service
-            
+
         Returns:
             True if all required services started successfully
         """
         self.running = True
         self.shutdown_event.clear()
-        
+
         if self.verbose:
             print("🚀 Starting Context Cleaner service orchestration...")
             print(f"📊 Dashboard port: {dashboard_port}")
         
         # Port conflict detection and resolution
+        print("🔍 DEBUG: Starting port conflict detection...")
         service_ports = {"dashboard": dashboard_port}
+        print(f"🔍 DEBUG: Service ports: {service_ports}")
+        print("🔍 DEBUG: About to call detect_port_conflicts()...")
         conflicts = await self.port_conflict_manager.detect_port_conflicts(service_ports)
+        print(f"🔍 DEBUG: Port conflicts detected: {conflicts}")
         
         # Resolve dashboard port conflicts if detected
         if conflicts.get("dashboard", False):
@@ -1047,8 +1051,10 @@ class ServiceOrchestrator:
                 # Handle case where health_check might return bool directly
                 health_func = service.health_check
                 if callable(health_func):
+                    # FIXED: Use asyncio.get_running_loop() to avoid deadlocks
+                    loop = asyncio.get_running_loop()
                     result = await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(
+                        loop.run_in_executor(
                             None, health_func
                         ),
                         timeout=10.0
@@ -1090,30 +1096,10 @@ class ServiceOrchestrator:
 
                         self.logger.debug(f"🏥 HEALTH_MONITOR: Running health check for {service_name} (last check: {time_since_last_check}s ago)")
 
-                        # Run health check using event loop safe approach
+                        # FIXED: Simplified health check - avoid complex event loop management
                         try:
-                            # Get or create event loop for this thread
-                            try:
-                                loop = asyncio.get_event_loop()
-                                if loop.is_closed():
-                                    raise RuntimeError("Event loop is closed")
-                            except RuntimeError:
-                                # Create new event loop for this thread
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                            
-                            # Run health check with timeout in thread's event loop
-                            if loop.is_running():
-                                # If loop is running, we need to run in executor
-                                import concurrent.futures
-                                with concurrent.futures.ThreadPoolExecutor() as executor:
-                                    future = executor.submit(self._run_health_check_sync, service_name)
-                                    healthy = future.result(timeout=30)
-                            else:
-                                # Loop not running, safe to use run_until_complete
-                                healthy = loop.run_until_complete(
-                                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-                                )
+                            # Use sync wrapper that handles event loops properly
+                            healthy = self._run_health_check_sync(service_name)
                         except Exception as health_error:
                             self.logger.error(f"🏥 HEALTH_MONITOR: Health check exception for {service_name}: {health_error}")
                             import traceback
@@ -1148,28 +1134,8 @@ class ServiceOrchestrator:
                             
                             # Restart service using event loop safe approach
                             try:
-                                # Get or create event loop for this thread
-                                try:
-                                    loop = asyncio.get_event_loop()
-                                    if loop.is_closed():
-                                        raise RuntimeError("Event loop is closed")
-                                except RuntimeError:
-                                    # Create new event loop for this thread
-                                    loop = asyncio.new_event_loop()
-                                    asyncio.set_event_loop(loop)
-                                
-                                # Run restart with timeout in thread's event loop
-                                if loop.is_running():
-                                    # If loop is running, we need to run in executor
-                                    import concurrent.futures
-                                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                                        future = executor.submit(self._restart_service_sync, service_name)
-                                        future.result(timeout=60)
-                                else:
-                                    # Loop not running, safe to use run_until_complete
-                                    loop.run_until_complete(
-                                        asyncio.wait_for(self._restart_service(service_name), timeout=60)
-                                    )
+                                # FIXED: Simplified restart - avoid complex event loop management
+                                self._restart_service_sync(service_name)
                             except Exception as restart_error:
                                 self.logger.error(f"Failed to restart service {service_name}: {restart_error}")
                 
@@ -1336,12 +1302,10 @@ class ServiceOrchestrator:
         """Handle shutdown signals."""
         if self.verbose:
             print(f"\n🛑 Received signal {signum}, initiating graceful shutdown...")
-        
-        # Run shutdown in new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.stop_all_services())
-        loop.close()
+
+        # FIXED: Set shutdown flag instead of creating competing event loop
+        self.shutdown_event.set()
+        # Let the main event loop handle graceful shutdown
 
     async def _start_consistency_checker_service(self, dashboard_port: int) -> bool:
         """Start the API/UI consistency checker service."""
@@ -1733,26 +1697,9 @@ class ServiceOrchestrator:
                 if self.verbose:
                     print(f"   🐳 Running Docker command (attempt {retry + 1}/{max_retries}, timeout: {adaptive_timeout}s): {' '.join(cmd)}")
                 
-                # Enhanced event loop detection and handling
-                current_loop = None
-                try:
-                    current_loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    current_loop = None
-                
-                if current_loop is None:
-                    # No event loop running, create new one
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
-                        return result
-                    finally:
-                        loop.close()
-                else:
-                    # Event loop is running, execute directly
-                    result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
-                    return result
+                # FIXED: Simplified - no manual event loop management needed in async function
+                result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
+                return result
                     
             except asyncio.TimeoutError:
                 execution_time = int((time.time() - start_time) * 1000)
@@ -2761,26 +2708,42 @@ class ServiceOrchestrator:
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
     
     def _run_health_check_sync(self, service_name: str) -> bool:
-        """Synchronous wrapper for _run_health_check method."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        """FIXED: Synchronous wrapper for _run_health_check method with proper event loop handling."""
         try:
-            return loop.run_until_complete(
-                asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-            )
-        finally:
-            loop.close()
-    
+            # Check if we're already in an event loop
+            asyncio.get_running_loop()
+            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
+            self.logger.warning(f"_run_health_check_sync called from within event loop for {service_name}")
+            return False
+        except RuntimeError:
+            # No event loop running - safe to create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(
+                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                )
+            finally:
+                loop.close()
+
     def _restart_service_sync(self, service_name: str) -> None:
-        """Synchronous wrapper for _restart_service method."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        """FIXED: Synchronous wrapper for _restart_service method with proper event loop handling."""
         try:
-            loop.run_until_complete(
-                asyncio.wait_for(self._restart_service(service_name), timeout=60)
-            )
-        finally:
-            loop.close()
+            # Check if we're already in an event loop
+            asyncio.get_running_loop()
+            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
+            self.logger.warning(f"_restart_service_sync called from within event loop for {service_name}")
+            return
+        except RuntimeError:
+            # No event loop running - safe to create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                )
+            finally:
+                loop.close()
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""

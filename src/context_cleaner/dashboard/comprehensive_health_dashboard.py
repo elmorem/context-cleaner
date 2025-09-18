@@ -91,7 +91,7 @@ except ImportError:
 
 # Project Summary Analytics imports
 try:
-    from ..analysis.project_summary_analytics import ProjectSummaryAnalytics
+    from context_cleaner.analysis.project_summary_analytics import ProjectSummaryAnalytics
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = True
 except ImportError:
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = False
@@ -2564,6 +2564,15 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error in project summary widgets endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
     
+        @self.app.route('/api/debug/project-analytics-status')
+        def debug_project_analytics_status():
+            """Debug endpoint to check project analytics import status."""
+            return jsonify({
+                'PROJECT_SUMMARY_ANALYTICS_AVAILABLE': PROJECT_SUMMARY_ANALYTICS_AVAILABLE,
+                'project_summary_analytics_instance': self.project_summary_analytics is not None,
+                'import_test': 'success' if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else 'failed'
+            })
+
         @self.app.route('/api/content-search', methods=['GET', 'POST'])
         def search_content():
             """Search across conversation content, files, and tool outputs."""

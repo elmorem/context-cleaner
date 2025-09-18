@@ -90,30 +90,43 @@ class PortConflictManager:
         self.default_timeout_seconds = 5
         self.port_check_timeout = 2
         
-    async def is_port_available(self, port: int, host: str = "127.0.0.1") -> Tuple[bool, Optional[str]]:
+    def is_port_available(self, port: int, host: str = "127.0.0.1") -> Tuple[bool, Optional[str]]:
         """
         Check if a port is available for binding.
-        
+
         Args:
             port: Port number to check
             host: Host address to check (default: 127.0.0.1)
-            
+
         Returns:
             Tuple of (is_available, error_message)
         """
+        import asyncio
+        import concurrent.futures
+
+        def _check_port_sync():
+            """Synchronous port check to run in executor"""
+            try:
+                # Try to bind to the port
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.settimeout(self.port_check_timeout)
+
+                result = sock.bind((host, port))
+                sock.close()
+                return True, None
+
+            except socket.error as e:
+                error_msg = f"Port {port} unavailable: {e}"
+                return False, error_msg
+            except Exception as e:
+                error_msg = f"Port check error for {port}: {e}"
+                return False, error_msg
+
         try:
-            # Try to bind to the port
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.settimeout(self.port_check_timeout)
-            
-            result = sock.bind((host, port))
-            sock.close()
-            return True, None
-            
-        except socket.error as e:
-            error_msg = f"Port {port} unavailable: {e}"
-            return False, error_msg
+            # Run synchronously since socket operations are fast and we're in a controlled environment
+            return _check_port_sync()
+
         except Exception as e:
             error_msg = f"Port check error for {port}: {e}"
             return False, error_msg
@@ -131,7 +144,7 @@ class PortConflictManager:
         conflicts = {}
         
         for service_name, port in service_ports.items():
-            available, error = await self.is_port_available(port)
+            available, error = self.is_port_available(port)
             conflicts[service_name] = not available
             
             if not available and self.verbose:
@@ -293,7 +306,7 @@ class PortConflictManager:
         
         for attempt_num, port in enumerate(fallback_ports, 1):
             start_time = time.time()
-            available, error = await self.is_port_available(port)
+            available, error = self.is_port_available(port)
             duration_ms = int((time.time() - start_time) * 1000)
             
             attempt = PortRetryAttempt(
