@@ -1,94 +1,80 @@
-"""
-Test Fixtures for Enhanced Token Counting System Tests
+"""Shared test fixtures for context cleaner analysis tests."""
 
-Provides comprehensive mock data that simulates the 90% undercount scenario
-and various conversation patterns found in Claude Code JSONL files.
-"""
-
-import json
-import tempfile
-from pathlib import Path
+from typing import Dict, List, Any
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Iterator, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch
-from dataclasses import dataclass, field
-import pytest
-import asyncio
+import json
 
 
-@dataclass
-class MockJSONLData:
-    """Mock JSONL data for testing."""
-    
-    # Simulates the current limitation: only 10% of tokens are counted
-    reported_tokens: int
-    actual_tokens: int  # What the enhanced system should detect
-    
-    # File content
-    entries: List[Dict[str, Any]] = field(default_factory=list)
-    session_count: int = 1
-    total_lines: int = 100
-    
-    @property
-    def undercount_percentage(self) -> float:
-        """Calculate undercount percentage."""
-        if self.actual_tokens == 0:
-            return 0.0
-        return ((self.actual_tokens - self.reported_tokens) / self.actual_tokens) * 100
+class AnalysisTestData:
+    """Helper class for generating test data for analysis tests."""
 
-
-class JSONLTestFixtures:
-    """Comprehensive test fixtures for JSONL data patterns."""
-    
     @staticmethod
-    def create_realistic_conversation_entry(
-        message_type: str = "user",
-        content: str = "Test message",
-        usage: Dict[str, int] = None,
-        session_id: str = "test_session_001",
-        timestamp: str = None
-    ) -> Dict[str, Any]:
-        """Create a realistic JSONL conversation entry."""
-        
-        if timestamp is None:
-            timestamp = datetime.now().isoformat()
-            
-        entry = {
-            "type": message_type,
-            "timestamp": timestamp,
-            "session_id": session_id,
-            "message": {
-                "role": message_type,
-                "content": content
+    def create_sample_conversation_data() -> List[Dict[str, Any]]:
+        """Create sample conversation data for testing."""
+        return [
+            {
+                "timestamp": datetime.now().isoformat(),
+                "role": "user",
+                "content": "Help me optimize this code",
+                "token_count": 25
+            },
+            {
+                "timestamp": (datetime.now() + timedelta(minutes=1)).isoformat(),
+                "role": "assistant",
+                "content": "I'll analyze your code and suggest optimizations",
+                "token_count": 45
+            },
+            {
+                "timestamp": (datetime.now() + timedelta(minutes=2)).isoformat(),
+                "role": "user",
+                "content": "Thanks, what about performance?",
+                "token_count": 28
+            }
+        ]
+
+    @staticmethod
+    def create_sample_file_analysis() -> Dict[str, Any]:
+        """Create sample file analysis data."""
+        return {
+            "total_files": 15,
+            "active_files": 8,
+            "stale_files": 7,
+            "total_size_mb": 2.5,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "file_categories": {
+                "code": 10,
+                "documentation": 3,
+                "configuration": 2
             }
         }
-        
-        # Add usage stats for assistant messages (current limitation)
-        if message_type == "assistant" and usage:
-            entry["message"]["usage"] = usage
-            
-        return entry
-    
+
     @staticmethod
-    def create_claude_md_content() -> str:
-        """Create Claude MD style content that should be categorized correctly."""
-        return """# Claude Code Instructions
+    def create_sample_token_usage() -> Dict[str, Any]:
+        """Create sample token usage data."""
+        return {
+            "total_tokens": 15000,
+            "input_tokens": 8000,
+            "output_tokens": 7000,
+            "cost_estimate": 0.045,
+            "session_duration_minutes": 45,
+            "efficiency_score": 0.82
+        }
 
-You are Claude Code, Anthropic's official CLI tool. You have enhanced capabilities for:
-
-## Development Guidelines
-
-- Always prefer editing existing files to creating new ones
-- Use absolute paths for all file operations
-- Follow the project's coding standards
-
-## MCP Tool Integration
-
-When using mcp__ tools, ensure proper error handling and validation.
-
-## Test Coverage
-
-Ensure comprehensive test coverage for all new functionality."""
+    @staticmethod
+    def create_sample_health_metrics() -> Dict[str, Any]:
+        """Create sample health metrics."""
+        return {
+            "focus_score": 0.75,
+            "redundancy_score": 0.68,
+            "recency_score": 0.85,
+            "size_optimization_score": 0.72,
+            "overall_health": 0.75,
+            "recommendations": [
+                "Remove duplicate content",
+                "Archive old conversations",
+                "Focus on current tasks"
+            ]
+        }
 
     @staticmethod
     def create_system_prompt_content() -> str:
@@ -110,4 +96,8 @@ Key responsibilities:
 
 <function_calls>
 <invoke name="Read">
-<parameter name="file_path">/path/to/file.py
+<parameter name="file_path">/path/to/file.py</parameter>
+</invoke>
+</function_calls>
+
+Let me analyze the code structure and create appropriate tests."""

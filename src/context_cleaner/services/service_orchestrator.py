@@ -33,8 +33,8 @@ import socket
 import urllib.request
 import urllib.error
 from .api_ui_consistency_checker import APIUIConsistencyChecker
-from .port_conflict_manager import PortConflictManager, PortConflictStrategy
-from ..telemetry.collector import get_collector
+from .port_conflict_manager import PortConflictManager, PortConflictStrategy, get_port_registry
+from context_cleaner.telemetry.collector import get_collector
 from .process_registry import (
     ProcessEntry,
     ProcessRegistryDatabase,
@@ -161,6 +161,9 @@ class ServiceOrchestrator:
         
         # Port Conflict Management
         self.port_conflict_manager = PortConflictManager(verbose=verbose, logger=self.logger)
+
+        # Centralized Port Registry
+        self.port_registry = get_port_registry()
         
         # Initialize service definitions
         self._initialize_service_definitions()
@@ -355,47 +358,40 @@ class ServiceOrchestrator:
     async def start_all_services(self, dashboard_port: int = 8110) -> bool:
         """
         Start all services in dependency order.
-        
+
         Args:
             dashboard_port: Port for the dashboard service
-            
+
         Returns:
             True if all required services started successfully
         """
         self.running = True
         self.shutdown_event.clear()
-        
+
         if self.verbose:
             print("🚀 Starting Context Cleaner service orchestration...")
             print(f"📊 Dashboard port: {dashboard_port}")
         
-        # Port conflict detection and resolution
-        service_ports = {"dashboard": dashboard_port}
-        conflicts = await self.port_conflict_manager.detect_port_conflicts(service_ports)
-        
-        # Resolve dashboard port conflicts if detected
-        if conflicts.get("dashboard", False):
+        # Centralized port allocation using PortRegistry
+        if self.verbose:
+            print("🔧 Allocating ports through centralized registry...")
+
+        # Allocate dashboard port
+        dashboard_allocated_port, dashboard_message = self.port_registry.allocate_port(
+            service_name="dashboard",
+            service_type="dashboard",
+            preferred_port=dashboard_port,
+            force_preferred=False
+        )
+
+        if dashboard_allocated_port:
+            dashboard_port = dashboard_allocated_port
             if self.verbose:
-                print(f"⚠️  Port conflict detected for dashboard on port {dashboard_port}")
-            
-            available_port, session = await self.port_conflict_manager.find_available_port(
-                "dashboard", 
-                dashboard_port, 
-                PortConflictStrategy.HYBRID,
-                max_attempts=15
-            )
-            
-            if available_port:
-                dashboard_port = available_port
-                if self.verbose:
-                    print(f"✅ Resolved dashboard port conflict: using port {dashboard_port}")
-                    retry_stats = self.port_conflict_manager.get_retry_statistics()
-                    total_duration = session.total_duration_ms or 0
-                    print(f"   📊 Resolution took {len(session.attempts)} attempts in {total_duration}ms")
-            else:
-                if self.verbose:
-                    print("❌ Failed to resolve dashboard port conflict - no available ports found")
-                return False
+                print(f"✅ Dashboard port allocation: {dashboard_message}")
+        else:
+            if self.verbose:
+                print(f"❌ Dashboard port allocation failed: {dashboard_message}")
+            return False
         
         # Clean up any existing processes to ensure singleton operation
         self._cleanup_existing_processes()
@@ -513,7 +509,19 @@ class ServiceOrchestrator:
         # Stop health monitoring
         if self.health_monitor_thread and self.health_monitor_thread.is_alive():
             self.health_monitor_thread.join(timeout=5)
-        
+
+        # Deallocate all ports from the registry
+        if self.verbose:
+            print("🔧 Deallocating ports from centralized registry...")
+
+        deallocated_services = []
+        for service_name in ["dashboard", "clickhouse", "otel", "api", "websocket"]:
+            if self.port_registry.deallocate_port(service_name):
+                deallocated_services.append(service_name)
+
+        if self.verbose and deallocated_services:
+            print(f"✅ Deallocated ports for: {', '.join(deallocated_services)}")
+
         if self.verbose:
             print("✅ All services stopped")
         
@@ -1047,8 +1055,10 @@ class ServiceOrchestrator:
                 # Handle case where health_check might return bool directly
                 health_func = service.health_check
                 if callable(health_func):
+                    # FIXED: Use asyncio.get_running_loop() to avoid deadlocks
+                    loop = asyncio.get_running_loop()
                     result = await asyncio.wait_for(
-                        asyncio.get_event_loop().run_in_executor(
+                        loop.run_in_executor(
                             None, health_func
                         ),
                         timeout=10.0
@@ -1090,30 +1100,10 @@ class ServiceOrchestrator:
 
                         self.logger.debug(f"🏥 HEALTH_MONITOR: Running health check for {service_name} (last check: {time_since_last_check}s ago)")
 
-                        # Run health check using event loop safe approach
+                        # FIXED: Simplified health check - avoid complex event loop management
                         try:
-                            # Get or create event loop for this thread
-                            try:
-                                loop = asyncio.get_event_loop()
-                                if loop.is_closed():
-                                    raise RuntimeError("Event loop is closed")
-                            except RuntimeError:
-                                # Create new event loop for this thread
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                            
-                            # Run health check with timeout in thread's event loop
-                            if loop.is_running():
-                                # If loop is running, we need to run in executor
-                                import concurrent.futures
-                                with concurrent.futures.ThreadPoolExecutor() as executor:
-                                    future = executor.submit(self._run_health_check_sync, service_name)
-                                    healthy = future.result(timeout=30)
-                            else:
-                                # Loop not running, safe to use run_until_complete
-                                healthy = loop.run_until_complete(
-                                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-                                )
+                            # Use sync wrapper that handles event loops properly
+                            healthy = self._run_health_check_sync(service_name)
                         except Exception as health_error:
                             self.logger.error(f"🏥 HEALTH_MONITOR: Health check exception for {service_name}: {health_error}")
                             import traceback
@@ -1148,28 +1138,8 @@ class ServiceOrchestrator:
                             
                             # Restart service using event loop safe approach
                             try:
-                                # Get or create event loop for this thread
-                                try:
-                                    loop = asyncio.get_event_loop()
-                                    if loop.is_closed():
-                                        raise RuntimeError("Event loop is closed")
-                                except RuntimeError:
-                                    # Create new event loop for this thread
-                                    loop = asyncio.new_event_loop()
-                                    asyncio.set_event_loop(loop)
-                                
-                                # Run restart with timeout in thread's event loop
-                                if loop.is_running():
-                                    # If loop is running, we need to run in executor
-                                    import concurrent.futures
-                                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                                        future = executor.submit(self._restart_service_sync, service_name)
-                                        future.result(timeout=60)
-                                else:
-                                    # Loop not running, safe to use run_until_complete
-                                    loop.run_until_complete(
-                                        asyncio.wait_for(self._restart_service(service_name), timeout=60)
-                                    )
+                                # FIXED: Simplified restart - avoid complex event loop management
+                                self._restart_service_sync(service_name)
                             except Exception as restart_error:
                                 self.logger.error(f"Failed to restart service {service_name}: {restart_error}")
                 
@@ -1336,12 +1306,10 @@ class ServiceOrchestrator:
         """Handle shutdown signals."""
         if self.verbose:
             print(f"\n🛑 Received signal {signum}, initiating graceful shutdown...")
-        
-        # Run shutdown in new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.stop_all_services())
-        loop.close()
+
+        # FIXED: Set shutdown flag instead of creating competing event loop
+        self.shutdown_event.set()
+        # Let the main event loop handle graceful shutdown
 
     async def _start_consistency_checker_service(self, dashboard_port: int) -> bool:
         """Start the API/UI consistency checker service."""
@@ -1733,26 +1701,9 @@ class ServiceOrchestrator:
                 if self.verbose:
                     print(f"   🐳 Running Docker command (attempt {retry + 1}/{max_retries}, timeout: {adaptive_timeout}s): {' '.join(cmd)}")
                 
-                # Enhanced event loop detection and handling
-                current_loop = None
-                try:
-                    current_loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    current_loop = None
-                
-                if current_loop is None:
-                    # No event loop running, create new one
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
-                        return result
-                    finally:
-                        loop.close()
-                else:
-                    # Event loop is running, execute directly
-                    result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
-                    return result
+                # FIXED: Simplified - no manual event loop management needed in async function
+                result = await self._execute_docker_command_core(cmd, adaptive_timeout, retry)
+                return result
                     
             except asyncio.TimeoutError:
                 execution_time = int((time.time() - start_time) * 1000)
@@ -2761,26 +2712,42 @@ class ServiceOrchestrator:
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
     
     def _run_health_check_sync(self, service_name: str) -> bool:
-        """Synchronous wrapper for _run_health_check method."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        """FIXED: Synchronous wrapper for _run_health_check method with proper event loop handling."""
         try:
-            return loop.run_until_complete(
-                asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-            )
-        finally:
-            loop.close()
-    
+            # Check if we're already in an event loop
+            asyncio.get_running_loop()
+            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
+            self.logger.warning(f"_run_health_check_sync called from within event loop for {service_name}")
+            return False
+        except RuntimeError:
+            # No event loop running - safe to create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(
+                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                )
+            finally:
+                loop.close()
+
     def _restart_service_sync(self, service_name: str) -> None:
-        """Synchronous wrapper for _restart_service method."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        """FIXED: Synchronous wrapper for _restart_service method with proper event loop handling."""
         try:
-            loop.run_until_complete(
-                asyncio.wait_for(self._restart_service(service_name), timeout=60)
-            )
-        finally:
-            loop.close()
+            # Check if we're already in an event loop
+            asyncio.get_running_loop()
+            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
+            self.logger.warning(f"_restart_service_sync called from within event loop for {service_name}")
+            return
+        except RuntimeError:
+            # No event loop running - safe to create one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                )
+            finally:
+                loop.close()
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""
@@ -2795,3 +2762,347 @@ class ServiceOrchestrator:
                     print(f"   🗑️  Triggered cache invalidation for {service_name}")
             except Exception as e:
                 self.logger.error(f"Cache invalidation callback error for {service_name}: {e}")
+
+    # =============================================================================
+    # CONSOLIDATED DASHBOARD SINGLETON ENFORCEMENT
+    # Replaces DashboardServiceManager functionality with existing infrastructure
+    # =============================================================================
+
+    async def ensure_singleton_dashboard(self,
+                                       requested_port: int,
+                                       host: str = "127.0.0.1",
+                                       force_cleanup: bool = False) -> Tuple[int, str]:
+        """
+        Ensure only one dashboard instance is running using ServiceOrchestrator infrastructure.
+
+        Consolidates DashboardServiceManager functionality into ServiceOrchestrator to
+        eliminate service management redundancy and use existing process/port management.
+
+        Args:
+            requested_port: The desired port for the dashboard
+            host: The host to bind to (default: 127.0.0.1)
+            force_cleanup: Force cleanup even if current process is healthy
+
+        Returns:
+            Tuple of (actual_port, dashboard_url) for the singleton instance
+
+        Raises:
+            RuntimeError: If singleton enforcement fails
+        """
+
+        if self.verbose:
+            self.logger.info(f"🔒 Ensuring singleton dashboard on {host}:{requested_port} (ServiceOrchestrator)")
+
+        try:
+            # 1. DISCOVERY PHASE: Use existing process discovery infrastructure
+            dashboard_processes = await self._discover_dashboard_processes()
+
+            if self.verbose and dashboard_processes:
+                self.logger.info(f"📊 Found {len(dashboard_processes)} existing dashboard processes")
+                for proc in dashboard_processes:
+                    self.logger.info(f"   - PID {proc.pid} on port {proc.get('port', 'unknown')}")
+
+            # 2. CONFLICT RESOLUTION: Use existing cleanup infrastructure
+            conflicts = self._identify_dashboard_conflicts(dashboard_processes, requested_port, host)
+
+            if conflicts or force_cleanup:
+                if self.verbose:
+                    self.logger.info(f"🧹 Cleaning up {len(conflicts)} conflicting dashboard processes")
+
+                cleanup_success = await self._cleanup_dashboard_conflicts(conflicts)
+                if not cleanup_success:
+                    raise RuntimeError("Failed to cleanup conflicting dashboard processes")
+
+                # Brief pause to ensure cleanup completion
+                await asyncio.sleep(2)
+
+            # 3. PORT ALLOCATION: Use existing port registry infrastructure
+            allocated_port, allocation_msg = self.port_registry.allocate_port(
+                service_name="dashboard",
+                service_type="web_interface",
+                preferred_port=requested_port
+            )
+
+            if allocated_port is None:
+                raise RuntimeError(f"Port allocation failed: {allocation_msg}")
+
+            if self.verbose:
+                if allocated_port != requested_port:
+                    self.logger.info(f"📝 Port allocated: {requested_port} → {allocated_port} ({allocation_msg})")
+                else:
+                    self.logger.info(f"✅ Port {allocated_port} allocated successfully")
+
+            # 4. FINAL VALIDATION: Ensure clean state
+            dashboard_url = f"http://{host}:{allocated_port}"
+
+            # Register current process in process registry
+            current_process_entry = ProcessEntry(
+                pid=os.getpid(),
+                command_line=" ".join(sys.argv),
+                service_type="dashboard",
+                start_time=datetime.now(),
+                registration_time=datetime.now(),
+                port=allocated_port,
+                status='starting',
+                registration_source='service_orchestrator_singleton'
+            )
+
+            try:
+                self.process_registry.register_process(current_process_entry)
+            except Exception as reg_error:
+                if self.verbose:
+                    self.logger.debug(f"Process registry registration warning: {reg_error}")
+
+            if self.verbose:
+                self.logger.info(f"✅ Singleton dashboard ready: {dashboard_url}")
+
+            return allocated_port, dashboard_url
+
+        except Exception as e:
+            self.logger.error(f"❌ Dashboard singleton enforcement failed: {e}")
+            raise RuntimeError(f"Dashboard singleton enforcement failed: {e}") from e
+
+    async def _discover_dashboard_processes(self) -> List[ProcessEntry]:
+        """
+        Discover existing dashboard processes using ServiceOrchestrator infrastructure.
+
+        Returns:
+            List of ProcessEntry objects for dashboard processes
+        """
+        try:
+            # Use existing discovery engine to find Context Cleaner processes
+            all_processes = self.discovery_engine.discover_all_processes()
+
+            # Filter for dashboard-specific processes
+            dashboard_processes = []
+
+            for process in all_processes:
+                # Check if this process looks like a dashboard
+                is_dashboard = self._is_dashboard_process(process)
+
+                if is_dashboard:
+                    # Enhance with port information if available
+                    port = self._extract_port_from_process(process)
+                    if port:
+                        # Add port info to process for conflict analysis
+                        process_dict = process.__dict__.copy()
+                        process_dict['port'] = port
+                        dashboard_processes.append(process_dict)
+                    else:
+                        dashboard_processes.append(process)
+
+            if self.verbose and dashboard_processes:
+                self.logger.info(f"🔍 Dashboard process discovery: {len(dashboard_processes)} found")
+
+            return dashboard_processes
+
+        except Exception as e:
+            self.logger.error(f"Dashboard process discovery failed: {e}")
+            return []
+
+    def _is_dashboard_process(self, process: ProcessEntry) -> bool:
+        """Check if a ProcessEntry represents a dashboard process."""
+        cmdline = process.command_line.lower()
+
+        # Dashboard detection patterns
+        dashboard_indicators = [
+            "dashboard",
+            "--dashboard-port",
+            "comprehensivehealthdashboard",
+            "context_cleaner.*run.*--dashboard",
+            "context-cleaner.*run.*--dashboard"
+        ]
+
+        return any(indicator in cmdline for indicator in dashboard_indicators)
+
+    def _extract_port_from_process(self, process: ProcessEntry) -> Optional[int]:
+        """Extract dashboard port from process command line."""
+        import re
+
+        cmdline = process.command_line
+
+        # Port extraction patterns
+        port_patterns = [
+            r'--dashboard-port[\s=](\d+)',
+            r'--port[\s=](\d+)',
+            r'-p[\s=](\d+)'
+        ]
+
+        for pattern in port_patterns:
+            match = re.search(pattern, cmdline)
+            if match:
+                try:
+                    return int(match.group(1))
+                except ValueError:
+                    continue
+
+        # Check if there's a port in the process registry
+        if hasattr(process, 'port') and process.port:
+            return process.port
+
+        # Default dashboard port if dashboard keyword found but no explicit port
+        if "dashboard" in cmdline.lower():
+            return 8110
+
+        return None
+
+    def _identify_dashboard_conflicts(self,
+                                   dashboard_processes: List[Any],
+                                   requested_port: int,
+                                   requested_host: str) -> List[Any]:
+        """Identify dashboard processes that conflict with our requirements."""
+        conflicts = []
+
+        for process in dashboard_processes:
+            # Skip our own process
+            process_pid = process.get('pid') if isinstance(process, dict) else getattr(process, 'pid', None)
+            if process_pid == os.getpid():
+                continue
+
+            should_cleanup = False
+
+            # Get process port
+            process_port = process.get('port') if isinstance(process, dict) else getattr(process, 'port', None)
+
+            if process_port:
+                # Cleanup if on exact requested port
+                if process_port == requested_port:
+                    should_cleanup = True
+                # Cleanup if in conflict range (±5 ports)
+                elif abs(process_port - requested_port) <= 5:
+                    should_cleanup = True
+            else:
+                # If we can't determine port, cleanup to be safe
+                should_cleanup = True
+
+            if should_cleanup:
+                conflicts.append(process)
+                if self.verbose:
+                    reason = f"port {process_port or 'unknown'} conflicts with requested {requested_port}"
+                    self.logger.info(f"   ⚠️  PID {process_pid}: {reason}")
+
+        return conflicts
+
+    async def _cleanup_dashboard_conflicts(self, conflicts: List[Any]) -> bool:
+        """Cleanup conflicting dashboard processes using existing infrastructure."""
+        if not conflicts:
+            return True
+
+        cleanup_success = True
+
+        for process in conflicts:
+            try:
+                process_pid = process.get('pid') if isinstance(process, dict) else getattr(process, 'pid', None)
+                process_port = process.get('port') if isinstance(process, dict) else getattr(process, 'port', None)
+
+                if not process_pid:
+                    continue
+
+                if self.verbose:
+                    self.logger.info(f"   🛑 Terminating PID {process_pid} (port {process_port or 'unknown'})")
+
+                # Use psutil for process termination (matching existing pattern)
+                try:
+                    proc = psutil.Process(process_pid)
+                except psutil.NoSuchProcess:
+                    # Process already gone
+                    continue
+
+                # Graceful termination with SIGTERM
+                proc.terminate()
+
+                # Wait up to 10 seconds for graceful termination
+                try:
+                    proc.wait(timeout=10)
+                    if self.verbose:
+                        self.logger.info(f"   ✅ Gracefully terminated PID {process_pid}")
+                except psutil.TimeoutExpired:
+                    # Force kill if graceful termination failed
+                    if self.verbose:
+                        self.logger.info(f"   🔨 Force killing PID {process_pid}")
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=5)
+                    except Exception as kill_error:
+                        cleanup_success = False
+                        self.logger.error(f"   ❌ Failed to force kill PID {process_pid}: {kill_error}")
+
+                # Unregister from process registry
+                try:
+                    self.process_registry.unregister_process(process_pid)
+                except Exception as reg_error:
+                    if self.verbose:
+                        self.logger.debug(f"Registry cleanup error for PID {process_pid}: {reg_error}")
+
+                # Deallocate port if known
+                if process_port:
+                    try:
+                        self.port_registry.deallocate_port("dashboard", process_port)
+                    except Exception as port_error:
+                        if self.verbose:
+                            self.logger.debug(f"Port deallocation error for {process_port}: {port_error}")
+
+            except Exception as e:
+                cleanup_success = False
+                self.logger.error(f"Failed to cleanup process: {e}")
+
+        if self.verbose:
+            if cleanup_success:
+                self.logger.info("   ✅ Dashboard conflict cleanup completed successfully")
+            else:
+                self.logger.error("   ❌ Some dashboard conflicts could not be cleaned up")
+
+        return cleanup_success
+
+    def mark_dashboard_running(self, port: int, host: str = "127.0.0.1") -> bool:
+        """
+        Mark the current dashboard as running in ServiceOrchestrator registry.
+
+        Args:
+            port: Port the dashboard is running on
+            host: Host the dashboard is bound to
+
+        Returns:
+            True if marked successfully
+        """
+        try:
+            # Update process registry with running status
+            try:
+                # Find our process entry and update it
+                current_processes = self.process_registry.get_processes_by_pid(os.getpid())
+                if current_processes:
+                    for process_entry in current_processes:
+                        if process_entry.service_type == "dashboard":
+                            # Update to running status
+                            updated_entry = ProcessEntry(
+                                pid=process_entry.pid,
+                                command_line=process_entry.command_line,
+                                service_type=process_entry.service_type,
+                                start_time=process_entry.start_time,
+                                registration_time=process_entry.registration_time,
+                                port=port,
+                                status='running',
+                                registration_source=process_entry.registration_source
+                            )
+                            self.process_registry.update_process_status(process_entry.pid, 'running')
+                            break
+            except Exception as reg_error:
+                if self.verbose:
+                    self.logger.debug(f"Process registry update error: {reg_error}")
+
+            # Update service state if dashboard service is tracked
+            if "dashboard" in self.service_states:
+                state = self.service_states["dashboard"]
+                state.status = ServiceStatus.RUNNING
+                state.metrics["port"] = port
+                state.metrics["host"] = host
+                state.metrics["url"] = f"http://{host}:{port}"
+
+            if self.verbose:
+                self.logger.info(f"✅ Dashboard marked as running on {host}:{port} (ServiceOrchestrator)")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to mark dashboard as running: {e}")
+            return False

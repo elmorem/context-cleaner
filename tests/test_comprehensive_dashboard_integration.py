@@ -301,8 +301,8 @@ class TestBackwardsCompatibility:
         assert hasattr(dashboard, 'start_server')
         
         # Should be able to pass config
-        from context_cleaner.config.settings import ContextCleanerConfig
-        config = ContextCleanerConfig.default()
+        from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+        config = ApplicationConfig.default()
         dashboard_with_config = ProductivityDashboard(config)
         assert dashboard_with_config.config == config
 

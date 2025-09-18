@@ -6,7 +6,7 @@ import pytest
 import tempfile
 from datetime import datetime, timedelta
 
-from context_cleaner.config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 
 
@@ -20,7 +20,7 @@ def temp_data_dir():
 @pytest.fixture
 def test_config(temp_data_dir):
     """Create test configuration."""
-    config = ContextCleanerConfig.default()
+    config = ApplicationConfig.default()
     config.data_directory = temp_data_dir
     config.tracking.enabled = True
     config.tracking.session_timeout_minutes = 5

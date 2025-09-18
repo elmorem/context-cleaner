@@ -117,7 +117,7 @@ class ManipulationEngine:
             
             # ccusage approach: Use accurate token counting
             try:
-                from ..analysis.enhanced_token_counter import get_accurate_token_count
+                from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
                 return get_accurate_token_count(content_str)
             except ImportError:
                 # ccusage approach: Return 0 when accurate counting is not available

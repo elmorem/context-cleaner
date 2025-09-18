@@ -16,6 +16,7 @@ import math
 import calendar
 
 from ..config.settings import ContextCleanerConfig
+from ..api.models import create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -553,7 +554,11 @@ class SeasonalPatternDetector:
             )
 
             if not analyses:
-                return {"error": "No seasonal patterns detected for productivity"}
+                raise create_error_response(
+                    "No seasonal patterns detected for productivity",
+                    "NO_SEASONAL_PATTERNS",
+                    404
+                )
 
             productivity_analysis = analyses[0]
 
@@ -609,7 +614,11 @@ class SeasonalPatternDetector:
 
         except Exception as e:
             logger.error(f"Productivity seasonality analysis failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Productivity seasonality analysis failed: {str(e)}",
+                "SEASONALITY_ANALYSIS_ERROR",
+                500
+            )
 
     def forecast_seasonal_values(
         self, pattern: SeasonalPattern, forecast_periods: int = 7
@@ -626,7 +635,11 @@ class SeasonalPatternDetector:
         """
         try:
             if not pattern.pattern_values:
-                return {"error": "No pattern values available for forecasting"}
+                raise create_error_response(
+                    "No pattern values available for forecasting",
+                    "NO_PATTERN_VALUES",
+                    400
+                )
 
             # Generate forecast based on seasonal pattern
             period_length = len(pattern.pattern_values)
@@ -663,7 +676,11 @@ class SeasonalPatternDetector:
 
         except Exception as e:
             logger.error(f"Seasonal forecasting failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Seasonal forecasting failed: {str(e)}",
+                "FORECASTING_ERROR",
+                500
+            )
 
     # Private analysis methods
 

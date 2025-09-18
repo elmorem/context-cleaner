@@ -5,7 +5,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 
-from ..clients.base import TelemetryClient
+from context_cleaner.telemetry.clients.base import TelemetryClient
+from context_cleaner.telemetry.context_rot.config import get_config
 from .models import (
     BudgetConfig, 
     ModelRecommendation, 
@@ -66,7 +67,7 @@ class CostOptimizationEngine:
     def _get_accurate_token_count(self, content_str: str) -> int:
         """Get accurate token count using ccusage approach."""
         try:
-            from ...analysis.enhanced_token_counter import get_accurate_token_count
+            from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
@@ -191,13 +192,12 @@ class CostOptimizationEngine:
             # Try to use enhanced token counter if available
             import asyncio
             try:
-                from ...analysis.enhanced_token_counter import AnthropicTokenCounter
-                import os
-                
-                # Get API key
-                api_key = os.getenv("ANTHROPIC_API_KEY")
+                from context_cleaner.analysis.enhanced_token_counter import AnthropicTokenCounter
+                # Get API key from config
+                config = get_config()
+                api_key = config.external_services.anthropic_api_key
                 if not api_key:
-                    logger.debug("No ANTHROPIC_API_KEY found, using fallback estimation")
+                    logger.debug("No ANTHROPIC_API_KEY found in config, using fallback estimation")
                     raise ValueError("No API key available")
                 
                 # Use Anthropic's count-tokens API to get accurate count

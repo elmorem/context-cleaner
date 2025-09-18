@@ -1,6 +1,7 @@
 /**
  * Real-time Dashboard Updates with Error Recovery
  * WebSocket-based real-time updates with fallback to polling
+ * PHASE 1: Simplified coordination to eliminate race conditions
  */
 class RealtimeDashboard {
     constructor(options = {}) {
@@ -21,16 +22,27 @@ class RealtimeDashboard {
         this.fallbackMode = false;
         this.subscribers = new Map();
         this.eventQueue = [];
-        
+
+        // PHASE 1: Request coordination to prevent race conditions
+        this.requestQueue = new Map();
+        this.debounceTimeout = 100; // ms
+        this.updateLock = false;
+
         // Initialize dashboard components if available
         this.dashboardComponents = window.dashboardComponents || null;
-        
+
         // Bind methods
         this.handleOpen = this.handleOpen.bind(this);
         this.handleMessage = this.handleMessage.bind(this);
         this.handleClose = this.handleClose.bind(this);
         this.handleError = this.handleError.bind(this);
-        
+
+        // PHASE 1: Single source of truth for widget updates
+        this.setAsGlobalUpdateManager();
+
+        // PHASE 1: Set up global error handling
+        this.setupGlobalErrorHandling();
+
         // Initialize connection
         this.initialize();
     }
@@ -42,6 +54,151 @@ class RealtimeDashboard {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
         return `${protocol}//${host}/ws/dashboard`;
+    }
+
+    /**
+     * PHASE 1: Set this instance as the global update manager
+     * Prevents multiple competing update mechanisms
+     */
+    setAsGlobalUpdateManager() {
+        // Override global functions that cause race conditions
+        window.globalUpdateManager = this;
+
+        // Replace competing update functions with coordinated versions
+        window.loadDashboardMetrics = () => this.coordinatedDashboardUpdate();
+        window.loadOverviewMetrics = () => this.coordinatedDashboardUpdate();
+        window.autoLoadMetrics = () => this.coordinatedDashboardUpdate();
+
+        // PHASE 1: Coordinate cache invalidation with update-data command
+        window.globalUpdateManager = this;
+        window.coordinatedCacheInvalidation = () => this.handleCacheInvalidation();
+
+        console.log('🔧 RealtimeDashboard: Set as global update manager, eliminated competing update functions');
+    }
+
+    /**
+     * PHASE 1: Coordinated dashboard update to prevent race conditions
+     * Single source of truth for all widget updates
+     */
+    async coordinatedDashboardUpdate() {
+        // Prevent concurrent updates
+        if (this.updateLock) {
+            console.log('🔒 Update already in progress, skipping duplicate request');
+            return;
+        }
+
+        this.updateLock = true;
+
+        try {
+            // Show loading state
+            this.setLoadingState(true);
+
+            // Use existing request if within debounce window
+            const cacheKey = 'dashboard-metrics';
+            if (this.requestQueue.has(cacheKey)) {
+                console.log('🔄 Using cached dashboard metrics request');
+                return await this.requestQueue.get(cacheKey);
+            }
+
+            // Create new request
+            const promise = this.fetchDashboardMetrics();
+            this.requestQueue.set(cacheKey, promise);
+
+            // Clean up cache after debounce period
+            setTimeout(() => this.requestQueue.delete(cacheKey), this.debounceTimeout);
+
+            const data = await promise;
+            this.updateDashboardElements(data);
+
+            console.log('✅ Coordinated dashboard update completed');
+            return data;
+
+        } catch (error) {
+            console.error('❌ Coordinated dashboard update failed:', error);
+            this.setErrorState(error.message);
+        } finally {
+            this.updateLock = false;
+            this.setLoadingState(false);
+        }
+    }
+
+    /**
+     * PHASE 1: Fetch dashboard metrics with proper error handling
+     */
+    async fetchDashboardMetrics() {
+        const response = await fetch('/api/dashboard-metrics');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * PHASE 1: Update dashboard elements with data
+     * Single function to prevent inconsistent updates
+     */
+    updateDashboardElements(data) {
+        const elements = {
+            'total-tokens': data.data?.total_tokens || data.total_tokens || '0',
+            'metric-total-sessions': data.data?.total_sessions || data.total_sessions || '0',
+            'success-rate': data.data?.success_rate || data.success_rate || '95%',
+            'active-agents': data.data?.active_agents || data.active_agents || '0'
+        };
+
+        let updatedCount = 0;
+        for (const [elementId, value] of Object.entries(elements)) {
+            if (this.safeElementUpdate(elementId, value)) {
+                // Add update animation only if update was successful
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.classList.add('data-updated');
+                    setTimeout(() => element.classList.remove('data-updated'), 1000);
+                    updatedCount++;
+                }
+            }
+        }
+
+        console.log(`📊 Dashboard elements updated: ${updatedCount}/${Object.keys(elements).length}`, elements);
+    }
+
+    /**
+     * PHASE 1: Set loading state for widgets
+     */
+    setLoadingState(isLoading) {
+        const loadingElements = ['total-tokens', 'metric-total-sessions', 'success-rate', 'active-agents'];
+
+        loadingElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                if (isLoading) {
+                    element.classList.add('loading');
+                    // Don't replace content with "Loading..." to prevent flickering
+                } else {
+                    element.classList.remove('loading');
+                }
+            }
+        });
+    }
+
+    /**
+     * PHASE 1: Set error state for widgets
+     */
+    setErrorState(errorMessage) {
+        console.error('🚨 Dashboard error state:', errorMessage);
+
+        const errorElements = ['total-tokens', 'metric-total-sessions', 'success-rate', 'active-agents'];
+
+        errorElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.classList.add('error');
+                // Keep existing content instead of showing error to prevent flickering
+                setTimeout(() => element.classList.remove('error'), 3000);
+            }
+        });
+
+        // Show notification instead of replacing widget content
+        this.showNotification('Dashboard Update Error', errorMessage, 'error');
     }
 
     /**
@@ -202,12 +359,16 @@ class RealtimeDashboard {
 
     /**
      * Poll for updates using HTTP
+     * PHASE 1: Use coordinated updates instead of separate polling
      */
     async pollForUpdates() {
-        if (!this.dashboardComponents) return;
+        console.log('🔄 Fallback polling: Using coordinated dashboard update');
 
+        // Use the same coordinated update mechanism for consistency
+        await this.coordinatedDashboardUpdate();
+
+        // Poll other endpoints that don't compete with dashboard metrics
         const endpoints = [
-            { type: 'metrics', url: '/api/dashboard/metrics' },
             { type: 'health', url: '/api/health/detailed' },
             { type: 'events', url: '/api/realtime/events' }
         ];
@@ -259,8 +420,17 @@ class RealtimeDashboard {
 
     /**
      * Handle metrics update
+     * PHASE 1: Use coordinated update mechanism for consistency
      */
     handleMetricsUpdate(payload) {
+        console.log('📡 WebSocket metrics update received');
+
+        // Use coordinated update to prevent race conditions with HTTP polling
+        if (payload && typeof payload === 'object') {
+            this.updateDashboardElements(payload);
+        }
+
+        // Legacy component support
         if (this.dashboardComponents) {
             const metricsComponent = this.dashboardComponents.components.get('metrics-component');
             if (metricsComponent) {
@@ -269,6 +439,7 @@ class RealtimeDashboard {
                 this.addUpdateAnimation('metrics-component');
             }
         }
+
         this.notifySubscribers('metrics_update', payload);
     }
 
@@ -499,23 +670,145 @@ class RealtimeDashboard {
     }
 
     /**
+     * PHASE 1: Global error boundary for dashboard operations
+     */
+    setupGlobalErrorHandling() {
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('🚨 Unhandled promise rejection:', event.reason);
+            this.handleGlobalError(event.reason, 'promise_rejection');
+            event.preventDefault(); // Prevent browser default error handling
+        });
+
+        // Capture JavaScript errors
+        window.addEventListener('error', (event) => {
+            console.error('🚨 JavaScript error:', event.error);
+            this.handleGlobalError(event.error, 'javascript_error');
+        });
+
+        console.log('🛡️ Global error handling enabled');
+    }
+
+    /**
+     * PHASE 1: Handle global errors gracefully
+     */
+    handleGlobalError(error, type) {
+        // Don't spam users with too many error notifications
+        const errorKey = `${type}_${error.message || error}`;
+        if (this.recentErrors && this.recentErrors.has(errorKey)) {
+            return;
+        }
+
+        if (!this.recentErrors) {
+            this.recentErrors = new Set();
+        }
+
+        this.recentErrors.add(errorKey);
+        setTimeout(() => this.recentErrors.delete(errorKey), 30000); // 30 second cooldown
+
+        // Show user-friendly error notification
+        const errorMessage = this.getErrorMessage(error, type);
+        this.showNotification('Dashboard Error', errorMessage, 'error');
+
+        // Log for debugging
+        console.error(`Dashboard error [${type}]:`, error);
+    }
+
+    /**
+     * PHASE 1: Get user-friendly error messages
+     */
+    getErrorMessage(error, type) {
+        if (type === 'promise_rejection') {
+            if (error && error.message) {
+                if (error.message.includes('fetch')) {
+                    return 'Unable to connect to dashboard services. Retrying...';
+                }
+                if (error.message.includes('JSON')) {
+                    return 'Invalid data received from server. Please refresh.';
+                }
+            }
+            return 'An unexpected error occurred. Dashboard will continue operating.';
+        }
+
+        if (type === 'javascript_error') {
+            return 'A client-side error occurred. Dashboard functionality may be limited.';
+        }
+
+        return 'An error occurred. Please refresh if issues persist.';
+    }
+
+    /**
+     * PHASE 1: Handle cache invalidation coordination
+     * Called by update-data command to prevent race conditions
+     */
+    async handleCacheInvalidation() {
+        console.log('🗑️ Cache invalidation requested - coordinating refresh');
+
+        try {
+            // Clear request cache to force fresh data
+            this.requestQueue.clear();
+
+            // Set loading state
+            this.setLoadingState(true);
+
+            // Wait a brief moment for cache clearing to complete
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Trigger coordinated update
+            await this.coordinatedDashboardUpdate();
+
+            this.showNotification('Cache Cleared', 'Dashboard data refreshed successfully', 'success');
+            console.log('✅ Cache invalidation completed');
+
+        } catch (error) {
+            console.error('❌ Cache invalidation failed:', error);
+            this.setErrorState('Failed to refresh dashboard data');
+        }
+    }
+
+    /**
+     * PHASE 1: Graceful degradation for missing elements
+     */
+    safeElementUpdate(elementId, value) {
+        try {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.warn(`🔍 Element '${elementId}' not found, skipping update`);
+                return false;
+            }
+
+            element.textContent = value;
+            return true;
+        } catch (error) {
+            console.error(`❌ Error updating element '${elementId}':`, error);
+            this.handleGlobalError(error, 'element_update');
+            return false;
+        }
+    }
+
+    /**
      * Clean up resources
      */
     destroy() {
         if (this.websocket) {
             this.websocket.close();
         }
-        
+
         if (this.fallbackInterval) {
             clearInterval(this.fallbackInterval);
         }
-        
+
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
         }
-        
+
         this.subscribers.clear();
         this.eventQueue = [];
+
+        // Clean up error tracking
+        if (this.recentErrors) {
+            this.recentErrors.clear();
+        }
     }
 }
 

@@ -16,6 +16,7 @@ from enum import Enum
 import math
 
 from ..config.settings import ContextCleanerConfig
+from context_cleaner.api.models import create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -477,7 +478,11 @@ class PredictiveModelEngine:
                     timestamps.append(timestamp)
 
             if len(productivity_values) < self.min_training_samples:
-                return {"error": "Insufficient productivity data"}
+                raise create_error_response(
+                    "Insufficient productivity data",
+                    "INSUFFICIENT_PRODUCTIVITY_DATA",
+                    400
+                )
 
             # Sort by timestamp
             sorted_data = sorted(zip(timestamps, productivity_values))
@@ -554,7 +559,11 @@ class PredictiveModelEngine:
 
         except Exception as e:
             logger.error(f"Productivity trend forecasting failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Productivity trend forecasting failed: {str(e)}",
+                "TREND_FORECASTING_ERROR",
+                500
+            )
 
     def predict_optimal_timing(
         self,
@@ -582,7 +591,11 @@ class PredictiveModelEngine:
             ]
 
             if len(recent_data) < self.min_training_samples:
-                return {"error": "Insufficient recent data for timing analysis"}
+                raise create_error_response(
+                    "Insufficient recent data for timing analysis",
+                    "INSUFFICIENT_TIMING_DATA",
+                    400
+                )
 
             # Analyze productivity by hour of day
             hourly_patterns = self._analyze_hourly_productivity_patterns(recent_data)
@@ -617,7 +630,11 @@ class PredictiveModelEngine:
 
         except Exception as e:
             logger.error(f"Optimal timing prediction failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Optimal timing prediction failed: {str(e)}",
+                "TIMING_PREDICTION_ERROR",
+                500
+            )
 
     def evaluate_model_performance(
         self,

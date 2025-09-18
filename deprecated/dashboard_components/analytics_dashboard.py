@@ -20,6 +20,9 @@ from flask_socketio import SocketIO, emit
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+from context_cleaner.api.models import (
+    create_no_data_error, create_unsupported_error, create_error_response
+)
 from ..analytics.productivity_analyzer import ProductivityAnalyzer
 from ..analytics.context_health_scorer import (
     ContextHealthScorer,
@@ -331,7 +334,7 @@ class AnalyticsDashboard:
             sessions = self._get_recent_sessions(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Prepare data for chart
             dates = []
@@ -395,7 +398,7 @@ class AnalyticsDashboard:
 
         except Exception as e:
             logger.error(f"Productivity chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
     def _generate_health_score_chart(self, days: int = 30) -> Dict[str, Any]:
         """Generate health score trend chart."""
@@ -403,7 +406,7 @@ class AnalyticsDashboard:
             sessions = self._get_recent_sessions(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             dates = []
             health_scores = []
@@ -463,7 +466,7 @@ class AnalyticsDashboard:
 
         except Exception as e:
             logger.error(f"Health score chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
     def _generate_pattern_visualization(
         self, pattern_type: str = "all"
@@ -473,7 +476,7 @@ class AnalyticsDashboard:
             sessions = self._get_recent_sessions(14)  # 2 weeks for pattern analysis
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Safe trend analysis with error handling
             try:
@@ -522,11 +525,11 @@ class AnalyticsDashboard:
 
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
-            return {"error": f"Pattern type {pattern_type} not supported yet"}
+            raise create_unsupported_error("Pattern type", pattern_type)
 
         except Exception as e:
             logger.error(f"Pattern visualization generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
     def _generate_session_timeline(self, days: int = 7) -> Dict[str, Any]:
         """Generate session timeline visualization."""
@@ -534,7 +537,7 @@ class AnalyticsDashboard:
             sessions = self._get_recent_sessions(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Prepare timeline data
             timeline_data = []
@@ -592,7 +595,7 @@ class AnalyticsDashboard:
 
         except Exception as e:
             logger.error(f"Session timeline generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
     def _get_current_recommendations(self) -> List[Recommendation]:
         """Get current recommendations."""
@@ -785,7 +788,7 @@ class AnalyticsDashboard:
 
         except Exception as e:
             logger.error(f"Current metrics retrieval failed: {e}")
-            return {"error": str(e), "session_active": False}
+            raise create_error_response(str(e), "CURRENT_METRICS_ERROR")
 
     def _calculate_average_productivity(self, sessions: List[Dict[str, Any]]) -> float:
         """Calculate average productivity from sessions."""

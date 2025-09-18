@@ -5,7 +5,7 @@ import logging
 
 from .full_content_parser import FullContentJsonlParser
 from .content_security import ContentSecurityManager
-from ..clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 

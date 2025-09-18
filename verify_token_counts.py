@@ -10,6 +10,19 @@ import sys
 import requests
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
+from datetime import datetime
+
+def create_script_error(message: str, error_code: str = "SCRIPT_ERROR") -> dict:
+    """Create standardized error dict for script usage"""
+    return {
+        "error": message,
+        "error_code": error_code,
+        "timestamp": datetime.now().isoformat()
+    }
+
+def create_script_no_data_error(data_type: str) -> dict:
+    """Create standardized no data error for script usage"""
+    return create_script_error(f"No {data_type} found", "NO_DATA_AVAILABLE")
 
 def get_anthropic_api_key() -> str:
     """Get Anthropic API key from environment"""
@@ -46,7 +59,7 @@ def call_anthropic_count_tokens(messages: List[Dict], model: str = "claude-3-5-s
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"❌ API Error: {e}")
-        return {"error": str(e)}
+        return create_script_error(str(e), "API_REQUEST_ERROR")
 
 def parse_jsonl_conversation(file_path: str, max_messages: int = 10) -> List[Dict]:
     """Parse JSONL file and extract conversation messages for API verification"""
@@ -146,7 +159,7 @@ def analyze_jsonl_file_tokens(file_path: str) -> Dict[str, Any]:
                 except json.JSONDecodeError:
                     continue
     except Exception as e:
-        return {"error": str(e)}
+        return create_script_error(str(e), "API_REQUEST_ERROR")
     
     return {
         "our_method": {
@@ -166,19 +179,19 @@ def verify_file_token_counts(file_path: str, sample_size: int = 5) -> Dict[str, 
     # Get our current method's count for the entire file
     our_analysis = analyze_jsonl_file_tokens(file_path)
     if "error" in our_analysis:
-        return {"error": f"Failed to analyze file: {our_analysis['error']}"}
+        return create_script_error(f"Failed to analyze file: {our_analysis['error']}", "FILE_ANALYSIS_ERROR")
     
     # Get a sample conversation for API verification
     sample_messages = parse_jsonl_conversation(file_path, sample_size)
     if not sample_messages:
-        return {"error": "No valid messages found for API verification"}
+        return create_script_no_data_error("valid messages for API verification")
     
     print(f"📝 Sample conversation: {len(sample_messages)} messages")
     
     # Call Anthropic API for verification
     api_result = call_anthropic_count_tokens(sample_messages)
     if "error" in api_result:
-        return {"error": f"API call failed: {api_result['error']}"}
+        return create_script_error(f"API call failed: {api_result['error']}", "API_CALL_FAILED")
     
     return {
         "file_path": file_path,

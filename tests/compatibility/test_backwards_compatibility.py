@@ -15,7 +15,7 @@ from context_cleaner.dashboard.comprehensive_health_dashboard import Comprehensi
 from context_cleaner.dashboard import Dashboard, ComprehensiveHealthDashboard as ImportedCompDash
 from context_cleaner.cli.optimization_commands import OptimizationCommandHandler
 from context_cleaner.cli.analytics_commands import AnalyticsCommandHandler
-from context_cleaner.config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 
 
 class TestBackwardsCompatibility:
@@ -144,7 +144,7 @@ class TestBackwardsCompatibility:
     def test_config_object_compatibility(self):
         """Test that configuration objects still work as expected."""
         # Should be able to create config
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         
         # Should be able to pass config to dashboards
         prod_dashboard = ProductivityDashboard(config)
@@ -193,7 +193,7 @@ class TestBackwardsCompatibility:
         analytics_handler = AnalyticsCommandHandler()
         
         # Should be able to create handlers with config
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         opt_handler_with_config = OptimizationCommandHandler(config=config)
         analytics_handler_with_config = AnalyticsCommandHandler(config=config)
         
@@ -296,7 +296,7 @@ class TestBackwardsCompatibility:
         assert dashboard1 is not None
         
         # Pattern 2: With config
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         dashboard2 = ProductivityDashboard(config)
         assert dashboard2.config == config
         

@@ -7,17 +7,17 @@ import yaml
 import os
 from pathlib import Path
 
-from context_cleaner.config.settings import (
-    ContextCleanerConfig,
+from context_cleaner.telemetry.context_rot.config import (
+    ApplicationConfig,
 )
 
 
-class TestContextCleanerConfig:
-    """Test suite for ContextCleanerConfig."""
+class TestApplicationConfig:
+    """Test suite for ApplicationConfig."""
 
     def test_default_config_creation(self):
         """Test creation of default configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
 
         assert config.analysis.health_thresholds["excellent"] == 90
         assert config.analysis.health_thresholds["good"] == 70
@@ -39,7 +39,7 @@ class TestContextCleanerConfig:
         )
 
         try:
-            config = ContextCleanerConfig.from_env()
+            config = ApplicationConfig.from_env()
             assert config.dashboard.port == 9000
             assert config.data_directory == "/tmp/test-data"
             assert config.log_level == "DEBUG"
@@ -68,7 +68,7 @@ class TestContextCleanerConfig:
             config_file = f.name
 
         try:
-            config = ContextCleanerConfig.from_file(Path(config_file))
+            config = ApplicationConfig.from_file(Path(config_file))
             assert config.dashboard.port == 8080
             assert config.dashboard.host == "0.0.0.0"
             assert config.dashboard.auto_refresh is False
@@ -81,7 +81,7 @@ class TestContextCleanerConfig:
 
     def test_config_to_dict(self):
         """Test configuration serialization to dictionary."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         config_dict = config.to_dict()
 
         assert isinstance(config_dict, dict)
@@ -95,7 +95,7 @@ class TestContextCleanerConfig:
     def test_invalid_config_file(self):
         """Test handling of invalid configuration file."""
         try:
-            config = ContextCleanerConfig.from_file(Path("/non/existent/config.yaml"))
+            config = ApplicationConfig.from_file(Path("/non/existent/config.yaml"))
             # If no exception, should fall back to defaults
             assert config is not None
             assert config.dashboard.port == 8548
@@ -109,7 +109,7 @@ class TestConfigComponents:
 
     def test_analysis_config_values(self):
         """Test AnalysisConfig values in default configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         assert config.analysis.max_context_size == 100000
         assert config.analysis.health_thresholds["excellent"] == 90
         assert config.analysis.health_thresholds["good"] == 70
@@ -117,7 +117,7 @@ class TestConfigComponents:
 
     def test_dashboard_config_values(self):
         """Test DashboardConfig values in default configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         assert config.dashboard.port == 8548
         assert config.dashboard.host == "localhost"
         assert config.dashboard.auto_refresh is True
@@ -125,7 +125,7 @@ class TestConfigComponents:
 
     def test_tracking_config_values(self):
         """Test TrackingConfig values in default configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         assert config.tracking.enabled is True
         assert config.tracking.sampling_rate == 1.0
         assert config.tracking.session_timeout_minutes == 30
@@ -133,7 +133,7 @@ class TestConfigComponents:
 
     def test_privacy_config_values(self):
         """Test PrivacyConfig values in default configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         assert config.privacy.local_only is True
         assert config.privacy.encrypt_storage is True
         assert config.privacy.require_consent is True

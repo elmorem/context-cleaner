@@ -14,7 +14,8 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 
-from ..config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
+from context_cleaner.api.models import create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +66,14 @@ class ContextHealthScorer:
     - Confidence metrics for score reliability
     """
 
-    def __init__(self, config: Optional[ContextCleanerConfig] = None):
+    def __init__(self, config: Optional[ApplicationConfig] = None):
         """
         Initialize context health scorer.
 
         Args:
             config: Context Cleaner configuration
         """
-        self.config = config or ContextCleanerConfig.from_env()
+        self.config = config or ApplicationConfig.from_env()
 
         # Scoring model weights - can be adapted based on usage
         self.model_weights = {
@@ -286,7 +287,7 @@ class ContextHealthScorer:
                 session_file = context_data['session_file']
                 if session_file and isinstance(session_file, str):
                     try:
-                        from ..analysis.context_window_analyzer import ContextWindowAnalyzer
+                        from context_cleaner.analysis.context_window_analyzer import ContextWindowAnalyzer
                         analyzer = ContextWindowAnalyzer(self.config)
                         analysis = analyzer._analyze_session_context(session_file)
                         if analysis and 'estimated_tokens' in analysis:
@@ -296,7 +297,7 @@ class ContextHealthScorer:
             
             # Try to get token count from enhanced token analysis service
             try:
-                from ..analysis.dashboard_integration import get_enhanced_token_analysis_sync
+                from context_cleaner.analysis.dashboard_integration import get_enhanced_token_analysis_sync
                 enhanced_result = get_enhanced_token_analysis_sync()
                 if enhanced_result and enhanced_result.get('total_tokens', 0) > 0:
                     # This gives us global token count, but we need specific context data
@@ -314,7 +315,7 @@ class ContextHealthScorer:
     def _get_accurate_token_count(self, content_str: str) -> int:
         """Get accurate token count using ccusage approach."""
         try:
-            from ..analysis.enhanced_token_counter import get_accurate_token_count
+            from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
@@ -812,8 +813,12 @@ class ContextHealthScorer:
                 "scoring_timestamp": datetime.now().isoformat(),
             }
 
-        except Exception:
-            return {"error": "Unable to extract scoring factors"}
+        except Exception as e:
+            raise create_error_response(
+                "Unable to extract scoring factors",
+                "SCORING_FACTORS_EXTRACTION_ERROR",
+                500
+            )
 
     def _record_scoring_event(
         self, result: HealthScore, calculation_time: float, context_data: Dict[str, Any]

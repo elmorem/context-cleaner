@@ -29,6 +29,24 @@ from plotly.utils import PlotlyJSONEncoder
 
 # API Response Formatting
 from ..core.api_response_formatter import APIResponseFormatter
+from context_cleaner.api.models import (
+    create_no_data_error, create_unsupported_error, create_error_response
+)
+
+# Phase 2.2 Extraction: Import extracted data models and enums
+from .modules.dashboard_models import (
+    WidgetType, UpdateFrequency, WidgetConfig, DataSource,
+    ProductivityDataSource, HealthDataSource, TaskDataSource,
+    ContextAnalysisError, SecurityError, DataValidationError,
+    HealthColor, ContextCategory, FocusMetrics, RedundancyAnalysis,
+    RecencyIndicators, SizeOptimizationMetrics, ComprehensiveHealthReport
+)
+
+# Phase 2.3 Extraction: Import extracted cache management
+from .modules.dashboard_cache import DashboardCache, CacheCoordinator
+
+# Phase 2.4 Extraction: Import extracted real-time WebSocket management
+from .modules.dashboard_realtime import DashboardRealtime, RealtimeCoordinator
 
 # Optional cache dashboard imports
 try:
@@ -76,7 +94,7 @@ except ImportError:
 
 # Project Summary Analytics imports
 try:
-    from ..analysis.project_summary_analytics import ProjectSummaryAnalytics
+    from context_cleaner.analysis.project_summary_analytics import ProjectSummaryAnalytics
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = True
 except ImportError:
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = False
@@ -208,563 +226,6 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-# Advanced Dashboard Integration - DataSource Classes
-class WidgetType(Enum):
-    """Types of dashboard widgets"""
-
-    METRIC_CARD = "metric_card"
-    CHART = "chart"
-    TABLE = "table"
-    HEATMAP = "heatmap"
-    GAUGE = "gauge"
-    PROGRESS = "progress"
-    LIST = "list"
-    CUSTOM = "custom"
-
-
-class UpdateFrequency(Enum):
-    """Widget update frequencies"""
-
-    REALTIME = "realtime"  # Updates immediately when data changes
-    FAST = "fast"  # Every 5 seconds
-    NORMAL = "normal"  # Every 30 seconds
-    SLOW = "slow"  # Every 5 minutes
-    MANUAL = "manual"  # Only when explicitly refreshed
-
-
-@dataclass
-class WidgetConfig:
-    """Configuration for a dashboard widget"""
-
-    widget_id: str
-    widget_type: WidgetType
-    title: str
-    data_source: str
-    position: Dict[str, int]  # x, y, width, height
-    update_frequency: UpdateFrequency = UpdateFrequency.NORMAL
-    config: Dict[str, Any] = field(default_factory=dict)
-    filters: Dict[str, Any] = field(default_factory=dict)
-    permissions: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.now)
-    updated_at: datetime = field(default_factory=datetime.now)
-
-
-class DataSource:
-    """Base class for dashboard data sources"""
-
-    def __init__(self, source_id: str, config: Dict[str, Any]):
-        self.source_id = source_id
-        self.config = config
-        self.cache = {}
-        self.last_updated = None
-
-    async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Get data from the source"""
-        raise NotImplementedError
-
-    async def get_schema(self) -> Dict[str, Any]:
-        """Get data schema for the source"""
-        raise NotImplementedError
-
-    def invalidate_cache(self):
-        """Invalidate cached data"""
-        self.cache.clear()
-        self.last_updated = None
-
-
-class ProductivityDataSource(DataSource):
-    """Data source for productivity metrics"""
-
-    async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Get productivity data"""
-        try:
-            from ..analytics.productivity_analyzer import ProductivityAnalyzer
-
-            analyzer = ProductivityAnalyzer()
-
-            # Apply date range filter if provided
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=30)
-
-            if filters:
-                if "start_date" in filters:
-                    start_date = datetime.fromisoformat(filters["start_date"])
-                if "end_date" in filters:
-                    end_date = datetime.fromisoformat(filters["end_date"])
-
-            # Generate mock session data for the date range
-            mock_sessions = []
-            current_date = start_date
-            while current_date <= end_date:
-                sessions_per_day = 3 + int(
-                    (current_date.weekday() < 5) * 2
-                )  # More sessions on weekdays
-
-                for session_num in range(sessions_per_day):
-                    session_start = current_date.replace(
-                        hour=9 + session_num * 3, minute=0, second=0, microsecond=0
-                    )
-
-                    mock_sessions.append(
-                        {
-                            "timestamp": session_start,
-                            "duration_minutes": 45 + (session_num * 15),
-                            "active_time_minutes": 35 + (session_num * 12),
-                            "context_switches": 5 + session_num,
-                            "applications": ["code_editor", "browser", "terminal"][
-                                : session_num + 1
-                            ],
-                        }
-                    )
-
-                current_date += timedelta(days=1)
-
-            # Generate analysis from mock sessions (simplified approach)
-            total_duration = sum(s["duration_minutes"] for s in mock_sessions)
-            total_active = sum(s["active_time_minutes"] for s in mock_sessions)
-            avg_productivity_score = min(100, (total_active / total_duration) * 100) if total_duration > 0 else 75
-            
-            analysis = {
-                "overall_productivity_score": avg_productivity_score,
-                "total_focus_time_hours": total_active / 60,
-                "daily_productivity_averages": {},
-                "productivity_trend": "stable",
-                "efficiency_ratio": total_active / total_duration if total_duration > 0 else 0.85,
-                "avg_context_switches_per_hour": sum(s["context_switches"] for s in mock_sessions) / len(mock_sessions),
-                "peak_productivity_hours": [9, 10, 14, 15],
-            }
-
-            return {
-                "productivity_score": analysis.get("overall_productivity_score", 75),
-                "focus_time_hours": analysis.get("total_focus_time_hours", 6.5),
-                "daily_averages": analysis.get("daily_productivity_averages", {}),
-                "trend_direction": analysis.get("productivity_trend", "stable"),
-                "efficiency_ratio": analysis.get("efficiency_ratio", 0.85),
-                "context_switches_avg": analysis.get(
-                    "avg_context_switches_per_hour", 12
-                ),
-                "most_productive_hours": analysis.get(
-                    "peak_productivity_hours", [9, 10, 14, 15]
-                ),
-                "total_sessions": len(mock_sessions),
-                "active_days": len(
-                    set(session["timestamp"].date() for session in mock_sessions)
-                ),
-            }
-        except ImportError:
-            # Fallback if productivity analyzer is not available
-            return {
-                "productivity_score": 75,
-                "focus_time_hours": 6.5,
-                "daily_averages": {},
-                "trend_direction": "stable",
-                "efficiency_ratio": 0.85,
-                "context_switches_avg": 12,
-                "most_productive_hours": [9, 10, 14, 15],
-                "total_sessions": 20,
-                "active_days": 15,
-            }
-
-    async def get_schema(self) -> Dict[str, Any]:
-        """Get schema for productivity data"""
-        return {
-            "productivity_score": {"type": "number", "min": 0, "max": 100, "unit": "%"},
-            "focus_time_hours": {"type": "number", "min": 0, "unit": "hours"},
-            "daily_averages": {"type": "object"},
-            "trend_direction": {
-                "type": "string",
-                "enum": ["upward", "downward", "stable"],
-            },
-            "efficiency_ratio": {"type": "number", "min": 0, "max": 1},
-            "context_switches_avg": {"type": "number", "min": 0},
-            "most_productive_hours": {"type": "array", "items": {"type": "number"}},
-            "total_sessions": {"type": "number", "min": 0},
-            "active_days": {"type": "number", "min": 0},
-        }
-
-
-class HealthDataSource(DataSource):
-    """Data source for health and wellness metrics"""
-
-    async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Get health data"""
-        import random
-
-        base_date = datetime.now() - timedelta(days=30)
-        daily_data = []
-
-        for i in range(30):
-            date = base_date + timedelta(days=i)
-            daily_data.append(
-                {
-                    "date": date.date().isoformat(),
-                    "sleep_hours": 6.5 + random.uniform(-1.5, 1.5),
-                    "stress_level": random.randint(1, 10),
-                    "energy_level": random.randint(1, 10),
-                    "exercise_minutes": random.randint(0, 90),
-                    "screen_time_hours": 8 + random.uniform(-2, 4),
-                }
-            )
-
-        avg_sleep = sum(d["sleep_hours"] for d in daily_data) / len(daily_data)
-        avg_stress = sum(d["stress_level"] for d in daily_data) / len(daily_data)
-        avg_energy = sum(d["energy_level"] for d in daily_data) / len(daily_data)
-
-        return {
-            "average_sleep_hours": round(avg_sleep, 1),
-            "average_stress_level": round(avg_stress, 1),
-            "average_energy_level": round(avg_energy, 1),
-            "total_exercise_minutes": sum(d["exercise_minutes"] for d in daily_data),
-            "average_screen_time": round(
-                sum(d["screen_time_hours"] for d in daily_data) / len(daily_data), 1
-            ),
-            "daily_data": daily_data,
-            "sleep_quality_trend": (
-                "improving" if sum(d["sleep_hours"] for d in daily_data[-7:]) > sum(d["sleep_hours"] for d in daily_data[:7]) else "stable"
-            ),
-            "wellness_score": min(
-                100, max(0, (avg_energy * 10) - (avg_stress * 5) + (avg_sleep * 5))
-            ),
-        }
-
-    async def get_schema(self) -> Dict[str, Any]:
-        """Get schema for health data"""
-        return {
-            "average_sleep_hours": {
-                "type": "number",
-                "min": 0,
-                "max": 12,
-                "unit": "hours",
-            },
-            "average_stress_level": {
-                "type": "number",
-                "min": 1,
-                "max": 10,
-                "unit": "scale",
-            },
-            "average_energy_level": {
-                "type": "number",
-                "min": 1,
-                "max": 10,
-                "unit": "scale",
-            },
-            "total_exercise_minutes": {"type": "number", "min": 0, "unit": "minutes"},
-            "average_screen_time": {"type": "number", "min": 0, "unit": "hours"},
-            "daily_data": {"type": "array"},
-            "sleep_quality_trend": {
-                "type": "string",
-                "enum": ["improving", "declining", "stable"],
-            },
-            "wellness_score": {"type": "number", "min": 0, "max": 100, "unit": "%"},
-        }
-
-
-class TaskDataSource(DataSource):
-    """Data source for task and project management data"""
-
-    async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Get task management data"""
-        import random
-        from collections import defaultdict
-
-        task_statuses = ["todo", "in_progress", "review", "completed"]
-        priorities = ["low", "medium", "high", "urgent"]
-        categories = [
-            "development",
-            "research",
-            "documentation",
-            "meetings",
-            "planning",
-        ]
-
-        tasks = []
-        task_counts = defaultdict(int)
-        priority_counts = defaultdict(int)
-
-        for i in range(50):
-            status = random.choice(task_statuses)
-            priority = random.choice(priorities)
-            category = random.choice(categories)
-            created_date = datetime.now() - timedelta(days=random.randint(1, 30))
-
-            task = {
-                "id": f"task_{i}",
-                "title": f"Task {i}: {category.title()} Work",
-                "status": status,
-                "priority": priority,
-                "category": category,
-                "created_date": created_date.isoformat(),
-                "estimated_hours": random.randint(1, 16),
-                "actual_hours": random.randint(1, 20) if status == "completed" else 0,
-                "progress": random.randint(0, 100) if status != "todo" else 0,
-            }
-
-            tasks.append(task)
-            task_counts[status] += 1
-            priority_counts[priority] += 1
-
-        completed_tasks = [t for t in tasks if t["status"] == "completed"]
-        completion_rate = len(completed_tasks) / len(tasks) * 100
-
-        recent_completions = [
-            t
-            for t in completed_tasks
-            if datetime.fromisoformat(t["created_date"])
-            > datetime.now() - timedelta(days=7)
-        ]
-
-        return {
-            "total_tasks": len(tasks),
-            "task_counts_by_status": dict(task_counts),
-            "priority_distribution": dict(priority_counts),
-            "completion_rate": round(completion_rate, 1),
-            "weekly_velocity": len(recent_completions),
-            "average_task_duration": round(
-                sum(t["actual_hours"] for t in completed_tasks)
-                / max(len(completed_tasks), 1),
-                1,
-            ),
-            "overdue_tasks": random.randint(2, 8),
-            "upcoming_deadlines": random.randint(5, 15),
-            "tasks_by_category": dict(
-                defaultdict(
-                    int,
-                    {
-                        cat: len([t for t in tasks if t["category"] == cat])
-                        for cat in categories
-                    },
-                )
-            ),
-        }
-
-    async def get_schema(self) -> Dict[str, Any]:
-        """Get schema for task data"""
-        return {
-            "total_tasks": {"type": "number", "min": 0},
-            "task_counts_by_status": {"type": "object"},
-            "priority_distribution": {"type": "object"},
-            "completion_rate": {"type": "number", "min": 0, "max": 100, "unit": "%"},
-            "weekly_velocity": {"type": "number", "min": 0, "unit": "tasks/week"},
-            "average_task_duration": {"type": "number", "min": 0, "unit": "hours"},
-            "overdue_tasks": {"type": "number", "min": 0},
-            "upcoming_deadlines": {"type": "number", "min": 0},
-            "tasks_by_category": {"type": "object"},
-        }
-
-
-# Custom exceptions for better error handling
-class ContextAnalysisError(Exception):
-    """Base exception for context analysis errors."""
-
-    pass
-
-
-class SecurityError(ContextAnalysisError):
-    """Raised when security validation fails."""
-
-    pass
-
-
-class DataValidationError(ContextAnalysisError):
-    """Raised when context data validation fails."""
-
-    pass
-
-
-class HealthColor(Enum):
-    """Color codes for health indicators."""
-
-    EXCELLENT = "🟢"  # Green - 80%+
-    GOOD = "🟡"  # Yellow - 60-79%
-    POOR = "🔴"  # Red - <60%
-    CRITICAL = "🔥"  # Fire - <30%
-
-
-class ContextCategory(Enum):
-    """Context content categories for analysis."""
-
-    CURRENT_WORK = "current_work"
-    ACTIVE_FILES = "active_files"
-    TODOS = "todos"
-    CONVERSATIONS = "conversations"
-    ERRORS = "errors"
-    COMPLETED_ITEMS = "completed_items"
-    STALE_CONTENT = "stale_content"
-
-
-@dataclass
-class FocusMetrics:
-    """Comprehensive focus metrics as per CLEAN-CONTEXT-GUIDE.md."""
-
-    focus_score: float  # % context relevant to current work
-    priority_alignment: float  # % important items in top 25%
-    current_work_ratio: float  # % active tasks vs total context
-    attention_clarity: float  # % clear next steps vs noise
-
-    # Enhanced metrics with usage data
-    usage_weighted_focus: float  # Focus score weighted by actual usage
-    workflow_alignment: float  # % context aligned with typical workflows
-    task_completion_clarity: float  # % clear completion criteria
-
-    @property
-    def overall_focus_health(self) -> HealthColor:
-        """Determine overall focus health color."""
-        avg_score = (
-            self.focus_score
-            + self.priority_alignment
-            + self.current_work_ratio
-            + self.attention_clarity
-        ) / 4
-
-        if avg_score >= 0.8:
-            return HealthColor.EXCELLENT
-        elif avg_score >= 0.6:
-            return HealthColor.GOOD
-        elif avg_score >= 0.3:
-            return HealthColor.POOR
-        else:
-            return HealthColor.CRITICAL
-
-
-@dataclass
-class RedundancyAnalysis:
-    """Comprehensive redundancy analysis as per CLEAN-CONTEXT-GUIDE.md."""
-
-    duplicate_content_percentage: float  # % repeated information detected
-    stale_context_percentage: float  # % outdated information
-    redundant_files_count: int  # Files read multiple times
-    obsolete_todos_count: int  # Completed/irrelevant tasks
-
-    # Enhanced analysis with usage patterns
-    usage_redundancy_score: float  # Redundancy based on actual access
-    content_overlap_analysis: Dict[str, float]  # Overlap between content types
-    elimination_opportunity: float  # % context that could be removed safely
-
-    @property
-    def overall_redundancy_health(self) -> HealthColor:
-        """Determine overall redundancy health color."""
-        if self.duplicate_content_percentage < 0.1:
-            return HealthColor.EXCELLENT
-        elif self.duplicate_content_percentage < 0.25:
-            return HealthColor.GOOD
-        elif self.duplicate_content_percentage < 0.5:
-            return HealthColor.POOR
-        else:
-            return HealthColor.CRITICAL
-
-
-@dataclass
-class RecencyIndicators:
-    """Comprehensive recency indicators as per CLEAN-CONTEXT-GUIDE.md."""
-
-    fresh_context_percentage: float  # % modified within last hour
-    recent_context_percentage: float  # % modified within last session
-    aging_context_percentage: float  # % older than current session
-    stale_context_percentage: float  # % from previous unrelated work
-
-    # Enhanced indicators with usage weighting
-    usage_weighted_freshness: float  # Freshness weighted by access frequency
-    session_relevance_score: float  # % relevant to current session goals
-    content_lifecycle_analysis: Dict[str, float]  # Lifecycle stage breakdown
-
-    @property
-    def overall_recency_health(self) -> HealthColor:
-        """Determine overall recency health color."""
-        current_relevance = (
-            self.fresh_context_percentage + self.recent_context_percentage
-        )
-
-        if current_relevance >= 0.8:
-            return HealthColor.EXCELLENT
-        elif current_relevance >= 0.6:
-            return HealthColor.GOOD
-        elif current_relevance >= 0.3:
-            return HealthColor.POOR
-        else:
-            return HealthColor.CRITICAL
-
-
-@dataclass
-class SizeOptimizationMetrics:
-    """Comprehensive size optimization metrics as per CLEAN-CONTEXT-GUIDE.md."""
-
-    total_context_size_tokens: int  # Total context size in tokens
-    optimization_potential_percentage: float  # % reduction possible
-    critical_context_percentage: float  # % must preserve
-    cleanup_impact_tokens: int  # Tokens that could be saved
-
-    # Enhanced metrics with usage intelligence
-    usage_based_optimization_score: float  # Optimization potential based on usage
-    content_value_density: float  # Value per token metric
-    optimization_risk_assessment: Dict[
-        str, str
-    ]  # Risk levels for different optimizations
-
-    @property
-    def overall_size_health(self) -> HealthColor:
-        """Determine overall size health color."""
-        if self.optimization_potential_percentage < 0.15:
-            return HealthColor.EXCELLENT
-        elif self.optimization_potential_percentage < 0.3:
-            return HealthColor.GOOD
-        elif self.optimization_potential_percentage < 0.5:
-            return HealthColor.POOR
-        else:
-            return HealthColor.CRITICAL
-
-
-@dataclass
-class ComprehensiveHealthReport:
-    """Complete context health report combining all metrics."""
-
-    # Core metric categories
-    focus_metrics: FocusMetrics
-    redundancy_analysis: RedundancyAnalysis
-    recency_indicators: RecencyIndicators
-    size_optimization: SizeOptimizationMetrics
-
-    # Enhanced insights
-    usage_insights: List[Dict[str, Any]]
-    file_access_heatmap: Dict[str, Dict[str, float]]
-    token_efficiency_trends: Dict[str, List[float]]
-    optimization_recommendations: List[Dict[str, Any]]
-
-    # Metadata
-    analysis_timestamp: datetime
-    context_analysis_duration: float
-    confidence_score: float
-
-    @property
-    def overall_health_score(self) -> float:
-        """Calculate overall health score (0-1)."""
-        focus_score = (
-            self.focus_metrics.focus_score
-            + self.focus_metrics.priority_alignment
-            + self.focus_metrics.current_work_ratio
-            + self.focus_metrics.attention_clarity
-        ) / 4
-
-        redundancy_score = 1 - self.redundancy_analysis.duplicate_content_percentage
-        recency_score = (
-            self.recency_indicators.fresh_context_percentage
-            + self.recency_indicators.recent_context_percentage
-        ) / 2
-        size_score = 1 - self.size_optimization.optimization_potential_percentage
-
-        return (focus_score + redundancy_score + recency_score + size_score) / 4
-
-    @property
-    def overall_health_color(self) -> HealthColor:
-        """Determine overall health color."""
-        score = self.overall_health_score
-        if score >= 0.8:
-            return HealthColor.EXCELLENT
-        elif score >= 0.6:
-            return HealthColor.GOOD
-        elif score >= 0.3:
-            return HealthColor.POOR
-        else:
-            return HealthColor.CRITICAL
 
 
 class ComprehensiveHealthDashboard:
@@ -826,22 +287,15 @@ class ComprehensiveHealthDashboard:
 
         # Dashboard configuration
         # Create default config if None provided (backwards compatibility)
-        from ..config.settings import ContextCleanerConfig
-        self.config = config or ContextCleanerConfig.default()
+        from ..telemetry.context_rot.config import ApplicationConfig
+        self.config = config or ApplicationConfig.default()
         self.host = "127.0.0.1"
         self.port = 8080
         self.debug = False
 
         # Real-time dashboard state
         self._is_running = False
-        self._update_thread: Optional[threading.Thread] = None
-        self._stop_event = threading.Event()
-        self._performance_history: List[Dict[str, Any]] = []
-        self._max_history_points = 200  # 10 minutes at 3-second intervals
         self._start_time = time.time()  # Track dashboard start time for uptime calculations
-
-        # Alert system (from real-time performance dashboard)
-        self._alerts_enabled = True
         self._alert_thresholds = {
             "memory_mb": 50.0,
             "cpu_percent": 5.0,
@@ -880,10 +334,19 @@ class ComprehensiveHealthDashboard:
             self.health_monitor = None
             self.dashboard_metrics_breaker = None
         
-        # Session analytics cache for performance optimization
-        self._session_analytics_cache: Optional[List[Dict[str, Any]]] = None
-        self._session_analytics_cache_time: Optional[datetime] = None
-        self._session_analytics_cache_ttl = 30  # Cache TTL in seconds
+        # Phase 2.3: Initialize unified cache management
+        self.dashboard_cache = DashboardCache(
+            cache_dashboard=self.cache_dashboard,
+            telemetry_widgets=None  # Will be set after telemetry initialization
+        )
+        self.cache_coordinator = CacheCoordinator(self.dashboard_cache)
+
+        # Phase 2.4: Initialize WebSocket-first real-time management
+        self.realtime_manager = DashboardRealtime(
+            socketio=self.socketio,
+            dashboard_instance=self
+        )
+        self.realtime_coordinator = RealtimeCoordinator(self.realtime_manager)
 
         # Telemetry integration (Phase 2 enhancement)
         self.telemetry_enabled = TELEMETRY_DASHBOARD_AVAILABLE
@@ -939,9 +402,9 @@ class ComprehensiveHealthDashboard:
         else:
             logger.info("Telemetry dashboard not available - running in basic mode")
         
-        # Setup Flask routes and SocketIO events
+        # Setup Flask routes and WebSocket-first real-time events
         self._setup_routes()
-        self._setup_socketio_events()
+        self.realtime_coordinator.setup_realtime_infrastructure()
 
         logger.info(
             f"Comprehensive health dashboard initialized with integrated features "
@@ -1033,7 +496,8 @@ class ComprehensiveHealthDashboard:
         def get_performance_metrics():
             """Get current performance metrics."""
             try:
-                metrics = self._get_current_performance_metrics()
+                # Phase 2.4: Delegate to extracted real-time module
+                metrics = self.realtime_manager.get_current_performance_metrics()
                 return jsonify(metrics)
             except Exception as e:
                 logger.error(f"Performance metrics failed: {e}")
@@ -1167,16 +631,17 @@ class ComprehensiveHealthDashboard:
         @self.app.route("/api/telemetry/clear-cache", methods=["POST"])
         def clear_widget_cache():
             """Clear widget cache to force fresh data retrieval."""
-            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
-                return jsonify({"error": "Telemetry not available"}), 404
-
             try:
-                self.telemetry_widgets.clear_cache()
-                logger.info("Widget cache cleared via API")
-                return jsonify({
-                    "message": "Widget cache cleared successfully",
-                    "timestamp": datetime.now().isoformat()
-                })
+                # Phase 2.3: Use extracted cache management
+                success = self.dashboard_cache.clear_widget_cache()
+                if success:
+                    logger.info("Widget cache cleared via unified cache management")
+                    return jsonify({
+                        "message": "Widget cache cleared successfully",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    return jsonify({"error": "Widget cache clearing not available"}), 404
             except Exception as e:
                 logger.error(f"Cache clear failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -1506,50 +971,15 @@ class ComprehensiveHealthDashboard:
         def get_cache_intelligence():
             """Get cache intelligence data from cache dashboard."""
             try:
+                # Phase 2.3: Use extracted cache management
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                cache_data = loop.run_until_complete(
-                    self.cache_dashboard.generate_dashboard(
-                        include_cross_session=True,
-                        max_sessions=30,
-                    )
+                cache_dict = loop.run_until_complete(
+                    self.dashboard_cache.get_cache_intelligence()
                 )
                 loop.close()
 
-                if cache_data:
-                    # Convert dataclass to dict for JSON serialization
-                    cache_dict = {
-                        "context_size": cache_data.context_size,
-                        "file_count": cache_data.file_count,
-                        "session_count": cache_data.session_count,
-                        "analysis_timestamp": cache_data.analysis_timestamp.isoformat(),
-                        "health_metrics": {
-                            "usage_weighted_focus_score": cache_data.health_metrics.usage_weighted_focus_score,
-                            "efficiency_score": cache_data.health_metrics.efficiency_score,
-                            "temporal_coherence_score": cache_data.health_metrics.temporal_coherence_score,
-                            "cross_session_consistency": cache_data.health_metrics.cross_session_consistency,
-                            "optimization_potential": cache_data.health_metrics.optimization_potential,
-                            "waste_reduction_score": cache_data.health_metrics.waste_reduction_score,
-                            "workflow_alignment": cache_data.health_metrics.workflow_alignment,
-                            "overall_health_score": cache_data.health_metrics.overall_health_score,
-                            "health_level": cache_data.health_metrics.health_level.value,
-                        },
-                        "usage_trends": cache_data.usage_trends,
-                        "efficiency_trends": cache_data.efficiency_trends,
-                        "insights": [
-                            {
-                                "type": insight.type,
-                                "title": insight.title,
-                                "description": insight.description,
-                                "impact_score": insight.impact_score,
-                                "recommendation": insight.recommendation,
-                                "file_patterns": insight.file_patterns,
-                                "session_correlation": insight.session_correlation,
-                            }
-                            for insight in cache_data.insights
-                        ],
-                        "optimization_recommendations": cache_data.optimization_recommendations,
-                    }
+                if cache_dict:
                     return jsonify(cache_dict)
                 else:
                     return jsonify({"message": "No cache intelligence data available"})
@@ -2076,57 +1506,29 @@ class ComprehensiveHealthDashboard:
 
         @self.app.route("/api/realtime/events")
         def realtime_events():
-            """Real-time events endpoint for WebSocket fallback."""
+            """
+            Real-time events endpoint - HTTP fallback for WebSocket-first architecture
+            Phase 2.4: Delegates to extracted real-time module
+            """
             try:
-                # Get recent events/updates for polling fallback
-                events = []
-
-                # Add dashboard metrics update event
-                try:
-                    metrics = self._get_basic_dashboard_metrics()
-                    events.append({
-                        "type": "dashboard_metrics",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "data": metrics
-                    })
-                except Exception:
-                    pass
-
-                # Add health status event
-                events.append({
-                    "type": "health_status",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "data": {
-                        "status": "healthy",
-                        "services_active": len(self.data_sources)
-                    }
-                })
-
-                # Add context window usage event if available
-                try:
-                    if CONTEXT_ANALYZER_AVAILABLE:
-                        analyzer = ContextWindowAnalyzer()
-                        usage_data = analyzer.get_total_context_usage()
-                        events.append({
-                            "type": "context_usage",
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "data": usage_data
-                        })
-                except Exception:
-                    pass
+                # Phase 2.4: Use extracted real-time module for HTTP fallback
+                events = self.realtime_manager.get_realtime_events_fallback()
 
                 return jsonify({
                     "events": events,
-                    "last_update": datetime.utcnow().isoformat(),
-                    "polling_interval": 5000,  # 5 seconds
-                    "total_events": len(events)
+                    "transport": "http_polling",
+                    "websocket_available": self.realtime_manager.socketio is not None,
+                    "recommendation": self.realtime_coordinator.get_transport_recommendation(),
+                    "timestamp": datetime.now().isoformat()
                 })
             except Exception as e:
-                logger.error(f"Real-time events endpoint failed: {e}")
+                logger.error(f"Real-time events fallback failed: {e}")
                 return jsonify({
-                    "events": [],
-                    "last_update": datetime.utcnow().isoformat(),
-                    "polling_interval": 10000,  # Fallback to 10 seconds
+                    "events": [{
+                        "type": "error",
+                        "timestamp": datetime.now().isoformat(),
+                        "data": {"message": str(e)}
+                    }],
                     "error": str(e)
                 }), 500
 
@@ -3165,6 +2567,15 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error in project summary widgets endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
     
+        @self.app.route('/api/debug/project-analytics-status')
+        def debug_project_analytics_status():
+            """Debug endpoint to check project analytics import status."""
+            return jsonify({
+                'PROJECT_SUMMARY_ANALYTICS_AVAILABLE': PROJECT_SUMMARY_ANALYTICS_AVAILABLE,
+                'project_summary_analytics_instance': self.project_summary_analytics is not None,
+                'import_test': 'success' if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else 'failed'
+            })
+
         @self.app.route('/api/content-search', methods=['GET', 'POST'])
         def search_content():
             """Search across conversation content, files, and tool outputs."""
@@ -3343,91 +2754,7 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Error in content search endpoint: {e}")
                 return jsonify({'error': str(e)}), 500
 
-    def _setup_socketio_events(self):
-        """Setup SocketIO events for real-time updates."""
-
-        @self.socketio.on("connect")
-        def handle_connect():
-            """Handle client connection."""
-            logger.info("Dashboard client connected")
-            # Send initial comprehensive health data
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                report = loop.run_until_complete(
-                    self.generate_comprehensive_health_report()
-                )
-                loop.close()
-                # Convert to JSON-safe format
-                try:
-                    report_dict = asdict(report)
-                    # Replace datetime objects with ISO strings
-                    def serialize_datetime(obj):
-                        if isinstance(obj, dict):
-                            return {k: serialize_datetime(v) for k, v in obj.items()}
-                        elif isinstance(obj, list):
-                            return [serialize_datetime(item) for item in obj]
-                        elif isinstance(obj, datetime):
-                            return obj.isoformat()
-                        elif hasattr(obj, 'value'):  # Handle enums
-                            return obj.value
-                        return obj
-                    safe_report = serialize_datetime(report_dict)
-                    emit("health_update", safe_report)
-                except Exception as serialize_error:
-                    logger.warning(f"Serialization error: {serialize_error}")
-                    emit("health_update", {"status": "error", "message": "Failed to serialize health data"})
-            except Exception as e:
-                logger.error(f"Initial health data failed: {e}")
-                emit("error", {"message": str(e)})
-
-        @self.socketio.on("disconnect")
-        def handle_disconnect():
-            """Handle client disconnection."""
-            logger.info("Dashboard client disconnected")
-
-        @self.socketio.on("request_health_update")
-        def handle_health_update_request():
-            """Handle health update request from client."""
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                report = loop.run_until_complete(
-                    self.generate_comprehensive_health_report()
-                )
-                loop.close()
-                # Convert to JSON-safe format
-                try:
-                    report_dict = asdict(report)
-                    # Replace datetime objects with ISO strings
-                    def serialize_datetime(obj):
-                        if isinstance(obj, dict):
-                            return {k: serialize_datetime(v) for k, v in obj.items()}
-                        elif isinstance(obj, list):
-                            return [serialize_datetime(item) for item in obj]
-                        elif isinstance(obj, datetime):
-                            return obj.isoformat()
-                        elif hasattr(obj, 'value'):  # Handle enums
-                            return obj.value
-                        return obj
-                    safe_report = serialize_datetime(report_dict)
-                    emit("health_update", safe_report)
-                except Exception as serialize_error:
-                    logger.warning(f"Serialization error: {serialize_error}")
-                    emit("health_update", {"status": "error", "message": "Failed to serialize health data"})
-            except Exception as e:
-                logger.error(f"Health update request failed: {e}")
-                emit("error", {"message": str(e)})
-
-        @self.socketio.on("request_performance_update")
-        def handle_performance_update_request():
-            """Handle performance update request from client."""
-            try:
-                metrics = self._get_current_performance_metrics()
-                emit("performance_update", metrics)
-            except Exception as e:
-                logger.error(f"Performance update request failed: {e}")
-                emit("error", {"message": str(e)})
+    # Phase 2.4: SocketIO events extracted to dashboard_realtime module
 
     def start_server(
         self,
@@ -3453,17 +2780,12 @@ class ComprehensiveHealthDashboard:
         self.port = port
         self.debug = debug
 
-        # Start real-time update thread
+        # Phase 2.4: Start WebSocket-first real-time infrastructure
         if not self._is_running:
             self._is_running = True
-            self._stop_event.clear()
-
-            self._update_thread = threading.Thread(
-                target=self._real_time_update_loop,
-                daemon=True,
-                name="ComprehensiveDashboard",
-            )
-            self._update_thread.start()
+            # Real-time infrastructure already started in setup, ensure it's running
+            if not (self.realtime_manager._update_thread and self.realtime_manager._update_thread.is_alive()):
+                self.realtime_manager.start_background_broadcasting()
 
         if production:
             logger.info(f"Starting comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
@@ -3673,10 +2995,10 @@ def create_app():
     try:
         logger.info("📦 Loading Context Cleaner modules...")
         from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-        from context_cleaner.config.settings import ContextCleanerConfig
-        
+        from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+
         logger.info("⚙️ Loading configuration...")
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         
         logger.info("🏗️ Creating dashboard instance...")
         dashboard = ComprehensiveHealthDashboard(config=config)
@@ -3946,14 +3268,14 @@ if __name__ == "__main__":
                 }
         except Exception as e:
             logger.error(f"Performance metrics error: {e}")
-            return {"timestamp": datetime.now().isoformat(), "error": str(e)}
+            raise create_error_response(str(e), "PERFORMANCE_METRICS_ERROR")
 
     def _generate_plotly_chart(self, chart_type: str) -> Dict[str, Any]:
         """Generate Plotly chart data for various chart types."""
         try:
             if chart_type == "health_trends":
                 if not self._performance_history:
-                    return {"error": "No health data available"}
+                    raise create_no_data_error("health")
 
                 # Extract trend data
                 timestamps = [h["timestamp"] for h in self._performance_history[-50:]]
@@ -4036,21 +3358,19 @@ if __name__ == "__main__":
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     def get_recent_sessions_analytics(self, days: int = 30) -> List[Dict[str, Any]]:
         """Get recent session data using real-time cache discovery and JSONL parsing."""
-        # Check cache first for performance optimization
-        now = datetime.now()
-        if (self._session_analytics_cache is not None and 
-            self._session_analytics_cache_time is not None and 
-            (now - self._session_analytics_cache_time).total_seconds() < self._session_analytics_cache_ttl):
-            logger.debug(f"Returning cached session analytics ({len(self._session_analytics_cache)} sessions)")
-            return self._session_analytics_cache
+        # Phase 2.3: Check unified cache first for performance optimization
+        cached_data = self.dashboard_cache.get_session_analytics_cache()
+        if cached_data is not None:
+            logger.debug(f"Returning cached session analytics ({len(cached_data)} sessions)")
+            return cached_data
             
         logger.info(f"Retrieving recent sessions for analytics dashboard ({days} days)")
         try:
@@ -4163,18 +3483,16 @@ if __name__ == "__main__":
             logger.info(
                 f"Retrieved {len(dashboard_sessions)} sessions from JSONL files"
             )
-            # Cache the results for performance optimization
+            # Phase 2.3: Cache the results using unified cache management
             result = dashboard_sessions[:100]  # Limit to 100 most recent sessions
-            self._session_analytics_cache = result
-            self._session_analytics_cache_time = now
+            self.dashboard_cache.set_session_analytics_cache(result)
             return result
 
         except Exception as e:
             logger.error(f"Session analytics retrieval failed: {e}")
             # Cache empty result to avoid repeated failures
             result = []
-            self._session_analytics_cache = result
-            self._session_analytics_cache_time = now
+            self.dashboard_cache.set_session_analytics_cache(result)
             return result
 
     def generate_analytics_charts(
@@ -4183,7 +3501,7 @@ if __name__ == "__main__":
         """Generate advanced analytics charts using Plotly."""
         try:
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             if chart_type == "productivity_trend":
                 # Productivity trend over time
@@ -4320,11 +3638,11 @@ if __name__ == "__main__":
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Analytics chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     def generate_session_timeline(self, days: int = 7) -> Dict[str, Any]:
         """Generate session timeline visualization."""
@@ -4332,7 +3650,7 @@ if __name__ == "__main__":
             sessions = self.get_recent_sessions_analytics(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Prepare timeline data
             timeline_data = []
@@ -4390,7 +3708,7 @@ if __name__ == "__main__":
 
         except Exception as e:
             logger.error(f"Session timeline generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     async def generate_comprehensive_health_report(
         self,
@@ -5949,7 +5267,7 @@ if __name__ == "__main__":
             # Find Claude Code cache directory
             cache_dir = Path.home() / ".claude" / "projects"
             if not cache_dir.exists():
-                return {"error": "Claude Code cache not found", "categories": []}
+                raise create_no_data_error("Claude Code cache")
             
             total_tokens = {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
             categories = {
@@ -5975,7 +5293,7 @@ if __name__ == "__main__":
             # Calculate percentages and create charts
             total_all = sum(total_tokens.values())
             if total_all == 0:
-                return {"error": "No token data found", "categories": []}
+                raise create_no_data_error("token data")
             
             # Create category summary
             category_data = []
@@ -6010,7 +5328,7 @@ if __name__ == "__main__":
             
         except Exception as e:
             logging.error(f"Token analysis error: {e}")
-            return {"error": str(e), "categories": []}
+            raise create_error_response(str(e), "TOKEN_ANALYSIS_ERROR")
     
     def _analyze_file_tokens(self, file_path, total_tokens, categories):
         """Analyze tokens from a single JSONL file."""

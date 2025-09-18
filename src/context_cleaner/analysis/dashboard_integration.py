@@ -6,12 +6,12 @@ with enhanced accuracy using Anthropic's count-tokens API and comprehensive
 JSONL file processing.
 """
 
-import os
 import logging
 import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
+from context_cleaner.telemetry.context_rot.config import get_config
 from .enhanced_token_counter import (
     EnhancedTokenCounterService, 
     SessionTokenTracker,
@@ -25,7 +25,8 @@ class DashboardTokenAnalyzer:
     """Enhanced token analyzer for dashboard integration."""
     
     def __init__(self):
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        config = get_config()
+        self.anthropic_api_key = config.external_services.anthropic_api_key
         self.token_service = EnhancedTokenCounterService(self.anthropic_api_key)
         self.session_tracker = SessionTokenTracker()
         self._last_analysis: Optional[EnhancedTokenAnalysis] = None

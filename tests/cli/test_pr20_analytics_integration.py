@@ -23,7 +23,7 @@ from context_cleaner.analytics.effectiveness_tracker import (
     EffectivenessMetrics,
     OptimizationSession
 )
-from context_cleaner.config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 
 
 class TestAnalyticsCommandHandler:
@@ -38,7 +38,7 @@ class TestAnalyticsCommandHandler:
     @pytest.fixture
     def mock_config(self, temp_dir):
         """Create mock configuration."""
-        config = Mock(spec=ContextCleanerConfig)
+        config = Mock(spec=ApplicationConfig)
         config.data_directory = str(temp_dir)
         config.dashboard = Mock()
         config.dashboard.port = 8080

@@ -16,14 +16,14 @@ from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ..clients.clickhouse_client import ClickHouseClient
-from ..cost_optimization.engine import CostOptimizationEngine
-from ..error_recovery.manager import ErrorRecoveryManager
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.cost_optimization.engine import CostOptimizationEngine
+from context_cleaner.telemetry.error_recovery.manager import ErrorRecoveryManager
 
 # Context Rot Meter imports
 try:
-    from ..context_rot.analyzer import ContextRotAnalyzer
-    from ..context_rot.widget import ContextRotWidget
+    from context_cleaner.telemetry.context_rot.analyzer import ContextRotAnalyzer
+    from context_cleaner.telemetry.context_rot.widget import ContextRotWidget
     CONTEXT_ROT_AVAILABLE = True
 except ImportError as e:
     print(f"Context Rot import failed: {e}")
@@ -71,8 +71,8 @@ except ImportError as e:
 
 # Phase 4: JSONL Analytics imports
 try:
-    from ..jsonl_enhancement.full_content_queries import FullContentQueries
-    from ..jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+    from context_cleaner.telemetry.jsonl_enhancement.full_content_queries import FullContentQueries
+    from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
     JSONL_ANALYTICS_AVAILABLE = True
 except ImportError:
     JSONL_ANALYTICS_AVAILABLE = False
@@ -90,9 +90,9 @@ except ImportError:
 
 # Phase 3: Orchestration system imports
 try:
-    from ..orchestration.task_orchestrator import TaskOrchestrator
-    from ..orchestration.workflow_learner import WorkflowLearner
-    from ..orchestration.agent_selector import AgentSelector
+    from context_cleaner.telemetry.orchestration.task_orchestrator import TaskOrchestrator
+    from context_cleaner.telemetry.orchestration.workflow_learner import WorkflowLearner
+    from context_cleaner.telemetry.orchestration.agent_selector import AgentSelector
     ORCHESTRATION_AVAILABLE = True
 except ImportError:
     ORCHESTRATION_AVAILABLE = False

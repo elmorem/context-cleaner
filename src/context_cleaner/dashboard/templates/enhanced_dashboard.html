@@ -1116,10 +1116,10 @@
                         (function(){
                             setTimeout(function(){
                                 fetch('/api/dashboard-metrics').then(r=>r.json()).then(d=>{
-                                    document.getElementById('total-tokens').textContent=d.total_tokens||'0';
-                                    document.getElementById('metric-total-sessions').textContent=d.total_sessions||'0';
-                                    document.getElementById('success-rate').textContent=d.success_rate||'95%';
-                                    document.getElementById('active-agents').textContent=d.active_agents||'0';
+                                    document.getElementById('total-tokens').textContent=d.data.total_tokens||'0';
+                                    document.getElementById('metric-total-sessions').textContent=d.data.total_sessions||'0';
+                                    document.getElementById('success-rate').textContent=d.data.success_rate||'95%';
+                                    document.getElementById('active-agents').textContent=d.data.active_agents||'0';
                                 }).catch(e=>{
                                     console.error('Metrics load failed:',e);
                                     document.getElementById('total-tokens').textContent='Error';
@@ -1251,16 +1251,16 @@
                         .then(data => {
                             console.log('Dashboard metrics loaded:', data);
                             if (document.getElementById('total-tokens')) {
-                                document.getElementById('total-tokens').textContent = data.total_tokens || '0';
+                                document.getElementById('total-tokens').textContent = data.data.total_tokens || '0';
                             }
                             if (document.getElementById('metric-total-sessions')) {
-                                document.getElementById('metric-total-sessions').textContent = data.total_sessions || '0';
+                                document.getElementById('metric-total-sessions').textContent = data.data.total_sessions || '0';
                             }
                             if (document.getElementById('success-rate')) {
-                                document.getElementById('success-rate').textContent = data.success_rate || '95%';
+                                document.getElementById('success-rate').textContent = data.data.success_rate || '95%';
                             }
                             if (document.getElementById('active-agents')) {
-                                document.getElementById('active-agents').textContent = data.active_agents || '11';
+                                document.getElementById('active-agents').textContent = data.data.active_agents || '11';
                             }
                         })
                         .catch(error => {
@@ -2164,17 +2164,17 @@ LIMIT 20</textarea>
                     .then(response => response.json())
                     .then(data => {
                         console.log('Auto-loading metrics:', data);
-                        if (data.total_tokens && document.getElementById('total-tokens')) {
-                            document.getElementById('total-tokens').textContent = data.total_tokens;
+                        if (data.data.total_tokens && document.getElementById('total-tokens')) {
+                            document.getElementById('total-tokens').textContent = data.data.total_tokens;
                         }
-                        if (data.total_sessions && document.getElementById('metric-total-sessions')) {
-                            document.getElementById('metric-total-sessions').textContent = data.total_sessions;
+                        if (data.data.total_sessions && document.getElementById('metric-total-sessions')) {
+                            document.getElementById('metric-total-sessions').textContent = data.data.total_sessions;
                         }
-                        if (data.success_rate && document.getElementById('success-rate')) {
-                            document.getElementById('success-rate').textContent = data.success_rate;
+                        if (data.data.success_rate && document.getElementById('success-rate')) {
+                            document.getElementById('success-rate').textContent = data.data.success_rate;
                         }
-                        if (data.active_agents && document.getElementById('active-agents')) {
-                            document.getElementById('active-agents').textContent = data.active_agents;
+                        if (data.data.active_agents && document.getElementById('active-agents')) {
+                            document.getElementById('active-agents').textContent = data.data.active_agents;
                         }
                     })
                     .catch(error => {
@@ -2391,17 +2391,17 @@ LIMIT 20</textarea>
                 .then(data => {
                     console.log('Overview metrics loaded:', data);
                     // Update the metrics in the overview section
-                    if (data.total_tokens) {
-                        document.getElementById('total-tokens').textContent = data.total_tokens;
+                    if (data.data.total_tokens) {
+                        document.getElementById('total-tokens').textContent = data.data.total_tokens;
                     }
-                    if (data.total_sessions) {
-                        document.getElementById('metric-total-sessions').textContent = data.total_sessions;
+                    if (data.data.total_sessions) {
+                        document.getElementById('metric-total-sessions').textContent = data.data.total_sessions;
                     }
-                    if (data.success_rate) {
-                        document.getElementById('success-rate').textContent = data.success_rate;
+                    if (data.data.success_rate) {
+                        document.getElementById('success-rate').textContent = data.data.success_rate;
                     }
-                    if (data.active_agents) {
-                        document.getElementById('active-agents').textContent = data.active_agents;
+                    if (data.data.active_agents) {
+                        document.getElementById('active-agents').textContent = data.data.active_agents;
                     }
                 })
                 .catch(error => {
@@ -2620,13 +2620,13 @@ LIMIT 20</textarea>
                             } else if (widget.id === 'agent-utilization') {
                                 content += `
                                     <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">
-                                        🤖 ${data.active_agents || 0} Active Agents
+                                        🤖 ${data.data.active_agents || 0} Active Agents
                                     </div>
                                     <div style="font-size: 0.875rem; color: #6b7280;">
-                                        Total Sessions: ${data.total_sessions || 0}
+                                        Total Sessions: ${data.data.total_sessions || 0}
                                     </div>
                                     <div style="font-size: 0.875rem; color: #6b7280;">
-                                        Processing ${data.total_tokens || 0} tokens
+                                        Processing ${data.data.total_tokens || 0} tokens
                                     </div>
                                 `;
                             } else if (widget.id === 'workflow-performance') {

@@ -16,6 +16,7 @@ import socket
 
 from .clickhouse_schema import ClickHouseSchema, SchemaVersion
 from ..telemetry.clients.clickhouse_client import ClickHouseClient, ConnectionStatus
+from ..telemetry.context_rot.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,9 @@ class DatabaseInitializer:
         Returns:
             Environment configuration dictionary
         """
+        # Get centralized configuration for production environment variables
+        config = get_config()
+
         configs = {
             "development": {
                 "database_name": "otel_dev",
@@ -459,8 +463,8 @@ class DatabaseInitializer:
             },
             "production": {
                 "database_name": "otel",
-                "host": os.getenv("CLICKHOUSE_HOST", "localhost"),
-                "port": int(os.getenv("CLICKHOUSE_PORT", "9000")),
+                "host": config.database.clickhouse_host,
+                "port": config.database.clickhouse_port,
                 "max_connections": 10,
                 "query_timeout": 60,
                 "enable_health_monitoring": True,
