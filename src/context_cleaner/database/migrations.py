@@ -17,7 +17,7 @@ import hashlib
 import json
 
 from .clickhouse_schema import ClickHouseSchema, SchemaVersion
-from ..telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 

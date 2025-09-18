@@ -13,7 +13,8 @@ import asyncio
 import socket
 import time
 import logging
-from typing import List, Dict, Optional, Tuple, Any
+import threading
+from typing import List, Dict, Optional, Tuple, Any, Set
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime, timedelta
@@ -90,30 +91,43 @@ class PortConflictManager:
         self.default_timeout_seconds = 5
         self.port_check_timeout = 2
         
-    async def is_port_available(self, port: int, host: str = "127.0.0.1") -> Tuple[bool, Optional[str]]:
+    def is_port_available(self, port: int, host: str = "127.0.0.1") -> Tuple[bool, Optional[str]]:
         """
         Check if a port is available for binding.
-        
+
         Args:
             port: Port number to check
             host: Host address to check (default: 127.0.0.1)
-            
+
         Returns:
             Tuple of (is_available, error_message)
         """
+        import asyncio
+        import concurrent.futures
+
+        def _check_port_sync():
+            """Synchronous port check to run in executor"""
+            try:
+                # Try to bind to the port
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.settimeout(self.port_check_timeout)
+
+                result = sock.bind((host, port))
+                sock.close()
+                return True, None
+
+            except socket.error as e:
+                error_msg = f"Port {port} unavailable: {e}"
+                return False, error_msg
+            except Exception as e:
+                error_msg = f"Port check error for {port}: {e}"
+                return False, error_msg
+
         try:
-            # Try to bind to the port
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.settimeout(self.port_check_timeout)
-            
-            result = sock.bind((host, port))
-            sock.close()
-            return True, None
-            
-        except socket.error as e:
-            error_msg = f"Port {port} unavailable: {e}"
-            return False, error_msg
+            # Run synchronously since socket operations are fast and we're in a controlled environment
+            return _check_port_sync()
+
         except Exception as e:
             error_msg = f"Port check error for {port}: {e}"
             return False, error_msg
@@ -131,7 +145,7 @@ class PortConflictManager:
         conflicts = {}
         
         for service_name, port in service_ports.items():
-            available, error = await self.is_port_available(port)
+            available, error = self.is_port_available(port)
             conflicts[service_name] = not available
             
             if not available and self.verbose:
@@ -293,7 +307,7 @@ class PortConflictManager:
         
         for attempt_num, port in enumerate(fallback_ports, 1):
             start_time = time.time()
-            available, error = await self.is_port_available(port)
+            available, error = self.is_port_available(port)
             duration_ms = int((time.time() - start_time) * 1000)
             
             attempt = PortRetryAttempt(
@@ -443,10 +457,252 @@ class PortConflictManager:
     def cleanup_all_sessions(self) -> int:
         """
         Clean up all retry sessions.
-        
+
         Returns:
             Number of sessions cleaned up
         """
         count = len(self.active_sessions)
         self.active_sessions.clear()
         return count
+
+
+@dataclass
+class PortAllocation:
+    """Represents a port allocation to a service."""
+    service_name: str
+    service_type: str  # 'dashboard', 'api', 'clickhouse', 'otel', etc.
+    port: int
+    allocated_at: datetime
+    last_health_check: Optional[datetime] = None
+    is_active: bool = True
+
+
+class PortRegistry:
+    """
+    Centralized port allocation and management system.
+
+    Prevents port conflicts between Flask dashboard, FastAPI, ClickHouse, OTEL, etc.
+    Maintains global registry of all allocated ports with health monitoring.
+    """
+
+    _instance: Optional['PortRegistry'] = None
+    _lock = threading.Lock()
+
+    def __init__(self):
+        # Core port tracking
+        self.allocated_ports: Dict[int, PortAllocation] = {}
+        self.service_ports: Dict[str, int] = {}  # service_name -> port
+        self.reserved_ports: Set[int] = set()
+
+        # Port ranges by service type
+        self.service_port_ranges = {
+            'dashboard': (8100, 8199),      # Flask dashboard
+            'api': (8000, 8099),            # FastAPI API
+            'clickhouse': (8200, 8299),     # ClickHouse
+            'otel': (4300, 4399),           # OTEL collectors
+            'websocket': (8300, 8399),      # WebSocket services
+            'auxiliary': (9000, 9999)       # Other services
+        }
+
+        # Default ports for services
+        self.default_ports = {
+            'dashboard': 8110,
+            'api': 8000,
+            'clickhouse': 8123,
+            'otel': 4317,
+            'websocket': 8350
+        }
+
+        # Thread safety
+        self._allocation_lock = threading.Lock()
+
+        # Health monitoring
+        self.health_check_interval = 30  # seconds
+        self.last_global_health_check = datetime.now()
+
+        # Port conflict manager integration
+        self.conflict_manager = PortConflictManager(verbose=True)
+
+    @classmethod
+    def get_instance(cls) -> 'PortRegistry':
+        """Get singleton instance of PortRegistry."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    def allocate_port(
+        self,
+        service_name: str,
+        service_type: str,
+        preferred_port: Optional[int] = None,
+        force_preferred: bool = False
+    ) -> Tuple[Optional[int], str]:
+        """
+        Allocate a port for a service.
+
+        Args:
+            service_name: Unique service identifier
+            service_type: Type of service (dashboard, api, clickhouse, etc.)
+            preferred_port: Desired port number
+            force_preferred: If True, fail if preferred port unavailable
+
+        Returns:
+            Tuple of (allocated_port, message)
+        """
+        with self._allocation_lock:
+            # Check if service already has a port
+            if service_name in self.service_ports:
+                existing_port = self.service_ports[service_name]
+                allocation = self.allocated_ports.get(existing_port)
+                if allocation and allocation.is_active:
+                    return existing_port, f"Service {service_name} already allocated port {existing_port}"
+
+            # Determine target port
+            target_port = preferred_port or self.default_ports.get(service_type, 8000)
+
+            # Check if preferred port is available
+            if self._is_port_allocatable(target_port, service_type):
+                allocated_port = self._perform_allocation(service_name, service_type, target_port)
+                return allocated_port, f"Allocated preferred port {allocated_port} to {service_name}"
+
+            # If force_preferred is True and preferred port unavailable, fail
+            if force_preferred:
+                return None, f"Preferred port {target_port} unavailable and force_preferred=True"
+
+            # Find alternative port in service range
+            port_range = self.service_port_ranges.get(service_type, (8000, 8999))
+
+            # Try ports in range
+            for port in range(port_range[0], port_range[1] + 1):
+                if self._is_port_allocatable(port, service_type):
+                    allocated_port = self._perform_allocation(service_name, service_type, port)
+                    return allocated_port, f"Allocated alternative port {allocated_port} to {service_name}"
+
+            # No ports available in range
+            return None, f"No available ports in range {port_range} for service type {service_type}"
+
+    def _is_port_allocatable(self, port: int, service_type: str) -> bool:
+        """Check if a port can be allocated."""
+        # Check if already allocated
+        if port in self.allocated_ports:
+            return False
+
+        # Check if reserved
+        if port in self.reserved_ports:
+            return False
+
+        # Check if actually available on system
+        available, _ = self.conflict_manager.is_port_available(port)
+        if not available:
+            return False
+
+        # Check if in valid range for service type
+        port_range = self.service_port_ranges.get(service_type)
+        if port_range and not (port_range[0] <= port <= port_range[1]):
+            return False
+
+        return True
+
+    def _perform_allocation(self, service_name: str, service_type: str, port: int) -> int:
+        """Perform the actual port allocation."""
+        allocation = PortAllocation(
+            service_name=service_name,
+            service_type=service_type,
+            port=port,
+            allocated_at=datetime.now(),
+            is_active=True
+        )
+
+        self.allocated_ports[port] = allocation
+        self.service_ports[service_name] = port
+
+        return port
+
+    def deallocate_port(self, service_name: str) -> bool:
+        """
+        Deallocate a port from a service.
+
+        Args:
+            service_name: Service identifier
+
+        Returns:
+            True if deallocated successfully
+        """
+        with self._allocation_lock:
+            if service_name not in self.service_ports:
+                return False
+
+            port = self.service_ports[service_name]
+
+            # Remove from allocations
+            if port in self.allocated_ports:
+                del self.allocated_ports[port]
+
+            # Remove from service mapping
+            del self.service_ports[service_name]
+
+            return True
+
+    def get_service_port(self, service_name: str) -> Optional[int]:
+        """Get the allocated port for a service."""
+        return self.service_ports.get(service_name)
+
+    def get_all_allocations(self) -> Dict[str, Dict[str, Any]]:
+        """Get all current port allocations."""
+        with self._allocation_lock:
+            allocations = {}
+            for service_name, port in self.service_ports.items():
+                allocation = self.allocated_ports.get(port)
+                if allocation:
+                    allocations[service_name] = {
+                        'port': port,
+                        'service_type': allocation.service_type,
+                        'allocated_at': allocation.allocated_at.isoformat(),
+                        'is_active': allocation.is_active,
+                        'last_health_check': allocation.last_health_check.isoformat() if allocation.last_health_check else None
+                    }
+            return allocations
+
+    def get_port_conflicts(self) -> Dict[str, Any]:
+        """
+        Detect and report port conflicts.
+
+        Returns:
+            Dictionary with conflict information
+        """
+        conflicts = {
+            'conflicted_services': [],
+            'system_conflicts': [],
+            'total_conflicts': 0
+        }
+
+        for service_name, port in self.service_ports.items():
+            available, error = self.conflict_manager.is_port_available(port)
+            if not available:
+                conflicts['conflicted_services'].append({
+                    'service_name': service_name,
+                    'port': port,
+                    'error': error
+                })
+
+        # Check for system-wide conflicts
+        all_ports = list(self.allocated_ports.keys())
+        for port in all_ports:
+            available, error = self.conflict_manager.is_port_available(port)
+            if not available:
+                conflicts['system_conflicts'].append({
+                    'port': port,
+                    'allocation': self.allocated_ports[port],
+                    'error': error
+                })
+
+        conflicts['total_conflicts'] = len(conflicts['conflicted_services']) + len(conflicts['system_conflicts'])
+        return conflicts
+
+
+# Global registry instance
+def get_port_registry() -> PortRegistry:
+    """Get the global PortRegistry instance."""
+    return PortRegistry.get_instance()

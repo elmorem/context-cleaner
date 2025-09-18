@@ -12,9 +12,22 @@ from pathlib import Path
 from typing import Dict, List, Any
 import sys
 import os
+from datetime import datetime
 
 # Add the project to path so we can import Claude Code modules
 sys.path.insert(0, '/Users/markelmore/_code/context-cleaner/src')
+
+def create_script_error(message: str, error_code: str = "SCRIPT_ERROR") -> dict:
+    """Create standardized error dict for script usage"""
+    return {
+        "error": message,
+        "error_code": error_code,
+        "timestamp": datetime.now().isoformat()
+    }
+
+def create_script_no_data_error(data_type: str) -> dict:
+    """Create standardized no data error for script usage"""
+    return create_script_error(f"No {data_type} available", "NO_DATA_AVAILABLE")
 
 def get_claude_api_credentials():
     """Get API credentials the same way Claude Code does"""
@@ -59,7 +72,7 @@ async def call_anthropic_count_tokens_async(messages: List[Dict], model: str = "
     """Call Anthropic's count-tokens API using async requests"""
     api_key = get_claude_api_credentials()
     if not api_key:
-        return {"error": "No API credentials available - need ANTHROPIC_API_KEY environment variable"}
+        return create_script_error("No API credentials available - need ANTHROPIC_API_KEY environment variable", "NO_CREDENTIALS")
     
     headers = {
         "x-api-key": api_key,
@@ -85,9 +98,9 @@ async def call_anthropic_count_tokens_async(messages: List[Dict], model: str = "
                     return await response.json()
                 else:
                     error_text = await response.text()
-                    return {"error": f"API error {response.status}: {error_text}"}
+                    return create_script_error(f"API error {response.status}: {error_text}", "API_ERROR")
     except Exception as e:
-        return {"error": f"Request failed: {str(e)}"}
+        return create_script_error(f"Request failed: {str(e)}", "REQUEST_FAILED")
 
 def call_anthropic_count_tokens_sync(messages: List[Dict], model: str = "claude-3-5-sonnet-20241022") -> Dict:
     """Synchronous wrapper for the async API call"""
@@ -98,7 +111,7 @@ def call_anthropic_count_tokens_sync(messages: List[Dict], model: str = "claude-
         loop.close()
         return result
     except Exception as e:
-        return {"error": f"Async call failed: {str(e)}"}
+        return create_script_error(f"Async call failed: {str(e)}", "ASYNC_FAILED")
 
 def parse_recent_jsonl_messages(file_path: str, max_messages: int = 5) -> List[Dict]:
     """Parse recent messages from JSONL file for API verification"""
@@ -152,7 +165,7 @@ def verify_single_file(file_path: str) -> Dict[str, Any]:
     # Get recent messages for API verification
     sample_messages = parse_recent_jsonl_messages(file_path, 5)
     if not sample_messages:
-        return {"error": "No valid messages found"}
+        return create_script_no_data_error("valid messages")
     
     print(f"📝 Testing with {len(sample_messages)} recent messages")
     
@@ -161,7 +174,7 @@ def verify_single_file(file_path: str) -> Dict[str, Any]:
     
     if "error" in api_result:
         print(f"❌ API Error: {api_result['error']}")
-        return {"error": api_result['error']}
+        return create_script_error(api_result['error'], "API_VALIDATION_ERROR")
     
     # Show sample messages (first few words)
     print("📋 Sample messages tested:")

@@ -15,8 +15,8 @@ from datetime import datetime
 
 from .monitor import ProductionReadyContextRotMonitor, QuickAssessment
 from .security import PrivacyConfig
-from ..clients.clickhouse_client import ClickHouseClient
-from ..error_recovery.manager import ErrorRecoveryManager
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.error_recovery.manager import ErrorRecoveryManager
 
 # Phase 2: ML Enhancement Imports
 try:

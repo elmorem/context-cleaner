@@ -9,7 +9,7 @@ from flask import Flask
 
 from context_cleaner.dashboard.web_server import ProductivityDashboard
 from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-from context_cleaner.config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 
 
 class TestProductivityDashboard:
@@ -17,7 +17,7 @@ class TestProductivityDashboard:
 
     def setup_method(self):
         """Set up test environment."""
-        self.config = ContextCleanerConfig.default()
+        self.config = ApplicationConfig.default()
         self.dashboard = ProductivityDashboard(self.config)
         
         # ProductivityDashboard now uses Flask (not FastAPI) via comprehensive dashboard
@@ -154,7 +154,7 @@ class TestDashboardConfiguration:
 
     def test_custom_dashboard_config(self):
         """Test dashboard with custom configuration."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         # Note: config structure may have changed - adapt as needed
         dashboard = ProductivityDashboard(config)
         
@@ -171,7 +171,7 @@ class TestDashboardConfiguration:
 
     def test_comprehensive_dashboard_integration(self):
         """Test that ProductivityDashboard properly integrates with ComprehensiveHealthDashboard."""
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         dashboard = ProductivityDashboard(config)
         
         # Should have comprehensive dashboard with all expected features

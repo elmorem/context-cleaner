@@ -18,6 +18,7 @@ import random
 import os
 
 from .clients.clickhouse_client import ClickHouseClient
+from .context_rot.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,8 @@ class ClaudeCodeTelemetryCollector:
         """Initialize the telemetry collector."""
         self.clickhouse_client = ClickHouseClient()
         self.session_id = f"session_{uuid.uuid4().hex[:8]}"
-        self.is_enabled = os.getenv("CLAUDE_CODE_ENABLE_TELEMETRY", "0") == "1"
+        config = get_config()
+        self.is_enabled = config.privacy.enable_telemetry
         
         # Service management state
         self.running = False

@@ -25,9 +25,9 @@ import aiohttp
 
 # Internal imports
 try:
-    from ..analysis.enhanced_token_counter import EnhancedTokenCounterService, EnhancedTokenAnalysis, SessionTokenMetrics
-    from ..telemetry.clients.clickhouse_client import ClickHouseClient
-    from ..telemetry.cost_optimization.engine import CostOptimizationEngine
+    from context_cleaner.analysis.enhanced_token_counter import EnhancedTokenCounterService, EnhancedTokenAnalysis, SessionTokenMetrics
+    from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
+    from context_cleaner.telemetry.cost_optimization.engine import CostOptimizationEngine
 except ImportError as e:
     logging.warning(f"Import warning in token_analysis_bridge: {e}")
 
@@ -106,7 +106,7 @@ class TokenAnalysisBridgeService:
             logger.info("Retrieving comprehensive token analysis from dashboard integration...")
             
             try:
-                from ..analysis.dashboard_integration import get_enhanced_token_analysis_sync
+                from context_cleaner.analysis.dashboard_integration import get_enhanced_token_analysis_sync
                 dashboard_analysis = get_enhanced_token_analysis_sync()
                 
                 logger.info(f"Retrieved dashboard analysis: {dashboard_analysis['total_tokens']:,} total tokens")

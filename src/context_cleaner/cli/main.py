@@ -15,10 +15,10 @@ from pathlib import Path
 
 import click
 
-from ..config.settings import ContextCleanerConfig
-from ..analytics.productivity_analyzer import ProductivityAnalyzer
-from ..dashboard.web_server import ProductivityDashboard
-from .. import __version__
+from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
+from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
+from context_cleaner.dashboard.web_server import ProductivityDashboard
+from context_cleaner import __version__
 
 
 def version_callback(ctx, param, value):
@@ -56,9 +56,9 @@ def main(ctx, config, data_dir, verbose):
 
     # Load configuration
     if config:
-        ctx.obj["config"] = ContextCleanerConfig.from_file(Path(config))
+        ctx.obj["config"] = ApplicationConfig.from_file(Path(config))
     else:
-        ctx.obj["config"] = ContextCleanerConfig.from_env()
+        ctx.obj["config"] = ApplicationConfig.from_env()
 
     # Override data directory if provided
     if data_dir:
@@ -282,7 +282,7 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         elif preview:
             # Preview mode using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
-            from ..optimization.personalized_strategies import StrategyType
+            from context_cleaner.optimization.personalized_strategies import StrategyType
 
             handler = OptimizationCommandHandler(verbose=verbose)
             # Use balanced strategy as default for preview
@@ -344,7 +344,7 @@ def start_session(ctx, session_id, project_path, model, version):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         session = tracker.start_session(
@@ -377,7 +377,7 @@ def end_session(ctx, session_id):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         success = tracker.end_session(session_id)
@@ -412,7 +412,7 @@ def session_stats(ctx, days, format):
     ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         summary = tracker.get_productivity_summary(days)
@@ -471,7 +471,7 @@ def list_sessions(ctx, limit, format):
     config = ctx.obj["config"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         sessions = tracker.get_recent_sessions(limit=limit)
@@ -528,8 +528,8 @@ def start_monitoring(ctx, watch_dirs, no_observer):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..monitoring.real_time_monitor import RealTimeMonitor
-        from ..monitoring.session_observer import SessionObserver
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.session_observer import SessionObserver
 
         # Create real-time monitor
         monitor = RealTimeMonitor(config)
@@ -599,7 +599,7 @@ def monitor_status(ctx, format):
     config = ctx.obj["config"]
 
     try:
-        from ..monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
 
         # Create monitor instance to get status (doesn't start monitoring)
         monitor = RealTimeMonitor(config)
@@ -661,7 +661,7 @@ def live_dashboard(ctx, refresh):
 
     try:
         import os
-        from ..monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
 
         monitor = RealTimeMonitor(config)
 
@@ -748,14 +748,14 @@ def live_dashboard(ctx, refresh):
         sys.exit(1)
 
 
-async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) -> dict:
+async def _run_productivity_analysis(config: ApplicationConfig, days: int) -> dict:
     """Run productivity analysis for specified number of days."""
     from datetime import datetime, timedelta
     from pathlib import Path
 
     # Use enhanced cache discovery system
-    from ..analysis.discovery import CacheDiscoveryService
-    from ..analytics.effectiveness_tracker import EffectivenessTracker
+    from context_cleaner.analysis.discovery import CacheDiscoveryService
+    from context_cleaner.analytics.effectiveness_tracker import EffectivenessTracker
 
     try:
         # Discover cache locations using enhanced discovery
@@ -874,7 +874,7 @@ def _format_text_analysis(results: dict) -> str:
     return "\n".join(output)
 
 
-def _export_all_data(config: ContextCleanerConfig) -> dict:
+def _export_all_data(config: ApplicationConfig) -> dict:
     """Export all productivity data."""
     # This would typically read actual session data
     # For now, return placeholder export data
@@ -1365,7 +1365,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     # Initialize orchestrator and discovery systems
     try:
-        from ..services import ServiceOrchestrator
+        from context_cleaner.services import ServiceOrchestrator
         orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
         discovery_engine = orchestrator.discovery_engine
         process_registry = orchestrator.process_registry
@@ -1434,7 +1434,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     discovery_summary["by_service_type"][service_type] = []
                 discovery_summary["by_service_type"][service_type].append({
                     "pid": process.pid,
-                    "command_line": process.command_line[:80] + "..." if len(process.command_line) > 80 else process.command_line
+                    "name": getattr(process, 'name', 'unknown'),
+                    "path": getattr(process, 'path', 'N/A'),
+                    "command_line": process.command_line[:60] + "..." if len(process.command_line) > 60 else process.command_line
                 })
             
             if verbose:
@@ -1447,7 +1449,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                         click.echo(f"      • {service_type}: {len(processes)} processes")
                         if verbose and show_discovery:
                             for proc in processes[:3]:  # Show first 3
-                                click.echo(f"        - PID {proc['pid']}: {proc['command_line']}")
+                                click.echo(f"        - PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
                             if len(processes) > 3:
                                 click.echo(f"        - ... and {len(processes) - 3} more")
             
@@ -1462,7 +1464,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     for service_type, processes in discovery_summary["by_service_type"].items():
                         click.echo(f"\n🔧 {service_type.upper()} ({len(processes)} processes):")
                         for proc in processes:
-                            click.echo(f"   PID {proc['pid']}: {proc['command_line']}")
+                            click.echo(f"   PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
                 
                 click.echo("\n" + "=" * 50)
                 if not force and not click.confirm("Proceed with shutdown of these processes?"):
@@ -1495,8 +1497,27 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if registry_cleanup:
             click.echo("   • Process registry entries cleanup")
         
-        processes_count = len(discovered_processes) if not no_discovery else "unknown number of"
-        click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
+        if not no_discovery and discovered_processes:
+            click.echo(f"\n📊 Processes to stop: {len(discovered_processes)} Context Cleaner processes")
+            # Show summary of what will be stopped
+            process_summary = {}
+            for proc in discovered_processes:
+                service_type = getattr(proc, 'service_type', 'unknown')
+                if service_type not in process_summary:
+                    process_summary[service_type] = []
+                process_summary[service_type].append(proc)
+
+            for service_type, processes in process_summary.items():
+                click.echo(f"   • {service_type}: {len(processes)} process(es)")
+                for proc in processes[:2]:  # Show first 2 per type
+                    proc_name = getattr(proc, 'name', 'unknown')
+                    proc_path = getattr(proc, 'path', 'N/A')
+                    click.echo(f"     - PID {proc.pid} ({proc_name}) [{proc_path}]")
+                if len(processes) > 2:
+                    click.echo(f"     - ... and {len(processes) - 2} more")
+        else:
+            processes_count = "unknown number of"
+            click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
         click.echo()
         
         if not click.confirm("Continue with comprehensive shutdown?"):
@@ -1726,15 +1747,33 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         click.echo("\n⚠️  SHUTDOWN INCOMPLETE!")
         if verification_processes:
             click.echo(f"❌ {len(verification_processes)} processes still running")
+            click.echo(f"\n📋 Remaining processes:")
+            for proc in verification_processes[:10]:  # Show up to 10
+                proc_name = getattr(proc, 'name', 'unknown')
+                proc_path = getattr(proc, 'path', 'N/A')
+                command_preview = proc.command_line[:60] + "..." if len(proc.command_line) > 60 else proc.command_line
+                click.echo(f"   • PID {proc.pid} ({proc_name}) [{proc_path}]: {command_preview}")
+            if len(verification_processes) > 10:
+                click.echo(f"   • ... and {len(verification_processes) - 10} more processes")
             if verbose:
-                for proc in verification_processes[:5]:  # Show first 5
-                    click.echo(f"   PID {proc.pid}: {proc.command_line[:80]}...")
+                for i, proc in enumerate(verification_processes[:5]):  # Show first 5 in verbose
+                    proc_name = getattr(proc, 'name', 'unknown')
+                    proc_path = getattr(proc, 'path', 'N/A')
+                    click.echo(f"   [{i+1}] PID {proc.pid} ({proc_name}) [{proc_path}]: {proc.command_line}")
         if remaining_ports:
             click.echo(f"❌ {len(remaining_ports)} ports still bound: {remaining_ports}")
         
         click.echo("\n💡 To force cleanup remaining processes:")
-        click.echo("   sudo pkill -f 'start_context_cleaner'")
-        click.echo("   context-cleaner debug processes  # Check what's still running")
+        if verification_processes:
+            # Show specific pkill commands for the remaining processes
+            unique_names = set(getattr(proc, 'name', 'unknown') for proc in verification_processes[:5])
+            for name in unique_names:
+                click.echo(f"   sudo pkill -f '{name}'")
+            if len(verification_processes) > 5:
+                click.echo("   sudo pkill -f 'start_context_cleaner'  # Catch-all for remaining")
+        else:
+            click.echo("   sudo pkill -f 'start_context_cleaner'")
+        click.echo("   context-cleaner debug processes  # Check what's still running (enhanced details above)")
     
     if verbose:
         click.echo("\n📋 Summary:")
@@ -1760,7 +1799,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     import psutil
     from collections import namedtuple
     
-    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'command_line', 'service_type'])
+    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'name', 'path', 'command_line', 'service_type'])
     found_processes = []
     
     # Comprehensive patterns based on all Context Cleaner startup methods
@@ -1810,7 +1849,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     
     try:
         # Iterate through all running processes
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'exe']):
             try:
                 if not proc.info['cmdline']:
                     continue
@@ -1864,15 +1903,24 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                         elif "gunicorn" in cmdline.lower() or "wsgi" in cmdline.lower():
                             service_type = "wsgi_server"
                         
+                        # Get process path safely
+                        try:
+                            process_path = proc.info.get('exe', 'N/A')
+                        except (psutil.AccessDenied, psutil.NoSuchProcess):
+                            process_path = 'N/A'
+
                         process_info = ProcessInfo(
                             pid=proc.info['pid'],
+                            name=proc.info.get('name', 'unknown'),
+                            path=process_path,
                             command_line=cmdline,
                             service_type=service_type
                         )
                         found_processes.append(process_info)
                         
                         if verbose:
-                            print(f"   🔍 Found PID {proc.info['pid']}: {service_type} - {cmdline[:60]}...")
+                            proc_name = proc.info.get('name', 'unknown')
+                            print(f"   🔍 Found PID {proc.info['pid']} ({proc_name}): {service_type} - {cmdline[:60]}...")
                         break  # Found match, move to next process
                         
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -2398,7 +2446,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     
     # Handle custom config file
     if config_file:
-        config = ContextCleanerConfig.from_file(Path(config_file))
+        config = ApplicationConfig.from_file(Path(config_file))
         ctx.obj["config"] = config
     
     # Enable development mode
@@ -2409,7 +2457,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     
     # Import service orchestrator
     try:
-        from ..services import ServiceOrchestrator
+        from context_cleaner.services import ServiceOrchestrator
     except ImportError:
         click.echo("❌ Service orchestrator not available", err=True)
         sys.exit(1)
@@ -2566,8 +2614,8 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         
         # Start the dashboard (this is the main blocking operation)
         try:
-            from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-            
+            from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+
             dashboard = ComprehensiveHealthDashboard(config=config)
             
             # Open browser if requested
@@ -2585,7 +2633,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
             # Update dashboard service status to running
             dashboard_state = orchestrator.service_states.get("dashboard")
             if dashboard_state:
-                from ..services.service_orchestrator import ServiceStatus
+                from context_cleaner.services.service_orchestrator import ServiceStatus
                 dashboard_state.status = ServiceStatus.RUNNING
                 dashboard_state.health_status = True
             
@@ -2620,6 +2668,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         click.echo(f"❌ Service orchestration failed: {e}", err=True)
         asyncio.run(orchestrator.stop_all_services())
         sys.exit(1)
+
 
 
 if __name__ == "__main__":

@@ -1,11 +1,18 @@
 """
 Dashboard Service Manager with Singleton Pattern and Process Orchestration
 
+⚠️  DEPRECATED: This module is deprecated as of Phase 2 modular refactoring.
+Dashboard singleton enforcement has been consolidated into ServiceOrchestrator
+to eliminate service management redundancy and leverage unified infrastructure.
+
+Use ServiceOrchestrator.ensure_singleton_dashboard() instead.
+
+LEGACY FUNCTIONALITY (for backward compatibility):
 This module provides comprehensive dashboard service management to prevent the port conflict
 chaos caused by dozens of competing dashboard instances. It implements:
 
 - Singleton pattern for dashboard instances
-- Process discovery and cleanup capabilities  
+- Process discovery and cleanup capabilities
 - Integration with existing PortConflictManager
 - Lock files and PID tracking for race condition prevention
 - Graceful shutdown of competing instances
@@ -41,6 +48,7 @@ from threading import Lock
 
 from .port_conflict_manager import PortConflictManager, PortConflictStrategy
 from .process_registry import get_process_registry, ProcessEntry
+from context_cleaner.api.models import create_error_response
 
 
 class DashboardState(Enum):
@@ -112,12 +120,21 @@ class DashboardServiceManager:
                 cls._instance._initialized = False
             return cls._instance
     
-    def __init__(self, 
+    def __init__(self,
                  config: Optional[Any] = None,
                  verbose: bool = False,
                  logger: Optional[logging.Logger] = None):
         """Initialize the dashboard service manager."""
-        
+
+        # DEPRECATION WARNING
+        import warnings
+        warnings.warn(
+            "DashboardServiceManager is deprecated. Use ServiceOrchestrator.ensure_singleton_dashboard() instead. "
+            "This class will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         if self._initialized:
             return
             
@@ -816,7 +833,12 @@ class DashboardServiceManager:
             asyncio.run(self._discover_dashboard_processes())
         except Exception as e:
             self.logger.error(f"Failed to discover processes for cleanup: {e}")
-            return {"error": "Process discovery failed", "details": str(e)}
+            raise create_error_response(
+                f"Process discovery failed: {str(e)}",
+                "PROCESS_DISCOVERY_ERROR",
+                500,
+                {"details": str(e)}
+            )
         
         # Filter processes to cleanup
         processes_to_cleanup = []
@@ -856,7 +878,12 @@ class DashboardServiceManager:
             return cleanup_results
             
         except Exception as e:
-            return {"error": "Cleanup operation failed", "details": str(e)}
+            raise create_error_response(
+                f"Cleanup operation failed: {str(e)}",
+                "CLEANUP_OPERATION_ERROR",
+                500,
+                {"details": str(e)}
+            )
     
     def shutdown(self) -> bool:
         """

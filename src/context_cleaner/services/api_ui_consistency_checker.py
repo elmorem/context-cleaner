@@ -17,10 +17,12 @@ import aiohttp
 from datetime import datetime, timedelta
 
 try:
-    from ..config.settings import ContextCleanerConfig
+    from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+    from context_cleaner.api.models import create_error_response
 except ImportError:
     # Fallback for testing
-    ContextCleanerConfig = None
+    ApplicationConfig = None
+    create_error_response = None
 
 
 class ConsistencyStatus(Enum):
@@ -134,10 +136,10 @@ class APIUIConsistencyChecker:
     that the UI is properly consuming and displaying the data.
     """
     
-    def __init__(self, config: Optional[ContextCleanerConfig] = None, dashboard_host: str = "127.0.0.1", dashboard_port: Optional[int] = None):
+    def __init__(self, config: Optional[ApplicationConfig] = None, dashboard_host: str = "127.0.0.1", dashboard_port: Optional[int] = None):
         # Use default config if none provided
-        if config is None and ContextCleanerConfig is not None:
-            self.config = ContextCleanerConfig.default()
+        if config is None and ApplicationConfig is not None:
+            self.config = ApplicationConfig.default()
         else:
             self.config = config
         self.dashboard_host = dashboard_host
@@ -756,7 +758,14 @@ class APIUIConsistencyChecker:
     def get_summary_report(self) -> Dict[str, Any]:
         """Generate a summary report of the consistency check results"""
         if not self.last_check_results:
-            return {"error": "No consistency check results available"}
+            if create_error_response:
+                raise create_error_response(
+                    "No consistency check results available",
+                    "NO_CONSISTENCY_RESULTS",
+                    404
+                )
+            else:
+                return {"error": "No consistency check results available"}  # Fallback for testing
             
         total_endpoints = len(self.last_check_results)
         consistent_count = len([r for r in self.last_check_results.values() 

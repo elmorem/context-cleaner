@@ -19,6 +19,7 @@ from collections import defaultdict, Counter
 from ..clients.clickhouse_client import ClickHouseClient
 from ..analytics.session_analysis import SessionAnalyticsEngine, TrendDirection
 from .task_orchestrator import WorkflowExecution, TaskStatus, AgentType, TaskComplexity
+from context_cleaner.api.models import create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +286,11 @@ class WorkflowLearner:
             if agent_type:
                 # Get specific agent insights
                 if agent_type not in self.agent_profiles:
-                    return {"error": f"No performance data for {agent_type.value}"}
+                    raise create_error_response(
+                        f"No performance data for {agent_type.value}",
+                        "NO_PERFORMANCE_DATA",
+                        404
+                    )
                 
                 profile = self.agent_profiles[agent_type]
                 return {
@@ -327,7 +332,11 @@ class WorkflowLearner:
                 
         except Exception as e:
             logger.error(f"Error getting agent performance insights: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Agent performance insights failed: {str(e)}",
+                "AGENT_PERFORMANCE_ERROR",
+                500
+            )
     
     async def get_learning_metrics(self) -> Dict[str, Any]:
         """Get overall learning system metrics"""
@@ -375,7 +384,11 @@ class WorkflowLearner:
             
         except Exception as e:
             logger.error(f"Error getting learning metrics: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Learning metrics retrieval failed: {str(e)}",
+                "LEARNING_METRICS_ERROR",
+                500
+            )
     
     async def _extract_workflow_features(self, execution: WorkflowExecution) -> Dict[str, Any]:
         """Extract features from workflow execution for learning"""
