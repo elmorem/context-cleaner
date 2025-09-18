@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # Modern FastAPI service
+  context-cleaner-api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.modern-api
+    ports:
+      - "8000:8000"  # FastAPI port
+    environment:
+      - CLICKHOUSE_HOST=clickhouse-otel
+      - CLICKHOUSE_PORT=9000
+      - REDIS_URL=redis://redis:6379
+      - DEBUG=false
+      - LOG_LEVEL=info
+    depends_on:
+      - redis
+      - clickhouse-otel
+    volumes:
+      - ../logs:/app/logs
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Legacy Flask service (for gradual migration)
+  context-cleaner-legacy:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.legacy
+    ports:
+      - "5000:5000"  # Flask port
+    environment:
+      - CLICKHOUSE_HOST=clickhouse-otel
+      - CLICKHOUSE_PORT=9000
+    depends_on:
+      - clickhouse-otel
+    volumes:
+      - ../logs:/app/logs
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # ClickHouse (existing)
+  clickhouse-otel:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ../config/clickhouse:/etc/clickhouse-server/config.d
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=otel
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+
+  # NGINX for load balancing and routing
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - context-cleaner-api
+      - context-cleaner-legacy
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+
+  # Monitoring and observability
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+    networks:
+      - context-cleaner-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  clickhouse_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  context-cleaner-network:
+    driver: bridge
