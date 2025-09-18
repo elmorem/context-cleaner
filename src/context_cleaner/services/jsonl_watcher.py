@@ -17,8 +17,8 @@ from typing import Set, Dict
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from ..telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
-from ..telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 

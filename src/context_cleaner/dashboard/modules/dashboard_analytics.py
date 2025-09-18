@@ -24,6 +24,11 @@ from typing import Dict, Any, Optional, List
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+from context_cleaner.api.models import (
+    create_no_data_error, create_unsupported_error, create_error_response,
+    AnalyticsChartResponse, AnalyticsSummaryResponse
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +47,7 @@ class AnalyticsChartGenerator:
         try:
             if chart_type == "health_trends":
                 if not self.performance_history:
-                    return {"error": "No health data available"}
+                    raise create_no_data_error("health")
 
                 # Extract trend data
                 timestamps = [h["timestamp"] for h in self.performance_history[-50:]]
@@ -109,11 +114,11 @@ class AnalyticsChartGenerator:
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
     def update_performance_history(self, history: List[Dict[str, Any]]) -> None:
         """Update performance history for chart generation"""
@@ -142,8 +147,8 @@ class SessionAnalyticsProcessor:
         logger.info(f"Retrieving recent sessions for analytics dashboard ({days} days)")
         try:
             # Use real-time cache discovery system to find JSONL session files
-            from ..analysis.discovery import CacheDiscoveryService
-            from ..analysis.session_parser import SessionCacheParser
+            from context_cleaner.analysis.discovery import CacheDiscoveryService
+            from context_cleaner.analysis.session_parser import SessionCacheParser
 
             discovery_service = CacheDiscoveryService()
 
@@ -275,7 +280,7 @@ class AdvancedAnalyticsCharts:
         """Generate advanced analytics charts using Plotly."""
         try:
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             if chart_type == "productivity_trend":
                 # Productivity trend over time
@@ -412,11 +417,11 @@ class AdvancedAnalyticsCharts:
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Analytics chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
 
 class SessionTimelineVisualizer:
@@ -435,7 +440,7 @@ class SessionTimelineVisualizer:
             sessions = self.session_processor.get_recent_sessions_analytics(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Prepare timeline data
             timeline_data = []
@@ -493,7 +498,7 @@ class SessionTimelineVisualizer:
 
         except Exception as e:
             logger.error(f"Session timeline generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
 
 class DashboardAnalytics:
@@ -559,7 +564,7 @@ class DashboardAnalytics:
             sessions = self.get_recent_sessions_analytics(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Calculate summary statistics
             total_sessions = len(sessions)
@@ -586,7 +591,7 @@ class DashboardAnalytics:
 
         except Exception as e:
             logger.error(f"Analytics summary generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "ANALYTICS_ERROR")
 
 
 class AnalyticsCoordinator:

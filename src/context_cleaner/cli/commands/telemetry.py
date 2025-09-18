@@ -6,8 +6,8 @@ import sys
 from typing import Optional
 import logging
 
-from ...telemetry import ClickHouseClient, ErrorRecoveryManager, CostOptimizationEngine
-from ...telemetry.cost_optimization.models import BudgetConfig
+from context_cleaner.telemetry import ClickHouseClient, ErrorRecoveryManager, CostOptimizationEngine
+from context_cleaner.telemetry.cost_optimization.models import BudgetConfig
 
 logger = logging.getLogger(__name__)
 

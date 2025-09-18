@@ -14,7 +14,8 @@ import threading
 
 from .app import create_app
 from .services import DashboardService
-from ..telemetry.clients.clickhouse_client import ClickHouseClient
+from .models import create_error_response
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,11 @@ class LegacyCompatibilityLayer:
 
         except Exception as e:
             logger.error(f"Legacy telemetry widgets failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Legacy telemetry widgets failed: {str(e)}",
+                "LEGACY_TELEMETRY_ERROR",
+                500
+            )
 
     def run_async_in_thread(self, coro):
         """Run async coroutine in thread pool"""

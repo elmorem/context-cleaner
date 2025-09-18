@@ -15,7 +15,11 @@ from .strategies import (
     RequestContext,
     RecoveryResult
 )
-from .exceptions import MaxRetriesExceeded, NoViableStrategyError
+from .exceptions import (
+    MaxRetriesExceeded, NoViableStrategyError,  # Legacy compatibility
+    create_max_retries_exceeded_error, create_no_viable_strategy_error  # Modern HTTPException pattern
+)
+from context_cleaner.api.models import create_error_response
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +80,7 @@ class ErrorRecoveryManager:
         applicable_strategies = self._get_applicable_strategies(error_type, context, error_pattern)
         
         if not applicable_strategies:
-            raise NoViableStrategyError(error_type)
+            raise create_no_viable_strategy_error(error_type)
         
         # Try strategies in priority order
         strategies_tried = []
@@ -101,7 +105,7 @@ class ErrorRecoveryManager:
         logger.error(f"All recovery strategies failed for error: {error_type}")
         await self._log_recovery_failure(error_type, strategies_tried, context)
         
-        raise MaxRetriesExceeded(len(strategies_tried), strategies_tried)
+        raise create_max_retries_exceeded_error(len(strategies_tried), strategies_tried)
     
     async def _analyze_error_pattern(self, error_type: str) -> ErrorPattern:
         """Analyze error patterns from telemetry data."""
@@ -192,7 +196,11 @@ class ErrorRecoveryManager:
             
         except Exception as e:
             logger.error(f"Failed to get recovery statistics: {e}")
-            return {"error": str(e)}
+            raise create_error_response(
+                f"Error recovery processing failed: {str(e)}",
+                "ERROR_RECOVERY_FAILED",
+                500
+            )
     
     async def suggest_optimizations(self, session_id: str) -> List[Dict[str, Any]]:
         """Suggest optimizations based on current session patterns."""

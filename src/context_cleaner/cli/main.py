@@ -15,10 +15,10 @@ from pathlib import Path
 
 import click
 
-from ..config.settings import ContextCleanerConfig
-from ..analytics.productivity_analyzer import ProductivityAnalyzer
-from ..dashboard.web_server import ProductivityDashboard
-from .. import __version__
+from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
+from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
+from context_cleaner.dashboard.web_server import ProductivityDashboard
+from context_cleaner import __version__
 
 
 def version_callback(ctx, param, value):
@@ -56,9 +56,9 @@ def main(ctx, config, data_dir, verbose):
 
     # Load configuration
     if config:
-        ctx.obj["config"] = ContextCleanerConfig.from_file(Path(config))
+        ctx.obj["config"] = ApplicationConfig.from_file(Path(config))
     else:
-        ctx.obj["config"] = ContextCleanerConfig.from_env()
+        ctx.obj["config"] = ApplicationConfig.from_env()
 
     # Override data directory if provided
     if data_dir:
@@ -282,7 +282,7 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         elif preview:
             # Preview mode using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
-            from ..optimization.personalized_strategies import StrategyType
+            from context_cleaner.optimization.personalized_strategies import StrategyType
 
             handler = OptimizationCommandHandler(verbose=verbose)
             # Use balanced strategy as default for preview
@@ -344,7 +344,7 @@ def start_session(ctx, session_id, project_path, model, version):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         session = tracker.start_session(
@@ -377,7 +377,7 @@ def end_session(ctx, session_id):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         success = tracker.end_session(session_id)
@@ -412,7 +412,7 @@ def session_stats(ctx, days, format):
     ctx.obj["verbose"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         summary = tracker.get_productivity_summary(days)
@@ -471,7 +471,7 @@ def list_sessions(ctx, limit, format):
     config = ctx.obj["config"]
 
     try:
-        from ..tracking.session_tracker import SessionTracker
+        from context_cleaner.tracking.session_tracker import SessionTracker
 
         tracker = SessionTracker(config)
         sessions = tracker.get_recent_sessions(limit=limit)
@@ -528,8 +528,8 @@ def start_monitoring(ctx, watch_dirs, no_observer):
     verbose = ctx.obj["verbose"]
 
     try:
-        from ..monitoring.real_time_monitor import RealTimeMonitor
-        from ..monitoring.session_observer import SessionObserver
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.session_observer import SessionObserver
 
         # Create real-time monitor
         monitor = RealTimeMonitor(config)
@@ -599,7 +599,7 @@ def monitor_status(ctx, format):
     config = ctx.obj["config"]
 
     try:
-        from ..monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
 
         # Create monitor instance to get status (doesn't start monitoring)
         monitor = RealTimeMonitor(config)
@@ -661,7 +661,7 @@ def live_dashboard(ctx, refresh):
 
     try:
         import os
-        from ..monitoring.real_time_monitor import RealTimeMonitor
+        from context_cleaner.monitoring.real_time_monitor import RealTimeMonitor
 
         monitor = RealTimeMonitor(config)
 
@@ -748,14 +748,14 @@ def live_dashboard(ctx, refresh):
         sys.exit(1)
 
 
-async def _run_productivity_analysis(config: ContextCleanerConfig, days: int) -> dict:
+async def _run_productivity_analysis(config: ApplicationConfig, days: int) -> dict:
     """Run productivity analysis for specified number of days."""
     from datetime import datetime, timedelta
     from pathlib import Path
 
     # Use enhanced cache discovery system
-    from ..analysis.discovery import CacheDiscoveryService
-    from ..analytics.effectiveness_tracker import EffectivenessTracker
+    from context_cleaner.analysis.discovery import CacheDiscoveryService
+    from context_cleaner.analytics.effectiveness_tracker import EffectivenessTracker
 
     try:
         # Discover cache locations using enhanced discovery
@@ -874,7 +874,7 @@ def _format_text_analysis(results: dict) -> str:
     return "\n".join(output)
 
 
-def _export_all_data(config: ContextCleanerConfig) -> dict:
+def _export_all_data(config: ApplicationConfig) -> dict:
     """Export all productivity data."""
     # This would typically read actual session data
     # For now, return placeholder export data
@@ -1365,7 +1365,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     # Initialize orchestrator and discovery systems
     try:
-        from ..services import ServiceOrchestrator
+        from context_cleaner.services import ServiceOrchestrator
         orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
         discovery_engine = orchestrator.discovery_engine
         process_registry = orchestrator.process_registry
@@ -2446,7 +2446,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     
     # Handle custom config file
     if config_file:
-        config = ContextCleanerConfig.from_file(Path(config_file))
+        config = ApplicationConfig.from_file(Path(config_file))
         ctx.obj["config"] = config
     
     # Enable development mode
@@ -2457,7 +2457,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     
     # Import service orchestrator
     try:
-        from ..services import ServiceOrchestrator
+        from context_cleaner.services import ServiceOrchestrator
     except ImportError:
         click.echo("❌ Service orchestrator not available", err=True)
         sys.exit(1)
@@ -2614,7 +2614,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         
         # Start the dashboard (this is the main blocking operation)
         try:
-            from ..dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+            from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
 
             dashboard = ComprehensiveHealthDashboard(config=config)
             
@@ -2633,7 +2633,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
             # Update dashboard service status to running
             dashboard_state = orchestrator.service_states.get("dashboard")
             if dashboard_state:
-                from ..services.service_orchestrator import ServiceStatus
+                from context_cleaner.services.service_orchestrator import ServiceStatus
                 dashboard_state.status = ServiceStatus.RUNNING
                 dashboard_state.health_status = True
             

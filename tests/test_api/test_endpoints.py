@@ -17,9 +17,38 @@ from decimal import Decimal
 
 
 @pytest.fixture
-def test_app():
-    """Create test FastAPI application"""
+def mock_services():
+    """Create mock services for testing"""
+    mock_dashboard_service = Mock()
+    mock_telemetry_service = Mock()
+
+    return {
+        'dashboard_service': mock_dashboard_service,
+        'telemetry_service': mock_telemetry_service
+    }
+
+
+@pytest.fixture
+def test_app(mock_services):
+    """Create test FastAPI application with dependency overrides"""
     app = create_testing_app()
+
+    # Import the dependency functions from the app module
+    # We need to get them from the app's internal scope
+    from context_cleaner.api import app as app_module
+
+    # Override dependencies with mocks - this is the proper FastAPI way
+    def mock_get_dashboard_service():
+        return mock_services['dashboard_service']
+
+    def mock_get_telemetry_service():
+        return mock_services['telemetry_service']
+
+    # We need to override the dependencies that are actually used in the routes
+    # Since the dependency functions are defined inside create_app, we need a different approach
+    app.state.dashboard_service = mock_services['dashboard_service']
+    app.state.telemetry_service = mock_services['telemetry_service']
+
     return app
 
 
@@ -27,32 +56,6 @@ def test_app():
 def client(test_app):
     """Create test client"""
     return TestClient(test_app)
-
-
-@pytest.fixture
-def mock_services(test_app):
-    """Mock the services for testing"""
-    # Mock dashboard service
-    mock_dashboard_service = Mock()
-    mock_telemetry_service = Mock()
-
-    test_app.dependency_overrides = {}
-
-    # Override dependency injection
-    def get_mock_dashboard_service():
-        return mock_dashboard_service
-
-    def get_mock_telemetry_service():
-        return mock_telemetry_service
-
-    from context_cleaner.api.app import get_dashboard_service, get_telemetry_service
-    test_app.dependency_overrides[get_dashboard_service] = get_mock_dashboard_service
-    test_app.dependency_overrides[get_telemetry_service] = get_mock_telemetry_service
-
-    return {
-        'dashboard_service': mock_dashboard_service,
-        'telemetry_service': mock_telemetry_service
-    }
 
 
 class TestHealthEndpoint:

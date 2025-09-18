@@ -29,6 +29,9 @@ from plotly.utils import PlotlyJSONEncoder
 
 # API Response Formatting
 from ..core.api_response_formatter import APIResponseFormatter
+from context_cleaner.api.models import (
+    create_no_data_error, create_unsupported_error, create_error_response
+)
 
 # Phase 2.2 Extraction: Import extracted data models and enums
 from .modules.dashboard_models import (
@@ -284,8 +287,8 @@ class ComprehensiveHealthDashboard:
 
         # Dashboard configuration
         # Create default config if None provided (backwards compatibility)
-        from ..config.settings import ContextCleanerConfig
-        self.config = config or ContextCleanerConfig.default()
+        from ..telemetry.context_rot.config import ApplicationConfig
+        self.config = config or ApplicationConfig.default()
         self.host = "127.0.0.1"
         self.port = 8080
         self.debug = False
@@ -2992,10 +2995,10 @@ def create_app():
     try:
         logger.info("📦 Loading Context Cleaner modules...")
         from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-        from context_cleaner.config.settings import ContextCleanerConfig
-        
+        from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+
         logger.info("⚙️ Loading configuration...")
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         
         logger.info("🏗️ Creating dashboard instance...")
         dashboard = ComprehensiveHealthDashboard(config=config)
@@ -3265,14 +3268,14 @@ if __name__ == "__main__":
                 }
         except Exception as e:
             logger.error(f"Performance metrics error: {e}")
-            return {"timestamp": datetime.now().isoformat(), "error": str(e)}
+            raise create_error_response(str(e), "PERFORMANCE_METRICS_ERROR")
 
     def _generate_plotly_chart(self, chart_type: str) -> Dict[str, Any]:
         """Generate Plotly chart data for various chart types."""
         try:
             if chart_type == "health_trends":
                 if not self._performance_history:
-                    return {"error": "No health data available"}
+                    raise create_no_data_error("health")
 
                 # Extract trend data
                 timestamps = [h["timestamp"] for h in self._performance_history[-50:]]
@@ -3355,11 +3358,11 @@ if __name__ == "__main__":
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     def get_recent_sessions_analytics(self, days: int = 30) -> List[Dict[str, Any]]:
         """Get recent session data using real-time cache discovery and JSONL parsing."""
@@ -3498,7 +3501,7 @@ if __name__ == "__main__":
         """Generate advanced analytics charts using Plotly."""
         try:
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             if chart_type == "productivity_trend":
                 # Productivity trend over time
@@ -3635,11 +3638,11 @@ if __name__ == "__main__":
                 return json.loads(json.dumps(fig, cls=PlotlyJSONEncoder))
 
             else:
-                return {"error": f"Chart type '{chart_type}' not supported"}
+                raise create_unsupported_error("Chart type", chart_type)
 
         except Exception as e:
             logger.error(f"Analytics chart generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     def generate_session_timeline(self, days: int = 7) -> Dict[str, Any]:
         """Generate session timeline visualization."""
@@ -3647,7 +3650,7 @@ if __name__ == "__main__":
             sessions = self.get_recent_sessions_analytics(days)
 
             if not sessions:
-                return {"error": "No session data available"}
+                raise create_no_data_error("session")
 
             # Prepare timeline data
             timeline_data = []
@@ -3705,7 +3708,7 @@ if __name__ == "__main__":
 
         except Exception as e:
             logger.error(f"Session timeline generation failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "CHART_ERROR")
 
     async def generate_comprehensive_health_report(
         self,
@@ -5264,7 +5267,7 @@ if __name__ == "__main__":
             # Find Claude Code cache directory
             cache_dir = Path.home() / ".claude" / "projects"
             if not cache_dir.exists():
-                return {"error": "Claude Code cache not found", "categories": []}
+                raise create_no_data_error("Claude Code cache")
             
             total_tokens = {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
             categories = {
@@ -5290,7 +5293,7 @@ if __name__ == "__main__":
             # Calculate percentages and create charts
             total_all = sum(total_tokens.values())
             if total_all == 0:
-                return {"error": "No token data found", "categories": []}
+                raise create_no_data_error("token data")
             
             # Create category summary
             category_data = []
@@ -5325,7 +5328,7 @@ if __name__ == "__main__":
             
         except Exception as e:
             logging.error(f"Token analysis error: {e}")
-            return {"error": str(e), "categories": []}
+            raise create_error_response(str(e), "TOKEN_ANALYSIS_ERROR")
     
     def _analyze_file_tokens(self, file_path, total_tokens, categories):
         """Analyze tokens from a single JSONL file."""

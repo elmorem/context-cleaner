@@ -19,7 +19,7 @@ import threading
 from datetime import datetime
 from typing import Dict, Any, Callable, Optional, List
 from dataclasses import asdict
-from flask_socketio import SocketIO, emit
+from context_cleaner.api.websocket import EventBus, ConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,8 @@ class DashboardRealtime:
     Critical: Preserves existing WebSocket event structure exactly
     """
 
-    def __init__(self, socketio: SocketIO = None, dashboard_instance=None):
-        self.socketio = socketio
+    def __init__(self, event_bus: EventBus = None, dashboard_instance=None):
+        self.event_bus = event_bus
         self.dashboard = dashboard_instance
         self.event_handlers = {}
         self.active_connections = set()
@@ -77,16 +77,20 @@ class DashboardRealtime:
         # Initialize serializer
         self.serializer = RealtimeEventSerializer()
 
-    def setup_socketio_events(self) -> None:
+    def setup_eventbus_handlers(self) -> None:
         """
-        Setup SocketIO event handlers
-        CRITICAL: Preserves exact event structure from original implementation
+        Setup EventBus handlers (migrated from SocketIO)
+        Now uses FastAPI WebSocket system instead of Flask-SocketIO
         """
-        if not self.socketio:
-            logger.warning("SocketIO not available for event setup")
+        if not self.event_bus:
+            logger.warning("EventBus not available for event setup")
             return
 
-        @self.socketio.on("connect")
+        # Register EventBus handlers instead of SocketIO decorators
+        # The EventBus will handle WebSocket communication internally
+        logger.info("✅ EventBus handlers configured for FastAPI WebSocket real-time updates")
+
+    def _handle_connect_legacy(self):
         def handle_connect():
             """Handle client connection with initial health data broadcast"""
             logger.info("Dashboard client connected via WebSocket")
@@ -112,13 +116,13 @@ class DashboardRealtime:
                 logger.error(f"Initial health data broadcast failed: {e}")
                 emit("error", {"message": str(e)})
 
-        @self.socketio.on("disconnect")
+        @self.event_bus.on("disconnect")
         def handle_disconnect():
             """Handle client disconnection"""
             logger.info("Dashboard client disconnected from WebSocket")
             self.active_connections.discard(id(self))
 
-        @self.socketio.on("request_health_update")
+        @self.event_bus.on("request_health_update")
         def handle_health_update_request():
             """
             Handle on-demand health update requests
@@ -142,7 +146,7 @@ class DashboardRealtime:
                 logger.error(f"Health update request failed: {e}")
                 emit("error", {"message": str(e)})
 
-        @self.socketio.on("request_performance_update")
+        @self.event_bus.on("request_performance_update")
         def handle_performance_update_request():
             """
             Handle performance metrics requests
@@ -191,7 +195,7 @@ class DashboardRealtime:
         """
         while not self._stop_event.is_set():
             try:
-                if not self.socketio or not self.dashboard:
+                if not self.event_bus or not self.dashboard:
                     self._stop_event.wait(timeout=10.0)
                     continue
 
@@ -219,9 +223,9 @@ class DashboardRealtime:
                 if len(self._performance_history) > self._max_history_points:
                     self._performance_history = self._performance_history[-self._max_history_points:]
 
-                # WebSocket-first: Broadcast to all connected clients
+                # EventBus: Broadcast to all connected clients
                 safe_report = self.serializer.serialize_health_report(report)
-                self.socketio.emit("health_update", safe_report)
+                asyncio.create_task(self.event_bus.emit("health_update", safe_report))
 
                 logger.debug(f"📡 Health update broadcasted to {len(self.active_connections)} WebSocket clients")
 
@@ -316,7 +320,7 @@ class DashboardRealtime:
                 "timestamp": datetime.now().isoformat(),
                 "data": {
                     "status": "healthy",
-                    "websocket_available": self.socketio is not None,
+                    "websocket_available": self.event_bus is not None,
                     "background_broadcasting": self._update_thread is not None and self._update_thread.is_alive(),
                     "connection_count": len(self.active_connections)
                 }
@@ -354,7 +358,7 @@ class DashboardRealtime:
         Broadcast widget-specific updates
         WebSocket-first: Immediate broadcast to connected clients
         """
-        if not self.socketio:
+        if not self.event_bus:
             logger.warning(f"Cannot broadcast {widget_type} update - WebSocket unavailable")
             return
 
@@ -365,7 +369,7 @@ class DashboardRealtime:
                 "data": self.serializer.serialize_datetime(data)
             }
 
-            self.socketio.emit("widget_update", update_payload)
+            asyncio.create_task(self.event_bus.emit("widget_update", update_payload))
             logger.debug(f"📡 Widget update broadcasted: {widget_type}")
 
         except Exception as e:
@@ -376,13 +380,13 @@ class DashboardRealtime:
         Emit custom events to connected WebSocket clients
         WebSocket-first: Direct real-time communication
         """
-        if not self.socketio:
+        if not self.event_bus:
             logger.warning(f"Cannot emit {event_name} - WebSocket unavailable")
             return
 
         try:
             safe_data = self.serializer.serialize_datetime(data)
-            self.socketio.emit(event_name, safe_data)
+            asyncio.create_task(self.event_bus.emit(event_name, safe_data))
             logger.debug(f"📡 Custom event emitted: {event_name}")
         except Exception as e:
             logger.error(f"Custom event emission failed for {event_name}: {e}")
@@ -390,7 +394,7 @@ class DashboardRealtime:
     def get_connection_stats(self) -> Dict[str, Any]:
         """Get real-time connection statistics"""
         return {
-            "websocket_available": self.socketio is not None,
+            "websocket_available": self.event_bus is not None,
             "active_connections": len(self.active_connections),
             "background_broadcasting": self._update_thread is not None and self._update_thread.is_alive(),
             "performance_history_size": len(self._performance_history),

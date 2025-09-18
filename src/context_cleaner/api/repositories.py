@@ -12,7 +12,7 @@ from decimal import Decimal
 import logging
 
 from .models import DashboardMetrics, WidgetData, SystemHealth
-from ..telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 from .full_content_processor import FullContentBatchProcessor
 from .full_content_queries import FullContentQueries
 

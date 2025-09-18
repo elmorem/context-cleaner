@@ -1,6 +1,6 @@
 """Advanced queries for complete content analysis."""
 from typing import List, Dict, Any, Optional
-from ..clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 class FullContentQueries:
     """Advanced queries for complete content analysis."""

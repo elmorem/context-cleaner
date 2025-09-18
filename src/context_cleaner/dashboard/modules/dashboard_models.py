@@ -93,7 +93,7 @@ class ProductivityDataSource(DataSource):
     async def get_data(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Get productivity data"""
         try:
-            from ..analytics.productivity_analyzer import ProductivityAnalyzer
+            from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 
             analyzer = ProductivityAnalyzer()
 

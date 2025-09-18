@@ -5,63 +5,169 @@ Creates the modern API application with proper dependency injection,
 middleware, WebSocket support, and integration with existing systems.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query, Path
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, Query, Path, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from typing import List, Optional, Dict, Any
 import logging
 import asyncio
 import uuid
+import traceback
 from datetime import datetime
 
 from .models import (
     APIResponse, PaginatedResponse, WidgetRequest, MetricsRequest,
-    CacheInvalidationRequest, DashboardOverviewResponse, WidgetListResponse
+    CacheInvalidationRequest, DashboardOverviewResponse, WidgetListResponse,
+    ErrorDetails, ValidationErrorResponse, ValidationErrorDetail
 )
 from .services import DashboardService, TelemetryService
 from .repositories import ClickHouseTelemetryRepository
 from .cache import MultiLevelCache, InMemoryCache
 from .websocket import ConnectionManager, EventBus, HeartbeatManager
-from ..telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig, ConfigManager
 
 logger = logging.getLogger(__name__)
 
 def create_app(
-    clickhouse_host: str = "localhost",
-    clickhouse_port: int = 9000,
-    redis_url: str = "redis://localhost:6379",
-    enable_websockets: bool = True,
-    debug: bool = False
+    config: Optional[ApplicationConfig] = None
 ) -> FastAPI:
     """
     Create and configure the FastAPI application
 
     Args:
-        clickhouse_host: ClickHouse server host
-        clickhouse_port: ClickHouse server port
-        redis_url: Redis connection URL for caching
-        enable_websockets: Enable WebSocket support
-        debug: Enable debug mode
+        config: Application configuration. If None, loads default configuration.
 
     Returns:
         Configured FastAPI application
     """
+    # Initialize configuration if not provided
+    if config is None:
+        config_manager = ConfigManager()
+        config = config_manager.get_config()
 
     app = FastAPI(
-        title="Context Cleaner API",
+        title=config.api.title,
         description="Modern API for Context Cleaner Dashboard with real-time capabilities",
-        version="2.0.0",
-        debug=debug
+        version=config.api.version,
+        debug=config.enable_debug_mode
     )
 
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:8080"],  # Add React dev server
+        allow_origins=config.api.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
+
+    # Global exception handlers for unified error responses
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """Handle HTTPException and convert to APIResponse format"""
+        request_id = str(uuid.uuid4())
+
+        # If the detail is already a structured error (from create_error_response)
+        if isinstance(exc.detail, dict):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=APIResponse(
+                    success=False,
+                    error=exc.detail.get("message", "HTTP Error"),
+                    error_code=exc.detail.get("code", "HTTP_ERROR"),
+                    metadata={
+                        "status_code": exc.status_code,
+                        "endpoint": str(request.url),
+                        "method": request.method
+                    },
+                    request_id=request_id
+                ).model_dump()
+            )
+
+        # Handle simple string detail
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=APIResponse(
+                success=False,
+                error=exc.detail,
+                error_code="HTTP_ERROR",
+                metadata={
+                    "status_code": exc.status_code,
+                    "endpoint": str(request.url),
+                    "method": request.method
+                },
+                request_id=request_id
+            ).model_dump()
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Handle validation errors with detailed field information"""
+        request_id = str(uuid.uuid4())
+
+        validation_details = []
+        for error in exc.errors():
+            field = ".".join(str(loc) for loc in error["loc"][1:])  # Skip 'body'
+            validation_details.append(ValidationErrorDetail(
+                field=field,
+                message=error["msg"],
+                value=error.get("input")
+            ))
+
+        return JSONResponse(
+            status_code=422,
+            content=APIResponse(
+                success=False,
+                error="Request validation failed",
+                error_code="VALIDATION_ERROR",
+                data=ValidationErrorResponse(details=validation_details).model_dump(),
+                metadata={
+                    "endpoint": str(request.url),
+                    "method": request.method,
+                    "validation_errors": len(validation_details)
+                },
+                request_id=request_id
+            ).model_dump()
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """Handle all other exceptions with consistent format"""
+        request_id = str(uuid.uuid4())
+
+        # Log the full exception for debugging
+        error_traceback = traceback.format_exc()
+        logger.error(f"Unhandled exception in {request.method} {request.url}: {exc}")
+        logger.error(f"Traceback: {error_traceback}")
+
+        # Don't expose internal error details in production
+        if debug:
+            error_message = str(exc)
+            metadata = {
+                "exception_type": type(exc).__name__,
+                "traceback": error_traceback.split('\n')[-10:]  # Last 10 lines
+            }
+        else:
+            error_message = "Internal server error"
+            metadata = {"exception_type": type(exc).__name__}
+
+        return JSONResponse(
+            status_code=500,
+            content=APIResponse(
+                success=False,
+                error=error_message,
+                error_code="INTERNAL_SERVER_ERROR",
+                metadata={
+                    **metadata,
+                    "endpoint": str(request.url),
+                    "method": request.method
+                },
+                request_id=request_id
+            ).model_dump()
+        )
 
     # Global state - will be initialized in startup event
     app.state.clickhouse_client = None
@@ -80,15 +186,15 @@ def create_app(
 
             # Initialize ClickHouse client
             app.state.clickhouse_client = ClickHouseClient(
-                host=clickhouse_host,
-                port=clickhouse_port,
+                host=config.database.clickhouse_host,
+                port=config.database.clickhouse_port,
                 database="otel"
             )
             await app.state.clickhouse_client.initialize()
 
             # Initialize cache service
             try:
-                app.state.cache_service = MultiLevelCache(redis_url=redis_url)
+                app.state.cache_service = MultiLevelCache(redis_url=config.api.redis_url)
             except Exception as e:
                 logger.warning(f"Redis not available, falling back to in-memory cache: {e}")
                 app.state.cache_service = InMemoryCache()
@@ -97,7 +203,7 @@ def create_app(
             telemetry_repo = ClickHouseTelemetryRepository(app.state.clickhouse_client)
 
             # Initialize WebSocket components
-            if enable_websockets:
+            if config.api.enable_websockets:
                 app.state.connection_manager = ConnectionManager()
                 app.state.event_bus = EventBus()
                 app.state.event_bus.set_websocket_manager(app.state.connection_manager)
@@ -346,7 +452,7 @@ def create_app(
             )
 
     # WebSocket endpoint
-    if enable_websockets:
+    if config.api.enable_websockets:
         @app.websocket("/ws/v1/realtime")
         async def websocket_endpoint(
             websocket: WebSocket,
@@ -401,7 +507,7 @@ def create_app(
         """Legacy health report endpoint for backward compatibility"""
         try:
             health = await dashboard_service.get_system_status()
-            # Transform to legacy format
+            # Transform to legacy format but use APIResponse structure
             legacy_response = {
                 "status": "healthy" if health.overall_healthy else "unhealthy",
                 "database_status": health.database_status,
@@ -409,12 +515,19 @@ def create_app(
                 "uptime": health.uptime_seconds,
                 "error_rate": health.error_rate
             }
-            return JSONResponse(content=legacy_response)
+
+            return APIResponse(
+                success=True,
+                data=legacy_response,
+                metadata={"endpoint": "legacy_health_report", "version": "legacy"},
+                request_id=str(uuid.uuid4())
+            ).model_dump()
         except Exception as e:
             logger.error(f"Legacy health report failed: {e}")
-            return JSONResponse(
-                content={"error": "Service temporarily unavailable"},
-                status_code=503
+            # Exception will be caught by global handler, but let's be explicit
+            raise HTTPException(
+                status_code=503,
+                detail="Service temporarily unavailable"
             )
 
     @app.get("/api/telemetry-widgets")
@@ -425,7 +538,7 @@ def create_app(
             widget_types = ["error_monitor", "cost_tracker", "model_efficiency", "timeout_risk"]
             widgets_data = await dashboard_service.get_multiple_widgets(widget_types)
 
-            # Transform to legacy format
+            # Transform to legacy format but use APIResponse structure
             legacy_widgets = {}
             for widget_type, widget_data in widgets_data.items():
                 legacy_widgets[widget_type] = {
@@ -434,40 +547,82 @@ def create_app(
                     "last_updated": widget_data.last_updated.isoformat()
                 }
 
-            return JSONResponse(content=legacy_widgets)
+            return APIResponse(
+                success=True,
+                data=legacy_widgets,
+                metadata={
+                    "endpoint": "legacy_telemetry_widgets",
+                    "version": "legacy",
+                    "widget_count": len(legacy_widgets)
+                },
+                request_id=str(uuid.uuid4())
+            ).model_dump()
         except Exception as e:
             logger.error(f"Legacy telemetry widgets failed: {e}")
-            return JSONResponse(
-                content={"error": "Telemetry not available"},
-                status_code=404
+            # Exception will be caught by global handler, but let's be explicit
+            raise HTTPException(
+                status_code=404,
+                detail="Telemetry not available"
             )
 
     return app
 
+
+# Global dependency injection functions for testing
+_dashboard_service_instance = None
+_telemetry_service_instance = None
+
+def get_dashboard_service() -> DashboardService:
+    """Global dependency function for dashboard service (testing support)"""
+    global _dashboard_service_instance
+    if _dashboard_service_instance is None:
+        raise HTTPException(status_code=503, detail="Dashboard service not available")
+    return _dashboard_service_instance
+
+def get_telemetry_service() -> TelemetryService:
+    """Global dependency function for telemetry service (testing support)"""
+    global _telemetry_service_instance
+    if _telemetry_service_instance is None:
+        raise HTTPException(status_code=503, detail="Telemetry service not available")
+    return _telemetry_service_instance
+
+def set_test_services(dashboard_service: DashboardService, telemetry_service: TelemetryService):
+    """Set service instances for testing"""
+    global _dashboard_service_instance, _telemetry_service_instance
+    _dashboard_service_instance = dashboard_service
+    _telemetry_service_instance = telemetry_service
+
+
 # Factory function for different environments
 def create_production_app() -> FastAPI:
     """Create production-ready app instance"""
-    return create_app(
-        clickhouse_host="clickhouse-otel",  # Docker container name
-        redis_url="redis://redis:6379",
-        enable_websockets=True,
-        debug=False
-    )
+    config_manager = ConfigManager()
+    config = config_manager.get_config()
+    # Override for production environment
+    config.database.clickhouse_host = "clickhouse-otel"  # Docker container name
+    config.api.redis_url = "redis://redis:6379"
+    config.api.enable_websockets = True
+    config.enable_debug_mode = False
+    return create_app(config)
 
 def create_development_app() -> FastAPI:
     """Create development app instance"""
-    return create_app(
-        clickhouse_host="localhost",
-        redis_url="redis://localhost:6379",
-        enable_websockets=True,
-        debug=True
-    )
+    config_manager = ConfigManager()
+    config = config_manager.get_config()
+    # Override for development environment
+    config.database.clickhouse_host = "localhost"
+    config.api.redis_url = "redis://localhost:6379"
+    config.api.enable_websockets = True
+    config.enable_debug_mode = True
+    return create_app(config)
 
 def create_testing_app() -> FastAPI:
-    """Create testing app instance with in-memory cache"""
-    return create_app(
-        clickhouse_host="localhost",
-        redis_url="redis://localhost:6379",  # Will fallback to in-memory if not available
-        enable_websockets=False,  # Disable WebSockets for testing
-        debug=True
-    )
+    """Create testing app instance with minimal real dependencies"""
+    config_manager = ConfigManager()
+    config = config_manager.get_config()
+    # Override for testing environment
+    config.database.clickhouse_host = "localhost"
+    config.api.redis_url = "redis://localhost:6379"  # Will fallback to in-memory if not available
+    config.api.enable_websockets = False  # Disable WebSockets for testing
+    config.enable_debug_mode = True
+    return create_app(config)

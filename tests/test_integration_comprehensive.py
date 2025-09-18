@@ -16,7 +16,7 @@ from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 from context_cleaner.monitoring.performance_optimizer import PerformanceOptimizer
 from context_cleaner.feedback.feedback_collector import FeedbackCollector
 from context_cleaner.utils.error_handling import ErrorHandler
-from context_cleaner.config.settings import ContextCleanerConfig
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 
 
 @pytest.mark.integration
@@ -152,7 +152,7 @@ class TestSystemIntegration:
     def test_configuration_propagation(self, temp_data_dir):
         """Test configuration propagation across all components."""
         # Create test configuration
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         config.data_directory = temp_data_dir
         config.tracking.enabled = True
         config.performance.monitoring_enabled = True
@@ -270,7 +270,7 @@ class TestEndToEndWorkflows:
     def test_new_user_onboarding_workflow(self, temp_data_dir):
         """Test complete new user onboarding workflow."""
         # Simulate new user setup
-        config = ContextCleanerConfig.default()
+        config = ApplicationConfig.default()
         config.data_directory = temp_data_dir
         
         # 1. First-time setup

@@ -26,19 +26,23 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 import concurrent.futures
 
+from context_cleaner.api.models import (
+    create_no_data_error, create_unsupported_error, create_error_response
+)
+
 logger = logging.getLogger(__name__)
 
 # Import telemetry components with graceful fallback
 try:
-    from ..telemetry.clients.clickhouse_client import ClickHouseClient
-    from ..telemetry.cost_optimization.engine import CostOptimizationEngine
-    from ..telemetry.error_recovery.manager import ErrorRecoveryManager
-    from ..telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
-    from ..telemetry.cost_optimization.models import BudgetConfig
-    from ..telemetry.orchestration.task_orchestrator import TaskOrchestrator
-    from ..telemetry.orchestration.workflow_learner import WorkflowLearner
-    from ..telemetry.orchestration.agent_selector import AgentSelector
-    from ..telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+    from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
+    from context_cleaner.telemetry.cost_optimization.engine import CostOptimizationEngine
+    from context_cleaner.telemetry.error_recovery.manager import ErrorRecoveryManager
+    from context_cleaner.telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
+    from context_cleaner.telemetry.cost_optimization.models import BudgetConfig
+    from context_cleaner.telemetry.orchestration.task_orchestrator import TaskOrchestrator
+    from context_cleaner.telemetry.orchestration.workflow_learner import WorkflowLearner
+    from context_cleaner.telemetry.orchestration.agent_selector import AgentSelector
+    from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
     TELEMETRY_DASHBOARD_AVAILABLE = True
 except ImportError as e:
     logger.info(f"Telemetry dashboard not available: {e}")
@@ -168,7 +172,7 @@ class TelemetryWidgetCoordinator:
     async def get_all_widget_data(self) -> Dict[str, Any]:
         """Get all telemetry widget data with proper serialization"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            return {"error": "Telemetry not available"}
+            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
 
         try:
             widgets = await self.telemetry.telemetry_widgets.get_all_widget_data()
@@ -193,12 +197,12 @@ class TelemetryWidgetCoordinator:
 
         except Exception as e:
             logger.error(f"Telemetry widgets failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     async def get_widget_data_thread_safe(self, widget_type: str, **kwargs) -> Dict[str, Any]:
         """Get specific widget data with thread-safe execution"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            return {"error": "Telemetry not available"}
+            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
 
         widget_map = {
             'error-monitor': 'ERROR_MONITOR',
@@ -213,7 +217,7 @@ class TelemetryWidgetCoordinator:
         }
 
         if widget_type not in widget_map:
-            return {"error": f"Unknown widget type: {widget_type}"}
+            raise create_unsupported_error("Widget type", widget_type)
 
         try:
             widget_enum = getattr(TelemetryWidgetType, widget_map[widget_type])
@@ -247,11 +251,11 @@ class TelemetryWidgetCoordinator:
 
                 return result
             else:
-                return {"error": "No data available"}
+                raise create_no_data_error("telemetry")
 
         except Exception as e:
             logger.error(f"Error getting telemetry widget {widget_type}: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     def get_data_freshness_report(self) -> Dict[str, Any]:
         """Get comprehensive data freshness report for debugging widget staleness"""
@@ -276,7 +280,7 @@ class TelemetryWidgetCoordinator:
             return report
         except Exception as e:
             logger.error(f"Data freshness report failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     def get_widget_health_summary(self) -> Dict[str, Any]:
         """Get widget health summary for quick debugging"""
@@ -303,7 +307,7 @@ class TelemetryWidgetCoordinator:
             return result
         except Exception as e:
             logger.error(f"Widget health summary failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
 
 class TelemetryErrorTracker:
@@ -319,7 +323,7 @@ class TelemetryErrorTracker:
     async def get_cost_burnrate_data(self) -> Dict[str, Any]:
         """Get real-time cost burn rate data"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            return {"error": "Telemetry not available"}
+            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
 
         try:
             cost_widget = await self.telemetry.telemetry_widgets.get_widget_data(TelemetryWidgetType.COST_TRACKER)
@@ -334,12 +338,12 @@ class TelemetryErrorTracker:
             }
         except Exception as e:
             logger.error(f"Cost burn rate failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     async def get_error_monitor_data(self) -> Dict[str, Any]:
         """Get error monitoring data"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            return {"error": "Telemetry not available"}
+            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
 
         try:
             error_widget = await self.telemetry.telemetry_widgets.get_widget_data(TelemetryWidgetType.ERROR_MONITOR)
@@ -354,12 +358,12 @@ class TelemetryErrorTracker:
             }
         except Exception as e:
             logger.error(f"Error monitor failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     async def get_detailed_error_analysis(self, hours: int = 24) -> Dict[str, Any]:
         """Get detailed error information for analysis with categorization"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_client:
-            return {"error": "Telemetry not available"}
+            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
 
         try:
             # Get detailed error events
@@ -397,7 +401,7 @@ class TelemetryErrorTracker:
 
         except Exception as e:
             logger.error(f"Error analysis failed: {e}")
-            return {"error": str(e)}
+            raise create_error_response(str(e), "TELEMETRY_ERROR")
 
     def _categorize_errors(self, error_breakdown: List[Dict]) -> Dict[str, List[Dict]]:
         """Categorize errors by type for better analysis"""
@@ -468,8 +472,8 @@ class TelemetryFallbackProcessor:
         """Get dashboard metrics from local JSONL files when telemetry is unavailable"""
         try:
             # Import enhanced token counter and session parser for local analysis
-            from ..analysis.enhanced_token_counter import get_accurate_token_count
-            from ..analysis.session_parser import SessionParser
+            from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+            from context_cleaner.analysis.session_parser import SessionParser
 
             # Find JSONL files in common directories
             jsonl_dirs = [

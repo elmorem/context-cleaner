@@ -11,6 +11,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from dataclasses import dataclass
+from fastapi import HTTPException
 
 T = TypeVar('T')
 
@@ -143,7 +144,7 @@ class MetricsRequest(BaseModel):
 class CacheInvalidationRequest(BaseModel):
     """Request model for cache invalidation"""
     pattern: str
-    scope: str = Field(default="dashboard", regex="^(dashboard|widgets|telemetry|all)$")
+    scope: str = Field(default="dashboard", pattern="^(dashboard|widgets|telemetry|all)$")
 
 # Event-specific models
 class DashboardMetricsEvent(BaseModel):
@@ -171,6 +172,54 @@ class ErrorEvent(BaseModel):
     timestamp: datetime
     context: Dict[str, Any] = Field(default_factory=dict)
 
+# Error Models
+class ErrorDetails(BaseModel):
+    """Detailed error information"""
+    code: str
+    message: str
+    details: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)
+    request_id: Optional[str] = None
+
+class ValidationErrorDetail(BaseModel):
+    """Validation error details"""
+    field: str
+    message: str
+    value: Any = None
+
+class ValidationErrorResponse(BaseModel):
+    """Validation error response"""
+    success: bool = False
+    error: str = "Validation failed"
+    error_code: str = "VALIDATION_ERROR"
+    details: List[ValidationErrorDetail]
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+# Analytics specific models
+class AnalyticsChartRequest(BaseModel):
+    """Request model for analytics charts"""
+    chart_type: str
+    time_range_days: int = Field(default=7, ge=1, le=90)
+    session_filter: Optional[str] = None
+    refresh: bool = False
+
+class AnalyticsChartResponse(BaseModel):
+    """Analytics chart response data"""
+    chart_type: str
+    data: Dict[str, Any]
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    generated_at: datetime = Field(default_factory=datetime.now)
+
+class AnalyticsSummaryResponse(BaseModel):
+    """Analytics summary response data"""
+    total_sessions: int
+    average_productivity: float
+    total_tokens: int
+    success_rate: float
+    summary_data: Dict[str, Any]
+    time_period: str
+    generated_at: datetime = Field(default_factory=datetime.now)
+
 # Response Models for specific endpoints
 class DashboardOverviewResponse(BaseModel):
     """Dashboard overview response data"""
@@ -186,3 +235,54 @@ class WidgetListResponse(BaseModel):
     healthy_count: int
     warning_count: int
     critical_count: int
+
+# Standardized Exception Helpers
+def create_error_response(message: str, error_code: str = "INTERNAL_ERROR",
+                         status_code: int = 500, details: Dict[str, Any] = None) -> HTTPException:
+    """Create standardized HTTPException with error details"""
+    error_data = ErrorDetails(
+        code=error_code,
+        message=message,
+        details=details or {}
+    )
+    return HTTPException(
+        status_code=status_code,
+        detail=error_data.model_dump()
+    )
+
+def create_not_found_error(resource: str, identifier: str = None) -> HTTPException:
+    """Create standardized 404 error"""
+    message = f"{resource} not found"
+    if identifier:
+        message += f": {identifier}"
+
+    return create_error_response(
+        message=message,
+        error_code="RESOURCE_NOT_FOUND",
+        status_code=404
+    )
+
+def create_validation_error(field: str, message: str, value: Any = None) -> HTTPException:
+    """Create standardized validation error"""
+    return HTTPException(
+        status_code=422,
+        detail=ValidationErrorResponse(
+            details=[ValidationErrorDetail(field=field, message=message, value=value)]
+        ).model_dump()
+    )
+
+def create_no_data_error(data_type: str) -> HTTPException:
+    """Create standardized no data available error"""
+    return create_error_response(
+        message=f"No {data_type} data available",
+        error_code="NO_DATA_AVAILABLE",
+        status_code=404
+    )
+
+def create_unsupported_error(item_type: str, item_value: str) -> HTTPException:
+    """Create standardized unsupported item error"""
+    return create_error_response(
+        message=f"{item_type} '{item_value}' not supported",
+        error_code="UNSUPPORTED_OPERATION",
+        status_code=400
+    )

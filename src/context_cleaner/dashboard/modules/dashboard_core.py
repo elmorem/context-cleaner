@@ -44,8 +44,8 @@ class DashboardConfigurationManager:
 
     def __init__(self, config=None):
         # Create default config if None provided (backwards compatibility)
-        from ...config.settings import ContextCleanerConfig
-        self.config = config or ContextCleanerConfig.default()
+        from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+        self.config = config or ApplicationConfig.default()
 
         # Server configuration
         self.host = "127.0.0.1"
@@ -125,13 +125,13 @@ class DashboardServiceIntegrator:
     def initialize_core_services(self):
         """Initialize core analysis services"""
         try:
-            from ..analysis.cache_discovery import CacheDiscoveryService
-            from ..analysis.usage_patterns import UsagePatternAnalyzer
-            from ..analysis.token_efficiency import TokenEfficiencyAnalyzer
-            from ..analysis.temporal_context import TemporalContextAnalyzer
-            from ..analysis.enhanced_context import EnhancedContextAnalyzer
-            from ..scoring.context_health_scorer import ContextHealthScorer
-            from ..recognition.advanced_pattern_recognizer import AdvancedPatternRecognizer
+            from context_cleaner.analysis.cache_discovery import CacheDiscoveryService
+            from context_cleaner.analysis.usage_patterns import UsagePatternAnalyzer
+            from context_cleaner.analysis.token_efficiency import TokenEfficiencyAnalyzer
+            from context_cleaner.analysis.temporal_context import TemporalContextAnalyzer
+            from context_cleaner.analysis.enhanced_context import EnhancedContextAnalyzer
+            from context_cleaner.scoring.context_health_scorer import ContextHealthScorer
+            from context_cleaner.recognition.advanced_pattern_recognizer import AdvancedPatternRecognizer
 
             # Initialize core services
             self.cache_discovery = CacheDiscoveryService()
@@ -151,7 +151,7 @@ class DashboardServiceIntegrator:
         """Initialize optional analysis services with graceful fallback"""
         # Context Window Analysis
         try:
-            from ..analysis.context_window_analyzer import ContextWindowAnalyzer
+            from context_cleaner.analysis.context_window_analyzer import ContextWindowAnalyzer
             self.context_analyzer = ContextWindowAnalyzer()
             logger.info("✅ Context window analyzer initialized")
         except ImportError:
@@ -160,7 +160,7 @@ class DashboardServiceIntegrator:
 
         # Project Summary Analytics
         try:
-            from ..analysis.project_summary_analytics import ProjectSummaryAnalytics
+            from context_cleaner.analysis.project_summary_analytics import ProjectSummaryAnalytics
             self.project_summary_analytics = ProjectSummaryAnalytics()
             logger.info("✅ Project summary analytics initialized")
         except ImportError:
@@ -170,7 +170,7 @@ class DashboardServiceIntegrator:
     def initialize_cache_services(self):
         """Initialize cache dashboard and management services"""
         try:
-            from ..optimization.cache_dashboard import CacheEnhancedDashboard
+            from context_cleaner.optimization.cache_dashboard import CacheEnhancedDashboard
             from .dashboard_cache import DashboardCache, CacheCoordinator
 
             self.cache_dashboard = CacheEnhancedDashboard()
@@ -240,8 +240,8 @@ class DashboardServiceIntegrator:
     def initialize_reliability_infrastructure(self):
         """Initialize enhanced reliability infrastructure"""
         try:
-            from ..core.enhanced_health_monitor import EnhancedHealthMonitor
-            from ..core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+            from context_cleaner.core.enhanced_health_monitor import EnhancedHealthMonitor
+            from context_cleaner.core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 
             # Initialize health monitor for dependency checking
             self.health_monitor = EnhancedHealthMonitor()
