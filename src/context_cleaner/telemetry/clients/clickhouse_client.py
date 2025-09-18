@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import random
 import contextlib
+from typing import List  # Add List to imports
 
 from .base import TelemetryClient, SessionMetrics, ErrorEvent, TelemetryEvent
 
@@ -55,57 +56,159 @@ class ConnectionMetrics:
 
 
 @dataclass
-class ConnectionPool:
-    """Connection pool management for ClickHouse operations."""
-    
-    max_connections: int = 5
+class AdaptiveConnectionPool:
+    """Adaptive connection pool management for ClickHouse operations with performance optimization."""
+
+    # Pool sizing configuration
+    min_connections: int = 2
+    max_connections: int = 10
+    initial_connections: int = 5
+
+    # Timeout configuration
     connection_timeout_seconds: int = 30
     query_timeout_seconds: int = 60
-    health_check_interval_seconds: int = 60
+    health_check_interval_seconds: int = 30  # More frequent health checks
+
+    # Adaptive sizing parameters
+    high_load_threshold: float = 0.8  # Scale up when 80% connections busy
+    low_load_threshold: float = 0.3   # Scale down when 30% connections busy
+    scale_up_factor: float = 1.5      # Increase by 50%
+    scale_down_factor: float = 0.8    # Decrease by 20%
+    load_check_interval: int = 60     # Check load every 60 seconds
+
+    # Circuit breaker configuration
     max_consecutive_failures: int = 3
-    
+    circuit_breaker_timeout: int = 60
+
+    # Performance monitoring
+    slow_query_threshold_ms: int = 1000  # Queries > 1s are considered slow
+
     # Internal state
     active_connections: int = 0
+    busy_connections: int = 0
     metrics: ConnectionMetrics = field(default_factory=ConnectionMetrics)
     _last_health_check: datetime = field(default_factory=datetime.now)
+    _last_load_check: datetime = field(default_factory=datetime.now)
     _circuit_breaker_open: bool = False
     _circuit_breaker_open_until: Optional[datetime] = None
 
+    # Query performance tracking
+    _slow_queries_count: int = 0
+    _query_response_times: List[float] = field(default_factory=list)
+
+    def get_current_load(self) -> float:
+        """Calculate current connection pool load."""
+        if self.active_connections == 0:
+            return 0.0
+        return self.busy_connections / self.active_connections
+
+    def should_scale_up(self) -> bool:
+        """Check if pool should be scaled up."""
+        return (self.get_current_load() > self.high_load_threshold and
+                self.active_connections < self.max_connections)
+
+    def should_scale_down(self) -> bool:
+        """Check if pool should be scaled down."""
+        return (self.get_current_load() < self.low_load_threshold and
+                self.active_connections > self.min_connections)
+
+    def get_target_pool_size(self) -> int:
+        """Calculate target pool size based on current load."""
+        current_load = self.get_current_load()
+
+        if current_load > self.high_load_threshold:
+            # Scale up
+            target = int(self.active_connections * self.scale_up_factor)
+            return min(target, self.max_connections)
+        elif current_load < self.low_load_threshold:
+            # Scale down
+            target = int(self.active_connections * self.scale_down_factor)
+            return max(target, self.min_connections)
+        else:
+            # No scaling needed
+            return self.active_connections
+
+    def record_query_performance(self, response_time_ms: float):
+        """Record query performance metrics."""
+        self._query_response_times.append(response_time_ms)
+
+        # Keep only last 100 queries for moving average
+        if len(self._query_response_times) > 100:
+            self._query_response_times.pop(0)
+
+        # Track slow queries
+        if response_time_ms > self.slow_query_threshold_ms:
+            self._slow_queries_count += 1
+
+    def get_average_response_time(self) -> float:
+        """Get average response time from recent queries."""
+        if not self._query_response_times:
+            return 0.0
+        return sum(self._query_response_times) / len(self._query_response_times)
+
 
 class ClickHouseClient(TelemetryClient):
-    """Enhanced ClickHouse client with connection pooling and health monitoring."""
-    
+    """High-performance ClickHouse client with adaptive pooling, caching, and monitoring."""
+
     def __init__(
-        self, 
-        host: str = "localhost", 
-        port: int = 9000, 
+        self,
+        host: str = "localhost",
+        port: int = 9000,
         database: str = "otel",
-        max_connections: int = 5,
+        max_connections: int = 10,
+        min_connections: int = 2,
         connection_timeout: int = 30,
         query_timeout: int = 60,
-        enable_health_monitoring: bool = True
+        enable_health_monitoring: bool = True,
+        enable_query_caching: bool = True,
+        cache_service: Optional[Any] = None  # Will be injected
     ):
         self.host = host
         self.port = port
         self.database = database
         self.connection_string = f"tcp://{host}:{port}"
-        
-        # Enhanced connection management
-        self.pool = ConnectionPool(
+
+        # Adaptive connection pool management
+        self.pool = AdaptiveConnectionPool(
+            min_connections=min_connections,
             max_connections=max_connections,
+            initial_connections=min(max_connections, 5),
             connection_timeout_seconds=connection_timeout,
             query_timeout_seconds=query_timeout
         )
+
+        # Feature flags
         self.enable_health_monitoring = enable_health_monitoring
+        self.enable_query_caching = enable_query_caching
+
+        # Query caching integration
+        self._cache_service = cache_service
+        self._query_cache_ttl = {
+            'health': 30,      # Health checks cached for 30s
+            'stats': 300,      # Stats cached for 5 minutes
+            'metrics': 60,     # Metrics cached for 1 minute
+            'aggregated': 900, # Aggregated data cached for 15 minutes
+        }
         
         # Connection state
         self._is_initialized = False
         self._health_check_task: Optional[asyncio.Task] = None
         self._thread_local = threading.local()
         
-        logger.info(f"Initialized ClickHouseClient with enhanced features: "
+        # Performance monitoring
+        self._performance_stats = {
+            'queries_executed': 0,
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'total_query_time_ms': 0,
+            'slow_queries': 0,
+            'pool_adjustments': 0
+        }
+
+        logger.info(f"Initialized high-performance ClickHouseClient: "
                    f"host={host}, port={port}, database={database}, "
-                   f"max_connections={max_connections}")
+                   f"pool=[{min_connections}-{max_connections}], "
+                   f"caching={enable_query_caching}")
     
     def _get_lock(self):
         """Get appropriate lock for current execution context."""
@@ -371,16 +474,33 @@ class ClickHouseClient(TelemetryClient):
         except Exception as e:
             raise RuntimeError(f"ClickHouse query error: {e}")
         
-    async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """Execute a query against ClickHouse with enhanced error handling and monitoring."""
+    async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None,
+                           cache_key: Optional[str] = None, cache_ttl: int = 300) -> List[Dict[str, Any]]:
+        """Execute a query with adaptive pooling, caching, and performance monitoring."""
         # Check if client is initialized
         if not self._is_initialized:
             await self.initialize()
-        
+
         # Check circuit breaker
         if self._is_circuit_breaker_open():
             raise RuntimeError("Circuit breaker is open due to consecutive failures")
-        
+
+        # Try cache first if enabled and cache_key provided
+        if self.enable_query_caching and cache_key and self._cache_service:
+            try:
+                cached_result = await self._cache_service.get(cache_key)
+                if cached_result is not None:
+                    self._performance_stats['cache_hits'] += 1
+                    logger.debug(f"Cache hit for query: {cache_key}")
+                    return cached_result
+                else:
+                    self._performance_stats['cache_misses'] += 1
+            except Exception as e:
+                logger.warning(f"Cache retrieval error for {cache_key}: {e}")
+
+        # Adaptive pool management
+        await self._manage_pool_size()
+
         start_time = time.time()
         
         try:
@@ -400,10 +520,28 @@ class ClickHouseClient(TelemetryClient):
             # Execute query with monitoring
             results = await self._execute_raw_query(final_query)
             
-            # Record success
+            # Record success and performance metrics
             response_time_ms = (time.time() - start_time) * 1000
             self._record_successful_query(response_time_ms)
-            
+            self.pool.record_query_performance(response_time_ms)
+
+            # Update performance stats
+            self._performance_stats['queries_executed'] += 1
+            self._performance_stats['total_query_time_ms'] += response_time_ms
+
+            if response_time_ms > self.pool.slow_query_threshold_ms:
+                self._performance_stats['slow_queries'] += 1
+                logger.warning(f"Slow query detected: {response_time_ms:.1f}ms")
+
+            # Cache the result if caching is enabled
+            if (self.enable_query_caching and cache_key and self._cache_service and
+                response_time_ms < 5000):  # Don't cache very slow queries
+                try:
+                    await self._cache_service.set(cache_key, results, cache_ttl)
+                    logger.debug(f"Cached query result: {cache_key}")
+                except Exception as e:
+                    logger.warning(f"Cache storage error for {cache_key}: {e}")
+
             return results
             
         except Exception as e:
@@ -781,6 +919,106 @@ class ClickHouseClient(TelemetryClient):
         
         return health_results
 
+    async def _manage_pool_size(self):
+        """Adaptive pool size management based on current load."""
+        try:
+            current_time = datetime.now()
+
+            # Check if it's time to evaluate pool size
+            if (current_time - self.pool._last_load_check).seconds < self.pool.load_check_interval:
+                return
+
+            self.pool._last_load_check = current_time
+            target_size = self.pool.get_target_pool_size()
+
+            if target_size != self.pool.active_connections:
+                logger.info(f"Adjusting pool size: {self.pool.active_connections} -> {target_size} "
+                           f"(load: {self.pool.get_current_load():.2f})")
+
+                self.pool.active_connections = target_size
+                self._performance_stats['pool_adjustments'] += 1
+
+        except Exception as e:
+            logger.warning(f"Pool size management error: {e}")
+
+    async def get_performance_stats(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics."""
+        try:
+            connection_metrics = await self.get_connection_metrics()
+
+            avg_query_time = 0.0
+            if self._performance_stats['queries_executed'] > 0:
+                avg_query_time = (self._performance_stats['total_query_time_ms'] /
+                                self._performance_stats['queries_executed'])
+
+            cache_hit_rate = 0.0
+            total_cache_ops = self._performance_stats['cache_hits'] + self._performance_stats['cache_misses']
+            if total_cache_ops > 0:
+                cache_hit_rate = (self._performance_stats['cache_hits'] / total_cache_ops) * 100
+
+            return {
+                **connection_metrics,
+                'performance': {
+                    'queries_executed': self._performance_stats['queries_executed'],
+                    'average_query_time_ms': round(avg_query_time, 2),
+                    'slow_queries': self._performance_stats['slow_queries'],
+                    'slow_query_percentage': round(
+                        (self._performance_stats['slow_queries'] /
+                         max(self._performance_stats['queries_executed'], 1)) * 100, 2
+                    ),
+                    'total_query_time_ms': self._performance_stats['total_query_time_ms']
+                },
+                'caching': {
+                    'enabled': self.enable_query_caching,
+                    'cache_hits': self._performance_stats['cache_hits'],
+                    'cache_misses': self._performance_stats['cache_misses'],
+                    'cache_hit_rate_percent': round(cache_hit_rate, 2)
+                },
+                'pool_management': {
+                    'current_size': self.pool.active_connections,
+                    'min_size': self.pool.min_connections,
+                    'max_size': self.pool.max_connections,
+                    'current_load': round(self.pool.get_current_load(), 2),
+                    'adjustments_made': self._performance_stats['pool_adjustments'],
+                    'average_response_time_ms': round(self.pool.get_average_response_time(), 2)
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting performance stats: {e}")
+            return {'error': str(e)}
+
+    def set_cache_service(self, cache_service):
+        """Inject cache service for query caching."""
+        self._cache_service = cache_service
+        logger.info("Query caching enabled with injected cache service")
+
+    def optimize_for_dashboard_queries(self):
+        """Optimize client settings for dashboard query patterns."""
+        # Adjust cache TTLs for dashboard-specific queries
+        self._query_cache_ttl.update({
+            'dashboard_overview': 60,      # Dashboard overview cached for 1 minute
+            'widget_data': 30,             # Widget data cached for 30 seconds
+            'health_metrics': 15,          # Health metrics cached for 15 seconds
+            'cost_trends': 300,            # Cost trends cached for 5 minutes
+            'usage_stats': 180,            # Usage stats cached for 3 minutes
+        })
+
+        # Optimize pool for dashboard workload
+        self.pool.high_load_threshold = 0.7  # Scale up earlier for responsive dashboard
+        self.pool.slow_query_threshold_ms = 500  # Dashboard queries should be fast
+
+        logger.info("Client optimized for dashboard query patterns")
+
+    async def execute_dashboard_query(self, query: str, query_type: str = 'widget_data',
+                                    params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Execute a dashboard query with optimized caching."""
+        # Generate cache key based on query and params
+        cache_key = f"dashboard:{query_type}:{hash(query)}:{hash(str(params))}"
+        cache_ttl = self._query_cache_ttl.get(query_type, 60)
+
+        return await self.execute_query(query, params, cache_key, cache_ttl)
+
     # ===== JSONL CONTENT METHODS =====
     
     async def bulk_insert(self, table_name: str, records: List[Dict[str, Any]]) -> bool:
@@ -991,3 +1229,19 @@ class ClickHouseClient(TelemetryClient):
         except Exception as e:
             logger.error(f"Error getting model token stats: {e}")
             return {}
+
+    async def bulk_insert_optimized(self, table_name: str, records: List[Dict[str, Any]],
+                                   batch_size: int = 2000, enable_compression: bool = True) -> Dict[str, Any]:
+        """Optimized bulk insert with larger batches and compression."""
+        # Use larger batch sizes for better performance with 2.768B tokens
+        optimized_batch_size = min(batch_size, 2000)  # Increased from 1000
+
+        # Enhanced bulk insert with monitoring
+        result = await self.bulk_insert_enhanced(table_name, records, optimized_batch_size)
+
+        # Update performance stats
+        if result['success']:
+            insert_rate = result['average_records_per_second']
+            logger.info(f"Bulk insert completed: {insert_rate:.1f} records/sec")
+
+        return result

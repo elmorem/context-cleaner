@@ -10,6 +10,9 @@
     <script src="{{ url_for('static', filename='js/api-client.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard_components.js') }}"></script>
     <script src="{{ url_for('static', filename='js/realtime_dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lazy_loading.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/websocket_streaming.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui_optimization.js') }}"></script>
     <style>
         :root {
             --primary-color: #2563eb;
@@ -416,6 +419,124 @@
             text-align: center;
             padding: 1rem;
         }
+
+        /* Performance Indicators */
+        .performance-indicators {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.375rem;
+        }
+
+        .websocket-status {
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .websocket-status.connecting {
+            background: #fbbf24;
+            color: #92400e;
+        }
+
+        .websocket-status.connected {
+            background: #34d399;
+            color: #065f46;
+        }
+
+        .websocket-status.disconnected, .websocket-status.error {
+            background: #f87171;
+            color: #991b1b;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-success { background: var(--success-color); }
+        .toast-warning { background: var(--warning-color); }
+        .toast-error { background: var(--danger-color); }
+        .toast-info { background: var(--primary-color); }
+
+        /* Lazy loading and optimization styles */
+        .lazy-loading {
+            opacity: 0.6;
+            position: relative;
+        }
+
+        .lazy-loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .lazy-loaded {
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .lazy-error {
+            opacity: 0.5;
+            border: 1px solid var(--danger-color);
+        }
+
+        /* Virtual scrolling optimizations */
+        .virtual-scroll-wrapper {
+            contain: layout style paint;
+        }
+
+        .virtual-scroll-item {
+            contain: layout style paint;
+            will-change: transform;
+        }
+
+        /* Performance critical elements */
+        [data-performance-critical] {
+            contain: layout style paint;
+        }
+
+        .ui-optimized-hidden {
+            animation-play-state: paused !important;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -425,6 +546,23 @@
             <span class="phase-badge">✅ Phase 1: Telemetry Infrastructure</span>
             <span class="phase-badge">✅ Phase 2: Enhanced Analytics</span>
             <span class="phase-badge">✅ Phase 3: Advanced Orchestration</span>
+            <span class="phase-badge">✅ Phase 4.3: Memory Optimization</span>
+            <span class="phase-badge">✅ Phase 4.4: Dashboard Rendering</span>
+            <span class="phase-badge">✅ Phase 4.5: Background Task Optimization</span>
+        </div>
+        <div class="performance-indicators">
+            <div class="indicator">
+                <span>WebSocket:</span>
+                <span id="websocket-status" class="websocket-status connecting">CONNECTING</span>
+            </div>
+            <div class="indicator">
+                <span>Rendering:</span>
+                <span id="rendering-fps">--</span> FPS
+            </div>
+            <div class="indicator">
+                <span>Memory:</span>
+                <span id="memory-usage">--</span> MB
+            </div>
         </div>
     </div>
 

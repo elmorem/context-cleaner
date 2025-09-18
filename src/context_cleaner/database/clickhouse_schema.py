@@ -92,9 +92,12 @@ class ClickHouseSchema:
     ORDER BY (session_id, analysis_id, timestamp)
     PARTITION BY toDate(timestamp)
     TTL timestamp + INTERVAL 90 DAY
-    SETTINGS index_granularity = 8192, 
+    SETTINGS index_granularity = 4096,
+             index_granularity_bytes = 10485760,
              compress_on_write = 1,
-             compression_method = 'lz4';
+             compression_method = 'lz4',
+             merge_with_ttl_timeout = 86400,
+             max_suspicious_broken_parts = 10;
     """
 
     ENHANCED_TOKEN_DETAILS_TABLE = """
@@ -135,9 +138,12 @@ class ClickHouseSchema:
     ORDER BY (analysis_id, session_id, file_path)
     PARTITION BY toDate(created_at)
     TTL created_at + INTERVAL 30 DAY
-    SETTINGS index_granularity = 8192,
+    SETTINGS index_granularity = 4096,
+             index_granularity_bytes = 10485760,
              compress_on_write = 1,
-             compression_method = 'lz4';
+             compression_method = 'lz4',
+             merge_with_ttl_timeout = 86400,
+             max_suspicious_broken_parts = 10;
     """
 
     ENHANCED_ANALYSIS_METADATA_TABLE = """
@@ -185,29 +191,50 @@ class ClickHouseSchema:
     ORDER BY (analysis_id, execution_timestamp)
     PARTITION BY toDate(execution_timestamp)
     TTL execution_timestamp + INTERVAL 365 DAY
-    SETTINGS index_granularity = 8192,
+    SETTINGS index_granularity = 4096,
+             index_granularity_bytes = 10485760,
              compress_on_write = 1,
-             compression_method = 'lz4';
+             compression_method = 'lz4',
+             merge_with_ttl_timeout = 86400,
+             max_suspicious_broken_parts = 10;
     """
 
-    # Index definitions for optimized query performance
+    # High-performance index definitions optimized for 2.768B tokens
     INDEXES = {
         "enhanced_token_summaries": [
-            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_session_timestamp (session_id, timestamp) TYPE minmax GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_total_tokens (calculated_total_tokens) TYPE minmax GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_accuracy (accuracy_ratio, undercount_percentage) TYPE minmax GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_timestamp (timestamp) TYPE minmax GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_validation_status (validation_status) TYPE set(0) GRANULARITY 8192;",
+            # Primary performance indexes with optimized granularity
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_session_timestamp (session_id, timestamp) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_total_tokens (calculated_total_tokens) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_accuracy (accuracy_ratio, undercount_percentage) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_timestamp (timestamp) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_validation_status (validation_status) TYPE set(0) GRANULARITY 4096;",
+            # High-performance indexes for common dashboard queries
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_session_analysis (session_id, analysis_id) TYPE bloom_filter(0.01) GRANULARITY 2048;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_token_range (calculated_total_tokens, timestamp) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_processing_performance (processing_duration_ms, files_processed) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_cost_analysis (reported_input_tokens, reported_output_tokens, accuracy_ratio) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_summaries ADD INDEX IF NOT EXISTS idx_analysis_version (analysis_version, timestamp) TYPE bloom_filter(0.01) GRANULARITY 2048;",
         ],
         "enhanced_token_details": [
-            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_path (file_path) TYPE bloom_filter(0.01) GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_tokens (file_total_tokens) TYPE minmax GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_processing_status (processing_status) TYPE set(0) GRANULARITY 8192;",
+            # Optimized indexes for file-level analysis
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_path (file_path) TYPE bloom_filter(0.01) GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_tokens (file_total_tokens) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_processing_status (processing_status) TYPE set(0) GRANULARITY 4096;",
+            # Performance indexes for file analysis queries
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_analysis_file (analysis_id, file_path) TYPE bloom_filter(0.01) GRANULARITY 2048;",
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_size_tokens (file_size_bytes, file_total_tokens) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_conversation_metrics (conversation_count, message_count) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_token_details ADD INDEX IF NOT EXISTS idx_file_processing_time (processing_duration_ms, processing_order) TYPE minmax GRANULARITY 4096;",
         ],
         "enhanced_analysis_metadata": [
-            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_trigger_source (trigger_source) TYPE set(0) GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_execution_mode (execution_mode) TYPE set(0) GRANULARITY 8192;",
-            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_validation_passed (validation_passed) TYPE set(0) GRANULARITY 8192;",
+            # Metadata analysis performance indexes
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_trigger_source (trigger_source) TYPE set(0) GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_execution_mode (execution_mode) TYPE set(0) GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_validation_passed (validation_passed) TYPE set(0) GRANULARITY 4096;",
+            # Performance monitoring indexes
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_performance_metrics (total_execution_time_ms, peak_memory_usage_mb) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_execution_results (files_processed, files_scanned, error_count) TYPE minmax GRANULARITY 4096;",
+            "ALTER TABLE {database}.enhanced_analysis_metadata ADD INDEX IF NOT EXISTS idx_analysis_timestamp (analysis_id, execution_timestamp) TYPE bloom_filter(0.01) GRANULARITY 2048;",
         ],
     }
 
