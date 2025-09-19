@@ -1314,8 +1314,9 @@ except ImportError:
 @click.option("--no-discovery", is_flag=True, help="Skip process discovery, use basic method")
 @click.option("--show-discovery", is_flag=True, help="Show discovered processes before shutdown")
 @click.option("--registry-cleanup", is_flag=True, help="Also clean up process registry entries")
+@click.option("--use-script", is_flag=True, help="Use stop-context-cleaner.sh script for comprehensive cleanup")
 @click.pass_context
-def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup):
+def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup, use_script):
     """
     🛑 ENHANCED STOP - Comprehensive service shutdown with process discovery.
     
@@ -1345,6 +1346,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
       context-cleaner stop --processes-only # Only background processes
       context-cleaner stop --force          # Skip confirmations
       context-cleaner stop --registry-cleanup # Also clean registry
+      context-cleaner stop --use-script     # Use stop-context-cleaner.sh script
     
     This solves the orphaned process problem by discovering and stopping
     ALL Context Cleaner processes regardless of how they were started.
@@ -1352,13 +1354,49 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     import subprocess
     import signal
     import os
+    import sys
     import asyncio
     import psutil
     from pathlib import Path
     
-    config = ctx.obj["config"] 
+    config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    
+
+    # Use shell script if requested
+    if use_script:
+        if verbose:
+            click.echo("🛑 Using stop-context-cleaner.sh for comprehensive cleanup...")
+
+        script_path = Path.cwd() / "stop-context-cleaner.sh"
+        if not script_path.exists():
+            click.echo(f"❌ Script not found: {script_path}", err=True)
+            click.echo("💡 Make sure stop-context-cleaner.sh is in the current directory", err=True)
+            sys.exit(1)
+
+        if not force:
+            click.echo("🛑 This will run stop-context-cleaner.sh to kill all context-cleaner processes")
+            if not click.confirm("Continue with shell script cleanup?"):
+                click.echo("❌ Shutdown cancelled")
+                return
+
+        try:
+            result = subprocess.run([str(script_path)], capture_output=True, text=True)
+            if verbose:
+                if result.stdout:
+                    click.echo(result.stdout)
+                if result.stderr:
+                    click.echo(result.stderr, err=True)
+
+            if result.returncode == 0:
+                click.echo("✅ Shell script cleanup completed successfully")
+            else:
+                click.echo(f"⚠️  Shell script completed with exit code {result.returncode}")
+        except Exception as e:
+            click.echo(f"❌ Failed to run shell script: {e}", err=True)
+            sys.exit(1)
+
+        return
+
     if verbose:
         click.echo("🛑 Starting enhanced Context Cleaner shutdown...")
         click.echo("🔍 Using process discovery and orchestration integration")

@@ -12,7 +12,6 @@ import psutil
 import os
 
 from ..clients.clickhouse_client import ClickHouseClient
-from ..error_recovery.manager import ErrorRecoveryManager
 from ...hooks.circuit_breaker import CircuitBreaker
 from .security import SecureContextRotAnalyzer, PrivacyConfig
 
@@ -190,7 +189,7 @@ class SessionHealthMonitor:
 class ProductionReadyContextRotMonitor:
     """Production-ready Context Rot Monitor with comprehensive safety measures."""
     
-    def __init__(self, clickhouse_client: ClickHouseClient, error_manager: ErrorRecoveryManager):
+    def __init__(self, clickhouse_client: ClickHouseClient, error_manager: "ErrorRecoveryManager"):
         self.clickhouse = clickhouse_client
         self.error_manager = error_manager
         

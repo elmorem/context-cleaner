@@ -26,8 +26,12 @@ from ..analysis import (
     CacheEnhancedAnalysis,
     CorrelationInsights,
 )
-from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
 from ..analytics.advanced_patterns import AdvancedPatternRecognizer
+
+def _get_health_scorer_classes():
+    """Lazy import to avoid circular dependency."""
+    from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
+    return ContextHealthScorer, HealthScore
 
 
 class HealthLevel(Enum):
@@ -117,7 +121,7 @@ class CacheEnhancedDashboardData:
     correlation_insights: CorrelationInsights
 
     # Traditional health analysis (enhanced with cache data)
-    traditional_health: HealthScore
+    traditional_health: "HealthScore"
 
     # Usage-based insights and recommendations
     insights: List[UsageInsight]
@@ -145,6 +149,7 @@ class CacheEnhancedDashboard:
         self.correlation_analyzer = CrossSessionCorrelationAnalyzer()
 
         # Traditional analyzers (enhanced with cache data)
+        ContextHealthScorer, _ = _get_health_scorer_classes()
         self.health_scorer = ContextHealthScorer()
         self.pattern_analyzer = AdvancedPatternRecognizer()
 
@@ -347,7 +352,7 @@ class CacheEnhancedDashboard:
 
     async def _generate_enhanced_health_analysis(
         self, context_path: Optional[Path], enhanced_analysis: CacheEnhancedAnalysis
-    ) -> HealthScore:
+    ) -> "HealthScore":
         """Generate traditional health analysis enhanced with cache insights."""
         if context_path and context_path.exists():
             health_report = await asyncio.to_thread(
@@ -362,6 +367,7 @@ class CacheEnhancedDashboard:
             return health_report
         else:
             # Generate synthetic health report from cache data
+            _, HealthScore = _get_health_scorer_classes()
             return HealthScore(
                 overall_score=int(
                     (
@@ -644,6 +650,7 @@ class CacheEnhancedDashboard:
     ) -> CacheEnhancedDashboardData:
         """Generate basic dashboard when cache analysis is unavailable."""
         # Generate traditional health analysis only
+        _, HealthScore = _get_health_scorer_classes()
         traditional_health = HealthScore(
             overall_score=50,
             component_scores={

@@ -6,6 +6,15 @@ CLEAN-CONTEXT-GUIDE.md, enhanced with PR15.3 cache intelligence and professional
 formatting with color-coded health indicators.
 """
 
+# Import and patch gevent first, before any other imports
+try:
+    import gevent
+    from gevent import monkey
+    monkey.patch_all()
+except ImportError:
+    # Fallback if gevent is not available
+    pass
+
 import asyncio
 import json
 import os
@@ -280,10 +289,29 @@ class ComprehensiveHealthDashboard:
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
             return response
 
-        # SocketIO for real-time updates
-        self.socketio = SocketIO(
-            self.app, cors_allowed_origins="*", async_mode="gevent"
-        )
+        # SocketIO for real-time updates with fallback async modes
+        socketio_async_mode = None
+        try:
+            # Try gevent first (preferred for production)
+            self.socketio = SocketIO(
+                self.app, cors_allowed_origins="*", async_mode="gevent"
+            )
+            socketio_async_mode = "gevent"
+        except Exception as e:
+            try:
+                # Fallback to threading
+                self.socketio = SocketIO(
+                    self.app, cors_allowed_origins="*", async_mode="threading"
+                )
+                socketio_async_mode = "threading"
+            except Exception as e2:
+                # Last resort: auto-detection
+                self.socketio = SocketIO(
+                    self.app, cors_allowed_origins="*"
+                )
+                socketio_async_mode = "auto"
+
+        print(f"SocketIO initialized with async_mode: {socketio_async_mode}")
 
         # Dashboard configuration
         # Create default config if None provided (backwards compatibility)
@@ -343,8 +371,8 @@ class ComprehensiveHealthDashboard:
 
         # Phase 2.4: Initialize WebSocket-first real-time management
         self.realtime_manager = DashboardRealtime(
-            socketio=self.socketio,
-            dashboard_instance=self
+            dashboard_instance=self,
+            socketio=self.socketio
         )
         self.realtime_coordinator = RealtimeCoordinator(self.realtime_manager)
 
@@ -2762,18 +2790,18 @@ class ComprehensiveHealthDashboard:
         port: int = 8080,
         debug: bool = False,
         open_browser: bool = True,
-        production: bool = False,
+        production: Optional[bool] = None,
         gunicorn_workers: Optional[int] = None,
     ):
         """
-        Start the comprehensive dashboard server.
+        Start the comprehensive dashboard server with smart production/development detection and robust fallback.
 
         Args:
             host: Host to bind to
             port: Port to bind to
             debug: Enable debug mode
             open_browser: Whether to open browser automatically
-            production: Use production server (Gunicorn) instead of dev server
+            production: Use production server (Gunicorn) - None for auto-detection
             gunicorn_workers: Number of Gunicorn workers (defaults to CPU count * 2 + 1)
         """
         self.host = host
@@ -2787,11 +2815,21 @@ class ComprehensiveHealthDashboard:
             if not (self.realtime_manager._update_thread and self.realtime_manager._update_thread.is_alive()):
                 self.realtime_manager.start_background_broadcasting()
 
+        # Smart auto-detection: try production first unless explicitly disabled
+        if production is None:
+            production = self._should_use_production_server()
+            logger.info(f"🔍 Auto-detected server mode: {'production' if production else 'development'}")
+
         if production:
-            logger.info(f"Starting comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
-            self._start_production_server(host, port, gunicorn_workers, open_browser)
+            logger.info(f"🚀 Attempting to start comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
+            try:
+                self._start_production_server(host, port, gunicorn_workers, open_browser)
+            except Exception as e:
+                logger.warning(f"💡 Production server failed: {e}")
+                logger.info("🔄 Falling back to development server...")
+                self._start_development_server(host, port, debug, open_browser)
         else:
-            logger.info(f"Starting comprehensive dashboard with Flask dev server on http://{host}:{port}")
+            logger.info(f"🛠️ Starting comprehensive dashboard with Flask development server on http://{host}:{port}")
             self._start_development_server(host, port, debug, open_browser)
 
     def _start_development_server(self, host: str, port: int, debug: bool, open_browser: bool):
@@ -2817,6 +2855,47 @@ class ComprehensiveHealthDashboard:
         except Exception as e:
             logger.error(f"Development server error: {e}")
             raise
+
+    def _should_use_production_server(self) -> bool:
+        """Smart auto-detection of whether to use production server"""
+        # Check if gunicorn is available
+        try:
+            import subprocess
+            subprocess.run(['gunicorn', '--version'],
+                         capture_output=True, check=True, timeout=5)
+            logger.debug("✅ Gunicorn is available")
+            gunicorn_available = True
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            logger.debug("❌ Gunicorn not available or not working")
+            gunicorn_available = False
+
+        # Check environment indicators
+        import os
+        env_indicators = {
+            'FLASK_ENV': os.getenv('FLASK_ENV', '').lower(),
+            'ENVIRONMENT': os.getenv('ENVIRONMENT', '').lower(),
+            'DEPLOYMENT_ENV': os.getenv('DEPLOYMENT_ENV', '').lower(),
+        }
+
+        # Force development server if explicitly set
+        is_dev_env = any(env in ['development', 'dev', 'local']
+                        for env in env_indicators.values())
+
+        # Force production server if explicitly set
+        is_prod_env = any(env in ['production', 'prod', 'staging']
+                         for env in env_indicators.values())
+
+        # Auto-detection logic
+        if is_dev_env:
+            logger.debug("🛠️ Environment indicates development mode")
+            return False
+        elif is_prod_env:
+            logger.debug("🚀 Environment indicates production mode")
+            return gunicorn_available
+        else:
+            # Default: try production if gunicorn is available
+            logger.debug("🔍 No explicit environment set, defaulting based on gunicorn availability")
+            return gunicorn_available
 
     def _start_production_server(self, host: str, port: int, workers: Optional[int], open_browser: bool):
         """Start production server using Gunicorn."""

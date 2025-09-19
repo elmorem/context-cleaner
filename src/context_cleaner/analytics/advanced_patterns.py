@@ -15,7 +15,6 @@ from enum import Enum
 import math
 
 from .productivity_analyzer import ProductivityMetrics
-from .context_health_scorer import HealthScore
 from ..config.settings import ContextCleanerConfig
 
 logger = logging.getLogger(__name__)
@@ -330,7 +329,7 @@ class AdvancedPatternRecognizer:
         self,
         session_data: List[Dict[str, Any]],
         productivity_data: Optional[List[ProductivityMetrics]] = None,
-        health_data: Optional[List[HealthScore]] = None,
+        health_data: Optional[List["HealthScore"]] = None,
         analysis_period_days: int = 90,
     ) -> List[AdvancedPattern]:
         """
@@ -613,7 +612,7 @@ class AdvancedPatternRecognizer:
         self,
         session_data: List[Dict[str, Any]],
         productivity_data: Optional[List[ProductivityMetrics]],
-        health_data: Optional[List[HealthScore]],
+        health_data: Optional[List["HealthScore"]],
         analysis_period_days: int,
     ) -> List[Dict[str, Any]]:
         """Prepare consolidated dataset for analysis."""
@@ -1120,8 +1119,8 @@ class AdvancedPatternRecognizer:
         return None
 
     def _find_matching_health_data(
-        self, timestamp: datetime, health_data: List[HealthScore]
-    ) -> Optional[HealthScore]:
+        self, timestamp: datetime, health_data: List["HealthScore"]
+    ) -> Optional["HealthScore"]:
         """Find health data matching a timestamp within 1 hour."""
         for health in health_data:
             time_diff = abs((health.timestamp - timestamp).total_seconds())

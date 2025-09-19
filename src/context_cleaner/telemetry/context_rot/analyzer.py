@@ -16,7 +16,6 @@ from datetime import datetime
 from .monitor import ProductionReadyContextRotMonitor, QuickAssessment
 from .security import PrivacyConfig
 from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
-from context_cleaner.telemetry.error_recovery.manager import ErrorRecoveryManager
 
 # Phase 2: ML Enhancement Imports
 try:
@@ -81,7 +80,7 @@ class StatisticalContextAnalyzer:
 class ContextRotAnalyzer:
     """Main Context Rot Analyzer orchestrating all components."""
     
-    def __init__(self, clickhouse_client: ClickHouseClient, error_manager: ErrorRecoveryManager):
+    def __init__(self, clickhouse_client: ClickHouseClient, error_manager: "ErrorRecoveryManager"):
         """Initialize with existing infrastructure components and Phase 2 ML enhancements."""
         self.clickhouse_client = clickhouse_client
         self.error_manager = error_manager

@@ -61,9 +61,10 @@ class DashboardRealtime:
     Critical: Preserves existing WebSocket event structure exactly
     """
 
-    def __init__(self, event_bus: EventBus = None, dashboard_instance=None):
+    def __init__(self, event_bus: EventBus = None, dashboard_instance=None, socketio=None):
         self.event_bus = event_bus
         self.dashboard = dashboard_instance
+        self.socketio = socketio
         self.event_handlers = {}
         self.active_connections = set()
 
@@ -187,6 +188,79 @@ class DashboardRealtime:
             if self._update_thread.is_alive():
                 logger.warning("Background thread did not stop gracefully")
         logger.info("🛑 Background broadcasting stopped")
+
+    def setup_socketio_events(self):
+        """Setup SocketIO event handlers for real-time dashboard communication."""
+        # Use constructor-provided socketio first, then fall back to dashboard.socketio
+        socketio = self.socketio
+        if not socketio and self.dashboard and hasattr(self.dashboard, 'socketio'):
+            socketio = self.dashboard.socketio
+
+        if not socketio:
+            logger.warning("SocketIO not available for event setup")
+            return
+
+        @socketio.on("connect")
+        def handle_connect():
+            """Handle client connection with initial health data broadcast"""
+            logger.info("Dashboard client connected via SocketIO")
+            self.active_connections.add(id(self))  # Track connection
+
+            try:
+                # Send initial comprehensive health data
+                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    report = loop.run_until_complete(
+                        self.dashboard.generate_comprehensive_health_report()
+                    )
+                    loop.close()
+
+                    # Serialize and emit
+                    safe_report = self.serializer.serialize_health_report(report)
+                    socketio.emit("health_update", safe_report)
+                else:
+                    socketio.emit("health_update", {"status": "dashboard_unavailable"})
+
+            except Exception as e:
+                logger.error(f"Initial health data broadcast failed: {e}")
+                socketio.emit("error", {"message": str(e)})
+
+        @socketio.on("disconnect")
+        def handle_disconnect():
+            """Handle client disconnection"""
+            logger.info("Dashboard client disconnected via SocketIO")
+            # Remove from active connections if present
+            try:
+                self.active_connections.discard(id(self))
+            except Exception as e:
+                logger.warning(f"Error removing connection: {e}")
+
+        @socketio.on("health_update_request")
+        def handle_health_update_request():
+            """Handle health update requests from clients"""
+            try:
+                # Get fresh health data
+                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    report = loop.run_until_complete(
+                        self.dashboard.generate_comprehensive_health_report()
+                    )
+                    loop.close()
+
+                    # Serialize and emit
+                    safe_report = self.serializer.serialize_health_report(report)
+                    socketio.emit("health_update", safe_report)
+                else:
+                    socketio.emit("health_update", {"status": "dashboard_unavailable"})
+            except Exception as e:
+                logger.error(f"Health update request failed: {e}")
+                socketio.emit("error", {"message": str(e)})
+
+        logger.info("✅ SocketIO event handlers configured for real-time dashboard")
 
     def _real_time_update_loop(self):
         """

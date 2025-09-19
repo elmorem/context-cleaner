@@ -191,8 +191,8 @@ class DashboardServiceIntegrator:
             from .dashboard_realtime import DashboardRealtime, RealtimeCoordinator
 
             self.realtime_manager = DashboardRealtime(
-                socketio=socketio,
-                dashboard_instance=dashboard_instance
+                dashboard_instance=dashboard_instance,
+                socketio=socketio
             )
             self.realtime_coordinator = RealtimeCoordinator(self.realtime_manager)
 
@@ -312,20 +312,30 @@ class DashboardServerManager:
         port: int = 8080,
         debug: bool = False,
         open_browser: bool = True,
-        production: bool = False,
+        production: Optional[bool] = None,
         gunicorn_workers: Optional[int] = None,
     ):
-        """Start the dashboard server with specified configuration"""
+        """Start the dashboard server with smart production/development detection and robust fallback"""
         self.config_manager.host = host
         self.config_manager.port = port
         self.config_manager.debug = debug
         self.config_manager._is_running = True
 
+        # Smart auto-detection: try production first unless explicitly disabled
+        if production is None:
+            production = self._should_use_production_server()
+            logger.info(f"🔍 Auto-detected server mode: {'production' if production else 'development'}")
+
         if production:
-            logger.info(f"Starting dashboard with Gunicorn (production) on http://{host}:{port}")
-            self._start_production_server(host, port, gunicorn_workers, open_browser)
+            logger.info(f"🚀 Attempting to start with Gunicorn (production) on http://{host}:{port}")
+            try:
+                self._start_production_server(host, port, gunicorn_workers, open_browser)
+            except Exception as e:
+                logger.warning(f"💡 Production server failed: {e}")
+                logger.info("🔄 Falling back to development server...")
+                self._start_development_server(host, port, debug, open_browser)
         else:
-            logger.info(f"Starting dashboard with Flask dev server on http://{host}:{port}")
+            logger.info(f"🛠️ Starting with Flask development server on http://{host}:{port}")
             self._start_development_server(host, port, debug, open_browser)
 
     def _start_development_server(self, host: str, port: int, debug: bool, open_browser: bool):
@@ -421,8 +431,48 @@ class DashboardServerManager:
 
         except Exception as e:
             logger.error(f"Production server startup failed: {e}")
-            logger.info("💡 Falling back to development server...")
-            self._start_development_server(host, port, False, open_browser)
+            raise  # Let the main start_server method handle the fallback
+
+    def _should_use_production_server(self) -> bool:
+        """Smart auto-detection of whether to use production server"""
+        # Check if gunicorn is available
+        try:
+            import subprocess
+            subprocess.run(['gunicorn', '--version'],
+                         capture_output=True, check=True, timeout=5)
+            logger.debug("✅ Gunicorn is available")
+            gunicorn_available = True
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            logger.debug("❌ Gunicorn not available or not working")
+            gunicorn_available = False
+
+        # Check environment indicators
+        import os
+        env_indicators = {
+            'FLASK_ENV': os.getenv('FLASK_ENV', '').lower(),
+            'ENVIRONMENT': os.getenv('ENVIRONMENT', '').lower(),
+            'DEPLOYMENT_ENV': os.getenv('DEPLOYMENT_ENV', '').lower(),
+        }
+
+        # Force development server if explicitly set
+        is_dev_env = any(env in ['development', 'dev', 'local']
+                        for env in env_indicators.values())
+
+        # Force production server if explicitly set
+        is_prod_env = any(env in ['production', 'prod', 'staging']
+                         for env in env_indicators.values())
+
+        # Auto-detection logic
+        if is_dev_env:
+            logger.debug("🛠️ Environment indicates development mode")
+            return False
+        elif is_prod_env:
+            logger.debug("🚀 Environment indicates production mode")
+            return gunicorn_available
+        else:
+            # Default: try production if gunicorn is available
+            logger.debug("🔍 No explicit environment set, defaulting based on gunicorn availability")
+            return gunicorn_available
 
     def _create_wsgi_entry_point(self):
         """Create WSGI entry point for Gunicorn"""

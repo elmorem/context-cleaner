@@ -297,7 +297,7 @@ class StreamingDataProcessor:
             value = data.get(header, '')
             # Escape CSV special characters
             if isinstance(value, str) and (',' in value or '"' in value or '\n' in value):
-                value = f'"{value.replace("""", """""")}"'
+                value = f'"{value.replace('"', '""')}"'
             values.append(str(value))
         return ','.join(values)
 
