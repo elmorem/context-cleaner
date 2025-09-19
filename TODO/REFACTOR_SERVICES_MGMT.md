@@ -152,6 +152,39 @@
 - Provide troubleshooting guide covering connection failures, auth errors, watchdog restarts, audit log interpretation, and fallback procedures.
 - Document recovery workflows for registry corruption and manual supervisor replacement.
 
+## Phase 0 Deliverables
+
+### Service Inventory
+- ClickHouse database (Docker `clickhouse`): required, provides telemetry storage, health check `_check_clickhouse_health`, startup timeout 180s.
+- OTEL collector (Docker `otel-collector`): optional, depends on ClickHouse, startup timeout 90s.
+- JSONL bridge service (`context_cleaner.cli.main bridge sync`): required when ClickHouse available; monitors JSONL files.
+- Dashboard web server (`ComprehensiveHealthDashboard`): required, launched in process; exposes sockets via Flask/SocketIO.
+- API/UI consistency checker: optional monitor depending on dashboard.
+- Telemetry collector: optional data ingestion service.
+- Ancillary scripts (monitoring, bridge, start_context_cleaner.py) currently unmanaged but interact with same resources.
+
+### IPC Transport Decision Notes
+- POSIX: Unix domain sockets under `$XDG_RUNTIME_DIR/context-cleaner/supervisor.sock`, permissions 600, cleanup via `atexit` handler.
+- Windows: prefer `\.\pipe\context_cleaner_supervisor` named pipe; fall back to TLS loopback TCP when elevated contexts or service accounts required.
+- WSL2 / mixed environments: detect via `/proc/version`; default to loopback TCP to avoid namespace issues; document firewall/antivirus considerations.
+- All transports share Proto-based framing with length-prefix to avoid partial reads.
+
+### Security Posture Summary
+- Authentication: HMAC-signed tokens stored per-user (macOS Keychain, Windows DPAPI, Linux secret store).
+- Rate limiting: token bucket (10 privileged commands/min, 100 status requests/min).
+- Audit logging: JSONL append with request metadata (timestamp, client, action, outcome).
+- Command authorization: same-user PID verification; future hooks for role separation.
+
+### Architecture Updates
+- Add supervisor component to diagrams: sits between CLI and orchestrator, exposes IPC endpoint, records state in ProcessRegistry.
+- Document state flow: supervisor -> orchestrator (async APIs) -> services, plus registry updates.
+- Identify fallback path: CLI -> supervisor; if unavailable -> legacy discovery fallback (deprecated).
+- Diagram annotation notes:
+  - Add supervisor node between CLI and ServiceOrchestrator with IPC link.
+  - Depict IPC transport paths (UDS, named pipe/TCP) and auth/rate-limiting controls.
+  - Show optional watchdog component receiving supervisor heartbeats (Phase 4B).
+  - Highlight ProcessRegistry updates storing supervisor and service metadata.
+
 ## Implementation PR Breakdown
 1. **PR 1 – Discovery & Design Artifacts (Phase 0)**
    - Deliver service inventory, transport decision matrix, security posture summary, and updated architecture diagrams.
@@ -197,3 +230,11 @@
 11. **PR 11 – Rollout & Legacy Cleanup (Phase 8)**
     - Enable feature flag by default, remove legacy discovery-heavy code, finalize release notes, and confirm graceful fallback story.
     - Tests: regression suite ensuring legacy paths removed; final smoke tests on all platforms.
+
+
+## Phase 0 Artifact Summary
+- Service inventory and dependency table (see "Service Inventory" section).
+- IPC transport decision matrix with cross-platform considerations.
+- Security posture overview (authentication, rate limiting, audit logging).
+- Architecture diagram notes highlighting supervisor placement, IPC flow, watchdog hook, and registry interactions.
+- Pending action: export updated architecture diagram (draw.io / diagrams.net) and attach to docs when ready.
