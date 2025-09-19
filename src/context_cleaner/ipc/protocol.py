@@ -83,7 +83,7 @@ class SupervisorRequest:
             "options": self.options,
             "filters": self.filters,
             "streaming": self.streaming,
-            "timeout": self.timeout_ms,
+            "timeout_ms": self.timeout_ms,
         }
         if self.client_info:
             payload["client_info"] = {

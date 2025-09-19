@@ -21,6 +21,5 @@ def test_request_serialisation_roundtrip():
     assert data["action"] == "status"
     assert data["options"]["force"] is True
     assert data["streaming"] is True
-    assert data["timeout"] == 30_000
+    assert data["timeout_ms"] == 30_000
     assert data["client_info"]["pid"] == 1234
-

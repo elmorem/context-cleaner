@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net" modified="2025-09-19T05:20:00.000Z" agent="codex-cli" version="24.7.7" type="device">
+  <diagram id="J2J8S-arch" name="Supervisor Architecture">
+    <mxGraphModel dx="914" dy="671" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="CLI Commands" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="100" y="120" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Service Supervisor" style="shape=process;rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="320" y="120" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Service Orchestrator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="560" y="120" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Managed Services\n(Docker, Dashboard, Bridge)" style="whiteSpace=wrap;html=1;rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="780" y="120" width="200" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="IPC Channel\n(UDS / Named Pipe / TCP)" style="whiteSpace=wrap;html=1;fontSize=12;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="310" y="70" width="210" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Process Registry" style="shape=process;rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="560" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Audit Logs" style="shape=document;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="320" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="Watchdog (Phase 4B)" style="dashed=1;rounded=1;whiteSpace=wrap;html=1;strokeColor=#999999;fillColor=#f5f5f5;fontSize=12;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="780" y="260" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" source="2" target="3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;" edge="1" source="3" target="4" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" source="4" target="5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;dashed=1;" edge="1" source="4" target="7" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;dashed=1;" edge="1" source="3" target="8" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" value="Heartbeat" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#999999;dashed=1;fontSize=11;fontColor=#333333;" edge="1" source="9" target="3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

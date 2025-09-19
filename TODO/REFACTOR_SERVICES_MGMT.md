@@ -181,6 +181,7 @@
 - Add supervisor component to diagrams: sits between CLI and orchestrator, exposes IPC endpoint, records state in ProcessRegistry.
 - Document state flow: supervisor -> orchestrator (async APIs) -> services, plus registry updates.
 - Identify fallback path: CLI -> supervisor; if unavailable -> legacy discovery fallback (deprecated).
+- Diagram source: `docs/design/service_supervisor_architecture.drawio` (diagrams.net format) with supervisor, orchestrator, registry, and watchdog relationships.
 - Diagram annotation notes:
   - Add supervisor node between CLI and ServiceOrchestrator with IPC link.
   - Depict IPC transport paths (UDS, named pipe/TCP) and auth/rate-limiting controls.
@@ -250,4 +251,4 @@
 - IPC transport decision matrix with cross-platform considerations.
 - Security posture overview (authentication, rate limiting, audit logging).
 - Architecture diagram notes highlighting supervisor placement, IPC flow, watchdog hook, and registry interactions.
-- Pending action: export updated architecture diagram (draw.io / diagrams.net) and attach to docs when ready.
+- Exported architecture diagram lives at `docs/design/service_supervisor_architecture.drawio` and is linked from the refactor plan.

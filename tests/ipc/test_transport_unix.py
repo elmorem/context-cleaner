@@ -1,5 +1,6 @@
 import os
 import socket
+import tempfile
 import threading
 import pytest
 
@@ -18,20 +19,28 @@ def test_unix_transport_requires_connection(tmp_path):
 
 @pytest.mark.skipif(os.name == "nt", reason="Unix socket transport not available on Windows")
 def test_unix_transport_round_trip(tmp_path):
-    short_path = "/tmp/context-cleaner-test.sock"
+    socket_dir = tempfile.mkdtemp(prefix="cc-ipc-", dir="/tmp")
+    short_path = os.path.join(socket_dir, "context-cleaner-test.sock")
 
     ready = threading.Event()
 
+    try:
+        os.unlink(short_path)
+    except FileNotFoundError:
+        pass
+
+    server_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        server_sock.bind(short_path)
+        server_sock.listen(1)
+    except PermissionError as exc:
+        server_sock.close()
+        pytest.skip(f"Unable to bind unix socket in test environment: {exc}")
+
     def server():
-        try:
-            os.unlink(short_path)
-        except FileNotFoundError:
-            pass
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as srv:
-            srv.bind(short_path)
-            srv.listen(1)
+        with server_sock:
             ready.set()
-            conn, _ = srv.accept()
+            conn, _ = server_sock.accept()
             with conn:
                 header = conn.recv(4)
                 size = int.from_bytes(header, "big")
@@ -58,4 +67,8 @@ def test_unix_transport_round_trip(tmp_path):
     try:
         os.unlink(short_path)
     except FileNotFoundError:
+        pass
+    try:
+        os.rmdir(socket_dir)
+    except OSError:
         pass
