@@ -21,6 +21,8 @@
 - Update architectural diagrams / README summary to reflect supervisor concept.
 
 ### Phase 1 – Supervisor Skeleton
+- Implement Proto parsing and transport framing for Unix/tcp endpoints.
+- Provide stub transport for Windows with detailed TODO comments and signal future implementation.
 - Create a `ServiceSupervisor` (or similar) module that:
   - Owns `ServiceOrchestrator` instance and recorded service state.
   - Listens on the chosen IPC endpoint.
@@ -230,6 +232,17 @@
 11. **PR 11 – Rollout & Legacy Cleanup (Phase 8)**
     - Enable feature flag by default, remove legacy discovery-heavy code, finalize release notes, and confirm graceful fallback story.
     - Tests: regression suite ensuring legacy paths removed; final smoke tests on all platforms.
+
+
+
+
+## Phase 1 Planning Notes
+- Module structure: create `context_cleaner.ipc` package with submodules `protocol.py`, `transport/__init__.py`, `transport/base.py`, `transport/unix.py`, `transport/windows.py`, and `client.py`.
+- Proto location: store `.proto` definitions under `proto/context_cleaner/supervisor.proto`; generate Python stubs into `src/context_cleaner/ipc/proto` via build step (initial commit includes raw proto and placeholder generated module).
+- Dependency additions: add `protobuf>=4.25.0` to project dependencies; ensure optional dev dependency for `mypy-protobuf` (future).
+- Logging directory: `logs/supervisor/` (ensure created dynamically).
+- Configuration: add new section to config to surface IPC endpoint paths; include defaults for POSIX and Windows.
+- Tests: create `tests/ipc/test_protocol.py` for encoding/decoding skeleton and `tests/ipc/test_transport_unix.py` with placeholder tests (skipped on Windows).
 
 
 ## Phase 0 Artifact Summary

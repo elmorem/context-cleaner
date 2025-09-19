@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package context_cleaner.ipc;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+option java_package = "dev.context_cleaner.ipc";
+option java_outer_classname = "SupervisorProto";
+
+message ClientInfo {
+  uint32 pid = 1;
+  string user = 2;
+  string version = 3;
+  repeated string capabilities = 4;
+}
+
+message AuthToken {
+  string token = 1;
+  string scheme = 2; // e.g., "hmac", "jwt"
+}
+
+enum RequestAction {
+  REQUEST_ACTION_UNSPECIFIED = 0;
+  REQUEST_ACTION_PING = 1;
+  REQUEST_ACTION_STATUS = 2;
+  REQUEST_ACTION_SHUTDOWN = 3;
+  REQUEST_ACTION_RESTART_SERVICE = 4;
+  REQUEST_ACTION_RELOAD_CONFIG = 5;
+}
+
+message SupervisorRequest {
+  string protocol_version = 1;
+  string request_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  RequestAction action = 4;
+  map<string, google.protobuf.Value> options = 5;
+  map<string, google.protobuf.Value> filters = 6;
+  bool streaming = 7;
+  uint32 timeout_ms = 8;
+  ClientInfo client_info = 9;
+  AuthToken auth = 10;
+}
+
+enum ResponseStatus {
+  RESPONSE_STATUS_UNSPECIFIED = 0;
+  RESPONSE_STATUS_OK = 1;
+  RESPONSE_STATUS_ERROR = 2;
+  RESPONSE_STATUS_IN_PROGRESS = 3;
+}
+
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_UNAUTHORIZED = 1;
+  ERROR_CODE_INVALID_ARGUMENT = 2;
+  ERROR_CODE_NOT_FOUND = 3;
+  ERROR_CODE_TIMEOUT = 4;
+  ERROR_CODE_INTERNAL = 5;
+  ERROR_CODE_CONCURRENCY_LIMIT = 6;
+}
+
+message ErrorDetails {
+  ErrorCode code = 1;
+  string message = 2;
+  map<string, string> metadata = 3;
+}
+
+message SupervisorResponse {
+  string protocol_version = 1;
+  string request_id = 2;
+  google.protobuf.Timestamp server_timestamp = 3;
+  ResponseStatus status = 4;
+  double progress = 5;
+  google.protobuf.Struct result = 6;
+  ErrorDetails error = 7;
+}
+
+message StreamChunk {
+  string request_id = 1;
+  google.protobuf.Timestamp server_timestamp = 2;
+  bytes payload = 3;
+  bool final_chunk = 4;
+}
+
+service SupervisorControl {
+  rpc UnaryCommand (SupervisorRequest) returns (SupervisorResponse);
+  rpc StreamCommand (SupervisorRequest) returns (stream StreamChunk);
+}
