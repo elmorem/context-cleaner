@@ -149,6 +149,10 @@ class ProcessRegistryDatabase:
     
     def _get_default_db_path(self) -> str:
         """Get the default database path in user's home directory."""
+        env_override = os.environ.get("CONTEXT_CLEANER_PROCESS_REGISTRY_DB")
+        if env_override:
+            return str(Path(env_override).expanduser())
+
         home_dir = Path.home()
         context_cleaner_dir = home_dir / '.context_cleaner'
         context_cleaner_dir.mkdir(exist_ok=True)

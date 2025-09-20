@@ -1326,6 +1326,11 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     • Uses service orchestrator for dependency-aware cleanup
     • Graceful termination with proper signal handling
     • Registry-aware process management
+
+    ✅ LIVE SUPERVISOR STREAMING:
+    • Streams shutdown progress directly from the supervisor when available
+    • Displays remaining services and transition progress in real time
+    • Automatically falls back to legacy orchestrator shutdown if supervisor unreachable
     
     ✅ PROCESS DISCOVERY:
     • Automatically discovers all Context Cleaner processes
@@ -1567,17 +1572,24 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         try:
             if verbose:
                 click.echo("\n🔧 PHASE 2: Orchestrated Service Shutdown")
-            
-            # Use orchestrator for graceful shutdown of managed services
-            success = asyncio.run(orchestrator.stop_all_services())
-            
-            if success:
+
+            supervisor_used, supervisor_success = _supervisor_stream_shutdown(verbose)
+
+            if supervisor_used and not supervisor_success:
+                if verbose:
+                    click.echo("   ⚠️  Supervisor reported shutdown issues, falling back to local orchestrator")
+
+            if supervisor_used and supervisor_success:
+                orchestrated_success = True
+            else:
+                orchestrated_success = asyncio.run(orchestrator.stop_all_services())
+
+            if orchestrated_success:
                 if verbose:
                     click.echo("   ✅ Orchestrated services stopped successfully")
             else:
                 if verbose:
                     click.echo("   ⚠️  Some orchestrated services had issues during shutdown")
-        
         except Exception as e:
             if verbose:
                 click.echo(f"   ❌ Orchestrated shutdown failed: {e}")
@@ -1971,8 +1983,96 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     
     if verbose:
         print(f"   📊 Manual discovery found {len(found_processes)} Context Cleaner processes")
-    
+
     return found_processes
+
+
+def _supervisor_stream_shutdown(verbose: bool) -> tuple[bool, bool]:
+    """Attempt to shut down services via the supervisor streaming API.
+
+    Returns a tuple of (used_streaming, success).
+    """
+
+    try:
+        from context_cleaner.ipc.client import SupervisorClient
+        from context_cleaner.ipc.transport.base import TransportError
+    except ImportError:
+        return False, False
+
+    try:
+        with SupervisorClient() as client:
+            if verbose:
+                click.echo("   🔄 Contacting supervisor for streaming shutdown...")
+
+            response = None
+            for kind, event in client.stream_shutdown():
+                if kind == "chunk":
+                    _render_shutdown_chunk(event, verbose)
+                else:
+                    response = event
+
+            if response is None:
+                if verbose:
+                    click.echo("   ⚠️  Supervisor stream ended without final response")
+                return True, False
+
+            if response.status == "ok":
+                if verbose:
+                    click.echo("   ✅ Supervisor reported successful shutdown")
+                return True, True
+
+            if verbose:
+                click.echo(f"   ⚠️  Supervisor reported shutdown error: {response.status}")
+            return True, False
+
+    except (TransportError, OSError) as exc:
+        if verbose:
+            click.echo(f"   ⚠️  Supervisor streaming unavailable: {exc}")
+        return False, False
+    except Exception as exc:  # pragma: no cover - defensive
+        if verbose:
+            click.echo(f"   ⚠️  Unexpected supervisor streaming error: {exc}")
+        return False, False
+
+
+def _render_shutdown_chunk(chunk, verbose: bool) -> None:
+    """Display supervisor shutdown progress information."""
+
+    try:
+        payload = json.loads(chunk.payload.decode("utf-8"))
+    except Exception:
+        click.echo("   ⏳ Supervisor progress update received")
+        return
+
+    stage = payload.get("stage")
+    running = payload.get("running_services")
+    transitioning = payload.get("transitioning", {}) or {}
+    required_failed = payload.get("required_failed", []) or []
+
+    if stage == "initiated":
+        click.echo("   ⏳ Supervisor acknowledged shutdown request")
+        if running is not None:
+            click.echo(f"      Services running: {running}")
+    elif stage == "progress":
+        if running is not None:
+            click.echo(f"   ⏳ Supervisor progress: {running} service(s) still running")
+        stopping = transitioning.get("stopping", [])
+        if stopping and verbose:
+            click.echo(f"      Stopping: {', '.join(stopping)}")
+        if required_failed and verbose:
+            click.echo(f"      Required service issues: {', '.join(required_failed)}")
+    elif stage == "completed":
+        success = payload.get("success")
+        if success:
+            click.echo("   ✅ Supervisor reports shutdown complete")
+        else:
+            click.echo("   ⚠️  Supervisor reports shutdown failure")
+        if running:
+            click.echo(f"      Services still running: {running}")
+        if required_failed:
+            click.echo(f"      Required service issues: {', '.join(required_failed)}")
+    else:
+        click.echo("   ⏳ Supervisor progress update received")
 
 
 def _terminate_process_with_escalation(proc, verbose: bool = False):

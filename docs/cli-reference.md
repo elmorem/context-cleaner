@@ -28,6 +28,16 @@ Global Options:
   --version               Show version and exit
 ```
 
+### **Streaming Supervisor Shutdown** ⭐ NEW
+
+`context-cleaner stop` now attempts to contact the long-running supervisor.
+When reachable, the CLI streams structured shutdown updates in real time—the
+output shows how many services remain, which ones are transitioning, and any
+required-service errors. If the supervisor cannot be reached, the CLI
+automatically falls back to the legacy orchestrator-based shutdown.
+
+Use `--verbose` to see the detailed streaming updates.
+
 ### **Examples:**
 ```bash
 # Use custom configuration file
@@ -41,6 +51,36 @@ context-cleaner --verbose health-check --detailed
 ```
 
 ## 🚀 **Core Commands**
+
+### **`stop`** ⭐ UPDATED
+Gracefully stop all Context Cleaner services. When the supervisor is running,
+the CLI streams shutdown progress updates in real time.
+
+```bash
+context-cleaner stop [OPTIONS]
+
+Options:
+  --force                Skip confirmation prompts
+  --docker-only          Only stop Docker services
+  --processes-only       Only stop background processes
+  --no-discovery         Skip process discovery
+  --show-discovery       Preview discovered processes before stopping
+  --registry-cleanup     Remove stale registry entries after shutdown
+  --use-script           Run stop-context-cleaner.sh instead of supervisor IPC
+  --help                 Show help message
+```
+
+**Supervisor streaming:**
+```
+$ context-cleaner --verbose stop
+🔧 PHASE 2: Orchestrated Service Shutdown
+⏳ Supervisor progress: 2 service(s) still running
+⏳ Supervisor progress: 1 service(s) still running
+✅ Supervisor reports shutdown complete
+```
+
+If the supervisor can't be reached, the command falls back to the legacy
+orchestrator shutdown and prints the traditional progress messages.
 
 ### **`start`**
 Start productivity tracking for the current development session.

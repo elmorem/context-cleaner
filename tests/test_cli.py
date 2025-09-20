@@ -35,6 +35,12 @@ class TestContextCleanerCLI:
         assert 'analyze' in result.output
         assert 'export' in result.output
         assert 'privacy' in result.output
+
+    def test_stop_help_mentions_streaming(self):
+        """Stop command help references supervisor streaming."""
+        result = self.runner.invoke(main, ['stop', '--help'])
+        assert result.exit_code == 0
+        assert 'Streaming' in result.output or 'stream' in result.output.lower()
     
     def test_start_command(self):
         """Test start command execution."""

@@ -2,9 +2,22 @@
 Pytest configuration and fixtures for Context Cleaner tests.
 """
 
+import warnings
+
 import pytest
 import tempfile
 from datetime import datetime, timedelta
+
+warnings.filterwarnings(
+    "ignore",
+    message=r".*websockets\.server\.serve is deprecated",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r".*websockets\.legacy is deprecated",
+    category=DeprecationWarning,
+)
 
 from context_cleaner.telemetry.context_rot.config import ApplicationConfig
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer

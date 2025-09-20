@@ -7,8 +7,15 @@ import os
 import platform
 from typing import Optional
 
-from .protocol import ClientInfo, SupervisorRequest, SupervisorResponse, RequestAction, AuthToken
-from .transport.base import Transport
+from .protocol import (
+    ClientInfo,
+    SupervisorRequest,
+    SupervisorResponse,
+    StreamChunk,
+    RequestAction,
+    AuthToken,
+)
+from .transport.base import Transport, TransportError
 from .transport.unix import UnixSocketTransport
 from .transport.windows import WindowsPipeTransport
 
@@ -59,6 +66,39 @@ class SupervisorClient:
         self._apply_auth(request)
         self._transport.send_request(request)
         return self._transport.receive_response()
+
+    def stream_shutdown(self):
+        """Yield stream chunks followed by the final response for a shutdown request."""
+
+        request = SupervisorRequest(
+            action=RequestAction.SHUTDOWN,
+            streaming=True,
+            client_info=self._default_client_info(),
+        )
+        self._apply_auth(request)
+        self._transport.send_request(request)
+
+        for chunk in self._transport.receive_stream():
+            yield ("chunk", chunk)
+            if chunk.final_chunk:
+                break
+
+        response = self._transport.receive_response()
+        yield ("response", response)
+
+    def shutdown_with_stream(self) -> tuple[SupervisorResponse, list[StreamChunk]]:
+        chunks: list[StreamChunk] = []
+        response: SupervisorResponse | None = None
+
+        for kind, event in self.stream_shutdown():
+            if kind == "chunk":
+                chunks.append(event)
+            else:
+                response = event
+
+        if response is None:
+            raise TransportError("Supervisor did not send a shutdown response")
+        return response, chunks
 
     def __enter__(self) -> "SupervisorClient":
         self.connect()

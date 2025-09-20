@@ -66,5 +66,28 @@ class UnixSocketTransport(Transport):
         return SupervisorResponse.from_json(payload.decode("utf-8"))
 
     def receive_stream(self) -> Iterable[StreamChunk]:
-        # Streaming not yet implemented for skeleton
-        raise NotImplementedError
+        sock = self._ensure_socket()
+        while True:
+            try:
+                header = sock.recv(4)
+                if len(header) < 4:
+                    raise TransportError("Incomplete stream header")
+                size = int.from_bytes(header, "big")
+                payload = bytearray()
+                while len(payload) < size:
+                    chunk = sock.recv(min(BUFFER_SIZE, size - len(payload)))
+                    if not chunk:
+                        raise TransportError("Supervisor connection closed during stream")
+                    payload.extend(chunk)
+            except OSError as exc:  # pragma: no cover - environment specific
+                raise TransportError(f"Failed to receive stream chunk: {exc}") from exc
+
+            data = payload.decode("utf-8")
+            if '"message_type":"response"' in data:
+                # Unexpected response frame encountered; push back by raising
+                raise TransportError("Unexpected response frame in stream")
+
+            chunk = StreamChunk.from_json(data)
+            yield chunk
+            if chunk.final_chunk:
+                break

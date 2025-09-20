@@ -165,6 +165,9 @@ class ServiceOrchestrator:
         # Centralized Port Registry
         self.port_registry = get_port_registry()
         
+        # Lifecycle timestamps
+        self.started_at: Optional[datetime] = None
+        
         # Initialize service definitions
         self._initialize_service_definitions()
         
@@ -366,6 +369,7 @@ class ServiceOrchestrator:
             True if all required services started successfully
         """
         self.running = True
+        self.started_at = datetime.now()
         self.shutdown_event.clear()
 
         if self.verbose:
@@ -482,6 +486,7 @@ class ServiceOrchestrator:
             return True
             
         self.running = False
+        self.started_at = None
         self.shutdown_event.set()
         
         if self.verbose:
@@ -1222,10 +1227,16 @@ class ServiceOrchestrator:
 
     def get_service_status(self) -> Dict[str, Any]:
         """Get comprehensive status of all services with process registry integration."""
+        now = datetime.now()
+        uptime_seconds = (now - self.started_at).total_seconds() if self.running and self.started_at else 0.0
+
         status = {
             "orchestrator": {
                 "running": self.running,
-                "uptime": (datetime.now() - datetime.now()).total_seconds() if self.running else 0
+                "uptime": uptime_seconds,
+                "uptime_seconds": uptime_seconds,
+                "started_at": self.started_at.isoformat() if self.started_at else None,
+                "shutdown_initiated": self.shutdown_event.is_set(),
             },
             "services": {},
             "process_registry": {
@@ -1257,6 +1268,15 @@ class ServiceOrchestrator:
         except Exception as e:
             status["process_registry"]["registry_status"] = f"error: {str(e)}"
         
+        summary = {
+            "total": len(self.service_states),
+            "by_status": {},
+            "required_failed": [],
+            "optional_failed": [],
+            "transitioning": {"starting": [], "stopping": []},
+            "running": [],
+        }
+
         # Service status information
         for service_name, state in self.service_states.items():
             service = self.services[service_name]
@@ -1272,8 +1292,21 @@ class ServiceOrchestrator:
                 "last_error": state.last_error,
                 "pid": state.pid,
                 "metrics": state.metrics,
-                "registry_info": None
+                "registry_info": None,
+                "is_transitioning": state.status in (ServiceStatus.STARTING, ServiceStatus.STOPPING),
+                "is_failed": state.status == ServiceStatus.FAILED,
             }
+            status_name = state.status.value
+            summary["by_status"][status_name] = summary["by_status"].get(status_name, 0) + 1
+            if state.status == ServiceStatus.FAILED:
+                target = summary["required_failed"] if service.required else summary["optional_failed"]
+                target.append(service_name)
+            if state.status == ServiceStatus.STARTING:
+                summary["transitioning"]["starting"].append(service_name)
+            if state.status == ServiceStatus.STOPPING:
+                summary["transitioning"]["stopping"].append(service_name)
+            if state.status in (ServiceStatus.RUNNING, ServiceStatus.ATTACHED):
+                summary["running"].append(service_name)
             
             # Add process registry information if available
             if state.pid:
@@ -1293,6 +1326,11 @@ class ServiceOrchestrator:
                     service_info["registry_info"] = {"registered": False, "reason": f"error: {str(e)}"}
             
             status["services"][service_name] = service_info
+        
+        status["services_summary"] = summary
+        status["orchestrator"]["services_running"] = len(summary["running"])
+        status["orchestrator"]["required_failed"] = summary["required_failed"]
+        status["orchestrator"]["transitioning"] = summary["transitioning"]
         
         # Add port conflict management statistics
         try:
