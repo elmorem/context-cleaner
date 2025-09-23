@@ -288,7 +288,55 @@ class ProcessRegistryDatabase:
         except Exception as e:
             logger.error(f"Failed to unregister process {pid}: {e}")
             return False
-    
+
+    def update_process_metadata(self, pid: int, **fields) -> bool:
+        """Update metadata columns for a registered process."""
+        if not fields:
+            return False
+
+        allowed_columns = {
+            "command_line",
+            "service_type",
+            "start_time",
+            "registration_time",
+            "last_health_check",
+            "status",
+            "port",
+            "host",
+            "parent_orchestrator",
+            "session_id",
+            "user_id",
+            "host_identifier",
+            "resource_limits",
+            "restart_policy",
+            "health_check_config",
+            "last_health_status",
+            "registration_source",
+            "working_directory",
+            "environment_vars",
+            "process_group_id",
+            "parent_pid",
+        }
+
+        update_fields = {k: v for k, v in fields.items() if k in allowed_columns}
+        if not update_fields:
+            return False
+
+        assignments = ", ".join(f"{column} = ?" for column in update_fields)
+        values = list(update_fields.values())
+
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    f"UPDATE processes SET {assignments} WHERE pid = ?",
+                    values + [pid],
+                )
+                conn.commit()
+                return conn.total_changes > 0
+        except Exception as e:  # pragma: no cover - sqlite edge cases
+            logger.error(f"Failed to update process {pid} metadata: {e}")
+            return False
+
     def get_process(self, pid: int) -> Optional[ProcessEntry]:
         """Get a specific process entry by PID."""
         try:

@@ -13,7 +13,7 @@ import uuid
 from contextlib import AsyncExitStack, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from context_cleaner.services.service_orchestrator import ServiceOrchestrator
 from context_cleaner.ipc.protocol import (
@@ -90,6 +90,7 @@ class ServiceSupervisor:
         self._registry = get_process_registry()
         self._supervisor_registered = False
         self._start_time: Optional[dt.datetime] = None
+        self._last_registry_environment: Optional[Dict[str, Any]] = None
 
     async def start(self) -> None:
         if self._running:
@@ -176,15 +177,21 @@ class ServiceSupervisor:
                 status_payload = await self._build_status_payload(exclude_token=token)
                 return SupervisorResponse(request_id=request.request_id, status="ok", result=status_payload)
             if request.action is RequestAction.SHUTDOWN:
+                shutdown_kwargs, error = self._resolve_shutdown_options(request)
+                if error:
+                    return error
                 if request.streaming and stream_writer is not None:
                     return await self._handle_shutdown_stream(request, stream_writer)
-                asyncio.create_task(self._orchestrator.stop_all_services())
+                asyncio.create_task(self._orchestrator.shutdown_all(**shutdown_kwargs))
                 if self._supervisor_registered:
                     await asyncio.to_thread(self._update_registry_status, "stopping")
+                active_filters = {k: v for k, v in shutdown_kwargs.items() if v}
                 payload = {
                     "message": "shutdown-started",
                     "services": await asyncio.to_thread(self._orchestrator.get_service_status),
                 }
+                if active_filters:
+                    payload["filters"] = active_filters
                 return SupervisorResponse(
                     request_id=request.request_id,
                     status="in-progress",
@@ -344,16 +351,11 @@ class ServiceSupervisor:
         if not self._registry:
             return False
         now = dt.datetime.now()
-        audit_path = str(self._audit_logger.path) if self._audit_logger else None
+        environment = self._build_registry_environment()
         metadata = {
             "max_connections": self._config.max_connections,
             "auth_required": bool(self._config.auth_token),
         }
-        environment = {
-            "IPC_ENDPOINT": self._config.endpoint,
-        }
-        if audit_path:
-            environment["AUDIT_LOG"] = audit_path
         entry = ProcessEntry(
             pid=os.getpid(),
             command_line="service_supervisor",
@@ -371,7 +373,10 @@ class ServiceSupervisor:
             health_check_config=json.dumps({"endpoint": self._config.endpoint}),
         )
         entry.parent_pid = os.getppid()
-        return self._registry.register_process(entry)
+        registered = self._registry.register_process(entry)
+        if registered:
+            self._last_registry_environment = environment
+        return registered
 
     def _update_registry_status(self, status: str) -> None:
         if not self._registry:
@@ -385,9 +390,14 @@ class ServiceSupervisor:
             return
         if not self._registry.unregister_process(os.getpid()):
             LOGGER.debug("Registry unregister for supervisor pid %s failed", os.getpid())
+        self._last_registry_environment = None
 
     async def _build_status_payload(self, *, exclude_token: Optional[object] = None) -> Dict[str, Any]:
         orchestrator_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+        await asyncio.to_thread(
+            self._update_registry_metadata,
+            orchestrator_status.get("services_summary") if isinstance(orchestrator_status, dict) else None,
+        )
         registry_snapshot = await asyncio.to_thread(self._collect_registry_snapshot)
         now = dt.datetime.now(dt.timezone.utc)
         uptime = None
@@ -471,22 +481,31 @@ class ServiceSupervisor:
         if self._supervisor_registered:
             await asyncio.to_thread(self._update_registry_status, "stopping")
 
+        shutdown_kwargs, error = self._resolve_shutdown_options(request)
+        if error:
+            return error
+        active_filters = {k: v for k, v in shutdown_kwargs.items() if v}
+
         before_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+        initial_chunk = {
+            "stage": "initiated",
+            "summary": before_status.get("services_summary"),
+            "running_services": before_status.get("orchestrator", {}).get("services_running"),
+            "required_failed": before_status.get("orchestrator", {}).get("required_failed"),
+        }
+        if active_filters:
+            initial_chunk["filters"] = active_filters
         await self._send_stream_chunk(
             writer,
             request,
-            {
-                "stage": "initiated",
-                "summary": before_status.get("services_summary"),
-                "running_services": before_status.get("orchestrator", {}).get("services_running"),
-                "required_failed": before_status.get("orchestrator", {}).get("required_failed"),
-            },
+            initial_chunk,
             final=False,
         )
 
-        shutdown_task = asyncio.create_task(self._orchestrator.stop_all_services())
+        shutdown_task = asyncio.create_task(self._orchestrator.shutdown_all(**shutdown_kwargs))
         progress_emitted = False
         last_snapshot = before_status
+        shutdown_summary: Dict[str, Any] | None = None
 
         try:
             while not shutdown_task.done():
@@ -508,25 +527,30 @@ class ServiceSupervisor:
                 )
                 progress_emitted = True
 
-            success = shutdown_task.result()
+            shutdown_summary = shutdown_task.result()
+            success = shutdown_summary.get("success", False)
         except Exception as exc:  # pragma: no cover - defensive
             success = False
             LOGGER.exception("Supervisor shutdown stream failed: %s", exc)
         finally:
             result_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+            final_chunk = {
+                "stage": "completed",
+                "success": success,
+                "summary": result_status.get("services_summary"),
+                "running_services": result_status.get("orchestrator", {}).get("services_running"),
+                "required_failed": result_status.get("orchestrator", {}).get("required_failed"),
+                "transitioning": result_status.get("orchestrator", {}).get("transitioning"),
+                "last_summary": last_snapshot.get("services_summary"),
+                "progress_emitted": progress_emitted,
+                "shutdown_summary": shutdown_summary,
+            }
+            if active_filters:
+                final_chunk["filters"] = active_filters
             await self._send_stream_chunk(
                 writer,
                 request,
-                {
-                    "stage": "completed",
-                    "success": success,
-                    "summary": result_status.get("services_summary"),
-                    "running_services": result_status.get("orchestrator", {}).get("services_running"),
-                    "required_failed": result_status.get("orchestrator", {}).get("required_failed"),
-                    "transitioning": result_status.get("orchestrator", {}).get("transitioning"),
-                    "last_summary": last_snapshot.get("services_summary"),
-                    "progress_emitted": progress_emitted,
-                },
+                final_chunk,
                 final=True,
             )
             await self._record_stream_audit(request, result_status, stage="completed", success=success)
@@ -535,7 +559,10 @@ class ServiceSupervisor:
         payload = {
             "message": "shutdown-complete" if success else "shutdown-failed",
             "success": success,
+            "summary": shutdown_summary,
         }
+        if active_filters:
+            payload["filters"] = active_filters
         response = SupervisorResponse(
             request_id=request.request_id,
             status=status,
@@ -595,5 +622,54 @@ class ServiceSupervisor:
             "transitioning": orchestrator.get("transitioning"),
             "success": success,
         }
+        active_filters = {k: v for k, v in request.options.items() if v}
+        if active_filters:
+            entry["filters"] = active_filters
         if self._audit_logger:
             await self._audit_logger.log(entry)
+
+    def _update_registry_metadata(self, summary: Optional[Dict[str, Any]]) -> None:
+        if not self._registry or not self._supervisor_registered:
+            return
+        environment = self._build_registry_environment(summary)
+        if environment == self._last_registry_environment:
+            return
+        updated = self._registry.update_process_metadata(
+            os.getpid(),
+            environment_vars=json.dumps(environment),
+        )
+        if updated:
+            self._last_registry_environment = environment
+        else:
+            LOGGER.debug("Registry metadata update for supervisor pid %s failed", os.getpid())
+
+    def _build_registry_environment(
+        self,
+        summary: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        environment: Dict[str, Any] = {
+            "IPC_ENDPOINT": self._config.endpoint,
+            "UPDATED_AT": dt.datetime.now(dt.timezone.utc).strftime(ISO8601),
+        }
+        if self._audit_logger:
+            environment["AUDIT_LOG"] = str(self._audit_logger.path)
+        if summary:
+            environment["SERVICES_SUMMARY"] = summary
+        return environment
+
+    def _resolve_shutdown_options(
+        self,
+        request: SupervisorRequest,
+    ) -> tuple[Dict[str, bool], Optional[SupervisorResponse]]:
+        docker_only = bool(request.options.get("docker_only"))
+        processes_only = bool(request.options.get("processes_only"))
+        if docker_only and processes_only:
+            return {}, self._error_response(
+                request,
+                code=ErrorCode.INVALID_ARGUMENT,
+                message="conflicting-shutdown-filters",
+            )
+        return {
+            "docker_only": docker_only,
+            "processes_only": processes_only,
+        }, None

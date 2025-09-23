@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import tempfile
+from typing import Dict
 
 import pytest
 
@@ -210,6 +211,10 @@ class StreamingStubOrchestrator:
         self.started_at = datetime.now()
         self.shutdown_event = _DummyEvent()
         self._stage = "running"
+        self.last_shutdown_kwargs: Dict[str, bool] = {
+            "docker_only": False,
+            "processes_only": False,
+        }
 
     def get_service_status(self):
         running_services = 2 if self._stage == "running" else 0
@@ -242,13 +247,28 @@ class StreamingStubOrchestrator:
             },
         }
 
-    async def stop_all_services(self) -> bool:
+    async def shutdown_all(self, docker_only: bool = False, processes_only: bool = False):
+        self.last_shutdown_kwargs = {
+            "docker_only": docker_only,
+            "processes_only": processes_only,
+        }
         self._stage = "stopping"
         await asyncio.sleep(0)
         self._stage = "stopped"
         self.running = False
         self.shutdown_event.set()
-        return True
+        return {
+            "requested": ["svc1", "svc2"],
+            "skipped": [],
+            "stopped": ["svc1", "svc2"],
+            "failed": [],
+            "errors": {},
+            "success": True,
+        }
+
+    async def stop_all_services(self, *, docker_only: bool = False, processes_only: bool = False) -> bool:
+        summary = await self.shutdown_all(docker_only=docker_only, processes_only=processes_only)
+        return summary["success"]
 
 
 class MemoryStreamWriter:
@@ -336,23 +356,71 @@ async def test_supervisor_shutdown_stream(tmp_path, monkeypatch):
 
     assert response.status == "ok"
     assert response.result["message"] == "shutdown-complete"
+    assert "summary" in response.result
+    assert response.result["summary"]["success"] is True
 
     stages = []
     finals = []
+    payloads = []
     for frame in writer.frames:
         size = int.from_bytes(frame[:4], "big")
         payload = frame[4 : 4 + size].decode("utf-8")
         data = json.loads(payload)
         assert data["message_type"] == "stream-chunk"
         chunk_body = json.loads(base64.b64decode(data["payload"]).decode("utf-8"))
+        payloads.append(chunk_body)
         stages.append(chunk_body.get("stage"))
         finals.append(data.get("final_chunk", False))
 
     assert stages[0] == "initiated"
     assert stages[-1] == "completed"
     assert finals[-1] is True
+    assert "shutdown_summary" in payloads[-1]
+    assert payloads[-1]["shutdown_summary"]["success"] is True
 
     await supervisor.stop()
+
+
+@pytest.mark.asyncio
+async def test_supervisor_shutdown_stream_with_filters(tmp_path, monkeypatch):
+    monkeypatch.setenv("CONTEXT_CLEANER_PROCESS_REGISTRY_DB", str(tmp_path / "registry.db"))
+    monkeypatch.setattr("context_cleaner.services.process_registry._registry", None)
+    monkeypatch.setattr("context_cleaner.services.process_registry._discovery_engine", None)
+
+    orchestrator = StreamingStubOrchestrator()
+    supervisor = ServiceSupervisor(
+        orchestrator,
+        SupervisorConfig(endpoint="ipc://stream-filter-test", audit_log_path=str(tmp_path / "audit.log")),
+    )
+    await supervisor.start()
+
+    writer = MemoryStreamWriter()
+    request = SupervisorRequest(action=RequestAction.SHUTDOWN, streaming=True)
+    request.options["docker_only"] = True
+    response = await supervisor.handle_request(request, writer)
+
+    assert orchestrator.last_shutdown_kwargs == {"docker_only": True, "processes_only": False}
+    assert response.status == "ok"
+    assert response.result["filters"] == {"docker_only": True}
+
+    decoded_chunks = []
+    for frame in writer.frames:
+        size = int.from_bytes(frame[:4], "big")
+        payload = frame[4 : 4 + size].decode("utf-8")
+        data = json.loads(payload)
+        chunk_body = json.loads(base64.b64decode(data["payload"]).decode("utf-8"))
+        decoded_chunks.append(chunk_body)
+
+    assert any(chunk.get("filters") == {"docker_only": True} for chunk in decoded_chunks)
+
+    await supervisor.stop()
+
+
+def test_client_stream_shutdown_mutually_exclusive():
+    client = SupervisorClient(transport=DebugTransport())
+
+    with pytest.raises(ValueError):
+        list(client.stream_shutdown(docker_only=True, processes_only=True))
 
 
 @pytest.mark.asyncio

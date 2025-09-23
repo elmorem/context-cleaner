@@ -1367,6 +1367,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
 
+    if docker_only and processes_only:
+        raise click.UsageError("Use either --docker-only or --processes-only, not both")
+
     # Use shell script if requested
     if use_script:
         if verbose:
@@ -1573,7 +1576,11 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if verbose:
                 click.echo("\n🔧 PHASE 2: Orchestrated Service Shutdown")
 
-            supervisor_used, supervisor_success = _supervisor_stream_shutdown(verbose)
+            supervisor_used, supervisor_success = _supervisor_stream_shutdown(
+                verbose=verbose,
+                docker_only=docker_only,
+                processes_only=processes_only,
+            )
 
             if supervisor_used and not supervisor_success:
                 if verbose:
@@ -1582,7 +1589,13 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if supervisor_used and supervisor_success:
                 orchestrated_success = True
             else:
-                orchestrated_success = asyncio.run(orchestrator.stop_all_services())
+                shutdown_summary = asyncio.run(
+                    orchestrator.shutdown_all(
+                        docker_only=docker_only,
+                        processes_only=processes_only,
+                    )
+                )
+                orchestrated_success = shutdown_summary.get("success", False)
 
             if orchestrated_success:
                 if verbose:
@@ -1987,7 +2000,12 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     return found_processes
 
 
-def _supervisor_stream_shutdown(verbose: bool) -> tuple[bool, bool]:
+def _supervisor_stream_shutdown(
+    *,
+    verbose: bool,
+    docker_only: bool,
+    processes_only: bool,
+) -> tuple[bool, bool]:
     """Attempt to shut down services via the supervisor streaming API.
 
     Returns a tuple of (used_streaming, success).
@@ -2005,7 +2023,10 @@ def _supervisor_stream_shutdown(verbose: bool) -> tuple[bool, bool]:
                 click.echo("   🔄 Contacting supervisor for streaming shutdown...")
 
             response = None
-            for kind, event in client.stream_shutdown():
+            for kind, event in client.stream_shutdown(
+                docker_only=docker_only,
+                processes_only=processes_only,
+            ):
                 if kind == "chunk":
                     _render_shutdown_chunk(event, verbose)
                 else:
@@ -2768,14 +2789,20 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
                 
                 threading.Thread(target=open_browser, daemon=True).start()
             
-            # Update dashboard service status to running
+            dashboard_url = f"http://{config.dashboard.host}:{dashboard_port}"
+            orchestrator.register_external_service(
+                "dashboard",
+                pid=os.getpid(),
+                stop_callback=dashboard.stop_server,
+                metadata={
+                    "port": dashboard_port,
+                    "url": dashboard_url,
+                    "command_line": f"dashboard-server:{dashboard_port}",
+                },
+            )
             dashboard_state = orchestrator.service_states.get("dashboard")
             if dashboard_state:
-                from context_cleaner.services.service_orchestrator import ServiceStatus
-                dashboard_state.status = ServiceStatus.RUNNING
-                dashboard_state.health_status = True
-            
-            dashboard_url = f"http://{config.dashboard.host}:{dashboard_port}"
+                dashboard_state.url = dashboard_url
             click.echo(f"🚀 Context Cleaner running at: {dashboard_url}")
             click.echo("📊 All services started successfully!")
             
@@ -2792,19 +2819,19 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         
         except Exception as e:
             click.echo(f"❌ Failed to start dashboard: {e}", err=True)
-            asyncio.run(orchestrator.stop_all_services())
+            asyncio.run(orchestrator.shutdown_all())
             sys.exit(1)
     
     except KeyboardInterrupt:
         if verbose:
             click.echo("\n👋 Received shutdown signal")
-        asyncio.run(orchestrator.stop_all_services())
+        asyncio.run(orchestrator.shutdown_all())
         if verbose:
             click.echo("✅ All services stopped cleanly")
-    
+
     except Exception as e:
         click.echo(f"❌ Service orchestration failed: {e}", err=True)
-        asyncio.run(orchestrator.stop_all_services())
+        asyncio.run(orchestrator.shutdown_all())
         sys.exit(1)
 
 

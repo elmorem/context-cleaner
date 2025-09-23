@@ -20,7 +20,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable, Tuple
+from typing import Dict, List, Optional, Any, Callable, Tuple, Awaitable, Union
 from dataclasses import dataclass, field
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
@@ -32,6 +32,8 @@ import platform
 import socket
 import urllib.request
 import urllib.error
+
+StopCallbackType = Callable[[], Union[bool, Awaitable[bool], None]]
 from .api_ui_consistency_checker import APIUIConsistencyChecker
 from .port_conflict_manager import PortConflictManager, PortConflictStrategy, get_port_registry
 from context_cleaner.telemetry.collector import get_collector
@@ -94,6 +96,7 @@ class ServiceDefinition:
     working_directory: Optional[str] = None
     required: bool = True
     startup_delay: int = 0  # seconds to wait before starting
+    category: str = "process"  # process, docker, internal
 
 
 @dataclass
@@ -114,6 +117,7 @@ class ServiceState:
     was_attached: bool = False  # True if we attached to existing container
     url: Optional[str] = None  # For web services like dashboard
     accessibility_status: Optional[str] = None  # Details about accessibility checks
+    stop_callback: Optional[StopCallbackType] = None
 
 
 class ServiceOrchestrator:
@@ -271,7 +275,8 @@ class ServiceOrchestrator:
             shutdown_timeout=60,
             dependencies=[],
             required=True,
-            startup_delay=0
+            startup_delay=0,
+            category="docker",
         )
         
         # 2. OTEL Collector (if applicable) - Enhanced with ClickHouse dependency awareness
@@ -287,7 +292,8 @@ class ServiceOrchestrator:
             shutdown_timeout=30,
             dependencies=["clickhouse"],
             required=False,
-            startup_delay=10  # Increased to allow ClickHouse DDL completion
+            startup_delay=10,  # Increased to allow ClickHouse DDL completion
+            category="docker",
         )
         
         # 3. JSONL Bridge Service
@@ -323,7 +329,8 @@ class ServiceOrchestrator:
             shutdown_timeout=10,
             dependencies=["clickhouse", "jsonl_bridge"],
             required=True,
-            startup_delay=15
+            startup_delay=15,
+            category="internal",
         )
         
         # 5. API/UI Consistency Checker
@@ -339,7 +346,8 @@ class ServiceOrchestrator:
             shutdown_timeout=5,
             dependencies=["dashboard"],
             required=False,  # Optional monitoring service
-            startup_delay=30
+            startup_delay=30,
+            category="internal",
         )
         
         # 6. Telemetry Collector
@@ -355,7 +363,8 @@ class ServiceOrchestrator:
             shutdown_timeout=5,
             dependencies=["clickhouse"],
             required=False,  # Optional telemetry service
-            startup_delay=5
+            startup_delay=5,
+            category="internal",
         )
 
     async def start_all_services(self, dashboard_port: int = 8110) -> bool:
@@ -475,62 +484,167 @@ class ServiceOrchestrator:
             await self.stop_all_services()
             return False
 
-    async def stop_all_services(self) -> bool:
-        """
-        Stop all services in reverse dependency order.
-        
-        Returns:
-            True if all services stopped successfully
-        """
-        if not self.running:
-            return True
-            
-        self.running = False
-        self.started_at = None
-        self.shutdown_event.set()
-        
+    async def shutdown_all(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+    ) -> Dict[str, Any]:
+        """Stop services with optional filtering and return a structured summary."""
+
+        summary: Dict[str, Any] = {
+            "requested": [],
+            "skipped": [],
+            "stopped": [],
+            "failed": [],
+            "errors": {},
+        }
+
+        shutdown_order = list(reversed(self._calculate_startup_order()))
+        full_shutdown = not docker_only and not processes_only
+
+        if full_shutdown:
+            self.running = False
+            self.started_at = None
+            self.shutdown_event.set()
+
         if self.verbose:
-            print("🛑 Stopping all Context Cleaner services...")
-        
-        # Stop services in reverse dependency order
-        startup_order = self._calculate_startup_order()
-        shutdown_order = list(reversed(startup_order))
-        
-        success = True
+            phase_label = "Stopping all Context Cleaner services" if full_shutdown else "Stopping selected services"
+            print(f"🛑 {phase_label}...")
+
         for service_name in shutdown_order:
+            service = self.services[service_name]
+            if not self._should_stop_service(service, docker_only, processes_only):
+                summary["skipped"].append(service_name)
+                continue
+
+            state = self.service_states.get(service_name)
+            if state and state.status == ServiceStatus.STOPPED:
+                summary["skipped"].append(service_name)
+                continue
+
+            summary["requested"].append(service_name)
             try:
                 if service_name == "dashboard":
-                    success &= await self._stop_dashboard_service()
+                    service_success = await self._stop_dashboard_service()
                 elif service_name == "consistency_checker":
-                    success &= await self._stop_consistency_checker_service()
+                    service_success = await self._stop_consistency_checker_service()
                 elif service_name == "telemetry_collector":
-                    success &= await self._stop_telemetry_collector_service()
+                    service_success = await self._stop_telemetry_collector_service()
                 else:
-                    success &= await self._stop_service(service_name)
-            except Exception as e:
-                self.logger.error(f"Failed to stop service {service_name}: {e}")
-                success = False
-        
-        # Stop health monitoring
-        if self.health_monitor_thread and self.health_monitor_thread.is_alive():
-            self.health_monitor_thread.join(timeout=5)
+                    service_success = await self._stop_service(service_name)
+            except Exception as exc:  # pragma: no cover - defensive
+                service_success = False
+                summary["errors"][service_name] = str(exc)
 
-        # Deallocate all ports from the registry
-        if self.verbose:
-            print("🔧 Deallocating ports from centralized registry...")
+            if service_success:
+                summary["stopped"].append(service_name)
+            else:
+                summary["failed"].append(service_name)
+                state_error = self.service_states[service_name].last_error
+                if state_error:
+                    summary["errors"][service_name] = state_error
 
-        deallocated_services = []
-        for service_name in ["dashboard", "clickhouse", "otel", "api", "websocket"]:
-            if self.port_registry.deallocate_port(service_name):
-                deallocated_services.append(service_name)
+        if full_shutdown:
+            if self.health_monitor_thread and self.health_monitor_thread.is_alive():
+                self.health_monitor_thread.join(timeout=5)
 
-        if self.verbose and deallocated_services:
-            print(f"✅ Deallocated ports for: {', '.join(deallocated_services)}")
+            if self.verbose:
+                print("🔧 Deallocating ports from centralized registry...")
 
-        if self.verbose:
-            print("✅ All services stopped")
-        
-        return success
+            deallocated_services = []
+            for service_name in ["dashboard", "clickhouse", "otel", "api", "websocket"]:
+                if self.port_registry.deallocate_port(service_name):
+                    deallocated_services.append(service_name)
+
+            if self.verbose and deallocated_services:
+                print(f"✅ Deallocated ports for: {', '.join(deallocated_services)}")
+
+        summary["success"] = len(summary["failed"]) == 0
+        return summary
+
+    async def stop_all_services(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+    ) -> bool:
+        summary = await self.shutdown_all(
+            docker_only=docker_only,
+            processes_only=processes_only,
+        )
+        return summary["success"]
+
+    def register_external_service(
+        self,
+        service_name: str,
+        *,
+        pid: Optional[int] = None,
+        process: Optional[subprocess.Popen] = None,
+        stop_callback: Optional[StopCallbackType] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Record externally launched service metadata for supervisor shutdown."""
+
+        if service_name not in self.services:
+            raise KeyError(f"Unknown service '{service_name}'")
+
+        state = self.service_states.setdefault(service_name, ServiceState(name=service_name))
+        now = datetime.now()
+        state.status = ServiceStatus.RUNNING
+        state.health_status = True
+        state.last_health_check = now
+        if state.start_time is None:
+            state.start_time = now
+
+        if process is not None:
+            state.process = process
+            state.pid = process.pid
+        elif pid is not None:
+            state.pid = pid
+
+        if metadata:
+            state.metrics.update(metadata)
+
+        state.stop_callback = stop_callback
+
+        if pid and pid != os.getpid() and self.process_registry:
+            existing_entry = self.process_registry.get_process(pid)
+            if existing_entry is None:
+                command = metadata.get("command_line") if metadata else ""
+                port = metadata.get("port") if metadata else None
+                entry = ProcessEntry(
+                    pid=pid,
+                    command_line=command or service_name,
+                    service_type=self.services[service_name].name,
+                    start_time=state.start_time,
+                    registration_time=now,
+                    status="running",
+                    port=port,
+                    host="127.0.0.1",
+                    parent_orchestrator=self.__class__.__name__,
+                    user_id=os.environ.get("USER", ""),
+                    host_identifier=platform.node(),
+                    registration_source="external",
+                )
+                entry.parent_pid = os.getpid()
+                environment = metadata.get("environment") if metadata else None
+                if environment:
+                    entry.environment_vars = json.dumps(environment)
+                try:
+                    self.process_registry.register_process(entry)
+                except Exception as exc:  # pragma: no cover - defensive registry issues
+                    self.logger.debug("Failed to register external service %s: %s", service_name, exc)
+            else:
+                update_payload: Dict[str, Any] = {"status": "running"}
+                if metadata and "port" in metadata:
+                    update_payload["port"] = metadata["port"]
+                if metadata and "environment" in metadata:
+                    try:
+                        update_payload["environment_vars"] = json.dumps(metadata["environment"])
+                    except (TypeError, ValueError):
+                        pass
+                self.process_registry.update_process_metadata(pid, **update_payload)
 
     async def _ensure_docker_environment(self) -> bool:
         """
@@ -960,13 +1074,25 @@ class ServiceOrchestrator:
                 except subprocess.TimeoutExpired:
                     state.process.kill()
                     success = True
+            elif state.stop_callback:
+                try:
+                    callback_result = state.stop_callback()
+                    if asyncio.iscoroutine(callback_result):
+                        callback_result = await callback_result
+                    success = True if callback_result is None else bool(callback_result)
+                except Exception as exc:
+                    self.logger.error("External stop callback for %s failed: %s", service_name, exc)
+                    state.last_error = str(exc)
+                    success = False
+            elif state.pid:
+                success = self._terminate_external_pid(state.pid, service.shutdown_timeout)
             else:
                 success = True
-            
+
             state.status = ServiceStatus.STOPPED
-            
+
             # Unregister from process registry if we had a PID
-            if state.pid:
+            if state.pid and state.pid != os.getpid():
                 self.process_registry.unregister_process(state.pid)
             
             state.process = None
@@ -996,14 +1122,60 @@ class ServiceOrchestrator:
             state.status = ServiceStatus.FAILED
             return False
 
+    def _terminate_external_pid(self, pid: int, timeout: int) -> bool:
+        """Terminate an external process by PID with escalation."""
+
+        if pid == os.getpid():  # Never terminate our own process
+            return True
+
+        try:
+            proc = psutil.Process(pid)
+        except psutil.NoSuchProcess:
+            return True
+        except psutil.AccessDenied:
+            self.logger.warning("Access denied while inspecting PID %s", pid)
+            return False
+
+        try:
+            proc.terminate()
+        except psutil.NoSuchProcess:
+            return True
+        except psutil.AccessDenied:
+            self.logger.warning("Access denied sending terminate to PID %s", pid)
+            return False
+
+        wait_timeout = max(timeout, 1)
+        try:
+            proc.wait(timeout=wait_timeout)
+            return True
+        except psutil.TimeoutExpired:
+            try:
+                proc.kill()
+                proc.wait(timeout=3)
+                return True
+            except psutil.TimeoutExpired:
+                self.logger.error("Process PID %s did not exit after SIGKILL", pid)
+            except psutil.NoSuchProcess:
+                return True
+        except psutil.NoSuchProcess:
+            return True
+
+        return False
+
     async def _stop_dashboard_service(self) -> bool:
         """Stop the dashboard service."""
         state = self.service_states["dashboard"]
         state.status = ServiceStatus.STOPPING
         
         try:
-            # Dashboard shutdown is handled by the main process
+            if state.stop_callback:
+                result = state.stop_callback()
+                if asyncio.iscoroutine(result):
+                    await result
             state.status = ServiceStatus.STOPPED
+            state.health_status = False
+            state.pid = None
+            state.process = None
             return True
         except Exception as e:
             state.last_error = str(e)
@@ -1519,6 +1691,18 @@ class ServiceOrchestrator:
             state.last_error = str(e)
             self.logger.error(f"Failed to stop telemetry collector: {e}")
             return False
+
+    def _should_stop_service(
+        self,
+        service: ServiceDefinition,
+        docker_only: bool,
+        processes_only: bool,
+    ) -> bool:
+        if docker_only:
+            return service.category == "docker"
+        if processes_only:
+            return service.category != "docker"
+        return True
     
     def get_consistency_report(self) -> Optional[Dict[str, Any]]:
         """Get the latest consistency check report."""

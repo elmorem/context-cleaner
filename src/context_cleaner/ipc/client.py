@@ -67,7 +67,12 @@ class SupervisorClient:
         self._transport.send_request(request)
         return self._transport.receive_response()
 
-    def stream_shutdown(self):
+    def stream_shutdown(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+    ):
         """Yield stream chunks followed by the final response for a shutdown request."""
 
         request = SupervisorRequest(
@@ -75,6 +80,12 @@ class SupervisorClient:
             streaming=True,
             client_info=self._default_client_info(),
         )
+        if docker_only and processes_only:
+            raise ValueError("docker_only and processes_only are mutually exclusive")
+        if docker_only:
+            request.options["docker_only"] = True
+        if processes_only:
+            request.options["processes_only"] = True
         self._apply_auth(request)
         self._transport.send_request(request)
 
@@ -86,11 +97,19 @@ class SupervisorClient:
         response = self._transport.receive_response()
         yield ("response", response)
 
-    def shutdown_with_stream(self) -> tuple[SupervisorResponse, list[StreamChunk]]:
+    def shutdown_with_stream(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+    ) -> tuple[SupervisorResponse, list[StreamChunk]]:
         chunks: list[StreamChunk] = []
         response: SupervisorResponse | None = None
 
-        for kind, event in self.stream_shutdown():
+        for kind, event in self.stream_shutdown(
+            docker_only=docker_only,
+            processes_only=processes_only,
+        ):
             if kind == "chunk":
                 chunks.append(event)
             else:

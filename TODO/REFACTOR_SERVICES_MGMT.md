@@ -13,14 +13,14 @@
 
 ## Implementation Phases
 
-### Phase 0 – Discovery & Design
+### Phase 0 – Discovery & Design (Complete)
 - Inventory every service currently started via `ServiceOrchestrator` or ancillary scripts; record command, requirements, health check expectations.
 - Decide on IPC transport with a cross-platform abstraction: Unix domain sockets on POSIX, named pipes or loopback TCP on Windows, with identical protocol semantics across platforms.
 - Define request/response schema (JSON payloads with `action`, `arguments`, `status`, `error`).
 - Decide supervisor lifecycle: dedicated process vs in-process server thread. (Target: keep everything inside the existing orchestrator process started by `context-cleaner run`.)
 - Update architectural diagrams / README summary to reflect supervisor concept.
 
-### Phase 1 – Supervisor Skeleton
+### Phase 1 – Supervisor Skeleton (Complete)
 - Implement Proto parsing and transport framing for Unix/tcp endpoints.
 - Provide stub transport for Windows with detailed TODO comments and signal future implementation.
 - Create a `ServiceSupervisor` (or similar) module that:
@@ -30,14 +30,14 @@
 - Ensure the supervisor publishes endpoint metadata (socket path, PID) into the process registry for discovery by CLI commands.
 - Handle graceful shutdown of the listener on exit.
 
-### Phase 2 – Integrate With `context-cleaner run`
+### Phase 2 – Integrate With `context-cleaner run` (Complete)
 - Modify `context-cleaner run` to:
   - Spawn / initialize the supervisor before starting services.
   - Block on supervisor.run_forever(), letting the dashboard run inside the same process or as a managed child.
   - Register cleanup handlers so Ctrl+C triggers supervisor shutdown.
 - Update run logging to emit the control endpoint location for support tooling.
 
-### Phase 3 – Update `context-cleaner stop`
+### Phase 3 – Update `context-cleaner stop` (Complete)
 - Replace the current multi-phase heuristic with:
   - Discover supervisor endpoint via registry/config.
   - Connect and send `shutdown` request (optionally `force` flag).
@@ -189,24 +189,24 @@
   - Highlight ProcessRegistry updates storing supervisor and service metadata.
 
 ## Implementation PR Breakdown
-1. **PR 1 – Discovery & Design Artifacts (Phase 0)**
+1. **PR 1 – Discovery & Design Artifacts (Phase 0) – Complete**
    - Deliver service inventory, transport decision matrix, security posture summary, and updated architecture diagrams.
    - Tests: documentation only.
 
-2. **PR 2 – IPC Protocol & Transport Foundation (Phase 1)**
+2. **PR 2 – IPC Protocol & Transport Foundation (Phase 1) – Complete**
    - Add `ipc/supervisor.proto`, implement framing layer, connection limits, auth token validation scaffold, and basic `ping` handling.
    - Include Windows named-pipe and POSIX socket adapters with placeholder platform quirks documented.
    - Tests: unit tests for protocol encoding/decoding, handshake, auth failures, rate limiting.
 
-3. **PR 3 – Supervisor Core Service (Phase 1 cont.)**
+3. **PR 3 – Supervisor Core Service (Phase 1 cont.) – Complete**
    - Implement supervisor lifecycle, state tracking, command routing (`status`, `shutdown` skeleton), audit logging, and error taxonomy.
    - Tests: supervisor unit tests exercising command dispatch, audit log writes, error mapping.
 
-4. **PR 4 – `context-cleaner run` Integration & Cross-Platform Smoke Tests (Phase 2)**
+4. **PR 4 – `context-cleaner run` Integration & Cross-Platform Smoke Tests (Phase 2) – Complete**
    - Wire supervisor startup into `run`, ensure graceful shutdown on Ctrl+C, publish connection metadata, and add automated smoke tests on Windows/macOS/Linux.
    - Tests: integration harness launching run command with mock IPC client; CI jobs for each OS.
 
-5. **PR 5 – `context-cleaner stop` IPC Client Rewrite (Phase 3)**
+5. **PR 5 – `context-cleaner stop` IPC Client Rewrite (Phase 3) – Complete**
    - Replace heuristic stop path with IPC client using new protocol, support streaming progress output, retain discovery fallback via `--fallback`.
    - Tests: CLI tests verifying success, authentication errors, fallback activation.
 
