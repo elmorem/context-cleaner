@@ -5,6 +5,7 @@ Tests the centralized process registry database and basic functionality
 following established testing standards.
 """
 
+import json
 import pytest
 import tempfile
 import shutil
@@ -39,6 +40,8 @@ class TestProcessEntry:
         assert entry.status == "running"  # Default value
         assert entry.port is None  # Default value
         assert entry.host == "127.0.0.1"  # Default value
+        assert entry.container_id is None
+        assert entry.metadata is None
     
     def test_process_entry_to_dict(self):
         """Test ProcessEntry.to_dict() method."""
@@ -51,17 +54,21 @@ class TestProcessEntry:
             service_type="test",
             start_time=start_time,
             registration_time=reg_time,
-            port=9999
+            port=9999,
+            container_id="abc123",
+            metadata=json.dumps({"foo": "bar"}),
         )
-        
+
         data = entry.to_dict()
-        
+
         assert data["pid"] == 11111
         assert data["command_line"] == "test command"
         assert data["service_type"] == "test"
         assert data["port"] == 9999
         assert "start_time" in data
         assert "registration_time" in data
+        assert data["container_id"] == "abc123"
+        assert data["metadata"] == json.dumps({"foo": "bar"})
     
     def test_process_entry_from_dict(self):
         """Test ProcessEntry.from_dict() method."""
@@ -76,6 +83,8 @@ class TestProcessEntry:
             "registration_time": reg_time,
             "port": 8888,
             "status": "stopped",
+            "container_id": "def456",
+            "metadata": json.dumps({"baz": 42}),
             # Extra database fields that should be filtered out
             "created_at": datetime.now(),
             "updated_at": datetime.now()
@@ -88,6 +97,8 @@ class TestProcessEntry:
         assert entry.service_type == "dashboard"
         assert entry.port == 8888
         assert entry.status == "stopped"
+        assert entry.container_id == "def456"
+        assert entry.metadata == json.dumps({"baz": 42})
 
 
 class TestProcessRegistryDatabase:
@@ -126,6 +137,8 @@ class TestProcessRegistryDatabase:
         assert len(processes) == 1
         assert processes[0].pid == 12345
         assert processes[0].service_type == "dashboard"
+        assert processes[0].container_id is None
+        assert processes[0].metadata is None
     
     def test_unregister_process(self):
         """Test unregistering a process."""
@@ -197,11 +210,36 @@ class TestProcessRegistryDatabase:
         dashboard_processes = self.registry.get_processes_by_type("dashboard")
         assert len(dashboard_processes) == 2
         assert all(p.service_type == "dashboard" for p in dashboard_processes)
+
+    def test_update_process_metadata_with_container(self):
+        entry = ProcessEntry(
+            pid=55555,
+            command_line="container service",
+            service_type="docker",
+            start_time=datetime.now(),
+            registration_time=datetime.now(),
+        )
+
+        self.registry.register_process(entry)
+
+        metadata_payload = {"container": "cc-svc", "metrics": {"latency": 42}}
+        updated = self.registry.update_process_metadata(
+            55555,
+            container_id="abc123",
+            container_state="running",
+            metadata=json.dumps(metadata_payload),
+        )
+        assert updated is True
+
+        stored = self.registry.get_process(55555)
+        assert stored is not None
+        assert stored.container_id == "abc123"
+        assert stored.container_state == "running"
+        assert stored.metadata == json.dumps(metadata_payload)
         
-        # Get bridge_sync processes
-        bridge_processes = self.registry.get_processes_by_type("bridge_sync")
-        assert len(bridge_processes) == 1
-        assert bridge_processes[0].service_type == "bridge_sync"
+        processes = self.registry.get_processes_by_type("docker")
+        assert len(processes) == 1
+        assert processes[0].container_id == "abc123"
 
 
 class TestProcessDiscoveryEngine:

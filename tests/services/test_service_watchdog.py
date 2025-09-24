@@ -87,3 +87,11 @@ def test_watchdog_triggers_restart_on_stale_heartbeat(monkeypatch):
         watchdog.stop()
 
     assert restart_calls, "Watchdog should trigger restart when heartbeat is stale"
+    assert watchdog.restart_attempts >= 1
+    assert watchdog.last_restart_reason == "stale-heartbeat"
+    assert watchdog.last_restart_success is True
+    assert watchdog.last_restart_at is not None
+    assert watchdog.last_heartbeat_at is not None
+    history = watchdog.restart_history
+    assert history
+    assert history[-1]["reason"] == "stale-heartbeat"

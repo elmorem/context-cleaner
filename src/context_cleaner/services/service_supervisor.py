@@ -13,7 +13,7 @@ import uuid
 from contextlib import AsyncExitStack, suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from context_cleaner.services.service_orchestrator import ServiceOrchestrator
 from context_cleaner.ipc.protocol import (
@@ -28,6 +28,9 @@ from context_cleaner.services.process_registry import (
     ProcessEntry,
     get_process_registry,
 )
+
+if TYPE_CHECKING:  # pragma: no cover - for type hints only
+    from context_cleaner.services.service_watchdog import ServiceWatchdog
 
 LOGGER = logging.getLogger(__name__)
 
@@ -95,6 +98,7 @@ class ServiceSupervisor:
         self._last_registry_environment: Optional[Dict[str, Any]] = None
         self._heartbeat_task: Optional[asyncio.Task[None]] = None
         self._last_heartbeat_at: Optional[dt.datetime] = None
+        self._watchdog: Optional["ServiceWatchdog"] = None
 
     async def start(self) -> None:
         if self._running:
@@ -145,6 +149,11 @@ class ServiceSupervisor:
             await asyncio.to_thread(self._unregister_supervisor_process)
             self._supervisor_registered = False
         self._heartbeat_task = None
+
+    def register_watchdog(self, watchdog: Optional["ServiceWatchdog"]) -> None:
+        """Associate a watchdog instance so status responses expose its telemetry."""
+
+        self._watchdog = watchdog
 
     async def handle_request(
         self,
@@ -436,10 +445,25 @@ class ServiceSupervisor:
             "heartbeat_timeout": self._config.heartbeat_timeout_seconds,
             "last_heartbeat_at": self._last_heartbeat_at.strftime(ISO8601) if self._last_heartbeat_at else None,
         }
+        watchdog_info: Dict[str, Any] = {}
+        if self._watchdog is not None:
+            history = self._watchdog.restart_history
+            max_history = 5
+            watchdog_info = {
+                "enabled": not self._watchdog.disabled,
+                "running": self._watchdog.is_running,
+                "last_heartbeat_at": self._watchdog.last_heartbeat_at.strftime(ISO8601) if self._watchdog.last_heartbeat_at else None,
+                "last_restart_reason": self._watchdog.last_restart_reason,
+                "last_restart_success": self._watchdog.last_restart_success,
+                "last_restart_at": self._watchdog.last_restart_at.isoformat() if self._watchdog.last_restart_at else None,
+                "restart_attempts": self._watchdog.restart_attempts,
+                "restart_history": history[-max_history:],
+            }
         return {
             "supervisor": supervisor_info,
             "orchestrator": orchestrator_status,
             "registry": registry_snapshot,
+            "watchdog": watchdog_info,
         }
 
     def _collect_registry_snapshot(self) -> Dict[str, Any]:
@@ -470,9 +494,20 @@ class ServiceSupervisor:
             "port",
             "last_health_status",
             "parent_orchestrator",
+            "container_id",
+            "container_state",
+            "metadata",
         )
         result = {key: data.get(key) for key in keys if data.get(key) not in (None, "", [])}
         for key in ("resource_limits", "health_check_config", "environment_vars"):
+            value = data.get(key)
+            if not value:
+                continue
+            try:
+                result[key] = json.loads(value)
+            except (TypeError, json.JSONDecodeError):
+                result[key] = value
+        for key in ("metadata",):
             value = data.get(key)
             if not value:
                 continue

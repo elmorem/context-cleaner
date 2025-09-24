@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 
 from context_cleaner.services.process_registry import (
     ProcessRegistryDatabase,
@@ -49,6 +49,10 @@ class ServiceWatchdog:
         self._last_restart_at: Optional[datetime] = None
         self._disabled = False
         self._lock = threading.Lock()
+        self._last_heartbeat_at: Optional[datetime] = None
+        self._last_restart_reason: Optional[str] = None
+        self._last_restart_success: Optional[bool] = None
+        self._restart_history: List[dict[str, object]] = []
 
     def start(self) -> bool:
         """Start the watchdog monitoring loop."""
@@ -82,6 +86,58 @@ class ServiceWatchdog:
         LOGGER.debug("Service watchdog stopped")
 
     # ------------------------------------------------------------------
+    # Monitoring inspection helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def last_heartbeat_at(self) -> Optional[datetime]:
+        """Most recent supervisor heartbeat timestamp observed by the watchdog."""
+
+        return self._last_heartbeat_at
+
+    @property
+    def last_restart_reason(self) -> Optional[str]:
+        """Reason supplied for the most recent restart attempt."""
+
+        return self._last_restart_reason
+
+    @property
+    def last_restart_success(self) -> Optional[bool]:
+        """Whether the most recent restart attempt reported success."""
+
+        return self._last_restart_success
+
+    @property
+    def restart_history(self) -> list[dict[str, object]]:
+        """Structured history of restart attempts (most recent last)."""
+
+        return list(self._restart_history)
+
+    @property
+    def restart_attempts(self) -> int:
+        """Current restart attempt counter."""
+
+        return self._restart_attempts
+
+    @property
+    def last_restart_at(self) -> Optional[datetime]:
+        """Timestamp of the last restart attempt."""
+
+        return self._last_restart_at
+
+    @property
+    def disabled(self) -> bool:
+        """Whether the watchdog has disabled itself after exceeding limits."""
+
+        return self._disabled
+
+    @property
+    def is_running(self) -> bool:
+        """Whether the watchdog monitoring thread is active."""
+
+        return self._thread is not None and self._thread.is_alive()
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
@@ -93,7 +149,7 @@ class ServiceWatchdog:
                 if healthy:
                     self._restart_attempts = 0
                 else:
-                    self._attempt_restart()
+                    self._attempt_restart("stale-heartbeat")
             except Exception as exc:  # pragma: no cover - defensive
                 LOGGER.debug("Watchdog iteration encountered error: %s", exc)
 
@@ -128,6 +184,8 @@ class ServiceWatchdog:
         heartbeat_at, timeout_seconds = heartbeat_info
         now = datetime.now(timezone.utc)
         grace = max(0, self._config.stale_grace_seconds)
+        self._last_heartbeat_at = heartbeat_at
+
         if heartbeat_at is None:
             LOGGER.warning("Watchdog could not parse heartbeat timestamp for supervisor PID %s", entry.pid)
             return False
@@ -185,7 +243,7 @@ class ServiceWatchdog:
         except ValueError:
             return None
 
-    def _attempt_restart(self) -> None:
+    def _attempt_restart(self, reason: str) -> None:
         if not self._restart_callback or self._disabled:
             return
 
@@ -207,8 +265,21 @@ class ServiceWatchdog:
         with self._lock:
             self._restart_attempts += 1
             self._last_restart_at = now
-            LOGGER.warning("Watchdog initiating supervisor restart (attempt %s)", self._restart_attempts)
+            self._last_restart_reason = reason
+            LOGGER.warning("Watchdog initiating supervisor restart (attempt %s, reason=%s)", self._restart_attempts, reason)
+            restart_record = {
+                "attempt": self._restart_attempts,
+                "reason": reason,
+                "timestamp": now.isoformat(),
+            }
             try:
                 self._restart_callback()
+                self._last_restart_success = True
+                restart_record["success"] = True
             except Exception as exc:  # pragma: no cover - defensive
+                self._last_restart_success = False
+                restart_record["success"] = False
+                restart_record["error"] = str(exc)
                 LOGGER.error("Watchdog restart callback failed: %s", exc)
+            finally:
+                self._restart_history.append(restart_record)

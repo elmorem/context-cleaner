@@ -45,6 +45,7 @@ async def test_register_external_service_tracks_state_and_stop_callback():
         stop_callback=stop_callback,
         metadata={"port": 8110, "url": "http://localhost:8110"},
     )
+    orchestrator.process_registry.update_process_metadata.assert_called()
 
     state = orchestrator.service_states["dashboard"]
     assert state.status is ServiceStatus.RUNNING
@@ -57,4 +58,3 @@ async def test_register_external_service_tracks_state_and_stop_callback():
     assert stop_called is True
     assert state.status is ServiceStatus.STOPPED
     assert state.health_status is False
-

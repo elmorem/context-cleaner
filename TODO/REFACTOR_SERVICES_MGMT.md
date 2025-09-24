@@ -49,11 +49,11 @@
 - ✅ Added thread/tpool backed helpers so `ServiceOrchestrator` and dashboard components can run async coroutines without clashing with Eventlet (`_run_coroutine_blocking`, health-check refactors).
 - ✅ Expose awaitable `shutdown_all()`/partial shutdown APIs that the supervisor can call directly.
 - ✅ Ensure externally launched services (dashboard subprocess, etc.) are registered with deterministic stop callbacks.
-- ☐ Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized.
+- 🔄 Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized. *(Next focus)*
 
 ### Phase 5 – Registry & Metadata Updates
-- Extend `ProcessRegistry` schema to store supervisor records (process type `supervisor`, socket path, start time).
-- Record child service metadata (ports, container IDs) so the supervisor can use structured info instead of rediscovery.
+- ✅ Extend `ProcessRegistry` schema to store supervisor records and enriched service metadata (socket path, container IDs, structured payloads).
+- 🔄 Record additional child service metadata (ports, container IDs) so the supervisor can use structured info instead of rediscovery.
 - Add cleanup routines that remove supervisor entries once shutdown completes.
 
 ### Phase 6 – Testing & Validation

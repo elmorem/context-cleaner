@@ -122,12 +122,78 @@ async def test_supervisor_ping_and_shutdown(tmp_path, monkeypatch):
     assert services_summary["by_status"] == {}
     registry_entries = status_response.result["registry"]["supervisor"]
     assert any(entry["pid"] == os.getpid() for entry in registry_entries)
+    assert "watchdog" in status_response.result
+    assert status_response.result["watchdog"] == {}
 
     shutdown_response = await supervisor.handle_request(SupervisorRequest(action=RequestAction.SHUTDOWN))
     assert shutdown_response.status == "in-progress"
     shutdown_snapshot = shutdown_response.result["services"]
     assert "services_summary" in shutdown_snapshot
     assert shutdown_snapshot["services_summary"]["total"] == 0
+
+    await supervisor.stop()
+
+
+@pytest.mark.asyncio
+async def test_supervisor_status_includes_watchdog(monkeypatch, tmp_path):
+    monkeypatch.setenv("CONTEXT_CLEANER_PROCESS_REGISTRY_DB", str(tmp_path / "registry.db"))
+    monkeypatch.setattr("context_cleaner.services.process_registry._registry", None)
+    monkeypatch.setattr("context_cleaner.services.process_registry._discovery_engine", None)
+
+    supervisor = ServiceSupervisor(
+        StubOrchestrator(),
+        SupervisorConfig(endpoint="ipc://watchdog", audit_log_path=str(tmp_path / "audit.log")),
+    )
+    await supervisor.start()
+
+    class _DummyWatchdog:
+        disabled = False
+
+        def __init__(self) -> None:
+            self._ts = dt.datetime.now(dt.timezone.utc)
+
+        @property
+        def is_running(self) -> bool:
+            return True
+
+        @property
+        def last_heartbeat_at(self) -> dt.datetime:
+            return self._ts
+
+        @property
+        def last_restart_reason(self) -> str:
+            return "manual-test"
+
+        @property
+        def last_restart_success(self) -> bool:
+            return True
+
+        @property
+        def last_restart_at(self) -> dt.datetime:
+            return self._ts
+
+        @property
+        def restart_attempts(self) -> int:
+            return 2
+
+        @property
+        def restart_history(self):
+            return [
+                {
+                    "attempt": 1,
+                    "reason": "manual-test",
+                    "timestamp": self._ts.isoformat(),
+                    "success": True,
+                }
+            ]
+
+    supervisor.register_watchdog(_DummyWatchdog())
+    status_response = await supervisor.handle_request(SupervisorRequest(action=RequestAction.STATUS))
+    assert status_response.status == "ok"
+    watchdog_info = status_response.result["watchdog"]
+    assert watchdog_info["running"] is True
+    assert watchdog_info["restart_attempts"] == 2
+    assert watchdog_info["restart_history"]
 
     await supervisor.stop()
 

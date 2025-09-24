@@ -65,12 +65,15 @@ class ProcessEntry:
     health_check_config: Optional[str] = None  # JSON string of health check config
     last_health_status: bool = True
     registration_source: str = 'orchestrator'  # 'orchestrator', 'discovery', 'manual'
-    
+
     # Process metadata
     working_directory: str = ''
     environment_vars: Optional[str] = None  # JSON string of relevant env vars
     process_group_id: Optional[int] = None
     parent_pid: Optional[int] = None
+    container_id: Optional[str] = None
+    container_state: Optional[str] = None
+    metadata: Optional[str] = None  # JSON payload with structured service metadata
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary with proper datetime serialization."""
@@ -101,7 +104,8 @@ class ProcessEntry:
             'session_id', 'user_id', 'host_identifier', 'resource_limits',
             'restart_policy', 'health_check_config', 'last_health_status',
             'registration_source', 'working_directory', 'environment_vars',
-            'process_group_id', 'parent_pid'
+            'process_group_id', 'parent_pid', 'container_id', 'container_state',
+            'metadata'
         }
         
         filtered_data = {k: v for k, v in data.items() if k in valid_fields}
@@ -202,6 +206,11 @@ class ProcessRegistryDatabase:
                 )
             """)
             
+            # Ensure new metadata columns exist (idempotent)
+            self._ensure_column(conn, 'container_id', "TEXT")
+            self._ensure_column(conn, 'container_state', "TEXT")
+            self._ensure_column(conn, 'metadata', "TEXT")
+
             # Create indexes for performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_service_type ON processes(service_type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON processes(status)")
@@ -219,7 +228,7 @@ class ProcessRegistryDatabase:
             """)
             
             conn.commit()
-    
+
     @contextmanager
     def _get_connection(self):
         """Get a database connection with file locking for atomic operations."""
@@ -239,6 +248,15 @@ class ProcessRegistryDatabase:
             if lock_fd is not None:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
                 os.close(lock_fd)
+
+    def _ensure_column(self, conn: sqlite3.Connection, column: str, definition: str) -> None:
+        """Add a column to the processes table if it's missing."""
+
+        cursor = conn.execute("PRAGMA table_info(processes)")
+        existing = {row[1] for row in cursor.fetchall()}
+        if column in existing:
+            return
+        conn.execute(f"ALTER TABLE processes ADD COLUMN {column} {definition}")
     
     def register_process(self, entry: ProcessEntry) -> bool:
         """Register a new process in the registry."""
@@ -316,6 +334,9 @@ class ProcessRegistryDatabase:
             "environment_vars",
             "process_group_id",
             "parent_pid",
+            "container_id",
+            "container_state",
+            "metadata",
         }
 
         update_fields = {k: v for k, v in fields.items() if k in allowed_columns}

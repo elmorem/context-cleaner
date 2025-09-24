@@ -654,6 +654,19 @@ class ServiceOrchestrator:
         state.stop_callback = stop_callback
 
         if pid and pid != os.getpid() and self.process_registry:
+            update_payload: Dict[str, Any] = {"status": "running"}
+            if metadata and "port" in metadata:
+                update_payload["port"] = metadata["port"]
+            if metadata and "environment" in metadata:
+                try:
+                    update_payload["environment_vars"] = json.dumps(metadata["environment"])
+                except (TypeError, ValueError):
+                    pass
+            if metadata and "container_id" in metadata:
+                update_payload["container_id"] = metadata["container_id"]
+            if metadata and "container_state" in metadata:
+                update_payload["container_state"] = metadata["container_state"]
+
             existing_entry = self.process_registry.get_process(pid)
             if existing_entry is None:
                 command = metadata.get("command_line") if metadata else ""
@@ -681,15 +694,40 @@ class ServiceOrchestrator:
                 except Exception as exc:  # pragma: no cover - defensive registry issues
                     self.logger.debug("Failed to register external service %s: %s", service_name, exc)
             else:
-                update_payload: Dict[str, Any] = {"status": "running"}
-                if metadata and "port" in metadata:
-                    update_payload["port"] = metadata["port"]
-                if metadata and "environment" in metadata:
-                    try:
-                        update_payload["environment_vars"] = json.dumps(metadata["environment"])
-                    except (TypeError, ValueError):
-                        pass
                 self.process_registry.update_process_metadata(pid, **update_payload)
+
+        self._update_process_registry_metadata(service_name, state)
+
+    def _update_process_registry_metadata(self, service_name: str, state: 'ServiceState') -> None:
+        """Persist structured service metadata to the process registry."""
+
+        if not self.process_registry or not state.pid:
+            return
+
+        metadata_payload: Dict[str, Any] = {
+            "service_name": service_name,
+            "metrics": state.metrics,
+            "was_attached": state.was_attached,
+        }
+        if state.url:
+            metadata_payload["url"] = state.url
+        if state.container_state:
+            metadata_payload["container_state"] = state.container_state.value
+
+        update_payload: Dict[str, Any] = {
+            "metadata": json.dumps(metadata_payload, default=str),
+        }
+        if state.container_id:
+            update_payload["container_id"] = state.container_id
+        if state.container_state:
+            update_payload["container_state"] = state.container_state.value
+        if state.metrics.get("port"):
+            update_payload.setdefault("port", state.metrics["port"])
+
+        try:
+            self.process_registry.update_process_metadata(state.pid, **update_payload)
+        except Exception as exc:
+            self.logger.debug("Failed to update registry metadata for %s: %s", service_name, exc)
 
     async def _ensure_docker_environment(self) -> bool:
         """
@@ -963,6 +1001,7 @@ class ServiceOrchestrator:
         if state.status == ServiceStatus.ATTACHED:
             if self.verbose:
                 print(f"   ⚡ Service {service_name} already attached to running container")
+            self._update_process_registry_metadata(service_name, state)
             return True
         
         state.status = ServiceStatus.STARTING
@@ -1000,6 +1039,7 @@ class ServiceOrchestrator:
                             
                             if self.verbose:
                                 print(f"   ✅ Attached to running {service_name} container ({container_id[:12]})")
+                            self._update_process_registry_metadata(service_name, state)
                             return True
                     
                     elif container_state in [ContainerState.STOPPED, ContainerState.EXITED]:
@@ -1071,6 +1111,7 @@ class ServiceOrchestrator:
                         state.status = ServiceStatus.RUNNING
                         state.health_status = True
                         state.last_health_check = datetime.now()
+                        self._update_process_registry_metadata(service_name, state)
                         return True
                     await asyncio.sleep(2)
                 
@@ -1084,6 +1125,7 @@ class ServiceOrchestrator:
                     is_healthy = await self._run_health_check(service_name)
                     state.health_status = is_healthy
                     state.last_health_check = datetime.now()
+                self._update_process_registry_metadata(service_name, state)
                 return True
             
         except Exception as e:
@@ -1143,12 +1185,14 @@ class ServiceOrchestrator:
             state.process = None
             state.pid = None
             state.health_status = False
+            self._update_process_registry_metadata(service_name, state)
             
             return success
             
         except Exception as e:
             state.last_error = str(e)
             state.status = ServiceStatus.FAILED
+            self._update_process_registry_metadata(service_name, state)
             return False
 
     async def _start_dashboard_service(self, port: int) -> bool:

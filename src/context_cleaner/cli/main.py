@@ -2686,10 +2686,11 @@ async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_on
 @click.option("--no-docker", is_flag=True, help="Skip Docker service startup")
 @click.option("--no-jsonl", is_flag=True, help="Skip JSONL processing service")
 @click.option("--status-only", is_flag=True, help="Show service status and exit")
+@click.option("--json", "status_json", is_flag=True, help="Output status-only data as JSON")
 @click.option("--config-file", type=click.Path(exists=True), help="Custom configuration file")
 @click.option("--dev-mode", is_flag=True, help="Enable development mode with debug logging")
 @click.pass_context
-def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, config_file, dev_mode):
+def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, status_json, config_file, dev_mode):
     """
     🚀 SINGLE ENTRY POINT - Start all Context Cleaner services with orchestration.
     
@@ -2748,15 +2749,66 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
     if status_only:
         click.echo("🔍 DEBUG: Status-only mode detected, getting service status...")
         status = orchestrator.get_service_status()
-        
+        watchdog_info = None
+        supervisor_endpoint = default_supervisor_endpoint()
+        try:
+            from context_cleaner.ipc.client import SupervisorClient
+            from context_cleaner.ipc.protocol import SupervisorRequest, RequestAction
+
+            with SupervisorClient(endpoint=supervisor_endpoint) as client:
+                response = client.send(SupervisorRequest(action=RequestAction.STATUS))
+                watchdog_info = response.result.get("watchdog") if response.status == "ok" else None
+        except Exception:
+            watchdog_info = None
+
+        payload = {
+            "orchestrator": status.get("orchestrator"),
+            "services": status.get("services"),
+            "services_summary": status.get("services_summary"),
+            "watchdog": watchdog_info or {},
+        }
+
+        if status_json:
+            click.echo(json.dumps(payload, indent=2, default=str))
+            return
+
         click.echo("\n🔍 CONTEXT CLEANER SERVICE STATUS")
         click.echo("=" * 45)
-        
+
         # Orchestrator status
         orch_status = status["orchestrator"]
         running_icon = "🟢" if orch_status["running"] else "🔴"
         click.echo(f"{running_icon} Orchestrator: {'Running' if orch_status['running'] else 'Stopped'}")
-        
+
+        if watchdog_info:
+            click.echo("\n👀 Watchdog:")
+            running = watchdog_info.get("running", False)
+            enabled = watchdog_info.get("enabled", True)
+            status_icon = "🟢" if running else "🔴"
+            state = "Active" if running else "Stopped"
+            click.echo(f"   {status_icon} {state} (enabled: {'yes' if enabled else 'no'})")
+
+            last_hb = watchdog_info.get("last_heartbeat_at") or "unknown"
+            click.echo(f"      Last heartbeat: {last_hb}")
+
+            last_restart = watchdog_info.get("last_restart_at")
+            reason = watchdog_info.get("last_restart_reason")
+            if last_restart or reason:
+                click.echo(f"      Last restart: {last_restart or 'never'} (reason: {reason or 'n/a'})")
+
+            attempts = watchdog_info.get("restart_attempts", 0)
+            click.echo(f"      Restart attempts: {attempts}")
+
+            history = watchdog_info.get("restart_history") or []
+            if history:
+                click.echo("      Recent history:")
+                for entry in history:
+                    ts = entry.get("timestamp", "unknown")
+                    rsn = entry.get("reason", "n/a")
+                    success = entry.get("success")
+                    icon = "✅" if success else "❌" if success is not None else "•"
+                    click.echo(f"         {icon} {ts} – {rsn}")
+
         # Individual services
         click.echo("\n📊 Services:")
         for service_name, service_info in status["services"].items():
@@ -2902,6 +2954,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
 
             if current and loop:
                 try:
+                    current.register_watchdog(None)
                     future = asyncio.run_coroutine_threadsafe(current.stop(), loop)
                     future.result(timeout=5)
                 except Exception as exc:
@@ -2926,6 +2979,9 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
 
     if _start_supervisor():
         watchdog = ServiceWatchdog(restart_callback=_restart_supervisor)
+        current_supervisor = supervisor_state["instance"]
+        if current_supervisor is not None:
+            current_supervisor.register_watchdog(watchdog)
         watchdog.start()
     else:
         supervisor_state["instance"] = None
@@ -3017,6 +3073,9 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         if watchdog:
             watchdog.stop()
             watchdog = None
+            current_supervisor = supervisor_state.get("instance")
+            if current_supervisor is not None:
+                current_supervisor.register_watchdog(None)
         _stop_supervisor()
         if verbose:
             click.echo("✅ All services stopped cleanly")
@@ -3027,6 +3086,9 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         if watchdog:
             watchdog.stop()
             watchdog = None
+            current_supervisor = supervisor_state.get("instance")
+            if current_supervisor is not None:
+                current_supervisor.register_watchdog(None)
         _stop_supervisor()
         sys.exit(1)
 
@@ -3035,6 +3097,9 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         if watchdog:
             watchdog.stop()
             watchdog = None
+            current_supervisor = supervisor_state.get("instance")
+            if current_supervisor is not None:
+                current_supervisor.register_watchdog(None)
         _stop_supervisor()
 
 
