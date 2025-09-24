@@ -17,6 +17,7 @@ import threading
 import time
 import webbrowser
 import concurrent.futures
+from typing import Any, Dict
 from datetime import datetime
 from pathlib import Path
 from contextlib import suppress
@@ -1375,8 +1376,19 @@ except ImportError:
 @click.option("--show-discovery", is_flag=True, help="Show discovered processes before shutdown")
 @click.option("--registry-cleanup", is_flag=True, help="Also clean up process registry entries")
 @click.option("--use-script", is_flag=True, help="Use stop-context-cleaner.sh script for comprehensive cleanup")
+@click.option(
+    "--service",
+    "services",
+    multiple=True,
+    help="Target specific services by name; repeat option to select multiple",
+)
+@click.option(
+    "--no-dependents",
+    is_flag=True,
+    help="Do not automatically stop dependent services when targeting specific services",
+)
 @click.pass_context
-def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup, use_script):
+def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup, use_script, services, no_dependents):
     """
     🛑 ENHANCED STOP - Comprehensive service shutdown with process discovery.
     
@@ -1430,6 +1442,12 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     if docker_only and processes_only:
         raise click.UsageError("Use either --docker-only or --processes-only, not both")
 
+    target_services = [svc.strip() for svc in services if svc and svc.strip()]
+    include_dependents = not no_dependents
+
+    if target_services and (docker_only or processes_only):
+        raise click.UsageError("--service cannot be combined with --docker-only/--processes-only filters")
+
     # Use shell script if requested
     if use_script:
         if verbose:
@@ -1465,9 +1483,23 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
 
         return
 
+    if target_services and show_discovery:
+        click.echo("⚠️  --show-discovery is ignored when targeting specific services", err=True)
+
+    perform_discovery = not no_discovery and not target_services
+    discovered_processes = []
+
     if verbose:
         click.echo("🛑 Starting enhanced Context Cleaner shutdown...")
         click.echo("🔍 Using process discovery and orchestration integration")
+        if target_services:
+            click.echo(f"🎯 Targeted services: {', '.join(target_services)}")
+            if include_dependents:
+                click.echo("   Dependent services will also be stopped")
+            else:
+                click.echo("   Dependent services will NOT be stopped automatically")
+            if perform_discovery is False and not no_discovery:
+                click.echo("   Skipping process discovery for targeted shutdown")
     
     # Initialize orchestrator and discovery systems
     try:
@@ -1497,7 +1529,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         return
     
     # 1. ENHANCED PROCESS DISCOVERY PHASE
-    if not no_discovery:
+    if perform_discovery:
         try:
             if verbose:
                 click.echo("\n🔍 PHASE 1: Enhanced Process Discovery")
@@ -1588,7 +1620,10 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     else:
         if verbose:
-            click.echo("⚠️  Process discovery skipped (--no-discovery)")
+            if no_discovery:
+                click.echo("⚠️  Process discovery skipped (--no-discovery)")
+            elif target_services:
+                click.echo("⚠️  Process discovery skipped for targeted shutdown")
         discovered_processes = []
     
     # 2. CONFIRMATION PHASE
@@ -1603,7 +1638,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if registry_cleanup:
             click.echo("   • Process registry entries cleanup")
         
-        if not no_discovery and discovered_processes:
+        if perform_discovery and discovered_processes:
             click.echo(f"\n📊 Processes to stop: {len(discovered_processes)} Context Cleaner processes")
             # Show summary of what will be stopped
             process_summary = {}
@@ -1622,8 +1657,11 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 if len(processes) > 2:
                     click.echo(f"     - ... and {len(processes) - 2} more")
         else:
-            processes_count = "unknown number of"
-            click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
+            if target_services:
+                click.echo(f"\n📊 Targeted services for shutdown: {', '.join(target_services)}")
+            else:
+                processes_count = "unknown number of"
+                click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
         click.echo()
         
         if not click.confirm("Continue with comprehensive shutdown?"):
@@ -1631,6 +1669,8 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             return
     
     # 3. ORCHESTRATED SHUTDOWN PHASE
+    shutdown_summary: Dict[str, Any] | None = None
+
     if not processes_only:
         try:
             if verbose:
@@ -1640,6 +1680,8 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 verbose=verbose,
                 docker_only=docker_only,
                 processes_only=processes_only,
+                services=target_services,
+                include_dependents=include_dependents,
             )
 
             if supervisor_used and not supervisor_success:
@@ -1653,9 +1695,17 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     orchestrator.shutdown_all(
                         docker_only=docker_only,
                         processes_only=processes_only,
+                        services=target_services if target_services else None,
+                        include_dependents=include_dependents,
                     )
                 )
                 orchestrated_success = shutdown_summary.get("success", False)
+                if shutdown_summary.get("invalid"):
+                    click.echo(
+                        "   ⚠️  Unknown services requested: "
+                        + ", ".join(shutdown_summary["invalid"]),
+                        err=True,
+                    )
 
             if orchestrated_success:
                 if verbose:
@@ -1663,6 +1713,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             else:
                 if verbose:
                     click.echo("   ⚠️  Some orchestrated services had issues during shutdown")
+                if shutdown_summary and shutdown_summary.get("errors") and verbose:
+                    for name, error_msg in shutdown_summary["errors"].items():
+                        click.echo(f"      - {name}: {error_msg}", err=True)
         except Exception as e:
             if verbose:
                 click.echo(f"   ❌ Orchestrated shutdown failed: {e}")
@@ -1671,7 +1724,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 sys.exit(1)
     
     # 4. DISCOVERED PROCESS CLEANUP PHASE  
-    if not no_discovery and discovered_processes:
+    if perform_discovery and discovered_processes:
         if verbose:
             click.echo("\n🧹 PHASE 3: Discovered Process Cleanup")
         
@@ -2065,6 +2118,8 @@ def _supervisor_stream_shutdown(
     verbose: bool,
     docker_only: bool,
     processes_only: bool,
+    services: list[str],
+    include_dependents: bool,
 ) -> tuple[bool, bool]:
     """Attempt to shut down services via the supervisor streaming API.
 
@@ -2086,6 +2141,8 @@ def _supervisor_stream_shutdown(
             for kind, event in client.stream_shutdown(
                 docker_only=docker_only,
                 processes_only=processes_only,
+                services=services or None,
+                include_dependents=include_dependents,
             ):
                 if kind == "chunk":
                     _render_shutdown_chunk(event, verbose)

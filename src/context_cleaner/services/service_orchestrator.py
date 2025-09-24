@@ -20,7 +20,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable, Tuple, Awaitable, Union
+from typing import Dict, List, Optional, Any, Callable, Tuple, Awaitable, Union, Sequence, Set
 from dataclasses import dataclass, field
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
@@ -489,6 +489,8 @@ class ServiceOrchestrator:
         *,
         docker_only: bool = False,
         processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
     ) -> Dict[str, Any]:
         """Stop services with optional filtering and return a structured summary."""
 
@@ -498,10 +500,43 @@ class ServiceOrchestrator:
             "stopped": [],
             "failed": [],
             "errors": {},
+            "invalid": [],
         }
 
         shutdown_order = list(reversed(self._calculate_startup_order()))
-        full_shutdown = not docker_only and not processes_only
+
+        requested_services: Optional[Set[str]] = None
+        if services is not None:
+            normalized: Set[str] = set()
+            for name in services:
+                if isinstance(name, str):
+                    candidate = name.strip()
+                    if candidate:
+                        normalized.add(candidate)
+
+            if normalized:
+                invalid = sorted(s for s in normalized if s not in self.services)
+                if invalid:
+                    summary["invalid"] = invalid
+
+            requested_services = {s for s in normalized if s in self.services}
+
+            if include_dependents and requested_services:
+                dependents_map: Dict[str, Set[str]] = {}
+                for svc_name, definition in self.services.items():
+                    for dependency in definition.dependencies:
+                        dependents = dependents_map.setdefault(dependency, set())
+                        dependents.add(svc_name)
+
+                queue = list(requested_services)
+                while queue:
+                    current = queue.pop()
+                    for dependent in dependents_map.get(current, set()):
+                        if dependent not in requested_services:
+                            requested_services.add(dependent)
+                            queue.append(dependent)
+
+        full_shutdown = services is None and not docker_only and not processes_only
 
         if full_shutdown:
             self.running = False
@@ -513,6 +548,8 @@ class ServiceOrchestrator:
             print(f"🛑 {phase_label}...")
 
         for service_name in shutdown_order:
+            if requested_services is not None and service_name not in requested_services:
+                continue
             service = self.services[service_name]
             if not self._should_stop_service(service, docker_only, processes_only):
                 summary["skipped"].append(service_name)
@@ -560,7 +597,11 @@ class ServiceOrchestrator:
             if self.verbose and deallocated_services:
                 print(f"✅ Deallocated ports for: {', '.join(deallocated_services)}")
 
-        summary["success"] = len(summary["failed"]) == 0
+        if requested_services is not None and not requested_services:
+            summary["success"] = False
+        else:
+            has_invalid = bool(summary.get("invalid"))
+            summary["success"] = len(summary["failed"]) == 0 and not has_invalid
         return summary
 
     async def stop_all_services(
@@ -568,10 +609,14 @@ class ServiceOrchestrator:
         *,
         docker_only: bool = False,
         processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
     ) -> bool:
         summary = await self.shutdown_all(
             docker_only=docker_only,
             processes_only=processes_only,
+            services=services,
+            include_dependents=include_dependents,
         )
         return summary["success"]
 

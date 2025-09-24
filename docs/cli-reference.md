@@ -67,6 +67,8 @@ Options:
   --show-discovery       Preview discovered processes before stopping
   --registry-cleanup     Remove stale registry entries after shutdown
   --use-script           Run stop-context-cleaner.sh instead of supervisor IPC
+  --service SERVICE      Target specific services (repeat for multiple)
+  --no-dependents        Do not automatically stop dependent services when using --service
   --help                 Show help message
 ```
 
@@ -81,6 +83,15 @@ $ context-cleaner --verbose stop
 
 If the supervisor can't be reached, the command falls back to the legacy
 orchestrator shutdown and prints the traditional progress messages.
+
+**Targeted shutdown:**
+```
+# Restart only the dashboard + its dependents
+context-cleaner stop --service dashboard
+
+# Stop just the JSONL bridge without touching dependents
+context-cleaner stop --service jsonl_bridge --no-dependents
+```
 
 ### **`start`**
 Start productivity tracking for the current development session.

@@ -706,7 +706,7 @@ class ServiceSupervisor:
     def _resolve_shutdown_options(
         self,
         request: SupervisorRequest,
-    ) -> tuple[Dict[str, bool], Optional[SupervisorResponse]]:
+    ) -> tuple[Dict[str, Any], Optional[SupervisorResponse]]:
         docker_only = bool(request.options.get("docker_only"))
         processes_only = bool(request.options.get("processes_only"))
         if docker_only and processes_only:
@@ -715,7 +715,32 @@ class ServiceSupervisor:
                 code=ErrorCode.INVALID_ARGUMENT,
                 message="conflicting-shutdown-filters",
             )
-        return {
+        filters: Dict[str, Any] = {
             "docker_only": docker_only,
             "processes_only": processes_only,
-        }, None
+        }
+
+        services_option = request.filters.get("services") or request.options.get("services")
+        services_list: Optional[list[str]] = None
+        if services_option is not None:
+            if isinstance(services_option, str):
+                if services_option:
+                    # Support comma-delimited strings from CLI callers
+                    services_list = [s.strip() for s in services_option.split(",") if s.strip()]
+            elif isinstance(services_option, (list, tuple, set)):
+                services_list = [str(item).strip() for item in services_option if str(item).strip()]
+            else:
+                return {}, self._error_response(
+                    request,
+                    code=ErrorCode.INVALID_ARGUMENT,
+                    message="invalid-services-filter",
+                )
+
+            if services_list:
+                filters["services"] = services_list
+
+        include_dependents_value = request.options.get("include_dependents")
+        if include_dependents_value is not None:
+            filters["include_dependents"] = bool(include_dependents_value)
+
+        return filters, None

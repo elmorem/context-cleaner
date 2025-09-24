@@ -5,7 +5,7 @@ from __future__ import annotations
 import getpass
 import os
 import platform
-from typing import Optional
+from typing import Optional, Sequence
 
 from .protocol import (
     ClientInfo,
@@ -76,6 +76,8 @@ class SupervisorClient:
         *,
         docker_only: bool = False,
         processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
     ):
         """Yield stream chunks followed by the final response for a shutdown request."""
 
@@ -90,6 +92,10 @@ class SupervisorClient:
             request.options["docker_only"] = True
         if processes_only:
             request.options["processes_only"] = True
+        if services:
+            request.options["services"] = [service for service in services if service]
+        if include_dependents is not None:
+            request.options["include_dependents"] = bool(include_dependents)
         self._apply_auth(request)
         self._transport.send_request(request)
 
@@ -106,6 +112,8 @@ class SupervisorClient:
         *,
         docker_only: bool = False,
         processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
     ) -> tuple[SupervisorResponse, list[StreamChunk]]:
         chunks: list[StreamChunk] = []
         response: SupervisorResponse | None = None
@@ -113,6 +121,8 @@ class SupervisorClient:
         for kind, event in self.stream_shutdown(
             docker_only=docker_only,
             processes_only=processes_only,
+            services=services,
+            include_dependents=include_dependents,
         ):
             if kind == "chunk":
                 chunks.append(event)

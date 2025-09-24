@@ -4,7 +4,7 @@ import json
 import os
 import shutil
 import tempfile
-from typing import Dict
+from typing import Any, Dict, Optional, Sequence
 
 import pytest
 
@@ -53,9 +53,40 @@ class StubOrchestrator:
             },
         }
 
-    async def stop_all_services(self):
+    async def shutdown_all(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
+    ) -> Dict[str, Any]:
         await asyncio.sleep(0)
-        return True
+        return {
+            "requested": [],
+            "skipped": [],
+            "stopped": [],
+            "failed": [],
+            "errors": {},
+            "invalid": [],
+            "success": True,
+        }
+
+    async def stop_all_services(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
+    ) -> bool:
+        summary = await self.shutdown_all(
+            docker_only=docker_only,
+            processes_only=processes_only,
+            services=services,
+            include_dependents=include_dependents,
+        )
+        return summary["success"]
 
 
 @pytest.mark.asyncio
@@ -211,9 +242,11 @@ class StreamingStubOrchestrator:
         self.started_at = datetime.now()
         self.shutdown_event = _DummyEvent()
         self._stage = "running"
-        self.last_shutdown_kwargs: Dict[str, bool] = {
+        self.last_shutdown_kwargs: Dict[str, Any] = {
             "docker_only": False,
             "processes_only": False,
+            "services": None,
+            "include_dependents": True,
         }
 
     def get_service_status(self):
@@ -247,10 +280,19 @@ class StreamingStubOrchestrator:
             },
         }
 
-    async def shutdown_all(self, docker_only: bool = False, processes_only: bool = False):
+    async def shutdown_all(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
+    ):
         self.last_shutdown_kwargs = {
             "docker_only": docker_only,
             "processes_only": processes_only,
+            "services": services,
+            "include_dependents": include_dependents,
         }
         self._stage = "stopping"
         await asyncio.sleep(0)
@@ -266,8 +308,20 @@ class StreamingStubOrchestrator:
             "success": True,
         }
 
-    async def stop_all_services(self, *, docker_only: bool = False, processes_only: bool = False) -> bool:
-        summary = await self.shutdown_all(docker_only=docker_only, processes_only=processes_only)
+    async def stop_all_services(
+        self,
+        *,
+        docker_only: bool = False,
+        processes_only: bool = False,
+        services: Optional[Sequence[str]] = None,
+        include_dependents: bool = True,
+    ) -> bool:
+        summary = await self.shutdown_all(
+            docker_only=docker_only,
+            processes_only=processes_only,
+            services=services,
+            include_dependents=include_dependents,
+        )
         return summary["success"]
 
 
@@ -399,7 +453,12 @@ async def test_supervisor_shutdown_stream_with_filters(tmp_path, monkeypatch):
     request.options["docker_only"] = True
     response = await supervisor.handle_request(request, writer)
 
-    assert orchestrator.last_shutdown_kwargs == {"docker_only": True, "processes_only": False}
+    assert orchestrator.last_shutdown_kwargs == {
+        "docker_only": True,
+        "processes_only": False,
+        "services": None,
+        "include_dependents": True,
+    }
     assert response.status == "ok"
     assert response.result["filters"] == {"docker_only": True}
 
@@ -412,6 +471,40 @@ async def test_supervisor_shutdown_stream_with_filters(tmp_path, monkeypatch):
         decoded_chunks.append(chunk_body)
 
     assert any(chunk.get("filters") == {"docker_only": True} for chunk in decoded_chunks)
+
+    await supervisor.stop()
+
+
+@pytest.mark.asyncio
+async def test_supervisor_shutdown_with_service_list(tmp_path, monkeypatch):
+    monkeypatch.setenv("CONTEXT_CLEANER_PROCESS_REGISTRY_DB", str(tmp_path / "registry.db"))
+    monkeypatch.setattr("context_cleaner.services.process_registry._registry", None)
+    monkeypatch.setattr("context_cleaner.services.process_registry._discovery_engine", None)
+
+    orchestrator = StreamingStubOrchestrator()
+    supervisor = ServiceSupervisor(
+        orchestrator,
+        SupervisorConfig(endpoint="ipc://service-filter-test", audit_log_path=str(tmp_path / "audit.log")),
+    )
+    await supervisor.start()
+
+    request = SupervisorRequest(action=RequestAction.SHUTDOWN)
+    request.options["services"] = ["dashboard"]
+    request.options["include_dependents"] = False
+    response = await supervisor.handle_request(request)
+
+    assert response.status == "in-progress"
+    assert response.result["message"] == "shutdown-started"
+
+    # Let the orchestrator coroutine run
+    await asyncio.sleep(0)
+
+    assert orchestrator.last_shutdown_kwargs == {
+        "docker_only": False,
+        "processes_only": False,
+        "services": ["dashboard"],
+        "include_dependents": False,
+    }
 
     await supervisor.stop()
 
@@ -440,30 +533,31 @@ async def test_client_shutdown_with_stream(monkeypatch, tmp_path):
     client = SupervisorClient(transport=transport)
     client.connect()
 
-    request = SupervisorRequest(action=RequestAction.SHUTDOWN, streaming=True, client_info=client._default_client_info())
-    client._apply_auth(request)
-    transport.send_request(request)
-
     # Simulate stream chunks and final response
+    request_id = "req-client-stream"
     stage_chunk = StreamChunk(
-        request_id=request.request_id,
+        request_id=request_id,
         server_timestamp=dt.datetime.now(dt.timezone.utc),
         payload=json.dumps({"stage": "progress"}).encode("utf-8"),
         final_chunk=False,
     )
     final_chunk = StreamChunk(
-        request_id=request.request_id,
+        request_id=request_id,
         server_timestamp=dt.datetime.now(dt.timezone.utc),
         payload=json.dumps({"stage": "completed"}).encode("utf-8"),
         final_chunk=True,
     )
     transport.queue_stream_chunk(stage_chunk)
     transport.queue_stream_chunk(final_chunk)
-    transport.queue_response(SupervisorResponse(request_id=request.request_id, status="ok"))
+    transport.queue_response(SupervisorResponse(request_id=request_id, status="ok"))
 
-    response, chunks = client.shutdown_with_stream()
+    response, chunks = client.shutdown_with_stream(services=["dashboard"], include_dependents=False)
     assert response.status == "ok"
     assert len(chunks) == 2
     assert chunks[-1].final_chunk is True
+
+    sent_request = transport.sent_requests.popleft()
+    assert sent_request.options.get("services") == ["dashboard"]
+    assert sent_request.options.get("include_dependents") is False
 
     await supervisor.stop()

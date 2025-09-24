@@ -47,8 +47,8 @@
 
 ### Phase 4 – Orchestrator Enhancements *(In Progress)*
 - ✅ Added thread/tpool backed helpers so `ServiceOrchestrator` and dashboard components can run async coroutines without clashing with Eventlet (`_run_coroutine_blocking`, health-check refactors).
-- ☐ Expose awaitable `shutdown_all()`/partial shutdown APIs that the supervisor can call directly (still needed).
-- ☐ Ensure externally launched services (dashboard subprocess, etc.) are registered with deterministic stop callbacks.
+- ✅ Expose awaitable `shutdown_all()`/partial shutdown APIs that the supervisor can call directly.
+- ✅ Ensure externally launched services (dashboard subprocess, etc.) are registered with deterministic stop callbacks.
 - ☐ Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized.
 
 ### Phase 5 – Registry & Metadata Updates
@@ -212,7 +212,8 @@
 
 6. **PR 6 – Orchestrator Async APIs & Service Registration (Phase 4A)** *(Partially in progress)*
    - ✅ Eventlet/asyncio compatibility helpers added for health checks and telemetry workflows.
-   - ☐ Expose awaitable `shutdown_all`, register external services/ports/container IDs, emit heartbeat data for future watchdog use.
+   - ✅ Expose awaitable `shutdown_all`, register external services/ports/container IDs, emit heartbeat data for future watchdog use.
+   - ✅ CLI `context-cleaner stop` exposes `--service`/`--no-dependents` flags, wiring supervisor filters into operator workflow.
    - Tests: orchestrator unit tests, integration test ensuring supervisor commands drive graceful shutdown.
 
 7. **PR 7 – Watchdog Epic (Phase 4B, optional rollout)**
