@@ -10,7 +10,7 @@ black==25.9.0
 blinker==1.9.0
 cffi==2.0.0
 click==8.3.0
--e git+ssh://git@github.com/elmorem/context-cleaner.git@6d2b760abf45be9a8970a78fbf206202e78aea40#egg=context_cleaner
+-e .
 contourpy==1.3.3
 coverage==7.10.6
 croniter==6.0.0

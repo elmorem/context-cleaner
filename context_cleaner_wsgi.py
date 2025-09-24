@@ -3,13 +3,6 @@
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
 Application Factory Pattern for Production Deployment
 """
-
-try:
-    import eventlet  # type: ignore
-    eventlet.monkey_patch()
-except Exception:  # pragma: no cover - optional dependency
-    pass
-
 import sys
 import os
 import logging
@@ -45,7 +38,7 @@ def create_app():
         logger.info("✅ Dashboard created successfully")
         logger.info("📡 Initializing SocketIO for production...")
         
-        # Ensure SocketIO is properly configured for eventlet
+        # Ensure SocketIO uses eventlet async mode
         if dashboard.socketio.async_mode != 'eventlet':
             logger.warning(
                 "⚠️ SocketIO async_mode is %s, expected 'eventlet'",

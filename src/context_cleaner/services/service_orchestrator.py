@@ -2934,55 +2934,46 @@ class ServiceOrchestrator:
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
     
     def _run_health_check_sync(self, service_name: str) -> bool:
-        """Run health check in an isolated event loop regardless of existing loops."""
-        if hasattr(asyncio, "Runner"):
-            try:
-                with asyncio.Runner() as runner:  # type: ignore[attr-defined]
-                    return runner.run(
-                        asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-                    )
-            except RuntimeError as exc:
-                self.logger.debug(
-                    "_run_health_check_sync Runner fallback triggered for %s: %s",
-                    service_name,
-                    exc,
-                )
+        """Run the async health check inside a dedicated helper thread."""
 
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            return loop.run_until_complete(
-                asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-            )
-        finally:
-            asyncio.set_event_loop(None)
-            loop.close()
+        result_holder: dict[str, bool] = {}
+        error_holder: dict[str, Exception] = {}
+
+        def _runner() -> None:
+            try:
+                result_holder["value"] = asyncio.run(
+                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                )
+            except Exception as exc:  # noqa: BLE001 - propagate after thread joins
+                error_holder["error"] = exc
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if error_holder:
+            raise error_holder["error"]
+        return result_holder.get("value", False)
 
     def _restart_service_sync(self, service_name: str) -> None:
-        """Restart service using an isolated temporary event loop."""
-        if hasattr(asyncio, "Runner"):
-            try:
-                with asyncio.Runner() as runner:  # type: ignore[attr-defined]
-                    runner.run(
-                        asyncio.wait_for(self._restart_service(service_name), timeout=60)
-                    )
-                    return
-            except RuntimeError as exc:
-                self.logger.debug(
-                    "_restart_service_sync Runner fallback triggered for %s: %s",
-                    service_name,
-                    exc,
-                )
+        """Restart service in a helper thread to avoid event-loop conflicts."""
 
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(
-                asyncio.wait_for(self._restart_service(service_name), timeout=60)
-            )
-        finally:
-            asyncio.set_event_loop(None)
-            loop.close()
+        error_holder: dict[str, Exception] = {}
+
+        def _runner() -> None:
+            try:
+                asyncio.run(
+                    asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                )
+            except Exception as exc:  # noqa: BLE001 - propagate after thread joins
+                error_holder["error"] = exc
+
+        thread = threading.Thread(target=_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if error_holder:
+            raise error_holder["error"]
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""
