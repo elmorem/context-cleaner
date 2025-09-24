@@ -20,6 +20,7 @@ import json
 import logging
 import multiprocessing
 import os
+import sys
 import shutil
 import subprocess
 import threading
@@ -81,7 +82,7 @@ class DashboardConfigurationManager:
         """Get SocketIO configuration"""
         return {
             "cors_allowed_origins": "*",
-            "async_mode": "gevent"
+            "async_mode": "eventlet"
         }
 
     def get_basic_dashboard_metrics(self) -> Dict[str, Any]:
@@ -377,9 +378,18 @@ class DashboardServerManager:
             if gunicorn_path:
                 logger.info(f"✅ Gunicorn found at: {gunicorn_path}")
             else:
-                logger.error("❌ Gunicorn not found in PATH")
-                logger.info("💡 Install with: pip install gunicorn")
-                raise FileNotFoundError("gunicorn not found")
+                logger.warning("⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter")
+
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "gunicorn", "--version"],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info(f"✅ Gunicorn module available in interpreter: {sys.executable}")
+            except Exception as exc:
+                logger.error("❌ Gunicorn invocation failed: %s", exc)
+                raise
 
             # Create WSGI application entry point
             logger.info("📝 Creating WSGI entry point...")
@@ -403,14 +413,14 @@ class DashboardServerManager:
 
             # Build Gunicorn command
             cmd = [
+                sys.executable,
+                '-m',
                 'gunicorn',
                 '--bind', f'{host}:{port}',
                 '--workers', str(workers),
-                '--worker-class', 'gevent',
-                '--worker-connections', '1000',
+                '--worker-class', 'eventlet',
                 '--timeout', '300',
                 '--keep-alive', '5',
-                '--preload',
                 '--access-logfile', '-',
                 '--error-logfile', '-',
                 '--log-level', 'info',

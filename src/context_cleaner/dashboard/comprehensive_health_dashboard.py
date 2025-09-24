@@ -6,18 +6,17 @@ CLEAN-CONTEXT-GUIDE.md, enhanced with PR15.3 cache intelligence and professional
 formatting with color-coded health indicators.
 """
 
-# Import and patch gevent first, before any other imports
+# Eventlet monkey patching must occur before other imports when using Gunicorn workers.
 try:
-    import gevent
-    from gevent import monkey
-    monkey.patch_all()
-except ImportError:
-    # Fallback if gevent is not available
+    import eventlet  # type: ignore
+    eventlet.monkey_patch()
+except Exception:  # pragma: no cover - optional dependency
     pass
 
 import asyncio
 import json
 import os
+import sys
 import time
 import statistics
 import re
@@ -289,29 +288,13 @@ class ComprehensiveHealthDashboard:
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
             return response
 
-        # SocketIO for real-time updates with fallback async modes
-        socketio_async_mode = None
-        try:
-            # Try gevent first (preferred for production)
-            self.socketio = SocketIO(
-                self.app, cors_allowed_origins="*", async_mode="gevent"
-            )
-            socketio_async_mode = "gevent"
-        except Exception as e:
-            try:
-                # Fallback to threading
-                self.socketio = SocketIO(
-                    self.app, cors_allowed_origins="*", async_mode="threading"
-                )
-                socketio_async_mode = "threading"
-            except Exception as e2:
-                # Last resort: auto-detection
-                self.socketio = SocketIO(
-                    self.app, cors_allowed_origins="*"
-                )
-                socketio_async_mode = "auto"
-
-        print(f"SocketIO initialized with async_mode: {socketio_async_mode}")
+        # SocketIO for real-time updates using eventlet
+        self.socketio = SocketIO(
+            self.app,
+            cors_allowed_origins="*",
+            async_mode="eventlet",
+        )
+        logger.debug("SocketIO initialized with async_mode=%s", self.socketio.async_mode)
 
         # Dashboard configuration
         # Create default config if None provided (backwards compatibility)
@@ -2853,7 +2836,8 @@ class ComprehensiveHealthDashboard:
             logger.info("Shutting down development server...")
             self.stop()
         except Exception as e:
-            logger.error(f"Development server error: {e}")
+            logger.error("Development server error: %s", e)
+            logger.exception("Development server full traceback")
             raise
 
     def _should_use_production_server(self) -> bool:
@@ -2918,10 +2902,20 @@ class ComprehensiveHealthDashboard:
             if gunicorn_path:
                 logger.info(f"✅ Gunicorn found at: {gunicorn_path}")
             else:
-                logger.error("❌ Gunicorn not found in PATH")
-                logger.info("💡 Install with: pip install gunicorn")
-                raise FileNotFoundError("gunicorn not found")
-            
+                logger.warning("⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter")
+
+            # Ensure the current interpreter can load gunicorn
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "gunicorn", "--version"],
+                    check=True,
+                    capture_output=True,
+                )
+                logger.info(f"✅ Gunicorn module available in interpreter: {sys.executable}")
+            except Exception as exc:
+                logger.error("❌ Gunicorn invocation failed: %s", exc)
+                raise
+
             # Create WSGI application entry point
             logger.info("📝 Creating WSGI entry point...")
             self._create_wsgi_entry_point()
@@ -2937,11 +2931,16 @@ class ComprehensiveHealthDashboard:
             
             # Set environment variables
             env = os.environ.copy()
+            project_root = Path(__file__).resolve().parents[3]
             env.update({
                 'FLASK_ENV': 'production',
                 'CLAUDE_CODE_ENABLE_TELEMETRY': '1',
-                'PYTHONPATH': str(Path(__file__).parent.parent.parent),
+                'PYTHONPATH': os.pathsep.join(filter(None, [str(project_root), env.get('PYTHONPATH')]))
             })
+
+            # Ensure the Python bin directory is at the front so subcommands use matching interpreter
+            python_bin = Path(sys.executable).parent
+            env['PATH'] = os.pathsep.join([str(python_bin), env.get('PATH', '')])
             logger.info(f"🌍 Environment variables set:")
             logger.info(f"   FLASK_ENV: {env.get('FLASK_ENV')}")
             logger.info(f"   CLAUDE_CODE_ENABLE_TELEMETRY: {env.get('CLAUDE_CODE_ENABLE_TELEMETRY')}")
@@ -2962,8 +2961,8 @@ class ComprehensiveHealthDashboard:
                 else:
                     logger.error("❌ Failed to create WSGI module spec")
             except Exception as import_error:
-                logger.error(f"❌ WSGI application import test failed: {import_error}")
-                logger.error(f"🔍 Import error type: {type(import_error).__name__}")
+                logger.error("❌ WSGI application import test failed: %s", import_error)
+                logger.error("🔍 Import error type: %s", type(import_error).__name__)
             
             # Open browser if requested
             if open_browser:
@@ -2974,19 +2973,17 @@ class ComprehensiveHealthDashboard:
             
             # Gunicorn command
             cmd = [
+                sys.executable,
+                '-m',
                 'gunicorn',
                 '--bind', f'{host}:{port}',
                 '--workers', str(workers),
-                '--worker-class', 'gevent',
-                '--worker-connections', '1000',
-                '--timeout', '30',
-                '--keep-alive', '2',
-                '--max-requests', '1000',
-                '--max-requests-jitter', '50',
+                '--worker-class', 'eventlet',
+                '--timeout', '60',
+                '--keep-alive', '5',
                 '--access-logfile', '-',
                 '--error-logfile', '-',
                 '--log-level', 'info',
-                '--preload',
                 'context_cleaner_wsgi:application'
             ]
             
@@ -2994,14 +2991,10 @@ class ComprehensiveHealthDashboard:
             logger.info(f"📋 Full command: {' '.join(cmd)}")
             logger.info(f"🔗 Binding to: {host}:{port}")
             logger.info(f"👥 Workers: {workers}")
-            logger.info(f"⚡ Worker class: gevent")
-            logger.info(f"🔌 Worker connections: 1000")
-            logger.info(f"⏱️ Timeout: 30 seconds")
-            logger.info(f"💓 Keep-alive: 2 seconds")
-            logger.info(f"📄 Max requests per worker: 1000")
-            logger.info(f"🎲 Max requests jitter: 50")
+            logger.info(f"⚡ Worker class: eventlet")
+            logger.info(f"⏱️ Timeout: 60 seconds")
+            logger.info(f"💓 Keep-alive: 5 seconds")
             logger.info(f"📊 Log level: info")
-            logger.info(f"🚀 Preload app: enabled")
             logger.info(f"📦 WSGI module: context_cleaner_wsgi:application")
             
             logger.info("🔄 === STARTING GUNICORN SERVER ===")
@@ -3038,7 +3031,7 @@ class ComprehensiveHealthDashboard:
             logger.error(f"💥 Exception type: {type(e).__name__}")
             logger.error(f"💥 Exception message: {e}")
             import traceback
-            logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+            logger.error("📋 Traceback\\n%s", traceback.format_exc())
             logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
 
@@ -3085,19 +3078,22 @@ def create_app():
         logger.info("✅ Dashboard created successfully")
         logger.info("📡 Initializing SocketIO for production...")
         
-        # Ensure SocketIO is properly configured for gevent
-        if dashboard.socketio.async_mode != 'gevent':
-            logger.warning(f"⚠️ SocketIO async_mode is {dashboard.socketio.async_mode}, expected 'gevent'")
+        # Ensure SocketIO uses eventlet async mode
+        if dashboard.socketio.async_mode != 'eventlet':
+            logger.warning(
+                "⚠️ SocketIO async_mode is %s, expected 'eventlet'",
+                dashboard.socketio.async_mode,
+            )
         else:
-            logger.info("✅ SocketIO configured with gevent async mode")
+            logger.info("✅ SocketIO configured with eventlet async mode")
         
         logger.info("🎯 WSGI application ready")
         return dashboard.app, dashboard.socketio
         
     except Exception as e:
-        logger.error(f"❌ Error creating WSGI application: {e}")
+        logger.error("❌ Error creating WSGI application: %s", e)
         import traceback
-        logger.error(f"📋 Traceback:\n{traceback.format_exc()}")
+        logger.error("📋 Traceback:\n%s", traceback.format_exc())
         raise
 
 # Create application using factory pattern
@@ -3122,7 +3118,10 @@ if __name__ == "__main__":
     # Use SocketIO's run method for development
     socketio.run(app, host="0.0.0.0", port=8081, debug=False)
 '''
-        
+
+        # Normalize literal newline escapes in generated WSGI file
+        wsgi_content = wsgi_content.replace("Traceback:\n", "Traceback\\n")
+
         wsgi_path = Path("context_cleaner_wsgi.py")
         with open(wsgi_path, "w") as f:
             f.write(wsgi_content)
@@ -3136,6 +3135,12 @@ if __name__ == "__main__":
         if self._is_running:
             self._is_running = False
             self._stop_event.set()
+
+            try:
+                if hasattr(self, "socketio"):
+                    self.socketio.stop()
+            except Exception as exc:  # pragma: no cover - best effort shutdown
+                logger.debug("SocketIO stop encountered an error: %s", exc)
 
             if self._update_thread and self._update_thread.is_alive():
                 self._update_thread.join(timeout=5.0)

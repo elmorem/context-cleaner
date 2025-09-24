@@ -3,6 +3,13 @@
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
 Application Factory Pattern for Production Deployment
 """
+
+try:
+    import eventlet  # type: ignore
+    eventlet.monkey_patch()
+except Exception:  # pragma: no cover - optional dependency
+    pass
+
 import sys
 import os
 import logging
@@ -38,20 +45,22 @@ def create_app():
         logger.info("✅ Dashboard created successfully")
         logger.info("📡 Initializing SocketIO for production...")
         
-        # Ensure SocketIO is properly configured for gevent
-        if dashboard.socketio.async_mode != 'gevent':
-            logger.warning(f"⚠️ SocketIO async_mode is {dashboard.socketio.async_mode}, expected 'gevent'")
+        # Ensure SocketIO is properly configured for eventlet
+        if dashboard.socketio.async_mode != 'eventlet':
+            logger.warning(
+                "⚠️ SocketIO async_mode is %s, expected 'eventlet'",
+                dashboard.socketio.async_mode,
+            )
         else:
-            logger.info("✅ SocketIO configured with gevent async mode")
+            logger.info("✅ SocketIO configured with eventlet async mode")
         
         logger.info("🎯 WSGI application ready")
         return dashboard.app, dashboard.socketio
         
     except Exception as e:
-        logger.error(f"❌ Error creating WSGI application: {e}")
+        logger.error("❌ Error creating WSGI application: %s", e)
         import traceback
-        logger.error(f"📋 Traceback:
-{traceback.format_exc()}")
+        logger.error("📋 Traceback\n%s", traceback.format_exc())
         raise
 
 # Create application using factory pattern

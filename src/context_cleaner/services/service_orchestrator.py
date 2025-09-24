@@ -541,7 +541,7 @@ class ServiceOrchestrator:
                 summary["stopped"].append(service_name)
             else:
                 summary["failed"].append(service_name)
-                state_error = self.service_states[service_name].last_error
+                state_error = state.last_error if state else None
                 if state_error:
                     summary["errors"][service_name] = state_error
 
@@ -2934,42 +2934,55 @@ class ServiceOrchestrator:
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
     
     def _run_health_check_sync(self, service_name: str) -> bool:
-        """FIXED: Synchronous wrapper for _run_health_check method with proper event loop handling."""
-        try:
-            # Check if we're already in an event loop
-            asyncio.get_running_loop()
-            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
-            self.logger.warning(f"_run_health_check_sync called from within event loop for {service_name}")
-            return False
-        except RuntimeError:
-            # No event loop running - safe to create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        """Run health check in an isolated event loop regardless of existing loops."""
+        if hasattr(asyncio, "Runner"):
             try:
-                return loop.run_until_complete(
-                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                with asyncio.Runner() as runner:  # type: ignore[attr-defined]
+                    return runner.run(
+                        asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+                    )
+            except RuntimeError as exc:
+                self.logger.debug(
+                    "_run_health_check_sync Runner fallback triggered for %s: %s",
+                    service_name,
+                    exc,
                 )
-            finally:
-                loop.close()
+
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(
+                asyncio.wait_for(self._run_health_check(service_name), timeout=30)
+            )
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
 
     def _restart_service_sync(self, service_name: str) -> None:
-        """FIXED: Synchronous wrapper for _restart_service method with proper event loop handling."""
-        try:
-            # Check if we're already in an event loop
-            asyncio.get_running_loop()
-            # If we get here, we're in an event loop - this shouldn't happen for sync wrapper
-            self.logger.warning(f"_restart_service_sync called from within event loop for {service_name}")
-            return
-        except RuntimeError:
-            # No event loop running - safe to create one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        """Restart service using an isolated temporary event loop."""
+        if hasattr(asyncio, "Runner"):
             try:
-                loop.run_until_complete(
-                    asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                with asyncio.Runner() as runner:  # type: ignore[attr-defined]
+                    runner.run(
+                        asyncio.wait_for(self._restart_service(service_name), timeout=60)
+                    )
+                    return
+            except RuntimeError as exc:
+                self.logger.debug(
+                    "_restart_service_sync Runner fallback triggered for %s: %s",
+                    service_name,
+                    exc,
                 )
-            finally:
-                loop.close()
+
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                asyncio.wait_for(self._restart_service(service_name), timeout=60)
+            )
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""

@@ -2,23 +2,84 @@
 Main CLI interface for Context Cleaner.
 """
 
+# Eventlet monkey patching must happen before other imports when running under Gunicorn.
+try:
+    import eventlet  # type: ignore
+    eventlet.monkey_patch()
+except Exception:  # pragma: no cover - optional dependency
+    pass
+
 import asyncio
 import json
-import queue
+import os
 import sys
 import threading
 import time
 import webbrowser
 import concurrent.futures
+import logging
 from datetime import datetime
 from pathlib import Path
+from contextlib import suppress
 
 import click
 
 from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 from context_cleaner.dashboard.web_server import ProductivityDashboard
+from context_cleaner.services.service_supervisor import ServiceSupervisor, SupervisorConfig
+from context_cleaner.services.service_watchdog import ServiceWatchdog
+from context_cleaner.ipc.client import default_supervisor_endpoint
 from context_cleaner import __version__
+
+LOGGER = logging.getLogger(__name__)
+
+
+def _run_asyncio(coro):
+    """Run an async coroutine using an isolated event loop."""
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop and running_loop.is_running():
+        result_holder = {}
+        error_holder = {}
+
+        def _thread_runner() -> None:
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                result_holder["value"] = loop.run_until_complete(coro)
+            except Exception as exc:  # pragma: no cover - defensive
+                error_holder["error"] = exc
+            finally:
+                with suppress(Exception):
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                asyncio.set_event_loop(None)
+                loop.close()
+
+        thread = threading.Thread(target=_thread_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if "error" in error_holder:
+            raise error_holder["error"]
+        return result_holder.get("value")
+
+    if hasattr(asyncio, "Runner"):
+        with asyncio.Runner() as runner:  # type: ignore[attr-defined]
+            return runner.run(coro)
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+    finally:
+        with suppress(Exception):
+            loop.run_until_complete(loop.shutdown_asyncgens())
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 def version_callback(ctx, param, value):
@@ -103,7 +164,7 @@ def analyze(ctx, days, format, output):
 
     try:
         # Run analysis
-        results = asyncio.run(_run_productivity_analysis(config, days))
+        results = _run_asyncio(_run_productivity_analysis(config, days))
 
         # Format output
         if format == "json":
@@ -545,7 +606,7 @@ def start_monitoring(ctx, watch_dirs, no_observer):
             monitor.add_event_callback(console_callback)
 
         # Start monitoring
-        asyncio.run(monitor.start_monitoring())
+        _run_asyncio(monitor.start_monitoring())
 
         # Setup file system observer if not disabled
         if not no_observer:
@@ -578,7 +639,7 @@ def start_monitoring(ctx, watch_dirs, no_observer):
                 click.echo("✅ Monitoring stopped")
 
         # Run the monitoring loop
-        asyncio.run(run_monitoring())
+        _run_asyncio(run_monitoring())
 
     except Exception as e:
         click.echo(f"❌ Failed to start monitoring: {e}", err=True)
@@ -741,7 +802,7 @@ def live_dashboard(ctx, refresh):
                 click.echo("\n👋 Live dashboard stopped")
 
         # Run the live dashboard
-        asyncio.run(run_live_dashboard())
+        _run_asyncio(run_live_dashboard())
 
     except Exception as e:
         click.echo(f"❌ Live dashboard error: {e}", err=True)
@@ -1425,7 +1486,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             click.echo("🔄 Falling back to basic process cleanup")
         
         # Fallback to basic cleanup if orchestrator unavailable
-        asyncio.run(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
+        _run_asyncio(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
         return
     
     except Exception as e:
@@ -1433,7 +1494,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if not force:
             sys.exit(1)
         # Continue with basic cleanup
-        asyncio.run(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
+        _run_asyncio(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
         return
     
     # 1. ENHANCED PROCESS DISCOVERY PHASE
@@ -1589,7 +1650,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if supervisor_used and supervisor_success:
                 orchestrated_success = True
             else:
-                shutdown_summary = asyncio.run(
+                shutdown_summary = _run_asyncio(
                     orchestrator.shutdown_all(
                         docker_only=docker_only,
                         processes_only=processes_only,
@@ -2684,6 +2745,136 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         orchestrator.services.pop("jsonl_bridge", None)
     
     click.echo("✅ DEBUG: Service configuration completed")
+
+    supervisor_config = SupervisorConfig(
+        endpoint=default_supervisor_endpoint(),
+        audit_log_path=str(Path("logs/supervisor/audit.log")),
+    )
+    supervisor_state = {"instance": None}
+    supervisor_restart_lock = threading.RLock()
+    supervisor_loop = None
+    supervisor_thread = None
+    watchdog = None
+
+    orchestrator_shutdown_initiated = False
+
+    def _shutdown_orchestrator(**shutdown_kwargs) -> None:
+        nonlocal orchestrator_shutdown_initiated
+        if orchestrator_shutdown_initiated:
+            return
+        orchestrator_shutdown_initiated = True
+        try:
+            _run_orchestrator_coro(orchestrator.shutdown_all(**shutdown_kwargs))
+        except Exception as exc:
+            if verbose:
+                click.echo(f"⚠️  Orchestrator shutdown encountered an error: {exc}")
+
+    def _run_on_supervisor_loop(coro, *, timeout: float | None = None):
+        if supervisor_loop is None:
+            raise RuntimeError("Supervisor event loop is not running")
+
+        future = asyncio.run_coroutine_threadsafe(coro, supervisor_loop)
+        try:
+            return future.result(timeout)
+        except Exception:
+            future.cancel()
+            raise
+
+    def _run_orchestrator_coro(coro, *, timeout: float | None = None):
+        if supervisor_loop is not None:
+            return _run_on_supervisor_loop(coro, timeout=timeout)
+        return _run_asyncio(coro)
+
+    def _start_supervisor() -> bool:
+        nonlocal supervisor_loop, supervisor_thread
+        with supervisor_restart_lock:
+            if supervisor_state["instance"] is not None:
+                return True
+
+            try:
+                supervisor = ServiceSupervisor(orchestrator, supervisor_config)
+            except Exception as exc:
+                if verbose:
+                    click.echo(f"⚠️  Failed to initialize supervisor: {exc}")
+                return False
+
+            loop = asyncio.new_event_loop()
+
+            def _loop_runner() -> None:
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_forever()
+                finally:
+                    pending_tasks = [task for task in asyncio.all_tasks(loop) if not task.done()]
+                    for task in pending_tasks:
+                        task.cancel()
+                    if pending_tasks:
+                        loop.run_until_complete(asyncio.gather(*pending_tasks, return_exceptions=True))
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                    asyncio.set_event_loop(None)
+
+            thread = threading.Thread(
+                target=_loop_runner,
+                name="context-cleaner-supervisor",
+                daemon=True,
+            )
+            thread.start()
+
+            future = asyncio.run_coroutine_threadsafe(supervisor.start(), loop)
+            try:
+                future.result(timeout=10)
+            except Exception as exc:
+                if verbose:
+                    click.echo(f"⚠️  Supervisor start failed: {exc}")
+                loop.call_soon_threadsafe(loop.stop)
+                thread.join(timeout=5)
+                loop.close()
+                return False
+
+            supervisor_state["instance"] = supervisor
+            supervisor_loop = loop
+            supervisor_thread = thread
+            return True
+
+    def _stop_supervisor() -> None:
+        nonlocal supervisor_loop, supervisor_thread
+        with supervisor_restart_lock:
+            loop = supervisor_loop
+            thread = supervisor_thread
+            current = supervisor_state["instance"]
+            supervisor_state["instance"] = None
+
+            if current and loop:
+                try:
+                    future = asyncio.run_coroutine_threadsafe(current.stop(), loop)
+                    future.result(timeout=5)
+                except Exception as exc:
+                    if verbose:
+                        click.echo(f"⚠️  Supervisor stop encountered an error: {exc}")
+
+            if loop:
+                loop.call_soon_threadsafe(loop.stop)
+            if thread and thread.is_alive():
+                thread.join(timeout=5)
+            if loop:
+                loop.close()
+
+            supervisor_loop = None
+            supervisor_thread = None
+
+    def _restart_supervisor() -> None:
+        if verbose:
+            LOGGER.debug("Watchdog requested supervisor restart")
+        _stop_supervisor()
+        _start_supervisor()
+
+    if _start_supervisor():
+        watchdog = ServiceWatchdog(restart_callback=_restart_supervisor)
+        watchdog.start()
+    else:
+        supervisor_state["instance"] = None
+        if verbose:
+            click.echo("⚠️  Supervisor unavailable; using fallback event loop handling")
     
     try:
         # Start all services - handle event loop properly with enhanced debugging
@@ -2696,75 +2887,16 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
                 click.echo(f"❌ DEBUG: Exception in start_all_services(): {str(e)}")
                 raise
         
-        click.echo("🔍 DEBUG: Checking for running event loop...")
-        success = False
-        
-        # Try to handle event loops more robustly
-        # Import threading modules at the top to avoid scoping issues
-        import threading
-        import queue
-        
+        if supervisor_loop is not None:
+            click.echo("🔍 DEBUG: Starting services via supervisor event loop...")
+        else:
+            click.echo("🔍 DEBUG: Starting services via fallback event loop...")
         try:
-            # Check if there's already a running event loop
-            current_loop = None
-            try:
-                current_loop = asyncio.get_running_loop()
-            except RuntimeError:
-                current_loop = None
-            
-            if current_loop is not None:
-                click.echo("🔍 DEBUG: Found running event loop, using threaded execution...")
-                # If we get here, there's an active loop - run in new thread
-                
-                result_queue = queue.Queue()
-                exception_occurred = threading.Event()
-                
-                def run_async():
-                    new_loop = None
-                    try:
-                        new_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(new_loop)
-                        click.echo("🔍 DEBUG: Thread started with new event loop")
-                        result = new_loop.run_until_complete(start_services())
-                        result_queue.put(("success", result))
-                        click.echo("🔍 DEBUG: Thread completed successfully")
-                    except Exception as e:
-                        click.echo(f"❌ DEBUG: Thread encountered error: {str(e)}")
-                        exception_occurred.set()
-                        result_queue.put(("error", e))
-                    finally:
-                        if new_loop and not new_loop.is_closed():
-                            new_loop.close()
-                            click.echo("🔍 DEBUG: Thread event loop closed")
-                
-                thread = threading.Thread(target=run_async, daemon=False)
-                thread.start()
-                
-                # Wait for thread completion with timeout
-                thread.join(timeout=300)  # 5 minute timeout
-                
-                if thread.is_alive():
-                    click.echo("❌ DEBUG: Thread timeout - service startup taking too long")
-                    return False
-                
-                if not result_queue.empty():
-                    result_type, result = result_queue.get()
-                    if result_type == "error":
-                        raise result
-                    success = result
-                else:
-                    click.echo("❌ DEBUG: No result from thread")
-                    success = False
-                    
-            else:
-                # No event loop running, safe to use asyncio.run
-                click.echo("🔍 DEBUG: No event loop running, using asyncio.run()...")
-                success = asyncio.run(start_services())
-                
+            success = _run_orchestrator_coro(start_services())
         except Exception as e:
             click.echo(f"❌ DEBUG: Event loop handling failed: {str(e)}")
             raise
-        
+
         click.echo(f"🔍 DEBUG: Service startup result: {success}")
         
         if not success:
@@ -2819,20 +2951,35 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, confi
         
         except Exception as e:
             click.echo(f"❌ Failed to start dashboard: {e}", err=True)
-            asyncio.run(orchestrator.shutdown_all())
+            _shutdown_orchestrator()
             sys.exit(1)
     
     except KeyboardInterrupt:
         if verbose:
             click.echo("\n👋 Received shutdown signal")
-        asyncio.run(orchestrator.shutdown_all())
+        _shutdown_orchestrator()
+        if watchdog:
+            watchdog.stop()
+            watchdog = None
+        _stop_supervisor()
         if verbose:
             click.echo("✅ All services stopped cleanly")
 
     except Exception as e:
         click.echo(f"❌ Service orchestration failed: {e}", err=True)
-        asyncio.run(orchestrator.shutdown_all())
+        _shutdown_orchestrator()
+        if watchdog:
+            watchdog.stop()
+            watchdog = None
+        _stop_supervisor()
         sys.exit(1)
+
+    finally:
+        _shutdown_orchestrator()
+        if watchdog:
+            watchdog.stop()
+            watchdog = None
+        _stop_supervisor()
 
 
 

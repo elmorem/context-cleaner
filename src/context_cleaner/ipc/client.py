@@ -20,11 +20,15 @@ from .transport.unix import UnixSocketTransport
 from .transport.windows import WindowsPipeTransport
 
 
-def _default_endpoint() -> str:
+def default_supervisor_endpoint() -> str:
     if os.name == "nt":
         return r"\\\\.\\pipe\\context_cleaner_supervisor"
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
     return os.path.join(runtime_dir, "context-cleaner", "supervisor.sock")
+
+
+# Backwards compatibility for previous internal helper name
+_default_endpoint = default_supervisor_endpoint
 
 
 class SupervisorClient:
@@ -36,7 +40,7 @@ class SupervisorClient:
         transport: Optional[Transport] = None,
         auth_token: Optional[str] = None,
     ) -> None:
-        self.endpoint = endpoint or _default_endpoint()
+        self.endpoint = endpoint or default_supervisor_endpoint()
         self._transport = transport or self._build_transport()
         self._auth_token = auth_token or os.environ.get("CONTEXT_CLEANER_SUPERVISOR_TOKEN")
 

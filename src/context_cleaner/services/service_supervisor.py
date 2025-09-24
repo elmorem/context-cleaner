@@ -71,6 +71,8 @@ class SupervisorConfig:
     max_connections: int = 8
     auth_token: Optional[str] = None
     audit_log_path: Optional[str] = None
+    heartbeat_interval_seconds: int = 10
+    heartbeat_timeout_seconds: int = 30
 
 
 class ServiceSupervisor:
@@ -91,6 +93,8 @@ class ServiceSupervisor:
         self._supervisor_registered = False
         self._start_time: Optional[dt.datetime] = None
         self._last_registry_environment: Optional[Dict[str, Any]] = None
+        self._heartbeat_task: Optional[asyncio.Task[None]] = None
+        self._last_heartbeat_at: Optional[dt.datetime] = None
 
     async def start(self) -> None:
         if self._running:
@@ -107,6 +111,8 @@ class ServiceSupervisor:
         self._supervisor_registered = await asyncio.to_thread(self._register_supervisor_process)
         if not self._supervisor_registered:
             LOGGER.warning("Failed to register supervisor process in registry")
+        self._heartbeat_task = asyncio.create_task(self._emit_heartbeat_loop())
+        self._stack.push_async_callback(self._cancel_heartbeat)
 
         if self._config.endpoint.startswith("ipc://"):
             LOGGER.debug("Supervisor running without network listener (debug endpoint)")
@@ -138,6 +144,7 @@ class ServiceSupervisor:
             await asyncio.to_thread(self._update_registry_status, "stopped")
             await asyncio.to_thread(self._unregister_supervisor_process)
             self._supervisor_registered = False
+        self._heartbeat_task = None
 
     async def handle_request(
         self,
@@ -425,6 +432,9 @@ class ServiceSupervisor:
             "services_transitioning": services_summary.get("transitioning", {}),
             "required_failed": services_summary.get("required_failed", []),
             "optional_failed": services_summary.get("optional_failed", []),
+            "heartbeat_interval": self._config.heartbeat_interval_seconds,
+            "heartbeat_timeout": self._config.heartbeat_timeout_seconds,
+            "last_heartbeat_at": self._last_heartbeat_at.strftime(ISO8601) if self._last_heartbeat_at else None,
         }
         return {
             "supervisor": supervisor_info,
@@ -643,13 +653,49 @@ class ServiceSupervisor:
         else:
             LOGGER.debug("Registry metadata update for supervisor pid %s failed", os.getpid())
 
+    async def _emit_heartbeat_loop(self) -> None:
+        interval = max(1, self._config.heartbeat_interval_seconds)
+        while self._running:
+            try:
+                await asyncio.sleep(interval)
+                await asyncio.to_thread(self._publish_heartbeat)
+            except asyncio.CancelledError:  # pragma: no cover - cooperative cancellation
+                break
+            except Exception as exc:  # pragma: no cover - defensive logging
+                LOGGER.debug("Heartbeat update failed: %s", exc)
+
+    def _publish_heartbeat(self) -> None:
+        if not self._registry or not self._supervisor_registered:
+            return
+        now = dt.datetime.now(dt.timezone.utc)
+        base_environment = self._build_registry_environment()
+        base_environment["HEARTBEAT_AT"] = now.strftime(ISO8601)
+        updated = self._registry.update_process_metadata(
+            os.getpid(),
+            environment_vars=json.dumps(base_environment),
+            last_health_check=now.isoformat(),
+        )
+        if updated:
+            self._last_registry_environment = base_environment
+            self._last_heartbeat_at = now
+
+    async def _cancel_heartbeat(self) -> None:
+        if self._heartbeat_task:
+            self._heartbeat_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._heartbeat_task
+
     def _build_registry_environment(
         self,
         summary: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        now = dt.datetime.now(dt.timezone.utc)
         environment: Dict[str, Any] = {
             "IPC_ENDPOINT": self._config.endpoint,
-            "UPDATED_AT": dt.datetime.now(dt.timezone.utc).strftime(ISO8601),
+            "UPDATED_AT": now.strftime(ISO8601),
+            "HEARTBEAT_AT": now.strftime(ISO8601),
+            "HEARTBEAT_INTERVAL": self._config.heartbeat_interval_seconds,
+            "HEARTBEAT_TIMEOUT": self._config.heartbeat_timeout_seconds,
         }
         if self._audit_logger:
             environment["AUDIT_LOG"] = str(self._audit_logger.path)
