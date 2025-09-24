@@ -532,6 +532,25 @@ class ProcessRegistryDatabase:
             logger.error(f"Failed to get registry stats: {e}")
             return {}
 
+    def prune_processes(self, *, service_type: Optional[str] = None) -> int:
+        """Delete processes from the registry, optionally filtered by service type."""
+        try:
+            with self._get_connection() as conn:
+                if service_type:
+                    cursor = conn.execute(
+                        "DELETE FROM processes WHERE service_type = ?",
+                        (service_type,),
+                    )
+                else:
+                    cursor = conn.execute("DELETE FROM processes")
+                conn.commit()
+                removed = cursor.rowcount
+                logger.info("Pruned %s registry entries (service_type=%s)", removed, service_type or "all")
+                return removed
+        except Exception as exc:
+            logger.error("Failed to prune registry entries: %s", exc)
+            return 0
+
 
 class ProcessDiscoveryEngine:
     """Engine for discovering existing Context Cleaner processes."""

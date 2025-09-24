@@ -274,6 +274,23 @@ def cleanup_stale(ctx, dry_run):
         sys.exit(1)
 
 
+@debug.command("registry-prune")
+@click.option("--service-type", help="Only remove entries matching this service type")
+@click.pass_context
+def registry_prune(ctx, service_type):
+    """Remove registry entries (useful for clearing stale supervisor/service records)."""
+    try:
+        registry = get_process_registry()
+        removed = registry.prune_processes(service_type=service_type)
+        if service_type:
+            click.echo(f"🗑️ Pruned {removed} '{service_type}' entries from registry")
+        else:
+            click.echo(f"🗑️ Pruned {removed} entries from registry")
+    except Exception as exc:
+        click.echo(f"❌ Error pruning registry entries: {exc}", err=True)
+        sys.exit(1)
+
+
 @debug.command("health-check")
 @click.option("--update-registry", is_flag=True, help="Update health status in registry")
 @click.pass_context
