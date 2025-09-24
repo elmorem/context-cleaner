@@ -7,11 +7,11 @@ formatting with color-coded health indicators.
 """
 
 # Eventlet monkey patching must occur before other imports when using Gunicorn workers.
-try:
-    import eventlet  # type: ignore
-    eventlet.monkey_patch()
-except Exception:  # pragma: no cover - optional dependency
-    pass
+from context_cleaner.utils.eventlet_support import ensure_eventlet_monkey_patch
+
+ensure_eventlet_monkey_patch()
+import logging
+logging.getLogger(__name__).debug("Eventlet monkey patch ensured in comprehensive health dashboard module")
 
 import asyncio
 import json

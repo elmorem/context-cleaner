@@ -2934,46 +2934,79 @@ class ServiceOrchestrator:
             discovery_results["summary"] = f"Discovery failed: {str(e)}"
     
     def _run_health_check_sync(self, service_name: str) -> bool:
-        """Run the async health check inside a dedicated helper thread."""
+        """Run the async health check in an isolated native thread."""
 
-        result_holder: dict[str, bool] = {}
-        error_holder: dict[str, Exception] = {}
+        self.logger.debug("Health monitor scheduling check for %s", service_name)
 
-        def _runner() -> None:
+        def runner() -> bool:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                result_holder["value"] = asyncio.run(
+                result = loop.run_until_complete(
                     asyncio.wait_for(self._run_health_check(service_name), timeout=30)
                 )
-            except Exception as exc:  # noqa: BLE001 - propagate after thread joins
-                error_holder["error"] = exc
+                return bool(result)
+            finally:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    pass
+                asyncio.set_event_loop(None)
+                loop.close()
 
-        thread = threading.Thread(target=_runner, daemon=True)
-        thread.start()
-        thread.join()
-
-        if error_holder:
-            raise error_holder["error"]
-        return result_holder.get("value", False)
+        result = self._execute_blocking_callable(runner)
+        self.logger.debug("Health monitor completed check for %s with result=%s", service_name, result)
+        return result
 
     def _restart_service_sync(self, service_name: str) -> None:
-        """Restart service in a helper thread to avoid event-loop conflicts."""
+        """Restart a service using an isolated native thread."""
 
-        error_holder: dict[str, Exception] = {}
+        self.logger.debug("Health monitor scheduling restart for %s", service_name)
 
-        def _runner() -> None:
+        def runner() -> None:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                asyncio.run(
+                loop.run_until_complete(
                     asyncio.wait_for(self._restart_service(service_name), timeout=60)
                 )
-            except Exception as exc:  # noqa: BLE001 - propagate after thread joins
-                error_holder["error"] = exc
+            finally:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    pass
+                asyncio.set_event_loop(None)
+                loop.close()
 
-        thread = threading.Thread(target=_runner, daemon=True)
-        thread.start()
-        thread.join()
+        self._execute_blocking_callable(runner)
+        self.logger.debug("Health monitor restart finished for %s", service_name)
 
-        if error_holder:
-            raise error_holder["error"]
+    def _execute_blocking_callable(self, func: callable) -> Any:
+        """Execute a callable in a native thread or eventlet thread pool."""
+
+        try:
+            import eventlet  # type: ignore
+
+            self.logger.debug("Executing blocking callable via eventlet.tpool")
+            return eventlet.tpool.execute(func)
+        except Exception:
+            self.logger.debug("Executing blocking callable via native thread fallback")
+            result_holder: dict[str, Any] = {}
+            error_holder: dict[str, Exception] = {}
+
+            def thread_runner() -> None:
+                try:
+                    result_holder["value"] = func()
+                except Exception as exc:  # noqa: BLE001
+                    error_holder["error"] = exc
+
+            thread = threading.Thread(target=thread_runner, daemon=True)
+            thread.start()
+            thread.join()
+
+            if error_holder:
+                raise error_holder["error"]
+            return result_holder.get("value")
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""

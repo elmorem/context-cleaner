@@ -2,12 +2,12 @@
 Main CLI interface for Context Cleaner.
 """
 
-# Eventlet monkey patching must happen before other imports when running under Gunicorn.
-try:
-    import eventlet  # type: ignore
-    eventlet.monkey_patch()
-except Exception:  # pragma: no cover - optional dependency
-    pass
+import logging
+
+from context_cleaner.utils.eventlet_support import ensure_eventlet_monkey_patch
+
+ensure_eventlet_monkey_patch(patch_threads=False)
+logging.getLogger(__name__).debug("Eventlet monkey patch ensured in CLI entrypoint")
 
 import asyncio
 import json
@@ -17,7 +17,6 @@ import threading
 import time
 import webbrowser
 import concurrent.futures
-import logging
 from datetime import datetime
 from pathlib import Path
 from contextlib import suppress
