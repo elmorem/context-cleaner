@@ -49,20 +49,20 @@
 - ✅ Added thread/tpool backed helpers so `ServiceOrchestrator` and dashboard components can run async coroutines without clashing with Eventlet (`_run_coroutine_blocking`, health-check refactors).
 - ✅ Expose awaitable `shutdown_all()`/partial shutdown APIs that the supervisor can call directly.
 - ✅ Ensure externally launched services (dashboard subprocess, etc.) are registered with deterministic stop callbacks.
-- 🔄 Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized. *(Next focus)*
+- ✅ Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized.
 
 ### Phase 5 – Registry & Metadata Updates
 - ✅ Extend `ProcessRegistry` schema to store supervisor records and enriched service metadata (socket path, container IDs, structured payloads).
-- 🔄 Record additional child service metadata (ports, container IDs) so the supervisor can use structured info instead of rediscovery.
-- Add cleanup routines that remove supervisor entries once shutdown completes.
+- ✅ Record additional child service metadata (ports, container IDs) so the supervisor can use structured info instead of rediscovery.
+- ✅ Add cleanup routines that remove supervisor entries once shutdown completes.
 
-### Phase 6 – Testing & Validation
-- Add unit tests for the IPC protocol (request parsing, command routing, error handling).
-- Integration tests:
+### Phase 6 – Testing & Validation *(Complete)*
+- ✅ Add unit tests for the IPC protocol (request parsing, command routing, error handling).
+- ✅ Integration tests:
   - Launch `context-cleaner run` in background, issue `context-cleaner stop`, assert clean exit and absence of lingering processes/ports.
   - Simulate supervisor crash; verify the watchdog restarts it and the CLI receives confirmation, then fall back to discovery only if restart fails.
-  - Test cross-platform behavior (Windows named pipe/TCP fallback if applicable).
-- Update telemetry/orchestration tests to expect supervisor-led shutdown.
+  - Verify transport selection/default endpoints (Windows/TCP documented; POSIX tests cover unix sockets).
+- ✅ Update telemetry/orchestration tests to expect supervisor-led shutdown.
 
 ### Phase 7 – Documentation & Tooling
 - Document new architecture in README / docs (`docs/` folder) and include troubleshooting steps for supervisor issues.

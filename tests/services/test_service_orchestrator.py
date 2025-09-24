@@ -13,6 +13,7 @@ import subprocess
 import socket
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock, patch, MagicMock, mock_open
 from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
@@ -189,6 +190,20 @@ class TestServiceOrchestrator:
         
         assert clickhouse_index < dashboard_index
         assert jsonl_bridge_index < dashboard_index
+
+    @pytest.mark.asyncio
+    async def test_shutdown_all_sets_flag(self):
+        orchestrator = ServiceOrchestrator()
+        orchestrator.services = {}
+        orchestrator.service_states = {}
+        orchestrator.port_registry = SimpleNamespace(deallocate_port=lambda *args, **kwargs: False)
+        orchestrator.running = True
+        orchestrator.shutdown_event.clear()
+
+        summary = await orchestrator.shutdown_all()
+
+        assert summary["success"] is True
+        assert orchestrator.shutdown_event.is_set()
 
     def test_get_service_status(self):
         """Test getting comprehensive service status."""
