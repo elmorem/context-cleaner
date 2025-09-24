@@ -1181,11 +1181,13 @@ class ServiceOrchestrator:
             # Unregister from process registry if we had a PID
             if state.pid and state.pid != os.getpid():
                 self.process_registry.unregister_process(state.pid)
-            
-            state.process = None
-            state.pid = None
-            state.health_status = False
-            self._update_process_registry_metadata(service_name, state)
+                state.process = None
+                state.pid = None
+            else:
+                state.process = None
+                state.pid = None
+                state.health_status = False
+                self._update_process_registry_metadata(service_name, state)
             
             return success
             

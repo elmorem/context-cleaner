@@ -119,6 +119,48 @@ context-cleaner --verbose start
 📈 Use 'context-cleaner dashboard' to view insights
 ```
 
+### **`run`** ⭐ UPDATED
+Full-service orchestrator entry point. Bootstraps the supervisor, orchestrator,
+Docker services, JSONL bridge, dashboard, and watchdog monitoring in one command.
+
+```bash
+context-cleaner run [OPTIONS]
+
+Options:
+  --dashboard-port, -p INTEGER   Dashboard port (default: 8110)
+  --no-browser                   Don't open browser automatically
+  --no-docker                    Skip Docker services (ClickHouse + OTEL)
+  --no-jsonl                     Skip JSONL processing service
+  --status-only                  Show service status and exit
+  --json                         With --status-only, output machine-readable JSON
+  --config-file PATH             Load custom configuration file
+  --dev-mode                     Enable development mode with verbose logging
+  --help                         Show help message
+```
+
+**Examples:**
+```bash
+# Start everything (default behaviour)
+context-cleaner run
+
+# Quick status snapshot without launching services
+context-cleaner run --status-only
+
+# Structured status output for tooling / dashboards
+context-cleaner run --status-only --json | jq '.watchdog'
+
+# Skip Docker-based telemetry stack
+context-cleaner run --no-docker
+```
+
+**Status output:**
+
+- Text mode highlights orchestrator state, each managed service (with health icons),
+  and—when the supervisor is reachable—the watchdog summary (heartbeat, last restart,
+  recent history). If the supervisor is offline, the watchdog block is omitted.
+- JSON mode returns a schema with `orchestrator`, `services`, `services_summary`,
+  and `watchdog` keys so CI tooling or dashboards can consume the data directly.
+
 ### **`dashboard`**
 Launch the productivity dashboard web interface.
 
