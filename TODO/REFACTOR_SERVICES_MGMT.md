@@ -64,10 +64,10 @@
   - Verify transport selection/default endpoints (Windows/TCP documented; POSIX tests cover unix sockets).
 - ✅ Update telemetry/orchestration tests to expect supervisor-led shutdown.
 
-### Phase 7 – Documentation & Tooling
-- Document new architecture in README / docs (`docs/` folder) and include troubleshooting steps for supervisor issues.
-- Update `stop-context-cleaner.sh` (if kept) to call the IPC endpoint first, then drop back to brute-force termination.
-- Provide developer instructions for restarting the supervisor during local development.
+### Phase 7 – Documentation & Tooling *(In Progress)*
+- ✅ Document new architecture in README / docs (`docs/` folder) and include troubleshooting steps for supervisor issues.
+- ✅ Update shutdown guidance to prefer CLI (`STOP_CONTEXT_CLEANER.md`) and remove the legacy script.
+- ✅ Provide developer instructions for restarting the supervisor during local development.
 
 ### Phase 8 – Rollout & Cleanup
 - Behind a feature flag/env var gate the new path while testing.

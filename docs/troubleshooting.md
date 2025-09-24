@@ -600,3 +600,45 @@ For enterprise support, custom integrations, and consulting services, contact te
 **Context Cleaner Troubleshooting Guide** - Comprehensive problem-solving for v0.2.0
 
 *Still having issues? Check the [FAQ](faq.md) or [CLI Reference](cli-reference.md) for additional help.*
+# ✅ **Supervisor & Watchdog**
+
+### **Supervisor unavailable / fallback triggered**
+
+**Symptom:** `context-cleaner run` prints `⚠️ Supervisor unavailable; using fallback event loop handling` and watchdog telemetry is missing.
+
+**Checklist:**
+
+1. **Stale socket file** – remove the unix socket and retry:
+   ```bash
+   rm -f $(python -c "from context_cleaner.ipc.client import default_supervisor_endpoint; print(default_supervisor_endpoint())")
+   ```
+2. **Previous supervisor still running** – stop all services:
+   ```bash
+   context-cleaner stop --force --no-discovery
+   ```
+3. **Permissions** – ensure `$XDG_RUNTIME_DIR/context-cleaner` exists and is writable.
+4. **Retry** – launch again with `context-cleaner run` once the above checks pass.
+
+### **Watchdog reports stale heartbeat**
+
+`context-cleaner run --status-only --json` exposes restart telemetry under the `watchdog` key.
+
+- If `running: false` or `last_heartbeat_at` is older than 30s, inspect the restart history:
+  ```bash
+  context-cleaner run --status-only --json | jq '.watchdog'
+  ```
+- The watchdog automatically attempts up to three restarts with backoff. If restarts fail, clean up manually:
+  ```bash
+  context-cleaner stop --force
+  context-cleaner run
+  ```
+- To prune stale registry entries:
+  ```bash
+  context-cleaner debug registry prune --type supervisor
+  ```
+
+### **Checking supervisor health**
+
+- Text mode: `context-cleaner run --status-only` now prints a human-readable watchdog section.
+- JSON mode: `context-cleaner run --status-only --json | jq '.watchdog'`.
+- Audit log: review `logs/supervisor/audit.log` for recent activity.

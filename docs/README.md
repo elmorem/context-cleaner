@@ -25,6 +25,7 @@ Welcome to the comprehensive documentation for Context Cleaner, the privacy-firs
 
 ### **Development**
 - [Architecture Overview](development/architecture.md) - System design and components
+- [Supervisor Architecture](development/supervisor.md) - IPC supervisor, watchdog, and registry integration
 - [Contributing Guide](development/contributing.md) - How to contribute to Context Cleaner
 - [Testing Guide](development/testing.md) - Running and writing tests
 - [Release Process](development/releases.md) - Version management and deployment
