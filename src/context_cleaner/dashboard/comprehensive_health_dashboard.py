@@ -13,6 +13,13 @@ ensure_eventlet_monkey_patch()
 import logging
 logging.getLogger(__name__).debug("Eventlet monkey patch ensured in comprehensive health dashboard module")
 
+try:
+    import eventlet  # type: ignore
+    from eventlet import patcher
+except Exception:  # pragma: no cover - optional dependency
+    eventlet = None
+    patcher = None
+
 import asyncio
 import json
 import os
@@ -24,10 +31,14 @@ import threading
 import webbrowser
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Union, Callable
+from typing import Dict, List, Optional, Tuple, Any, Union, Callable, Awaitable
 from dataclasses import dataclass, asdict, field
 from enum import Enum
-import logging
+
+if patcher is not None:
+    _native_threading = patcher.original("threading")
+else:
+    _native_threading = threading
 
 # Flask and SocketIO imports for real-time dashboard
 from flask import Flask, render_template, jsonify, request
@@ -422,6 +433,46 @@ class ComprehensiveHealthDashboard:
             f"(telemetry: {'enabled' if self.telemetry_enabled else 'disabled'})"
         )
 
+    def _run_coroutine_blocking(self, coroutine: Awaitable[Any]) -> Any:
+        """Execute an asyncio coroutine inside a native thread or eventlet tpool."""
+
+        def runner() -> Any:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(coroutine)
+                return result
+            finally:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    logger.debug("shutdown_asyncgens failed in dashboard helper", exc_info=True)
+                asyncio.set_event_loop(None)
+                loop.close()
+
+        if eventlet is not None and getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
+            logger.debug("Running dashboard coroutine via eventlet.tpool")
+            return eventlet.tpool.execute(runner)
+        elif eventlet is not None and not getattr(eventlet, "tpool", None):
+            logger.warning("Eventlet detected without tpool support; falling back to native threading")
+
+        result_holder: Dict[str, Any] = {}
+        error_holder: Dict[str, BaseException] = {}
+
+        def thread_runner() -> None:
+            try:
+                result_holder["value"] = runner()
+            except BaseException as exc:  # noqa: BLE001
+                error_holder["error"] = exc
+
+        thread = _native_threading.Thread(target=thread_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if error_holder:
+            raise error_holder["error"]
+        return result_holder.get("value")
+
     def _get_templates_dir(self) -> str:
         """Get templates directory path."""
         return str(Path(__file__).parent / "templates")
@@ -473,16 +524,9 @@ class ComprehensiveHealthDashboard:
         def get_health_report():
             """Get comprehensive health report."""
             try:
-                # Run async method in thread
-                import asyncio
-
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                report = loop.run_until_complete(
+                report = self._run_coroutine_blocking(
                     self.generate_comprehensive_health_report()
                 )
-                loop.close()
-
                 return jsonify(asdict(report))
             except Exception as e:
                 logger.error(f"Health report generation failed: {e}")
@@ -492,12 +536,9 @@ class ComprehensiveHealthDashboard:
         def get_productivity_summary():
             """Get productivity summary data."""
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                data = loop.run_until_complete(
+                data = self._run_coroutine_blocking(
                     self.data_sources["productivity"].get_data()
                 )
-                loop.close()
                 return jsonify(data)
             except Exception as e:
                 logger.error(f"Productivity summary failed: {e}")
@@ -1594,21 +1635,13 @@ class ComprehensiveHealthDashboard:
                                 logger.info(f"Context Rot Meter: widget_enum={widget_enum}, type={type(widget_enum)}")
                                 logger.info(f"Context Rot Meter: calling get_widget_data with session_id={session_id}, time_range_days={time_range_days}")
                             
-                            # Use thread-safe async execution instead of event loop
-                            try:
-                                data = asyncio.run(
-                                    self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
+                            data = self._run_coroutine_blocking(
+                                self.telemetry_widgets.get_widget_data(
+                                    widget_enum,
+                                    session_id=session_id,
+                                    time_range_days=time_range_days,
                                 )
-                            except RuntimeError:
-                                # If we're in an async context, use thread executor
-                                import concurrent.futures
-                                with concurrent.futures.ThreadPoolExecutor() as executor:
-                                    future = executor.submit(
-                                        lambda: asyncio.run(
-                                            self.telemetry_widgets.get_widget_data(widget_enum, session_id=session_id, time_range_days=time_range_days)
-                                        )
-                                    )
-                                    data = future.result(timeout=30)
+                            )
                             return jsonify({
                                 'widget_type': data.widget_type.value,
                                 'title': data.title,
@@ -1618,13 +1651,12 @@ class ComprehensiveHealthDashboard:
                                 'last_updated': data.last_updated.isoformat()
                             })
                         except Exception as e:
-                            loop.close()
                             import traceback
                             logger.error(f"Error getting telemetry widget {widget_type}: {e}")
                             logger.error(f"Traceback: {traceback.format_exc()}")
                             if widget_type == 'context-rot-meter':
                                 logger.error(f"Context Rot Meter specific error: widget_enum={widget_enum}, exception_type={type(e)}")
-                            
+
                 return jsonify({
                     'title': f'{widget_type.replace("-", " ").title()}',
                     'status': 'operational',

@@ -3,10 +3,6 @@
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
 Application Factory Pattern for Production Deployment
 """
-
-from context_cleaner.utils.eventlet_support import ensure_eventlet_monkey_patch
-
-ensure_eventlet_monkey_patch()
 import sys
 import os
 import logging
@@ -18,7 +14,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-logger.debug("Eventlet monkey patch ensured in WSGI entrypoint")
 
 # Add src directory to Python path
 src_path = Path(__file__).parent / "src"

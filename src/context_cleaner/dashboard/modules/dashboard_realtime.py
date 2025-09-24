@@ -17,11 +17,23 @@ import asyncio
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Any, Callable, Optional, List
+from typing import Dict, Any, Callable, Optional, List, Awaitable
 from dataclasses import asdict
 from context_cleaner.api.websocket import EventBus, ConnectionManager
 
+try:
+    import eventlet  # type: ignore
+    from eventlet import patcher
+except Exception:  # pragma: no cover - optional dependency
+    eventlet = None
+    patcher = None
+
 logger = logging.getLogger(__name__)
+
+if patcher is not None:
+    _native_threading = patcher.original("threading")
+else:
+    _native_threading = threading
 
 
 class RealtimeEventSerializer:
@@ -77,6 +89,50 @@ class DashboardRealtime:
 
         # Initialize serializer
         self.serializer = RealtimeEventSerializer()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _run_coroutine_blocking(self, coroutine: Awaitable[Any]) -> Any:
+        """Run the coroutine in a real OS thread to avoid eventlet loop conflicts."""
+
+        def runner() -> Any:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(coroutine)
+                return result
+            finally:
+                try:
+                    loop.run_until_complete(loop.shutdown_asyncgens())
+                except Exception:
+                    logger.debug("shutdown_asyncgens failed", exc_info=True)
+                asyncio.set_event_loop(None)
+                loop.close()
+
+        if eventlet is not None and getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
+            logger.debug("Running coroutine via eventlet.tpool")
+            return eventlet.tpool.execute(runner)
+        elif eventlet is not None and not getattr(eventlet, "tpool", None):
+            logger.warning("Eventlet detected without tpool support; falling back to native threading")
+
+        result_holder: Dict[str, Any] = {}
+        error_holder: Dict[str, BaseException] = {}
+
+        def thread_runner() -> None:
+            try:
+                result_holder["value"] = runner()
+            except BaseException as exc:  # noqa: BLE001
+                error_holder["error"] = exc
+
+        thread = _native_threading.Thread(target=thread_runner, daemon=True)
+        thread.start()
+        thread.join()
+
+        if error_holder:
+            raise error_holder["error"]
+        return result_holder.get("value")
 
     def setup_eventbus_handlers(self) -> None:
         """
@@ -206,26 +262,21 @@ class DashboardRealtime:
             logger.info("Dashboard client connected via SocketIO")
             self.active_connections.add(id(self))  # Track connection
 
-            try:
-                # Send initial comprehensive health data
-                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    report = loop.run_until_complete(
-                        self.dashboard.generate_comprehensive_health_report()
-                    )
-                    loop.close()
+            def _broadcast_initial_health():
+                try:
+                    if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                        report = self._run_coroutine_blocking(
+                            self.dashboard.generate_comprehensive_health_report()
+                        )
+                        safe_report = self.serializer.serialize_health_report(report)
+                        socketio.emit("health_update", safe_report)
+                    else:
+                        socketio.emit("health_update", {"status": "dashboard_unavailable"})
+                except Exception as exc:
+                    logger.error("Initial health data broadcast failed: %s", exc, exc_info=True)
+                    socketio.emit("error", {"message": str(exc)})
 
-                    # Serialize and emit
-                    safe_report = self.serializer.serialize_health_report(report)
-                    socketio.emit("health_update", safe_report)
-                else:
-                    socketio.emit("health_update", {"status": "dashboard_unavailable"})
-
-            except Exception as e:
-                logger.error(f"Initial health data broadcast failed: {e}")
-                socketio.emit("error", {"message": str(e)})
+            socketio.start_background_task(_broadcast_initial_health)
 
         @socketio.on("disconnect")
         def handle_disconnect():
@@ -240,25 +291,21 @@ class DashboardRealtime:
         @socketio.on("health_update_request")
         def handle_health_update_request():
             """Handle health update requests from clients"""
-            try:
-                # Get fresh health data
-                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    report = loop.run_until_complete(
-                        self.dashboard.generate_comprehensive_health_report()
-                    )
-                    loop.close()
 
-                    # Serialize and emit
-                    safe_report = self.serializer.serialize_health_report(report)
-                    socketio.emit("health_update", safe_report)
-                else:
-                    socketio.emit("health_update", {"status": "dashboard_unavailable"})
-            except Exception as e:
-                logger.error(f"Health update request failed: {e}")
-                socketio.emit("error", {"message": str(e)})
+            def _broadcast_health_update():
+                try:
+                    if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                        report = self._run_coroutine_blocking(
+                            self.dashboard.generate_comprehensive_health_report()
+                        )
+                        safe_report = self.serializer.serialize_health_report(report)
+                        socketio.emit("health_update", safe_report)
+                    else:
+                        socketio.emit("health_update", {"status": "dashboard_unavailable"})
+                except Exception as exc:
+                    logger.error("Health update request failed: %s", exc, exc_info=True)
+
+            socketio.start_background_task(_broadcast_health_update)
 
         logger.info("✅ SocketIO event handlers configured for real-time dashboard")
 
@@ -274,12 +321,9 @@ class DashboardRealtime:
                     continue
 
                 # Generate comprehensive health report
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                report = loop.run_until_complete(
+                report = self._run_coroutine_blocking(
                     self.dashboard.generate_comprehensive_health_report()
                 )
-                loop.close()
 
                 # Store in performance history
                 health_data = {

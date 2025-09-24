@@ -45,11 +45,11 @@
   - If IPC connection fails, fall back to the existing discovery-based shutdown (after warning the user).
 - Ensure exit codes reflect success/failure of the supervisor-driven shutdown.
 
-### Phase 4 – Orchestrator Enhancements
-- Expose async-safe methods on `ServiceOrchestrator` for `shutdown_all()` that the supervisor can await (rather than rebuilding a fresh orchestrator).
-- Provide hooks for partial shutdown (Docker only, processes only) to match existing CLI flags.
-- Make sure services launched externally (dashboard subprocess, etc.) are registered so the supervisor can terminate them deterministically.
-- Introduce a lightweight watchdog (separate process or system service) that monitors the supervisor and restarts it with preserved state if a failure is detected.
+### Phase 4 – Orchestrator Enhancements *(In Progress)*
+- ✅ Added thread/tpool backed helpers so `ServiceOrchestrator` and dashboard components can run async coroutines without clashing with Eventlet (`_run_coroutine_blocking`, health-check refactors).
+- ☐ Expose awaitable `shutdown_all()`/partial shutdown APIs that the supervisor can call directly (still needed).
+- ☐ Ensure externally launched services (dashboard subprocess, etc.) are registered with deterministic stop callbacks.
+- ☐ Introduce watchdog heartbeat monitoring and restart logic once supervisor APIs are stabilized.
 
 ### Phase 5 – Registry & Metadata Updates
 - Extend `ProcessRegistry` schema to store supervisor records (process type `supervisor`, socket path, start time).
@@ -210,8 +210,9 @@
    - Replace heuristic stop path with IPC client using new protocol, support streaming progress output, retain discovery fallback via `--fallback`.
    - Tests: CLI tests verifying success, authentication errors, fallback activation.
 
-6. **PR 6 – Orchestrator Async APIs & Service Registration (Phase 4A)**
-   - Expose awaitable `shutdown_all`, register external services/ports/container IDs, emit heartbeat data for future watchdog use.
+6. **PR 6 – Orchestrator Async APIs & Service Registration (Phase 4A)** *(Partially in progress)*
+   - ✅ Eventlet/asyncio compatibility helpers added for health checks and telemetry workflows.
+   - ☐ Expose awaitable `shutdown_all`, register external services/ports/container IDs, emit heartbeat data for future watchdog use.
    - Tests: orchestrator unit tests, integration test ensuring supervisor commands drive graceful shutdown.
 
 7. **PR 7 – Watchdog Epic (Phase 4B, optional rollout)**
