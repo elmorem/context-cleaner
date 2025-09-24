@@ -94,6 +94,10 @@ See `docs/troubleshooting.md` (Supervisor & Watchdog section) for:
   Windows). Tests covering endpoint detection live in
   `tests/ipc/test_client_transport.py`.
 
+* Feature flag: set `CONTEXT_CLEANER_ENABLE_SUPERVISOR_ORCHESTRATION=false` to
+  disable supervisor integration and exercise the legacy orchestrator-only
+  shutdown path.
+
 ## Manual Restart Procedures
 
 During development you may want to restart only the supervisor without a full

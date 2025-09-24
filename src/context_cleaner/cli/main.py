@@ -158,6 +158,7 @@ def analyze(ctx, days, format, output):
     """Analyze productivity trends and generate insights."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
+    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
 
     if verbose:
         click.echo(f"📈 Analyzing productivity data for the last {days} days...")
@@ -1512,21 +1513,12 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             click.echo("✅ Service orchestrator and discovery engine initialized")
     
     except ImportError as e:
-        if verbose:
-            click.echo(f"⚠️  Service orchestrator not available: {e}")
-            click.echo("🔄 Falling back to basic process cleanup")
-        
-        # Fallback to basic cleanup if orchestrator unavailable
-        _run_asyncio(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
-        return
-    
+        click.echo(f"❌ Service orchestrator not available: {e}", err=True)
+        sys.exit(1)
+
     except Exception as e:
         click.echo(f"❌ Failed to initialize orchestrator: {e}", err=True)
-        if not force:
-            sys.exit(1)
-        # Continue with basic cleanup
-        _run_asyncio(_basic_stop_fallback(ctx, force, docker_only, processes_only, verbose))
-        return
+        sys.exit(1)
     
     # 1. ENHANCED PROCESS DISCOVERY PHASE
     if perform_discovery:
@@ -1676,13 +1668,19 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if verbose:
                 click.echo("\n🔧 PHASE 2: Orchestrated Service Shutdown")
 
-            supervisor_used, supervisor_success = _supervisor_stream_shutdown(
-                verbose=verbose,
-                docker_only=docker_only,
-                processes_only=processes_only,
-                services=target_services,
-                include_dependents=include_dependents,
-            )
+            supervisor_used = False
+            supervisor_success = False
+
+            if supervisor_enabled:
+                supervisor_used, supervisor_success = _supervisor_stream_shutdown(
+                    verbose=verbose,
+                    docker_only=docker_only,
+                    processes_only=processes_only,
+                    services=target_services,
+                    include_dependents=include_dependents,
+                )
+            elif verbose:
+                click.echo("   ⚠️ Supervisor feature disabled; using orchestrator shutdown")
 
             if supervisor_used and not supervisor_success:
                 if verbose:
@@ -2538,139 +2536,6 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
     return shutdown_results
 
 
-async def _basic_stop_fallback(ctx, force: bool, docker_only: bool, processes_only: bool, verbose: bool):
-    """Fallback basic stop implementation when orchestrator is unavailable."""
-    import subprocess
-    import signal
-    import os
-    import psutil
-    from pathlib import Path
-    
-    if verbose:
-        click.echo("🔄 Using basic fallback cleanup method")
-    
-    if not force:
-        click.echo("🛑 This will stop Context Cleaner services using basic method:")
-        if not docker_only:
-            click.echo("   • Background processes (pattern matching)")
-            click.echo("   • Dashboard servers on common ports")
-        if not processes_only:
-            click.echo("   • Docker containers")
-        click.echo()
-        
-        if not click.confirm("Continue with basic shutdown?"):
-            click.echo("❌ Shutdown cancelled")
-            return
-    
-    stopped_services = []
-    
-    # Stop background processes if requested
-    if not docker_only:
-        try:
-            # Use comprehensive process discovery for fallback as well
-            manual_processes = _discover_all_context_cleaner_processes(verbose)
-            
-            for process in manual_processes:
-                try:
-                    proc = psutil.Process(process.pid)
-                    if proc.is_running():
-                        success = _terminate_process_with_escalation(proc, verbose)
-                        if success and verbose:
-                            click.echo(f"   ✅ Stopped PID {process.pid} ({process.service_type})")
-                        elif not success and verbose:
-                            click.echo(f"   ❌ Failed to stop PID {process.pid}")
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue  # Process already gone or inaccessible
-            
-            # Also try pattern-based killing as backup
-            patterns = [
-                "start_context_cleaner",
-                "context_cleaner.*run", 
-                "context_cleaner.*jsonl", 
-                "jsonl_background_service",
-                "context_cleaner.*dashboard", 
-                "context_cleaner.*bridge",
-                "ComprehensiveHealthDashboard",
-                "context_cleaner_wsgi"
-            ]
-            
-            for pattern in patterns:
-                subprocess.run(["pkill", "-f", pattern], capture_output=True)
-            
-            # Kill dashboard processes by port pattern
-            ports_to_check = range(8080, 8200)  # Extended range
-            for port in ports_to_check:
-                try:
-                    result = subprocess.run(
-                        ["lsof", "-ti", f":{port}"],
-                        capture_output=True, text=True
-                    )
-                    if result.returncode == 0 and result.stdout.strip():
-                        pids = result.stdout.strip().split('\n')
-                        for pid in pids:
-                            try:
-                                os.kill(int(pid), signal.SIGTERM)
-                                if verbose:
-                                    click.echo(f"✅ Stopped process on port {port} (PID: {pid})")
-                            except (ProcessLookupError, ValueError):
-                                pass
-                except Exception:
-                    pass
-            
-            stopped_services.append("background processes (basic)")
-            
-        except Exception as e:
-            if verbose:
-                click.echo(f"⚠️ Error stopping background processes: {e}")
-    
-    # Stop Docker services if requested - using enhanced ClickHouse shutdown
-    if not processes_only:
-        if verbose:
-            click.echo("🐳 Using enhanced ClickHouse shutdown in fallback mode...")
-
-        # Use robust ClickHouse shutdown even in fallback mode
-        clickhouse_results = _shutdown_clickhouse_containers_robust(verbose)
-
-        if clickhouse_results["success"]:
-            stopped_services.append("ClickHouse containers (robust shutdown)")
-        else:
-            stopped_services.append("ClickHouse containers (partial shutdown)")
-            if verbose:
-                for issue in clickhouse_results["remaining_issues"]:
-                    click.echo(f"   ⚠️  {issue}")
-
-        # Traditional compose cleanup
-        compose_file = Path("docker-compose.yml")
-        if compose_file.exists():
-            try:
-                result = subprocess.run(
-                    ["docker", "compose", "down"],
-                    capture_output=True, text=True, timeout=30
-                )
-
-                if result.returncode == 0:
-                    stopped_services.append("Docker compose cleanup")
-                else:
-                    stopped_services.append("Docker compose cleanup (with warnings)")
-
-            except subprocess.TimeoutExpired:
-                try:
-                    subprocess.run(["docker", "compose", "kill"], timeout=10)
-                    subprocess.run(["docker", "compose", "down"], timeout=10)
-                    stopped_services.append("Docker compose (forced)")
-                except:
-                    click.echo("❌ Failed to stop Docker services", err=True)
-            except Exception as e:
-                click.echo(f"❌ Error stopping Docker services: {e}", err=True)
-    
-    # Summary
-    if stopped_services:
-        click.echo("🎯 Basic shutdown complete!")
-        for service in stopped_services:
-            click.echo(f"   ✅ {service}")
-    else:
-        click.echo("🤷 No services were found running")
-
 
 # REMOVED: Conflicting dashboard-mgr command group - use 'run' and 'stop' commands instead
 # The dashboard-mgr command group has been removed to avoid confusion with the comprehensive service
@@ -2720,6 +2585,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
     
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"] or dev_mode
+    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
     
     # Handle custom config file
     if config_file:
@@ -2750,16 +2616,17 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         click.echo("🔍 DEBUG: Status-only mode detected, getting service status...")
         status = orchestrator.get_service_status()
         watchdog_info = None
-        supervisor_endpoint = default_supervisor_endpoint()
-        try:
-            from context_cleaner.ipc.client import SupervisorClient
-            from context_cleaner.ipc.protocol import SupervisorRequest, RequestAction
+        if supervisor_enabled:
+            supervisor_endpoint = default_supervisor_endpoint()
+            try:
+                from context_cleaner.ipc.client import SupervisorClient
+                from context_cleaner.ipc.protocol import SupervisorRequest, RequestAction
 
-            with SupervisorClient(endpoint=supervisor_endpoint) as client:
-                response = client.send(SupervisorRequest(action=RequestAction.STATUS))
-                watchdog_info = response.result.get("watchdog") if response.status == "ok" else None
-        except Exception:
-            watchdog_info = None
+                with SupervisorClient(endpoint=supervisor_endpoint) as client:
+                    response = client.send(SupervisorRequest(action=RequestAction.STATUS))
+                    watchdog_info = response.result.get("watchdog") if response.status == "ok" else None
+            except Exception:
+                watchdog_info = None
 
         payload = {
             "orchestrator": status.get("orchestrator"),
@@ -2771,6 +2638,9 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         if status_json:
             click.echo(json.dumps(payload, indent=2, default=str))
             return
+
+        if not supervisor_enabled and verbose:
+            click.echo("⚠️ Supervisor orchestration disabled via feature flag")
 
         click.echo("\n🔍 CONTEXT CLEANER SERVICE STATUS")
         click.echo("=" * 45)
@@ -2977,16 +2847,20 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         _stop_supervisor()
         _start_supervisor()
 
-    if _start_supervisor():
-        watchdog = ServiceWatchdog(restart_callback=_restart_supervisor)
-        current_supervisor = supervisor_state["instance"]
-        if current_supervisor is not None:
-            current_supervisor.register_watchdog(watchdog)
-        watchdog.start()
+    if supervisor_enabled:
+        if _start_supervisor():
+            watchdog = ServiceWatchdog(restart_callback=_restart_supervisor)
+            current_supervisor = supervisor_state["instance"]
+            if current_supervisor is not None:
+                current_supervisor.register_watchdog(watchdog)
+            watchdog.start()
+        else:
+            supervisor_state["instance"] = None
+            if verbose:
+                click.echo("⚠️  Supervisor unavailable; using fallback event loop handling")
     else:
-        supervisor_state["instance"] = None
         if verbose:
-            click.echo("⚠️  Supervisor unavailable; using fallback event loop handling")
+            click.echo("⚠️ Supervisor orchestration feature disabled; running without IPC supervisor")
     
     try:
         # Start all services - handle event loop properly with enhanced debugging

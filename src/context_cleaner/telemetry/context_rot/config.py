@@ -218,6 +218,7 @@ class ApplicationConfig:
         "enable_conversation_flow_analysis": True,
         "enable_real_time_alerts": True,
         "enable_user_feedback": True,
+        "enable_supervisor_orchestration": True,
         "enable_dashboard_widget": True,
         "enable_data_export": False,
         "enable_advanced_analytics": False

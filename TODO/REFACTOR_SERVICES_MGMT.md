@@ -69,10 +69,11 @@
 - ✅ Update shutdown guidance to prefer CLI (`STOP_CONTEXT_CLEANER.md`) and remove the legacy script.
 - ✅ Provide developer instructions for restarting the supervisor during local development.
 
-### Phase 8 – Rollout & Cleanup
-- Behind a feature flag/env var gate the new path while testing.
-- Once stable, retire large chunks of the heuristic discovery code, keeping only minimal fallback.
-- Ensure release notes capture the breaking-change risk (users must use the new CLI for shutdown).
+### Phase 8 – Rollout & Cleanup *(In Progress)*
+- ✅ Behind a feature flag/env var gate the new path while testing (`CONTEXT_CLEANER_ENABLE_SUPERVISOR_ORCHESTRATION`).
+- 🔄 Once stable, retire large chunks of the heuristic discovery code, keeping only minimal fallback.
+- 🔄 Ensure release notes capture the breaking-change risk (users must use the new CLI for shutdown).
+- 🔄 Manual QA pass (run/status/stop flows with flag on/off; watchdog restart; targeted shutdowns).
 
 ## Risks & Mitigations
 - **Cross-platform IPC parity** → ship a common protocol with OS-specific transports (Unix domain socket, Windows named pipe/TCP) hidden behind one adapter, and run CI on Windows/macOS/Linux to guarantee identical behaviour.
