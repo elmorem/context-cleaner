@@ -347,6 +347,16 @@ class ComprehensiveHealthDashboard:
         }
         self._last_alerts: Dict[str, datetime] = {}
         self._alert_cooldown_minutes = 5
+        self._eventlet_tpool_available = bool(
+            eventlet is not None
+            and getattr(eventlet, "tpool", None)
+            and hasattr(eventlet.tpool, "execute")
+        )
+        self._eventlet_warning_emitted = False
+        if eventlet is not None and not self._eventlet_tpool_available:
+            logger.warning(
+                "Eventlet detected without tpool support; falling back to native threading"
+            )
         self._stop_event = threading.Event()
         self._shutdown_signaled = False
 
@@ -473,11 +483,14 @@ class ComprehensiveHealthDashboard:
                 asyncio.set_event_loop(None)
                 loop.close()
 
-        if eventlet is not None and getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
+        if self._eventlet_tpool_available:
             logger.debug("Running dashboard coroutine via eventlet.tpool")
             return eventlet.tpool.execute(runner)
-        elif eventlet is not None and not getattr(eventlet, "tpool", None):
-            logger.warning("Eventlet detected without tpool support; falling back to native threading")
+        elif eventlet is not None and not self._eventlet_warning_emitted:
+            logger.warning(
+                "Eventlet tpool unavailable; using native threading for blocking coroutine execution"
+            )
+            self._eventlet_warning_emitted = True
 
         result_holder: Dict[str, Any] = {}
         error_holder: Dict[str, BaseException] = {}
@@ -1829,10 +1842,6 @@ class ComprehensiveHealthDashboard:
             """Get real performance trends from telemetry data"""
             try:
                 if hasattr(self, 'telemetry_client') and self.telemetry_client:
-                    import asyncio
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    
                     try:
                         # Query real performance data
                         query = """
@@ -1872,9 +1881,9 @@ class ComprehensiveHealthDashboard:
                             cs.total_requests
                         FROM current_week c, previous_week p, cache_stats cs
                         """
-                        
-                        results = loop.run_until_complete(self.telemetry_client.execute_query(query))
-                        loop.close()
+                        results = self._run_coroutine_blocking(
+                            self.telemetry_client.execute_query(query)
+                        )
                         
                         if results and len(results) > 0:
                             data = results[0]
@@ -1901,7 +1910,6 @@ class ComprehensiveHealthDashboard:
                                 'events_prev_week': events_prev_week
                             })
                     except Exception as e:
-                        loop.close()
                         logger.error(f"Error getting performance trends: {e}")
                 
                 # Return fallback data if no telemetry client
@@ -2857,6 +2865,13 @@ class ComprehensiveHealthDashboard:
         if production is None:
             production = self._should_use_production_server()
             logger.info(f"🔍 Auto-detected server mode: {'production' if production else 'development'}")
+
+        if production and self.socketio.async_mode != "eventlet":
+            logger.info(
+                "⚠️ SocketIO async_mode=%s incompatible with Gunicorn eventlet worker; using development server instead",
+                self.socketio.async_mode,
+            )
+            production = False
 
         if production:
             logger.info(f"🚀 Attempting to start comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
