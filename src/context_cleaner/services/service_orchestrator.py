@@ -501,6 +501,7 @@ class ServiceOrchestrator:
             "failed": [],
             "errors": {},
             "invalid": [],
+            "optional_issues": [],
         }
 
         shutdown_order = list(reversed(self._calculate_startup_order()))
@@ -551,11 +552,14 @@ class ServiceOrchestrator:
             if requested_services is not None and service_name not in requested_services:
                 continue
             service = self.services[service_name]
+            state = self.service_states.get(service_name)
+            if state is None:
+                state = self.service_states[service_name] = ServiceState(name=service_name)
+
             if not self._should_stop_service(service, docker_only, processes_only):
                 summary["skipped"].append(service_name)
                 continue
 
-            state = self.service_states.get(service_name)
             if state and state.status == ServiceStatus.STOPPED:
                 summary["skipped"].append(service_name)
                 continue
@@ -577,10 +581,24 @@ class ServiceOrchestrator:
             if service_success:
                 summary["stopped"].append(service_name)
             else:
-                summary["failed"].append(service_name)
                 state_error = state.last_error if state else None
-                if state_error:
-                    summary["errors"][service_name] = state_error
+                if not service.required:
+                    summary["optional_issues"].append(service_name)
+                    if state_error:
+                        summary["errors"][service_name] = state_error
+                    # Ensure optional services transition to a clean stopped state so subsequent
+                    # verification does not repeatedly flag them.
+                    if state:
+                        state.status = ServiceStatus.STOPPED
+                        state.health_status = False
+                    if self.verbose:
+                        self.logger.warning(
+                            "Optional service %s reported issues during shutdown", service_name
+                        )
+                else:
+                    summary["failed"].append(service_name)
+                    if state_error:
+                        summary["errors"][service_name] = state_error
 
         if full_shutdown:
             if self.health_monitor_thread and self.health_monitor_thread.is_alive():
@@ -3078,8 +3096,10 @@ class ServiceOrchestrator:
         try:
             import eventlet  # type: ignore
 
-            self.logger.debug("Executing blocking callable via eventlet.tpool")
-            return eventlet.tpool.execute(func)
+            if getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
+                self.logger.debug("Executing blocking callable via eventlet.tpool")
+                return eventlet.tpool.execute(func)
+            raise AttributeError("eventlet.tpool unavailable")
         except Exception:
             self.logger.debug("Executing blocking callable via native thread fallback")
             result_holder: dict[str, Any] = {}

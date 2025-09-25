@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from contextlib import suppress
 
+import psutil
+
 import click
 
 from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
@@ -158,7 +160,6 @@ def analyze(ctx, days, format, output):
     """Analyze productivity trends and generate insights."""
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
 
     if verbose:
         click.echo(f"📈 Analyzing productivity data for the last {days} days...")
@@ -1439,6 +1440,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
+    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
 
     if docker_only and processes_only:
         raise click.UsageError("Use either --docker-only or --processes-only, not both")
@@ -1870,6 +1872,8 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             verification_processes = []
             
             for proc in orchestrator_processes + manual_processes:
+                if proc.pid == os.getpid():
+                    continue  # Ignore the current stop command process
                 if proc.pid not in all_verification_pids:
                     verification_processes.append(proc)
                     all_verification_pids.add(proc.pid)
@@ -1910,6 +1914,56 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     # Report verification results
     shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
+
+    if not shutdown_complete and force:
+        if verbose:
+            click.echo("   ⚠️  Residual processes detected, forcing cleanup...")
+        forced_cleanups = 0
+        for process in verification_processes:
+            if process.pid == os.getpid():
+                continue
+            try:
+                try:
+                    proc = psutil.Process(process.pid)
+                except psutil.NoSuchProcess:
+                    continue
+                if _terminate_process_with_escalation(proc, verbose):
+                    forced_cleanups += 1
+            except Exception as cleanup_error:
+                if verbose:
+                    click.echo(f"   ❌ Forced cleanup failed for PID {process.pid}: {cleanup_error}")
+
+        if forced_cleanups and verbose:
+            click.echo(f"   ✅ Forced cleanup terminated {forced_cleanups} residual process(es)")
+
+        # Re-run verification once after forced cleanup
+        verification_processes = []
+        remaining_ports = []
+        try:
+            orchestrator_processes = discovery_engine.discover_all_processes()
+            manual_processes = _discover_all_context_cleaner_processes(verbose=False)
+            seen_pids = set()
+            for proc in orchestrator_processes + manual_processes:
+                if proc.pid == os.getpid():
+                    continue
+                if proc.pid not in seen_pids:
+                    verification_processes.append(proc)
+                    seen_pids.add(proc.pid)
+        except Exception as verify_error:
+            if verbose:
+                click.echo(f"   ⚠️  Verification after forced cleanup failed: {verify_error}")
+
+        for port in common_ports:
+            try:
+                import socket
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    result = sock.connect_ex(('127.0.0.1', port))
+                    if result == 0:
+                        remaining_ports.append(port)
+            except Exception:
+                continue
+
+        shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
     
     if shutdown_complete:
         # 8. FINAL SUCCESS REPORT
@@ -2615,7 +2669,10 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
     if status_only:
         click.echo("🔍 DEBUG: Status-only mode detected, getting service status...")
         status = orchestrator.get_service_status()
-        watchdog_info = None
+
+        supervisor_snapshot: Dict[str, Any] | None = None
+        watchdog_info: Dict[str, Any] | None = None
+
         if supervisor_enabled:
             supervisor_endpoint = default_supervisor_endpoint()
             try:
@@ -2624,16 +2681,30 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
 
                 with SupervisorClient(endpoint=supervisor_endpoint) as client:
                     response = client.send(SupervisorRequest(action=RequestAction.STATUS))
-                    watchdog_info = response.result.get("watchdog") if response.status == "ok" else None
+                    if response.status == "ok":
+                        supervisor_snapshot = response.result
+                        watchdog_info = supervisor_snapshot.get("watchdog")
             except Exception:
+                supervisor_snapshot = None
                 watchdog_info = None
 
-        payload = {
-            "orchestrator": status.get("orchestrator"),
-            "services": status.get("services"),
-            "services_summary": status.get("services_summary"),
-            "watchdog": watchdog_info or {},
-        }
+        if supervisor_snapshot and "orchestrator" in supervisor_snapshot:
+            supervisor_orchestrator = supervisor_snapshot.get("orchestrator", {})
+            payload = {
+                "orchestrator": supervisor_orchestrator.get("orchestrator", {}),
+                "services": supervisor_orchestrator.get("services", {}),
+                "services_summary": supervisor_orchestrator.get("services_summary", {}),
+                "watchdog": watchdog_info or supervisor_snapshot.get("watchdog", {}) or {},
+                "supervisor": supervisor_snapshot.get("supervisor"),
+                "registry": supervisor_snapshot.get("registry"),
+            }
+        else:
+            payload = {
+                "orchestrator": status.get("orchestrator"),
+                "services": status.get("services"),
+                "services_summary": status.get("services_summary"),
+                "watchdog": watchdog_info or {},
+            }
 
         if status_json:
             click.echo(json.dumps(payload, indent=2, default=str))
@@ -2646,30 +2717,32 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         click.echo("=" * 45)
 
         # Orchestrator status
-        orch_status = status["orchestrator"]
-        running_icon = "🟢" if orch_status["running"] else "🔴"
-        click.echo(f"{running_icon} Orchestrator: {'Running' if orch_status['running'] else 'Stopped'}")
+        orch_status = payload.get("orchestrator", {}) or {}
+        orch_running = bool(orch_status.get("running"))
+        running_icon = "🟢" if orch_running else "🔴"
+        click.echo(f"{running_icon} Orchestrator: {'Running' if orch_running else 'Stopped'}")
 
-        if watchdog_info:
+        if payload.get("watchdog"):
             click.echo("\n👀 Watchdog:")
-            running = watchdog_info.get("running", False)
-            enabled = watchdog_info.get("enabled", True)
+            watchdog_view = payload["watchdog"]
+            running = watchdog_view.get("running", False)
+            enabled = watchdog_view.get("enabled", True)
             status_icon = "🟢" if running else "🔴"
             state = "Active" if running else "Stopped"
             click.echo(f"   {status_icon} {state} (enabled: {'yes' if enabled else 'no'})")
 
-            last_hb = watchdog_info.get("last_heartbeat_at") or "unknown"
+            last_hb = watchdog_view.get("last_heartbeat_at") or "unknown"
             click.echo(f"      Last heartbeat: {last_hb}")
 
-            last_restart = watchdog_info.get("last_restart_at")
-            reason = watchdog_info.get("last_restart_reason")
+            last_restart = watchdog_view.get("last_restart_at")
+            reason = watchdog_view.get("last_restart_reason")
             if last_restart or reason:
                 click.echo(f"      Last restart: {last_restart or 'never'} (reason: {reason or 'n/a'})")
 
-            attempts = watchdog_info.get("restart_attempts", 0)
+            attempts = watchdog_view.get("restart_attempts", 0)
             click.echo(f"      Restart attempts: {attempts}")
 
-            history = watchdog_info.get("restart_history") or []
+            history = watchdog_view.get("restart_history") or []
             if history:
                 click.echo("      Recent history:")
                 for entry in history:
@@ -2681,7 +2754,8 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
 
         # Individual services
         click.echo("\n📊 Services:")
-        for service_name, service_info in status["services"].items():
+        services_view = payload.get("services", {}) or {}
+        for service_name, service_info in services_view.items():
             status_icon = {
                 "running": "🟢",
                 "starting": "🟡", 
@@ -2691,17 +2765,21 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
                 "unknown": "⚪"
             }.get(service_info["status"], "⚪")
             
-            health_icon = "💚" if service_info["health_status"] else "💔" if service_info["status"] == "running" else "⚪"
-            required_text = " (required)" if service_info["required"] else " (optional)"
+            service_status = service_info.get("status", "unknown")
+            is_healthy = bool(service_info.get("health_status"))
+            health_icon = "💚" if is_healthy else "💔" if service_status == "running" else "⚪"
+            required_text = " (required)" if service_info.get("required", False) else " (optional)"
             
-            click.echo(f"   {status_icon} {health_icon} {service_info['name']}{required_text}")
-            click.echo(f"      Status: {service_info['status'].title()}")
+            click.echo(f"   {status_icon} {health_icon} {service_info.get('name', service_name)}{required_text}")
+            click.echo(f"      Status: {service_status.title()}")
             
-            if service_info["restart_count"] > 0:
-                click.echo(f"      Restarts: {service_info['restart_count']}")
+            restart_count = service_info.get("restart_count", 0)
+            if restart_count > 0:
+                click.echo(f"      Restarts: {restart_count}")
             
-            if service_info["last_error"]:
-                click.echo(f"      Last error: {service_info['last_error']}")
+            last_error = service_info.get("last_error")
+            if last_error:
+                click.echo(f"      Last error: {last_error}")
         
         return
     
@@ -2845,7 +2923,17 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         if verbose:
             LOGGER.debug("Watchdog requested supervisor restart")
         _stop_supervisor()
-        _start_supervisor()
+        if not _start_supervisor():
+            if verbose:
+                click.echo("⚠️  Watchdog restart attempt failed to relaunch supervisor")
+            return
+
+        if watchdog:
+            current = supervisor_state.get("instance")
+            if current is not None:
+                current.register_watchdog(watchdog)
+                if verbose:
+                    LOGGER.debug("Watchdog reattached to restarted supervisor")
 
     if supervisor_enabled:
         if _start_supervisor():

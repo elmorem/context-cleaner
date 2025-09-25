@@ -6,8 +6,11 @@ CLEAN-CONTEXT-GUIDE.md, enhanced with PR15.3 cache intelligence and professional
 formatting with color-coded health indicators.
 """
 
-# Eventlet monkey patching must occur before other imports when using Gunicorn workers.
-from context_cleaner.utils.eventlet_support import ensure_eventlet_monkey_patch
+# Eventlet utilities must be imported before other modules that rely on monkey patching.
+from context_cleaner.utils.eventlet_support import (
+    ensure_eventlet_monkey_patch,
+    get_socketio_async_mode,
+)
 
 ensure_eventlet_monkey_patch()
 import logging
@@ -299,12 +302,30 @@ class ComprehensiveHealthDashboard:
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
             return response
 
-        # SocketIO for real-time updates using eventlet
-        self.socketio = SocketIO(
-            self.app,
-            cors_allowed_origins="*",
-            async_mode="eventlet",
-        )
+        # SocketIO for real-time updates (async mode configurable via env)
+        async_mode = get_socketio_async_mode()
+
+        try:
+            self.socketio = SocketIO(
+                self.app,
+                cors_allowed_origins="*",
+                async_mode=async_mode,
+            )
+        except Exception as socketio_error:
+            if async_mode != "threading":
+                logger.warning(
+                    "SocketIO init failed for async_mode=%s (%s); retrying with 'threading'",
+                    async_mode,
+                    socketio_error,
+                )
+                self.socketio = SocketIO(
+                    self.app,
+                    cors_allowed_origins="*",
+                    async_mode="threading",
+                )
+            else:  # pragma: no cover - propagate unexpected failure
+                raise
+
         logger.debug("SocketIO initialized with async_mode=%s", self.socketio.async_mode)
 
         # Dashboard configuration
@@ -326,6 +347,8 @@ class ComprehensiveHealthDashboard:
         }
         self._last_alerts: Dict[str, datetime] = {}
         self._alert_cooldown_minutes = 5
+        self._stop_event = threading.Event()
+        self._shutdown_signaled = False
 
         # Data sources (from advanced dashboard)
         self.data_sources: Dict[str, DataSource] = {
@@ -3173,6 +3196,14 @@ if __name__ == "__main__":
                     self.socketio.stop()
             except Exception as exc:  # pragma: no cover - best effort shutdown
                 logger.debug("SocketIO stop encountered an error: %s", exc)
+
+            if getattr(self.socketio, "async_mode", None) == "threading" and not self._shutdown_signaled:
+                try:
+                    import signal
+                    os.kill(os.getpid(), signal.SIGINT)
+                    self._shutdown_signaled = True
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug("Failed to signal main thread for shutdown: %s", exc)
 
             if self._update_thread and self._update_thread.is_alive():
                 self._update_thread.join(timeout=5.0)
