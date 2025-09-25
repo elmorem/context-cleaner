@@ -29,7 +29,14 @@ import click
 from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 from context_cleaner.dashboard.web_server import ProductivityDashboard
-from context_cleaner.services.service_supervisor import ServiceSupervisor, SupervisorConfig
+try:
+    from context_cleaner.services.service_supervisor import ServiceSupervisor, SupervisorConfig
+    _SUPERVISOR_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:  # pragma: no cover - missing orchestrator path
+    ServiceSupervisor = None  # type: ignore[assignment]
+    SupervisorConfig = None  # type: ignore[assignment]
+    _SUPERVISOR_IMPORT_ERROR = exc
+
 from context_cleaner.services.service_watchdog import ServiceWatchdog
 from context_cleaner.ipc.client import default_supervisor_endpoint
 from context_cleaner import __version__
@@ -1442,6 +1449,18 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     verbose = ctx.obj["verbose"]
     supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
 
+    if supervisor_enabled and _SUPERVISOR_IMPORT_ERROR is not None:
+        click.echo(
+            "❌ Cannot use supervisor-managed shutdown because required components are missing:",
+            err=True,
+        )
+        click.echo(f"   {_SUPERVISOR_IMPORT_ERROR}", err=True)
+        click.echo(
+            "💡 Restore 'src/context_cleaner/services/service_orchestrator.py' or reinstall the package before retrying.",
+            err=True,
+        )
+        sys.exit(1)
+
     if docker_only and processes_only:
         raise click.UsageError("Use either --docker-only or --processes-only, not both")
 
@@ -1506,17 +1525,21 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     
     # Initialize orchestrator and discovery systems
     try:
-        from context_cleaner.services import ServiceOrchestrator
+        from context_cleaner.services import ServiceOrchestrator, _ORCHESTRATOR_IMPORT_ERROR
+        if ServiceOrchestrator is None:
+            msg = _ORCHESTRATOR_IMPORT_ERROR or "Service orchestrator module missing"
+            click.echo(f"❌ Service orchestrator not available: {msg}", err=True)
+            click.echo(
+                "💡 Restore 'src/context_cleaner/services/service_orchestrator.py' or reinstall the package before retrying.",
+                err=True,
+            )
+            sys.exit(1)
         orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
         discovery_engine = orchestrator.discovery_engine
         process_registry = orchestrator.process_registry
         
         if verbose:
             click.echo("✅ Service orchestrator and discovery engine initialized")
-    
-    except ImportError as e:
-        click.echo(f"❌ Service orchestrator not available: {e}", err=True)
-        sys.exit(1)
 
     except Exception as e:
         click.echo(f"❌ Failed to initialize orchestrator: {e}", err=True)
@@ -1915,9 +1938,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     # Report verification results
     shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
 
-    if not shutdown_complete and force:
+    if not shutdown_complete:
         if verbose:
-            click.echo("   ⚠️  Residual processes detected, forcing cleanup...")
+            click.echo("   ⚠️  Residual processes detected, attempting forced cleanup...")
         forced_cleanups = 0
         for process in verification_processes:
             if process.pid == os.getpid():
@@ -1966,6 +1989,13 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
     
     if shutdown_complete:
+        # Remove lingering supervisor registry entries now that the process is gone
+        try:
+            process_registry.prune_processes(service_type="supervisor")
+        except Exception as prune_error:
+            if verbose:
+                click.echo(f"   ⚠️  Failed to prune supervisor registry entries: {prune_error}")
+
         # 8. FINAL SUCCESS REPORT
         click.echo("\n🎯 COMPREHENSIVE SHUTDOWN COMPLETE!")
         click.echo("✅ All Context Cleaner services have been stopped")
@@ -2640,7 +2670,19 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"] or dev_mode
     supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
-    
+
+    if supervisor_enabled and _SUPERVISOR_IMPORT_ERROR is not None:
+        click.echo(
+            "❌ Supervisor orchestration is enabled but required components are missing:",
+            err=True,
+        )
+        click.echo(f"   {_SUPERVISOR_IMPORT_ERROR}", err=True)
+        click.echo(
+            "💡 Restore 'src/context_cleaner/services/service_orchestrator.py' or reinstall the package.",
+            err=True,
+        )
+        sys.exit(1)
+
     # Handle custom config file
     if config_file:
         config = ApplicationConfig.from_file(Path(config_file))
@@ -2654,11 +2696,19 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
     
     # Import service orchestrator
     try:
-        from context_cleaner.services import ServiceOrchestrator
-    except ImportError:
-        click.echo("❌ Service orchestrator not available", err=True)
+        from context_cleaner.services import ServiceOrchestrator, _ORCHESTRATOR_IMPORT_ERROR
+        if ServiceOrchestrator is None:
+            msg = _ORCHESTRATOR_IMPORT_ERROR or "Service orchestrator module missing"
+            click.echo(f"❌ Service orchestrator not available: {msg}", err=True)
+            click.echo(
+                "💡 Restore 'src/context_cleaner/services/service_orchestrator.py' or reinstall the package before retrying.",
+                err=True,
+            )
+            sys.exit(1)
+    except ImportError as exc:
+        click.echo(f"❌ Service orchestrator not available: {exc}", err=True)
         sys.exit(1)
-    
+
     # Initialize orchestrator
     click.echo("🔍 DEBUG: Creating ServiceOrchestrator instance...")
     orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
@@ -2936,6 +2986,18 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
                     LOGGER.debug("Watchdog reattached to restarted supervisor")
 
     if supervisor_enabled:
+        if _SUPERVISOR_IMPORT_ERROR is not None:
+            click.echo(
+                "❌ Supervisor orchestration is enabled but required components are missing:",
+                err=True,
+            )
+            click.echo(f"   {_SUPERVISOR_IMPORT_ERROR}", err=True)
+            click.echo(
+                "💡 Restore 'src/context_cleaner/services/service_orchestrator.py' or reinstall the package.",
+                err=True,
+            )
+            sys.exit(1)
+
         if _start_supervisor():
             watchdog = ServiceWatchdog(restart_callback=_restart_supervisor)
             current_supervisor = supervisor_state["instance"]

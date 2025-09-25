@@ -233,6 +233,7 @@ class ProcessRegistryDatabase:
     def _get_connection(self):
         """Get a database connection with file locking for atomic operations."""
         lock_fd = None
+        conn: Optional[sqlite3.Connection] = None
         try:
             # Acquire file lock for atomic operations
             lock_fd = os.open(self.lock_file, os.O_CREAT | os.O_WRONLY)
@@ -248,6 +249,11 @@ class ProcessRegistryDatabase:
             if lock_fd is not None:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
                 os.close(lock_fd)
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception as close_error:  # pragma: no cover - defensive
+                    logger.warning(f"Failed to close process registry connection: {close_error}")
 
     def _ensure_column(self, conn: sqlite3.Connection, column: str, definition: str) -> None:
         """Add a column to the processes table if it's missing."""
@@ -492,45 +498,107 @@ class ProcessRegistryDatabase:
     
     def get_registry_stats(self) -> Dict[str, Any]:
         """Get statistics about the process registry."""
+        stats: Dict[str, Any] = {
+            "database_path": self.db_path,
+            "total_processes": 0,
+            "running_processes": 0,
+            "failed_processes": 0,
+            "stale_entries": 0,
+            "service_types": {},
+            "registration_sources": {},
+            "healthy_processes": 0,
+            "unhealthy_processes": 0,
+            "unknown_health_processes": 0,
+            "ports_in_use": [],
+            "database_size_bytes": 0,
+            "last_cleanup_time": None,
+            "by_status": {},
+            "by_type": {},
+            "oldest_entry": None,
+            "newest_entry": None,
+        }
+
         try:
             with self._get_connection() as conn:
-                stats = {}
-                
-                # Total processes
-                stats['total_processes'] = conn.execute("SELECT COUNT(*) FROM processes").fetchone()[0]
-                
-                # Processes by status
-                status_rows = conn.execute("""
-                    SELECT status, COUNT(*) as count 
-                    FROM processes 
-                    GROUP BY status
-                """).fetchall()
-                stats['by_status'] = {row['status']: row['count'] for row in status_rows}
-                
-                # Processes by type
-                type_rows = conn.execute("""
-                    SELECT service_type, COUNT(*) as count 
-                    FROM processes 
-                    GROUP BY service_type
-                """).fetchall()
-                stats['by_type'] = {row['service_type']: row['count'] for row in type_rows}
-                
-                # Database file size
+                rows = conn.execute(
+                    """
+                    SELECT pid, status, service_type, registration_source,
+                           last_health_status, port, registration_time
+                    FROM processes
+                """
+                ).fetchall()
+
+                stats["total_processes"] = len(rows)
+
+                service_type_counts: Dict[str, int] = {}
+                status_counts: Dict[str, int] = {}
+                registration_counts: Dict[str, int] = {}
+                ports_in_use: set[int] = set()
+                stale_pids: set[int] = set()
+
+                for row in rows:
+                    pid = row["pid"]
+                    status = row["status"] or "unknown"
+                    service_type = row["service_type"] or "unknown"
+                    registration_source = row["registration_source"] or "unknown"
+                    last_health_status = row["last_health_status"]
+                    port = row["port"]
+
+                    # Status totals
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                    if status.lower() == "running":
+                        stats["running_processes"] += 1
+                    if status.lower() == "failed":
+                        stats["failed_processes"] += 1
+
+                    # Service/registration counts
+                    service_type_counts[service_type] = service_type_counts.get(service_type, 0) + 1
+                    registration_counts[registration_source] = registration_counts.get(registration_source, 0) + 1
+
+                    # Health metrics
+                    if last_health_status is None:
+                        stats["unknown_health_processes"] += 1
+                    elif bool(last_health_status):
+                        stats["healthy_processes"] += 1
+                    else:
+                        stats["unhealthy_processes"] += 1
+
+                    # Ports
+                    if port is not None:
+                        ports_in_use.add(port)
+
+                    # Track oldest/newest entry times
+                    registration_time = row["registration_time"]
+                    if stats["oldest_entry"] is None or registration_time < stats["oldest_entry"]:
+                        stats["oldest_entry"] = registration_time
+                    if stats["newest_entry"] is None or registration_time > stats["newest_entry"]:
+                        stats["newest_entry"] = registration_time
+
+                    # Detect stale processes similar to cleanup_stale
+                    try:
+                        if not psutil.pid_exists(pid):
+                            stale_pids.add(pid)
+                            continue
+                        process = psutil.Process(pid)
+                        if process.status() == psutil.STATUS_ZOMBIE:
+                            stale_pids.add(pid)
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        stale_pids.add(pid)
+
+                stats["by_status"] = status_counts
+                stats["by_type"] = service_type_counts
+                stats["service_types"] = service_type_counts
+                stats["registration_sources"] = registration_counts
+                stats["ports_in_use"] = sorted(ports_in_use)
+                stats["stale_entries"] = len(stale_pids)
+
                 if os.path.exists(self.db_path):
-                    stats['database_size_bytes'] = os.path.getsize(self.db_path)
-                
-                # Oldest and newest entries
-                oldest = conn.execute("SELECT MIN(registration_time) FROM processes").fetchone()[0]
-                newest = conn.execute("SELECT MAX(registration_time) FROM processes").fetchone()[0]
-                
-                stats['oldest_entry'] = oldest
-                stats['newest_entry'] = newest
-                
-                return stats
-                
-        except Exception as e:
+                    stats["database_size_bytes"] = os.path.getsize(self.db_path)
+
+        except Exception as e:  # pragma: no cover - defensive
             logger.error(f"Failed to get registry stats: {e}")
-            return {}
+
+        return stats
 
     def prune_processes(self, *, service_type: Optional[str] = None) -> int:
         """Delete processes from the registry, optionally filtered by service type."""

@@ -286,6 +286,9 @@ class ComprehensiveHealthDashboard:
         
         # Project Summary Analytics
         self.project_summary_analytics = ProjectSummaryAnalytics() if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else None
+        self._project_summary_cache_last_run: Optional[datetime] = None
+        # Refresh analytics periodically to avoid scanning the filesystem on every request
+        self._project_summary_cache_ttl = timedelta(minutes=5)
 
         # Flask application setup for web dashboard
         self.app = Flask(__name__, template_folder=self._get_templates_dir())
@@ -543,6 +546,59 @@ class ComprehensiveHealthDashboard:
                 "websocket_connected": False,
                 "error": str(e)
             }
+
+    def _get_project_summary_search_paths(self) -> List[Path]:
+        """Collect search paths for project summary analysis."""
+        search_paths: List[Path] = []
+
+        if hasattr(self, "cache_discovery") and self.cache_discovery:
+            try:
+                cache_stats = self.cache_discovery.get_discovery_stats()
+                for path_str in cache_stats.get("search_paths", []):
+                    try:
+                        search_paths.append(Path(path_str))
+                    except Exception as path_error:  # pragma: no cover - defensive
+                        logger.debug(
+                            "Ignoring invalid project summary path %s: %s",
+                            path_str,
+                            path_error,
+                        )
+            except Exception as discovery_error:  # pragma: no cover - defensive
+                logger.warning(
+                    "Failed to collect cache discovery paths for project summaries: %s",
+                    discovery_error,
+                )
+
+        if not search_paths:
+            search_paths = [Path.home() / ".claude" / "projects"]
+
+        return search_paths
+
+    def _refresh_project_summary_cache(self, force: bool = False) -> Optional[Dict[str, Any]]:
+        """Run project summary analysis if cache is stale."""
+        if not (self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE):
+            return None
+
+        now = datetime.now()
+        if (
+            not force
+            and self._project_summary_cache_last_run is not None
+            and now - self._project_summary_cache_last_run < self._project_summary_cache_ttl
+        ):
+            return None
+
+        search_paths = self._get_project_summary_search_paths()
+        analytics_data = self.project_summary_analytics.analyze_project_summaries(search_paths)
+
+        if analytics_data.get("error"):
+            logger.warning(
+                "Project summary analytics returned error: %s",
+                analytics_data["error"],
+            )
+            return analytics_data
+
+        self._project_summary_cache_last_run = datetime.now()
+        return analytics_data
 
     def _setup_routes(self):
         """Setup Flask routes for the comprehensive dashboard."""
@@ -2544,23 +2600,29 @@ class ComprehensiveHealthDashboard:
             """Get comprehensive project summary analytics."""
             try:
                 if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
-                    # Get cache discovery paths to analyze
-                    search_paths = []
-                    if hasattr(self, 'cache_discovery') and self.cache_discovery:
-                        try:
-                            cache_stats = self.cache_discovery.get_discovery_stats()
-                            for path_str in cache_stats.get('search_paths', []):
-                                search_paths.append(Path(path_str))
-                        except Exception as e:
-                            logger.warning(f"Error getting cache discovery paths: {e}")
-                    
-                    # If no paths from cache discovery, use default
-                    if not search_paths:
-                        search_paths = [Path.home() / ".claude" / "projects"]
-                    
-                    # Run full analytics
-                    analytics_data = self.project_summary_analytics.analyze_project_summaries(search_paths)
-                    
+                    fallback_data = {
+                        'overview': {'total_projects': 0},
+                        'categories': {},
+                        'completion_status': {},
+                        'timeline': {},
+                        'technology_trends': {},
+                        'productivity_insights': {},
+                        'metadata': {'total_summaries': 0}
+                    }
+
+                    analytics_data = self._refresh_project_summary_cache(force=True)
+                    if analytics_data is None:
+                        analytics_data = fallback_data
+
+                    if analytics_data.get('error'):
+                        message = analytics_data['error']
+                        logger.error(f"Error in full project analytics endpoint: {message}")
+                        return jsonify({
+                            'success': False,
+                            'message': f'Project summary analytics failed: {message}',
+                            'data': fallback_data
+                        })
+
                     return jsonify({
                         'success': True,
                         'data': analytics_data
@@ -2588,6 +2650,7 @@ class ComprehensiveHealthDashboard:
         def get_project_summary_widgets():
             """Get project summary widgets for dashboard."""
             try:
+                self._refresh_project_summary_cache()
                 widgets = {}
                 
                 if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:

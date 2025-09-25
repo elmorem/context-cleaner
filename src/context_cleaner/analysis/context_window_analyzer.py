@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 
 from .session_parser import SessionCacheParser
-from .models import CacheConfig
+from .models import CacheConfig, FileType
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +60,90 @@ class ContextWindowAnalyzer:
     def _get_latest_session_file(self, project_path: str) -> Optional[str]:
         """Get the most recent session file for a project."""
         try:
-            jsonl_files = glob.glob(f"{project_path}/*.jsonl")
+            jsonl_files = sorted(
+                glob.glob(f"{project_path}/*.jsonl"),
+                key=os.path.getmtime,
+                reverse=True,
+            )
+
             if not jsonl_files:
                 return None
-                
-            # Get the most recently modified file (actual latest session)
-            latest_file = max(jsonl_files, key=os.path.getmtime)
-            return latest_file
-            
+
+            for candidate in jsonl_files:
+                if not self._is_summary_file(candidate):
+                    return candidate
+
+            # Fall back to most recent file even if it's a summary
+            return jsonl_files[0]
+
         except Exception as e:
             logger.error(f"Error finding latest session: {e}")
             return None
+
+    def _is_summary_file(self, file_path: str) -> bool:
+        """Determine if a session file is a summary metadata file."""
+        summary_parser = getattr(self.session_parser, "summary_parser", None)
+        if summary_parser:
+            try:
+                metadata = summary_parser.detect_file_type(Path(file_path))
+                if metadata.file_type == FileType.SUMMARY:
+                    return True
+                return False
+            except Exception as detection_error:  # pragma: no cover - defensive
+                logger.debug(
+                    "Failed to detect session file type for %s: %s",
+                    file_path,
+                    detection_error,
+                )
+
+        # Fallback: inspect first few lines for summary markers
+        try:
+            with open(file_path, "r") as handle:
+                for _ in range(5):
+                    line = handle.readline()
+                    if not line:
+                        break
+                    if '"type":"summary"' in line:
+                        return True
+        except Exception as read_error:  # pragma: no cover - defensive
+            logger.debug(
+                "Failed to read session file for summary detection %s: %s",
+                file_path,
+                read_error,
+            )
+
+        return False
+
+    def _find_previous_conversation_file(self, current_file: str) -> Optional[str]:
+        """Locate the next most recent conversation file for a project."""
+        project_path = os.path.dirname(current_file)
+        try:
+            jsonl_files = sorted(
+                glob.glob(f"{project_path}/*.jsonl"),
+                key=os.path.getmtime,
+                reverse=True,
+            )
+        except Exception as glob_error:  # pragma: no cover - defensive
+            logger.debug(
+                "Failed to enumerate session files for %s: %s",
+                project_path,
+                glob_error,
+            )
+            return None
+
+        encountered_current = False
+        for candidate in jsonl_files:
+            if not encountered_current:
+                if os.path.samefile(candidate, current_file):
+                    encountered_current = True
+                continue
+
+            if self._is_summary_file(candidate):
+                continue
+
+            return candidate
+
+        return None
     
     def _analyze_session_context(self, session_file: str) -> Dict[str, any]:
         """Analyze context usage from a session file."""
@@ -85,18 +158,43 @@ class ContextWindowAnalyzer:
             # Get actual token usage from JSONL using SessionCacheParser (ccusage approach)
             estimated_tokens = 0
             try:
-                session_analysis = self.session_parser.parse_session_file(Path(session_file))
+                session_path = Path(session_file)
+                session_analysis = self.session_parser.parse_session_file(session_path)
                 if session_analysis:
                     estimated_tokens = session_analysis.total_tokens
-                    logger.debug(f"Parsed {estimated_tokens} actual tokens from {session_file}")
+                    logger.debug(
+                        "Parsed %s actual tokens from %s",
+                        estimated_tokens,
+                        session_file,
+                    )
                 else:
-                    # Check if it's a summary file (which is expected to return None)
-                    with open(session_file, 'r') as f:
-                        first_line = f.readline().strip()
-                        if first_line and '"type":"summary"' in first_line:
-                            logger.debug(f"Skipping summary file: {session_file}")
+                    logger.debug(
+                        "Latest session file %s did not contain conversation data; searching for fallback",
+                        session_file,
+                    )
+                    fallback_file = self._find_previous_conversation_file(session_file)
+                    if fallback_file:
+                        logger.debug("Using fallback session file for context stats: %s", fallback_file)
+                        session_path = Path(fallback_file)
+                        session_analysis = self.session_parser.parse_session_file(session_path)
+                        if session_analysis:
+                            # Update file metadata to reflect the fallback file
+                            session_file = fallback_file
+                            file_size = os.path.getsize(session_file)
+                            file_size_mb = file_size / (1024 * 1024)
+                            stat = os.stat(session_file)
+                            last_modified = datetime.fromtimestamp(stat.st_mtime)
+                            estimated_tokens = session_analysis.total_tokens
                         else:
-                            logger.warning(f"Could not parse session file: {session_file}")
+                            logger.warning(
+                                "Fallback session file also lacked conversation data: %s",
+                                fallback_file,
+                            )
+                    else:
+                        logger.debug(
+                            "No fallback conversation file found for directory %s",
+                            os.path.dirname(session_file),
+                        )
             except Exception as e:
                 logger.error(f"Error parsing tokens from {session_file}: {e}")
                 # No fallback estimation - maintain accuracy by returning 0
