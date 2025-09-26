@@ -308,9 +308,16 @@ class ClaudeCodeTelemetryCollector:
             return True
             
         try:
+            # Ensure ClickHouse connectivity/monitoring is ready before marking running
+            initialized = await self.clickhouse_client.initialize()
+            if not initialized:
+                logger.error("Telemetry collector failed to initialize ClickHouse client")
+                self.running = False
+                return False
+
             self.running = True
             self.last_health_check = datetime.now()
-            
+
             # Start background collection task (if needed for continuous collection)
             # For now, we just mark as running since collection happens on-demand
             logger.info(f"Telemetry collector service started (session: {self.session_id})")
@@ -328,17 +335,19 @@ class ClaudeCodeTelemetryCollector:
             
         try:
             self.running = False
-            
+
             if self.background_task and not self.background_task.done():
                 self.background_task.cancel()
                 try:
                     await self.background_task
                 except asyncio.CancelledError:
                     pass
-            
+
+            await self.close()
+
             logger.info("Telemetry collector service stopped")
             return True
-            
+
         except Exception as e:
             logger.error(f"Error stopping telemetry collector service: {e}")
             return False

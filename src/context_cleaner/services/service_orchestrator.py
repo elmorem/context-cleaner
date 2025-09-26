@@ -23,7 +23,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Tuple, Awaitable, Union, Sequence, Set
 from dataclasses import dataclass, field
 from enum import Enum
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from contextlib import suppress
 import sys
 import os
 import psutil
@@ -135,7 +136,7 @@ class ServiceOrchestrator:
         self.config = config
         self.verbose = verbose
         self.logger = logging.getLogger(__name__)
-        
+
         # Service management
         self.services: Dict[str, ServiceDefinition] = {}
         self.service_states: Dict[str, ServiceState] = {}
@@ -154,27 +155,44 @@ class ServiceOrchestrator:
 
         # Telemetry Collector
         self.telemetry_collector = None
-        
+
+        # Feature flags
+        self.consistency_checker_enabled = os.getenv(
+            "CONTEXT_CLEANER_ENABLE_CONSISTENCY_CHECKER",
+            "false",
+        ).strip().lower() in {"1", "true", "yes", "on"}
+
         # Docker management
         self.docker_daemon_status = DockerDaemonStatus.UNKNOWN
         self.container_states: Dict[str, ContainerState] = {}
-        
+
         # Process Registry Integration (Phase 1)
         self.process_registry = get_process_registry()
         self.discovery_engine = get_discovery_engine()
-        
+
         # Port Conflict Management
         self.port_conflict_manager = PortConflictManager(verbose=verbose, logger=self.logger)
 
         # Centralized Port Registry
         self.port_registry = get_port_registry()
-        
+
         # Lifecycle timestamps
         self.started_at: Optional[datetime] = None
-        
+
+        # Dedicated asyncio loop for health/restart helpers
+        self._async_loop = asyncio.new_event_loop()
+        self._async_loop_ready = threading.Event()
+        self._async_loop_thread = threading.Thread(
+            target=self._run_internal_async_loop,
+            name="ServiceOrchestratorAsyncLoop",
+            daemon=True,
+        )
+        self._async_loop_thread.start()
+        self._async_loop_ready.wait()
+
         # Initialize service definitions
         self._initialize_service_definitions()
-        
+
         # Register signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -436,7 +454,11 @@ class ServiceOrchestrator:
         success = True
         for service_name in startup_order:
             service = self.services[service_name]
-            
+
+            if service_name == "consistency_checker" and not self.consistency_checker_enabled:
+                self.logger.info("Skipping consistency checker service (disabled by configuration)")
+                continue
+
             print(f"🔄 Starting {service.description}...")
             
             # Wait for startup delay
@@ -562,6 +584,10 @@ class ServiceOrchestrator:
 
             if state and state.status == ServiceStatus.STOPPED:
                 summary["skipped"].append(service_name)
+                continue
+
+            if service_name == "consistency_checker" and not self.consistency_checker_enabled:
+                self.logger.info("Consistency checker disabled; skipping shutdown step")
                 continue
 
             summary["requested"].append(service_name)
@@ -1632,6 +1658,11 @@ class ServiceOrchestrator:
 
     async def _start_consistency_checker_service(self, dashboard_port: int) -> bool:
         """Start the API/UI consistency checker service."""
+
+        if not self.consistency_checker_enabled:
+            self.logger.info("Consistency checker disabled; start skipped")
+            return True
+
         state = self.service_states["consistency_checker"]
         state.status = ServiceStatus.STARTING
         
@@ -1704,6 +1735,11 @@ class ServiceOrchestrator:
     
     async def _stop_consistency_checker_service(self) -> bool:
         """Stop the API/UI consistency checker service."""
+
+        if not self.consistency_checker_enabled:
+            self.logger.info("Consistency checker disabled; stop skipped")
+            return True
+
         state = self.service_states["consistency_checker"]
         state.status = ServiceStatus.STOPPING
 
@@ -2636,6 +2672,9 @@ class ServiceOrchestrator:
     
     def _check_consistency_checker_health(self) -> bool:
         """Check if the API/UI consistency checker is healthy with relaxed requirements."""
+        if not self.consistency_checker_enabled:
+            return True
+
         health_check_start = datetime.now()
         check_details = {
             "timestamp": health_check_start.isoformat(),
@@ -3047,77 +3086,76 @@ class ServiceOrchestrator:
 
         self.logger.debug("Health monitor scheduling check for %s", service_name)
 
-        def runner() -> bool:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(
-                    asyncio.wait_for(self._run_health_check(service_name), timeout=30)
-                )
-                return bool(result)
-            finally:
-                try:
-                    loop.run_until_complete(loop.shutdown_asyncgens())
-                except Exception:
-                    pass
-                asyncio.set_event_loop(None)
-                loop.close()
-
-        result = self._execute_blocking_callable(runner)
-        self.logger.debug("Health monitor completed check for %s with result=%s", service_name, result)
-        return result
+        try:
+            result = self._await_internal_coroutine(
+                self._run_health_check(service_name),
+                timeout=30,
+            )
+            self.logger.debug(
+                "Health monitor completed check for %s with result=%s",
+                service_name,
+                result,
+            )
+            return bool(result)
+        except asyncio.TimeoutError:
+            self.logger.warning("Health check timeout for %s after 30s", service_name)
+            return False
+        except Exception as exc:
+            self.logger.error("Health check failed for %s: %s", service_name, exc)
+            return False
 
     def _restart_service_sync(self, service_name: str) -> None:
         """Restart a service using an isolated native thread."""
 
         self.logger.debug("Health monitor scheduling restart for %s", service_name)
 
-        def runner() -> None:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(
-                    asyncio.wait_for(self._restart_service(service_name), timeout=60)
-                )
-            finally:
-                try:
-                    loop.run_until_complete(loop.shutdown_asyncgens())
-                except Exception:
-                    pass
-                asyncio.set_event_loop(None)
-                loop.close()
-
-        self._execute_blocking_callable(runner)
-        self.logger.debug("Health monitor restart finished for %s", service_name)
-
-    def _execute_blocking_callable(self, func: callable) -> Any:
-        """Execute a callable in a native thread or eventlet thread pool."""
-
         try:
-            import eventlet  # type: ignore
+            self._await_internal_coroutine(
+                self._restart_service(service_name),
+                timeout=60,
+            )
+            self.logger.debug("Health monitor restart finished for %s", service_name)
+        except asyncio.TimeoutError as timeout_error:
+            raise RuntimeError(
+                f"Restart timed out for {service_name} after 60s"
+            ) from timeout_error
 
-            if getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
-                self.logger.debug("Executing blocking callable via eventlet.tpool")
-                return eventlet.tpool.execute(func)
-            raise AttributeError("eventlet.tpool unavailable")
+    def _run_internal_async_loop(self) -> None:
+        """Run the dedicated asyncio loop used for health/restart helpers."""
+
+        asyncio.set_event_loop(self._async_loop)
+        self._async_loop_ready.set()
+        try:
+            self._async_loop.run_forever()
+        finally:
+            pending = [
+                task for task in asyncio.all_tasks(loop=self._async_loop) if not task.done()
+            ]
+            for task in pending:
+                task.cancel()
+            if pending:
+                with suppress(Exception):
+                    self._async_loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+            with suppress(Exception):
+                self._async_loop.run_until_complete(self._async_loop.shutdown_asyncgens())
+            self._async_loop.close()
+
+    def _await_internal_coroutine(self, coro: Awaitable[Any], *, timeout: float) -> Any:
+        """Await an async coroutine on the dedicated orchestrator event loop."""
+
+        wrapped = asyncio.wait_for(coro, timeout=timeout)
+        future = asyncio.run_coroutine_threadsafe(wrapped, self._async_loop)
+        try:
+            return future.result(timeout + 1)
+        except FutureTimeoutError as exc:
+            future.cancel()
+            raise asyncio.TimeoutError(
+                f"Coroutine timed out after {timeout}s"
+            ) from exc
         except Exception:
-            self.logger.debug("Executing blocking callable via native thread fallback")
-            result_holder: dict[str, Any] = {}
-            error_holder: dict[str, Exception] = {}
-
-            def thread_runner() -> None:
-                try:
-                    result_holder["value"] = func()
-                except Exception as exc:  # noqa: BLE001
-                    error_holder["error"] = exc
-
-            thread = threading.Thread(target=thread_runner, daemon=True)
-            thread.start()
-            thread.join()
-
-            if error_holder:
-                raise error_holder["error"]
-            return result_holder.get("value")
+            raise
 
     def register_cache_invalidation_callback(self, callback):
         """Register a callback for cache invalidation on service restarts"""

@@ -10,11 +10,13 @@ import asyncio
 import time
 import json
 import logging
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import aiohttp
 from datetime import datetime, timedelta
+import psutil
 
 try:
     from context_cleaner.telemetry.context_rot.config import ApplicationConfig
@@ -158,10 +160,29 @@ class APIUIConsistencyChecker:
         self.last_check_results: Dict[str, ConsistencyCheckResult] = {}
         self.check_history: List[Dict[str, ConsistencyCheckResult]] = []
         
-        # Check intervals
-        self.check_interval = 45.0  # seconds - increased from 30 to give more time between checks
-        self.ui_check_timeout = 10.0  # seconds
-        self.startup_delay = 15.0  # seconds - wait for dashboard to be ready
+        # Configuration and cadence controls (ENV overrides for tuning)
+        self.check_interval = float(os.getenv("CONTEXT_CLEANER_CONSISTENCY_INTERVAL", "300"))
+        self.ui_check_timeout = float(os.getenv("CONTEXT_CLEANER_CONSISTENCY_UI_TIMEOUT", "5.0"))
+        self.startup_delay = float(os.getenv("CONTEXT_CLEANER_CONSISTENCY_STARTUP_DELAY", "15.0"))
+        self.http_session_timeout = float(os.getenv("CONTEXT_CLEANER_CONSISTENCY_HTTP_TIMEOUT", "30.0"))
+        self.http_connector_limit = int(os.getenv("CONTEXT_CLEANER_CONSISTENCY_HTTP_LIMIT", "4"))
+        self.max_endpoints_per_cycle = int(os.getenv("CONTEXT_CLEANER_CONSISTENCY_ENDPOINT_BATCH", "5"))
+        self.ui_min_content_length = int(os.getenv("CONTEXT_CLEANER_CONSISTENCY_MIN_HTML", "2000"))
+        self.fd_logging_enabled = os.getenv("CONTEXT_CLEANER_CONSISTENCY_LOG_FDS", "false").strip().lower() in {"1", "true", "yes", "on"}
+        self._fd_process = psutil.Process() if self.fd_logging_enabled else None
+        self._fd_baseline: Optional[int] = None
+
+        # UI readiness heuristics
+        self.ui_ready_markers = (
+            "telemetry-widget",
+            "data-widget",
+            "dashboard-root",
+            "context-cleaner",
+            "window.__CONTEXT_CLEANER",
+        )
+
+        # Endpoint batching state
+        self._endpoint_cursor = 0
 
         # Task management and error recovery
         self.monitoring_task: Optional[asyncio.Task] = None
@@ -417,101 +438,149 @@ class APIUIConsistencyChecker:
 
         return False
 
-    async def test_api_endpoint(self, endpoint_test: APIEndpointTest) -> Tuple[str, float, int, Optional[str], Any]:
-        """
-        Test a single API endpoint and return status, response time, data size, error, and response data
-        """
+    async def test_api_endpoint(
+        self,
+        endpoint_test: APIEndpointTest,
+        *,
+        session: aiohttp.ClientSession,
+    ) -> Tuple[str, float, int, Optional[str], Any]:
+        """Test a single API endpoint using a shared HTTP session."""
+
         start_time = time.time()
-        self.logger.debug(f"🔗 ENDPOINT_TEST: Starting test for {endpoint_test.path} (method: {endpoint_test.method})")
+        self.logger.debug(
+            f"🔗 ENDPOINT_TEST: Starting test for {endpoint_test.path} (method: {endpoint_test.method})"
+        )
 
         # Check circuit breaker before making request
         circuit_breaker = self._circuit_breakers.get(endpoint_test.path)
         if circuit_breaker and not circuit_breaker.can_execute():
             response_time = time.time() - start_time
             state_info = circuit_breaker.get_state_info()
-            self.logger.warning(f"🔗 ENDPOINT_TEST: Circuit breaker OPEN for {endpoint_test.path}: {state_info}")
-            return "circuit_open", response_time, 0, f"Circuit breaker {state_info['state']}: {circuit_breaker.failure_count} failures", None
+            self.logger.warning(
+                f"🔗 ENDPOINT_TEST: Circuit breaker OPEN for {endpoint_test.path}: {state_info}"
+            )
+            return (
+                "circuit_open",
+                response_time,
+                0,
+                f"Circuit breaker {state_info['state']}: {circuit_breaker.failure_count} failures",
+                None,
+            )
 
         try:
-            session_timeout = aiohttp.ClientTimeout(total=endpoint_test.timeout)
-            self.logger.debug(f"🔗 ENDPOINT_TEST: Creating session for {endpoint_test.path} with timeout {endpoint_test.timeout}s")
+            url = f"{self.base_url}{endpoint_test.path}"
+            request_start = time.time()
+            request_timeout = aiohttp.ClientTimeout(total=endpoint_test.timeout)
 
-            async with aiohttp.ClientSession(timeout=session_timeout) as session:
-                url = f"{self.base_url}{endpoint_test.path}"
-                self.logger.debug(f"🔗 ENDPOINT_TEST: Making {endpoint_test.method} request to {url}")
+            async with session.request(
+                endpoint_test.method,
+                url,
+                timeout=request_timeout,
+            ) as response:
+                response_time = time.time() - start_time
+                request_duration = time.time() - request_start
 
-                request_start = time.time()
-                async with session.request(endpoint_test.method, url) as response:
-                    response_time = time.time() - start_time
-                    request_duration = time.time() - request_start
+                self.logger.debug(
+                    f"🔗 ENDPOINT_TEST: {endpoint_test.path} responded with status {response.status} in {request_duration:.2f}s"
+                )
 
-                    self.logger.debug(f"🔗 ENDPOINT_TEST: {endpoint_test.path} responded with status {response.status} in {request_duration:.2f}s")
+                if response.status == 200:
+                    try:
+                        json_start = time.time()
+                        data = await response.json()
+                        json_duration = time.time() - json_start
+                        data_size = len(json.dumps(data))
+                        self.logger.debug(
+                            f"🔗 ENDPOINT_TEST: {endpoint_test.path} JSON parsing took {json_duration:.2f}s, size: {data_size} bytes"
+                        )
 
-                    if response.status == 200:
-                        try:
-                            json_start = time.time()
-                            data = await response.json()
-                            json_duration = time.time() - json_start
-                            data_size = len(json.dumps(data))
-                            self.logger.debug(f"🔗 ENDPOINT_TEST: {endpoint_test.path} JSON parsing took {json_duration:.2f}s, size: {data_size} bytes")
-                            
-                            # Check if expected keys are present
-                            missing_keys = []
-                            for key in endpoint_test.expected_keys:
-                                if key not in data:
-                                    missing_keys.append(key)
-                            
-                            if missing_keys:
-                                result = ("partial", response_time, data_size, f"Missing keys: {missing_keys}", data)
-                                self._record_circuit_breaker_result(endpoint_test.path, "partial")
-                                return result
+                        missing_keys = [
+                            key for key in endpoint_test.expected_keys if key not in data
+                        ]
 
-                            result = ("success", response_time, data_size, None, data)
-                            self._record_circuit_breaker_result(endpoint_test.path, "success")
+                        if missing_keys:
+                            result = (
+                                "partial",
+                                response_time,
+                                data_size,
+                                f"Missing keys: {missing_keys}",
+                                data,
+                            )
+                            self._record_circuit_breaker_result(endpoint_test.path, "partial")
                             return result
-                            
-                        except json.JSONDecodeError as e:
-                            result = ("invalid_json", response_time, 0, f"JSON decode error: {str(e)}", None)
-                            self._record_circuit_breaker_result(endpoint_test.path, "invalid_json")
-                            return result
 
-                    else:
-                        error_text = await response.text()
-                        result = ("error", response_time, len(error_text), f"HTTP {response.status}: {error_text}", None)
-                        self._record_circuit_breaker_result(endpoint_test.path, "error")
+                        result = ("success", response_time, data_size, None, data)
+                        self._record_circuit_breaker_result(endpoint_test.path, "success")
                         return result
+
+                    except json.JSONDecodeError as json_error:
+                        result = (
+                            "invalid_json",
+                            response_time,
+                            0,
+                            f"JSON decode error: {json_error}",
+                            None,
+                        )
+                        self._record_circuit_breaker_result(endpoint_test.path, "invalid_json")
+                        return result
+
+                error_text = await response.text()
+                result = (
+                    "error",
+                    response_time,
+                    len(error_text),
+                    f"HTTP {response.status}: {error_text}",
+                    None,
+                )
+                self._record_circuit_breaker_result(endpoint_test.path, "error")
+                return result
 
         except asyncio.TimeoutError:
             response_time = time.time() - start_time
-            result = ("timeout", response_time, 0, f"Request timeout after {endpoint_test.timeout}s", None)
+            result = (
+                "timeout",
+                response_time,
+                0,
+                f"Request timeout after {endpoint_test.timeout}s",
+                None,
+            )
             self._record_circuit_breaker_result(endpoint_test.path, "timeout")
             return result
 
-        except Exception as e:
+        except Exception as exc:
             response_time = time.time() - start_time
-            error_type = type(e).__name__
-            error_msg = str(e)
+            error_type = type(exc).__name__
+            error_msg = str(exc)
 
-            # Log detailed error information
-            self.logger.warning(f"🔗 ENDPOINT_TEST: ❌ {endpoint_test.path} failed after {response_time:.2f}s: {error_type}")
-            self.logger.debug(f"🔗 ENDPOINT_TEST: Full error for {endpoint_test.path}: {error_msg}")
+            self.logger.warning(
+                f"🔗 ENDPOINT_TEST: ❌ {endpoint_test.path} failed after {response_time:.2f}s: {error_type}"
+            )
+            self.logger.debug(
+                f"🔗 ENDPOINT_TEST: Full error for {endpoint_test.path}: {error_msg}"
+            )
 
-            # Categorize connection errors for better debugging
-            if "Cannot connect to host" in error_msg or "Connection refused" in error_msg:
-                self.logger.warning(f"🔗 ENDPOINT_TEST: Connection error to {self.base_url}{endpoint_test.path} - Dashboard may be down or port incorrect")
+            if "cannot connect" in error_msg.lower() or "connection refused" in error_msg.lower():
+                self.logger.warning(
+                    f"🔗 ENDPOINT_TEST: Connection error to {self.base_url}{endpoint_test.path}"
+                )
             elif "timeout" in error_msg.lower():
-                self.logger.warning(f"🔗 ENDPOINT_TEST: Timeout error for {endpoint_test.path} after {endpoint_test.timeout}s")
-            elif "SSL" in error_msg or "ssl" in error_msg:
-                self.logger.warning(f"🔗 ENDPOINT_TEST: SSL/TLS error for {endpoint_test.path}")
+                self.logger.warning(
+                    f"🔗 ENDPOINT_TEST: Timeout error for {endpoint_test.path} after {endpoint_test.timeout}s"
+                )
+            elif "ssl" in error_msg.lower():
+                self.logger.warning(
+                    f"🔗 ENDPOINT_TEST: SSL/TLS error for {endpoint_test.path}"
+                )
 
-            # Record circuit breaker failure with detailed context
             circuit_breaker = self._circuit_breakers.get(endpoint_test.path)
             if circuit_breaker:
                 old_state = circuit_breaker.state.value
                 self._record_circuit_breaker_result(endpoint_test.path, "error")
                 new_state = circuit_breaker.state.value
                 if old_state != new_state:
-                    self.logger.warning(f"🔗 CIRCUIT_BREAKER: {endpoint_test.path} state changed: {old_state} → {new_state} (failures: {circuit_breaker.failure_count})")
+                    self.logger.warning(
+                        f"🔗 CIRCUIT_BREAKER: {endpoint_test.path} state changed: {old_state} → {new_state} (failures: {circuit_breaker.failure_count})"
+                    )
 
             result = ("error", response_time, 0, error_msg, None)
             return result
@@ -538,32 +607,79 @@ class APIUIConsistencyChecker:
             elif status in ["error", "timeout", "invalid_json"]:
                 circuit_breaker.record_failure()
 
-    async def check_ui_widget_status(self, endpoint_path: str) -> Tuple[str, Optional[str]]:
-        """
-        Attempt to check if UI widgets are properly displaying data
-        This is a simplified check - in a full implementation, you'd use browser automation
-        """
+    async def check_ui_widget_status(
+        self,
+        endpoint_path: str,
+        *,
+        session: aiohttp.ClientSession,
+        dashboard_html: Optional[str] = None,
+    ) -> Tuple[str, Optional[str]]:
+        """Classify the dashboard UI state using a shared session and cached HTML."""
+
         try:
-            # For now, we'll check if the main dashboard page loads
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.ui_check_timeout)) as session:
-                async with session.get(self.base_url) as response:
-                    if response.status == 200:
-                        html_content = await response.text()
-                        
-                        # Simple heuristic checks
-                        if "Loading..." in html_content:
-                            return "loading", "Dashboard HTML contains 'Loading...' text"
-                        elif "Error" in html_content or "error" in html_content.lower():
-                            return "error", "Dashboard HTML contains error indicators"
-                        elif len(html_content) < 1000:
-                            return "minimal", "Dashboard HTML is suspiciously small"
-                        else:
-                            return "loaded", None
-                    else:
-                        return "error", f"Dashboard returned HTTP {response.status}"
-                        
-        except Exception as e:
-            return "error", str(e)
+            if dashboard_html is None:
+                dashboard_html = await self.fetch_dashboard_html(session)
+
+            if dashboard_html is None:
+                return "error", "Dashboard HTML unavailable"
+
+            return self._classify_dashboard_html(dashboard_html)
+
+        except Exception as exc:  # pragma: no cover - defensive
+            return "error", str(exc)
+
+    async def fetch_dashboard_html(self, session: aiohttp.ClientSession) -> Optional[str]:
+        """Fetch the dashboard HTML once per cycle."""
+
+        try:
+            async with session.get(
+                self.base_url,
+                timeout=aiohttp.ClientTimeout(total=self.ui_check_timeout),
+            ) as response:
+                if response.status == 200:
+                    html = await response.text()
+                    self.logger.debug(
+                        f"🌐 DASHBOARD_HTML: Retrieved {len(html)} bytes from {self.base_url}"
+                    )
+                    return html
+
+                self.logger.debug(
+                    f"🌐 DASHBOARD_HTML: HTTP {response.status} while fetching dashboard root"
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug(f"🌐 DASHBOARD_HTML: Failed to fetch dashboard HTML: {exc}")
+
+        return None
+
+    def _classify_dashboard_html(self, html: str) -> Tuple[str, Optional[str]]:
+        """Apply lightweight heuristics to classify dashboard readiness."""
+
+        content_length = len(html)
+        lowered = html.lower()
+
+        if content_length < self.ui_min_content_length:
+            return "minimal", (
+                f"Dashboard HTML length {content_length} below threshold {self.ui_min_content_length}"
+            )
+
+        if "data-dashboard-error" in lowered or "runtime error" in lowered or "stack trace" in lowered:
+            return "error", "Dashboard HTML contains error indicators"
+
+        ready_marker = any(marker.lower() in lowered for marker in self.ui_ready_markers)
+        loading_marker = (
+            "data-loading" in lowered
+            or "aria-busy=\"true\"" in lowered
+            or "loading..." in lowered
+        )
+
+        if ready_marker:
+            return "loaded", None
+
+        if loading_marker:
+            return "loading", "Dashboard HTML indicates loading state"
+
+        # Default to loaded when content looks healthy but markers were absent
+        return "loaded", None
 
     async def wait_for_dashboard_ready(self, max_wait: float = 60.0, check_interval: float = 2.0) -> bool:
         """Wait for the dashboard to be ready before starting consistency checks"""
@@ -686,58 +802,141 @@ class APIUIConsistencyChecker:
             
         return recommendations
     
-    async def run_consistency_check(self) -> Dict[str, ConsistencyCheckResult]:
-        """Run a comprehensive consistency check on all endpoints"""
-        
-        self.logger.info(f"Starting API/UI consistency check for {len(self.api_endpoints)} endpoints")
-        
-        results = {}
-        
-        for endpoint_test in self.api_endpoints:
-            self.logger.debug(f"Testing endpoint: {endpoint_test.path}")
-            
-            # Test the API endpoint
-            api_status, response_time, data_size, api_error, api_data = await self.test_api_endpoint(endpoint_test)
-            
-            # Check UI status (simplified for this endpoint)
-            ui_status, ui_error = await self.check_ui_widget_status(endpoint_test.path)
-            
-            # Determine consistency status
-            consistency_status = self.determine_consistency_status(api_status, ui_status, data_size)
-            
-            # Create result
-            result = ConsistencyCheckResult(
-                endpoint=endpoint_test.path,
-                api_status=api_status,
-                api_response_time=response_time,
-                api_data_size=data_size,
-                api_error=api_error,
-                ui_status=ui_status,
-                ui_error=ui_error,
-                consistency_status=consistency_status,
-                timestamp=datetime.now()
+    async def run_consistency_check(
+        self,
+        session: Optional[aiohttp.ClientSession] = None,
+    ) -> Dict[str, ConsistencyCheckResult]:
+        """Run a consistency check using a shared session and batched endpoints."""
+
+        owns_session = session is None
+        if owns_session:
+            timeout = aiohttp.ClientTimeout(total=self.http_session_timeout)
+            connector = aiohttp.TCPConnector(limit_per_host=self.http_connector_limit)
+            session = aiohttp.ClientSession(timeout=timeout, connector=connector)
+
+        assert session is not None  # For type-checkers
+
+        endpoints_to_check = self._select_endpoints_for_cycle()
+        if not endpoints_to_check:
+            self.logger.debug("Consistency check skipped: no endpoints configured")
+            return {}
+
+        self.logger.info(
+            f"Starting API/UI consistency check for {len(endpoints_to_check)} endpoints (batch mode)"
+        )
+
+        if self.fd_logging_enabled:
+            fd_before = self._capture_fd_count()
+            if fd_before is not None:
+                self.logger.debug(f"🔍 FD_MONITOR: descriptors before cycle={fd_before}")
+                if self._fd_baseline is None:
+                    self._fd_baseline = fd_before
+
+        cycle_results: Dict[str, ConsistencyCheckResult] = {}
+
+        try:
+            dashboard_html = await self.fetch_dashboard_html(session)
+
+            for endpoint_test in endpoints_to_check:
+                self.logger.debug(f"Testing endpoint: {endpoint_test.path}")
+
+                api_status, response_time, data_size, api_error, api_data = await self.test_api_endpoint(
+                    endpoint_test,
+                    session=session,
+                )
+
+                ui_status, ui_error = await self.check_ui_widget_status(
+                    endpoint_test.path,
+                    session=session,
+                    dashboard_html=dashboard_html,
+                )
+
+                consistency_status = self.determine_consistency_status(
+                    api_status,
+                    ui_status,
+                    data_size,
+                )
+
+                result = ConsistencyCheckResult(
+                    endpoint=endpoint_test.path,
+                    api_status=api_status,
+                    api_response_time=response_time,
+                    api_data_size=data_size,
+                    api_error=api_error,
+                    ui_status=ui_status,
+                    ui_error=ui_error,
+                    consistency_status=consistency_status,
+                    timestamp=datetime.now(),
+                )
+
+                result.recommendations = self.generate_recommendations(result)
+                cycle_results[endpoint_test.path] = result
+
+            if cycle_results:
+                self.last_check_results.update(cycle_results)
+                self.check_history.append({
+                    "timestamp": datetime.now(),
+                    "results": cycle_results.copy(),
+                })
+                if len(self.check_history) > 50:
+                    self.check_history = self.check_history[-50:]
+
+            self.logger.info(
+                f"Consistency check completed. Found {self._count_inconsistencies(cycle_results)} inconsistencies"
             )
-            
-            # Generate recommendations
-            result.recommendations = self.generate_recommendations(result)
-            
-            results[endpoint_test.path] = result
-            
-        # Store results
-        self.last_check_results = results
-        self.check_history.append({
-            "timestamp": datetime.now(),
-            "results": results.copy()
-        })
-        
-        # Keep only last 50 checks in history
-        if len(self.check_history) > 50:
-            self.check_history = self.check_history[-50:]
-            
-        self.logger.info(f"Consistency check completed. Found {self._count_inconsistencies(results)} inconsistencies")
-        
-        return results
+
+            if self.fd_logging_enabled:
+                fd_after = self._capture_fd_count()
+                if fd_after is not None:
+                    delta = (
+                        None
+                        if self._fd_baseline is None
+                        else fd_after - self._fd_baseline
+                    )
+                    self.logger.debug(
+                        f"🔍 FD_MONITOR: descriptors after cycle={fd_after} (Δ{delta})"
+                    )
+
+            return cycle_results
+
+        finally:
+            if owns_session:
+                await session.close()
     
+    def _select_endpoints_for_cycle(self) -> List[APIEndpointTest]:
+        """Return the next batch of endpoints to evaluate."""
+
+        if not self.api_endpoints:
+            return []
+
+        if (
+            self.max_endpoints_per_cycle <= 0
+            or self.max_endpoints_per_cycle >= len(self.api_endpoints)
+        ):
+            return list(self.api_endpoints)
+
+        batch_size = max(1, self.max_endpoints_per_cycle)
+        selected: List[APIEndpointTest] = []
+        total = len(self.api_endpoints)
+
+        for _ in range(batch_size):
+            index = self._endpoint_cursor % total
+            selected.append(self.api_endpoints[index])
+            self._endpoint_cursor = (self._endpoint_cursor + 1) % total
+
+        return selected
+
+    def _capture_fd_count(self) -> Optional[int]:
+        """Capture the current file descriptor count when enabled."""
+
+        if not self.fd_logging_enabled or self._fd_process is None:
+            return None
+
+        try:
+            return self._fd_process.num_fds()
+        except Exception:  # pragma: no cover - platform dependent
+            return None
+
     def _count_inconsistencies(self, results: Dict[str, ConsistencyCheckResult]) -> int:
         """Count the number of inconsistencies found"""
         return len([r for r in results.values() 
@@ -879,10 +1078,17 @@ class APIUIConsistencyChecker:
 
                     # Run consistency check with timeout protection
                     check_start = time.time()
-                    await asyncio.wait_for(
-                        self.run_consistency_check(),
-                        timeout=self.check_interval * 0.8  # Use 80% of interval as timeout
-                    )
+                    timeout_obj = aiohttp.ClientTimeout(total=self.http_session_timeout)
+                    connector = aiohttp.TCPConnector(limit_per_host=self.http_connector_limit)
+
+                    async with aiohttp.ClientSession(
+                        timeout=timeout_obj,
+                        connector=connector,
+                    ) as session:
+                        await asyncio.wait_for(
+                            self.run_consistency_check(session=session),
+                            timeout=self.check_interval * 0.8,  # Use 80% of interval as timeout
+                        )
 
                     check_duration = time.time() - check_start
 

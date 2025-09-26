@@ -39,9 +39,15 @@ def get_socketio_async_mode() -> str:
             mode,
         )
 
-    # Default to the safe built-in threading mode. Teams that prefer Eventlet or
-    # another async driver can opt-in via the environment variable above.
-    return "threading"
+    # Default: prefer eventlet when available so we can run under Gunicorn
+    try:
+        import eventlet  # type: ignore # noqa: F401
+
+        return "eventlet"
+    except Exception:
+        # Fall back to the safe built-in threading mode. Teams that prefer a
+        # different async driver can opt-in via the environment variable above.
+        return "threading"
 
 
 def ensure_eventlet_monkey_patch(*, patch_threads: bool = True) -> None:
