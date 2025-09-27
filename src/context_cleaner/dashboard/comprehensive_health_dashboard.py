@@ -3352,39 +3352,54 @@ if __name__ == "__main__":
 
         import asyncio
 
-        asyncio.set_event_loop(loop)
-        coroutine = self.telemetry_client.get_total_aggregated_stats()
+        try:
+            asyncio.set_event_loop(loop)
+            coroutine = self.telemetry_client.get_total_aggregated_stats()
 
-        # Defensive guard: make sure we actually got a coroutine/future back
-        if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
-            logger.warning(
-                "Expected coroutine from get_total_aggregated_stats(), got %s",
-                type(coroutine),
-            )
-            return coroutine
+            # Defensive guard: make sure we actually got a coroutine/future back
+            if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+                logger.warning(
+                    "Expected coroutine from get_total_aggregated_stats(), got %s",
+                    type(coroutine),
+                )
+                return coroutine
 
-        return loop.run_until_complete(coroutine)
+            return loop.run_until_complete(coroutine)
+
+        finally:
+            # Ensure the loop is closed to avoid pending coroutine warnings on shutdown
+            try:
+                loop.close()
+            except RuntimeError:
+                pass
     
     def _fetch_model_efficiency(self, loop):
         """Helper method to fetch model efficiency data in separate thread."""
 
         import asyncio
 
-        asyncio.set_event_loop(loop)
+        try:
+            asyncio.set_event_loop(loop)
 
-        coroutine = self.telemetry_widgets.get_widget_data(
-            TelemetryWidgetType.MODEL_EFFICIENCY
-        )
-
-        if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
-            logger.warning(
-                "Expected coroutine from telemetry widget get_widget_data(), got %s",
-                type(coroutine),
+            coroutine = self.telemetry_widgets.get_widget_data(
+                TelemetryWidgetType.MODEL_EFFICIENCY
             )
-            return getattr(coroutine, "data", None)
 
-        model_widget = loop.run_until_complete(coroutine)
-        return model_widget.data if model_widget else None
+            if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+                logger.warning(
+                    "Expected coroutine from telemetry widget get_widget_data(), got %s",
+                    type(coroutine),
+                )
+                return getattr(coroutine, "data", None)
+
+            model_widget = loop.run_until_complete(coroutine)
+            return model_widget.data if model_widget else None
+
+        finally:
+            try:
+                loop.close()
+            except RuntimeError:
+                pass
 
     def _get_local_jsonl_stats(self) -> Dict[str, Any]:
         """Get dashboard metrics from local JSONL files when telemetry is unavailable."""

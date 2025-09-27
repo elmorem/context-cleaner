@@ -588,6 +588,7 @@ class TelemetryWidgetManager:
             else:
                 trend = "stable"
             
+            max_recent_errors = 15
             error_data = ErrorMonitorData(
                 current_error_rate=error_rate,
                 error_trend=trend,
@@ -596,7 +597,7 @@ class TelemetryWidgetManager:
                     "error_type": e.error_type,
                     "timestamp": e.timestamp.isoformat(),
                     "model": e.model
-                } for e in recent_errors[-5:]],  # Last 5 errors
+                } for e in recent_errors[:max_recent_errors]],  # Most recent errors (up to 15)
                 recovery_success_rate=recovery_rate,
                 last_error_time=recent_errors[-1].timestamp if recent_errors else None
             )

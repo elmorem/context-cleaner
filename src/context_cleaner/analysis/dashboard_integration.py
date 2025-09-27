@@ -124,7 +124,7 @@ class DashboardTokenAnalyzer:
             })
         
         # Sort by total tokens descending
-        categories.sort(key=lambda x: x["total_tokens"], reverse=True)
+        categories.sort(key=lambda x: x["tokens"], reverse=True)
         
         # Create summary statistics
         total_input = sum(cat["breakdown"]["input"] for cat in categories)
