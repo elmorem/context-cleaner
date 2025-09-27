@@ -106,15 +106,17 @@ class DashboardTokenAnalyzer:
                 efficiency = 0
                 cache_usage = 0
             
+            breakdown = {
+                "input": int(actual_tokens * 0.6),
+                "cache_creation": int(actual_tokens * 0.15),
+                "cache_read": int(actual_tokens * 0.15),
+                "output": int(actual_tokens * 0.1)
+            }
+
             categories.append({
                 "name": category.replace("_", " ").title(),
-                "tokens": {
-                    "input": int(actual_tokens * 0.6),  # Estimated breakdown
-                    "cache_creation": int(actual_tokens * 0.15),
-                    "cache_read": int(actual_tokens * 0.15), 
-                    "output": int(actual_tokens * 0.1)
-                },
-                "total_tokens": actual_tokens,
+                "tokens": actual_tokens,
+                "breakdown": breakdown,
                 "efficiency": efficiency,
                 "cache_usage": cache_usage,
                 "sessions": len([s for s in analysis.sessions.values() 
@@ -125,23 +127,25 @@ class DashboardTokenAnalyzer:
         categories.sort(key=lambda x: x["total_tokens"], reverse=True)
         
         # Create summary statistics
-        total_input = sum(cat["tokens"]["input"] for cat in categories)
-        total_cache_creation = sum(cat["tokens"]["cache_creation"] for cat in categories)
-        total_cache_read = sum(cat["tokens"]["cache_read"] for cat in categories)
-        total_output = sum(cat["tokens"]["output"] for cat in categories)
-        
+        total_input = sum(cat["breakdown"]["input"] for cat in categories)
+        total_cache_creation = sum(cat["breakdown"]["cache_creation"] for cat in categories)
+        total_cache_read = sum(cat["breakdown"]["cache_read"] for cat in categories)
+        total_output = sum(cat["breakdown"]["output"] for cat in categories)
+
         # Calculate improvement metrics
         improvement_factor = analysis.global_accuracy_ratio
         missed_tokens = max(0, analysis.total_calculated_tokens - analysis.total_reported_tokens)
-        
+
+        token_breakdown = {
+            "input": total_input,
+            "cache_creation": total_cache_creation,
+            "cache_read": total_cache_read,
+            "output": total_output
+        }
+
         return {
-            "total_tokens": {
-                "input": total_input,
-                "cache_creation": total_cache_creation, 
-                "cache_read": total_cache_read,
-                "output": total_output,
-                "total": actual_total_tokens
-            },
+            "total_tokens": actual_total_tokens,
+            "token_breakdown": token_breakdown,
             "categories": categories,
             "analysis_metadata": {
                 "enhanced_analysis": True,

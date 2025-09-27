@@ -26,13 +26,17 @@ from enum import Enum
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from contextlib import suppress
 import sys
-import os
 import psutil
 import re
 import platform
 import socket
 import urllib.request
 import urllib.error
+
+try:  # Some platforms (e.g. Windows) do not expose resource
+    import resource
+except ImportError:  # pragma: no cover - platform fallback
+    resource = None
 
 StopCallbackType = Callable[[], Union[bool, Awaitable[bool], None]]
 from .api_ui_consistency_checker import APIUIConsistencyChecker
@@ -178,6 +182,9 @@ class ServiceOrchestrator:
 
         # Lifecycle timestamps
         self.started_at: Optional[datetime] = None
+
+        # Proactively lift file descriptor limits to avoid docker health check failures
+        self._ensure_fd_capacity()
 
         # Dedicated asyncio loop for health/restart helpers
         self._async_loop = asyncio.new_event_loop()
@@ -2137,6 +2144,31 @@ class ServiceOrchestrator:
             'resource temporarily unavailable'
         ]
         return any(pattern in error_str for pattern in retryable_patterns)
+
+    def _ensure_fd_capacity(self, minimum_limit: int = 4096) -> None:
+        """Attempt to raise the soft file-descriptor limit to keep long-running Docker checks healthy."""
+
+        if resource is None:  # Platform without resource module
+            return
+
+        try:
+            soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
+            # Determine the desired target respecting the hard limit/infinity sentinel
+            if hard == resource.RLIM_INFINITY:
+                target = max(soft, minimum_limit)
+            else:
+                target = min(max(soft, minimum_limit), hard)
+
+            if target > soft:
+                resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+                self.logger.info(
+                    "Increased file descriptor soft limit from %s to %s to prevent docker command failures",
+                    soft,
+                    target,
+                )
+        except (ValueError, OSError) as exc:
+            self.logger.debug("Could not adjust file descriptor limit: %s", exc)
     
     async def _execute_docker_command_core(self, cmd: List[str], timeout: int, retry_count: int) -> 'DockerCommandResult':
         """Core Docker command execution with circuit breaker pattern."""
@@ -2215,10 +2247,24 @@ class ServiceOrchestrator:
             )
             
         except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+
+            # Gracefully handle file descriptor exhaustion by attempting to raise limits once
+            if isinstance(e, OSError) and getattr(e, "errno", None) == 24:
+                self.logger.error(
+                    "Docker command failed due to file descriptor exhaustion (%s).",
+                    e,
+                )
+                self._ensure_fd_capacity()
+                return DockerCommandResult(
+                    stderr="Too many open files",
+                    execution_time_ms=execution_time,
+                    retry_count=retry_count,
+                )
+
             error_msg = f"Docker command execution error: {str(e)}"
             if self.verbose:
                 print(f"   ⚠️  {error_msg}")
-            execution_time = int((time.time() - start_time) * 1000)
             raise e
 
     # Health check implementations with multi-stage validation

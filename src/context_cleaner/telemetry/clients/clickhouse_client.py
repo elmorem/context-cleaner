@@ -15,6 +15,9 @@ import random
 import contextlib
 from typing import List  # Add List to imports
 
+from urllib import request as urllib_request
+from urllib import error as urllib_error
+
 from .base import TelemetryClient, SessionMetrics, ErrorEvent, TelemetryEvent
 
 logger = logging.getLogger(__name__)
@@ -167,6 +170,10 @@ class ClickHouseClient(TelemetryClient):
         self.port = port
         self.database = database
         self.connection_string = f"tcp://{host}:{port}"
+        self.http_host = os.getenv("CLICKHOUSE_HTTP_HOST", host)
+        self.http_port = int(os.getenv("CLICKHOUSE_HTTP_PORT", "8123"))
+        self.http_url = f"http://{self.http_host}:{self.http_port}"
+        self._http_timeout = query_timeout
 
         # Adaptive connection pool management
         self.pool = AdaptiveConnectionPool(
@@ -209,6 +216,11 @@ class ClickHouseClient(TelemetryClient):
                    f"host={host}, port={port}, database={database}, "
                    f"pool=[{min_connections}-{max_connections}], "
                    f"caching={enable_query_caching}")
+
+    def close(self):
+        """Release network resources."""
+        # No persistent HTTP session to close when using urllib
+        return
     
     def _get_lock(self):
         """Get appropriate lock for current execution context."""
@@ -445,20 +457,49 @@ class ClickHouseClient(TelemetryClient):
         timeout = timeout or self.pool.query_timeout_seconds
         
         try:
-            # Use docker exec to run clickhouse-client
+            try:
+                params = "default_format=JSONEachRow"
+                url = f"{self.http_url}/?{params}"
+                req = urllib_request.Request(
+                    url,
+                    data=query.encode("utf-8"),
+                    headers={
+                        "Content-Type": "text/plain; charset=utf-8",
+                        "Accept": "application/json"
+                    },
+                    method="POST",
+                )
+
+                with urllib_request.urlopen(req, timeout=timeout) as response:
+                    body = response.read().decode("utf-8")
+
+                results = []
+                for line in body.strip().split('\n'):
+                    if line:
+                        try:
+                            results.append(json.loads(line))
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse JSON line: {line}, error: {e}")
+                return results
+            except urllib_error.URLError as http_error:
+                logger.warning(
+                    "HTTP query path failed (%s). Falling back to docker exec.",
+                    http_error,
+                )
+
+            # Fall back to docker exec when HTTP path fails
             cmd = [
-                "docker", "exec", "clickhouse-otel", 
-                "clickhouse-client", 
+                "docker", "exec", "clickhouse-otel",
+                "clickhouse-client",
                 "--query", query,
                 "--format", "JSONEachRow"
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-            
+
             if result.returncode != 0:
                 raise RuntimeError(f"ClickHouse query failed: {result.stderr}")
-            
-            # Parse JSON lines
+
             results = []
             for line in result.stdout.strip().split('\n'):
                 if line:
@@ -466,7 +507,7 @@ class ClickHouseClient(TelemetryClient):
                         results.append(json.loads(line))
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON line: {line}, error: {e}")
-            
+
             return results
             
         except subprocess.TimeoutExpired:

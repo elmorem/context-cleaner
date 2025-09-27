@@ -11,6 +11,8 @@ This service addresses the 90% undercount issue in the current token analysis by
 import logging
 import asyncio
 import json
+import math
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
@@ -28,6 +30,25 @@ except ImportError:
     aiohttp = None
 
 logger = logging.getLogger(__name__)
+
+
+def get_accurate_token_count(content: Any) -> int:
+    """Return a conservative token estimate for arbitrary content strings."""
+
+    if content is None:
+        return 0
+
+    if not isinstance(content, str):
+        content = str(content)
+
+    normalized = content.strip()
+    if not normalized:
+        return 0
+
+    word_tokens = len(re.findall(r"\S+", normalized))
+    char_tokens = math.ceil(len(normalized) / 4)
+
+    return max(word_tokens, char_tokens)
 
 
 @dataclass

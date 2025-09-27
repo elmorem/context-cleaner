@@ -2137,11 +2137,13 @@ class ComprehensiveHealthDashboard:
                         'last_updated': datetime.now().isoformat(),
                         'response_time_ms': response_time
                     }
-                    
+
                     # Add model efficiency data if available
                     if model_efficiency_data:
                         response_data['model_efficiency'] = model_efficiency_data
-                    
+
+                    self._apply_definitive_total_tokens(response_data, stats)
+
                     return jsonify(APIResponseFormatter.success(
                         response_data,
                         "Dashboard metrics retrieved successfully"
@@ -2160,19 +2162,23 @@ class ComprehensiveHealthDashboard:
             local_stats = self._get_local_jsonl_stats()
             response_time = (datetime.now() - start_time).total_seconds() * 1000
             
+            response_payload = {
+                'total_tokens': local_stats['total_tokens'],
+                'total_sessions': local_stats['total_sessions'],
+                'success_rate': local_stats['success_rate'],
+                'active_agents': local_stats['active_agents'],
+                'orchestration_status': 'local-mode',
+                'telemetry_status': 'using-local-data',
+                'total_cost': local_stats['total_cost'],
+                'total_errors': local_stats['total_errors'],
+                'last_updated': datetime.now().isoformat(),
+                'response_time_ms': response_time
+            }
+
+            self._apply_definitive_total_tokens(response_payload, local_stats)
+
             return jsonify(APIResponseFormatter.degraded(
-                {
-                    'total_tokens': local_stats['total_tokens'],
-                    'total_sessions': local_stats['total_sessions'],
-                    'success_rate': local_stats['success_rate'],
-                    'active_agents': local_stats['active_agents'],
-                    'orchestration_status': 'local-mode',
-                    'telemetry_status': 'using-local-data',
-                    'total_cost': local_stats['total_cost'],
-                    'total_errors': local_stats['total_errors'],
-                    'last_updated': datetime.now().isoformat(),
-                    'response_time_ms': response_time
-                },
+                response_payload,
                 "Using local data due to telemetry service unavailability",
                 "TELEMETRY_FALLBACK"
             ))
@@ -3342,20 +3348,42 @@ if __name__ == "__main__":
                 self._stop_event.wait(timeout=10.0)
 
     def _fetch_telemetry_stats(self, loop):
-        """Helper method to fetch telemetry stats in separate thread"""
+        """Helper method to fetch telemetry stats in separate thread."""
+
         import asyncio
+
         asyncio.set_event_loop(loop)
-        return loop.run_until_complete(
-            self.telemetry_client.get_total_aggregated_stats()
-        )
+        coroutine = self.telemetry_client.get_total_aggregated_stats()
+
+        # Defensive guard: make sure we actually got a coroutine/future back
+        if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+            logger.warning(
+                "Expected coroutine from get_total_aggregated_stats(), got %s",
+                type(coroutine),
+            )
+            return coroutine
+
+        return loop.run_until_complete(coroutine)
     
     def _fetch_model_efficiency(self, loop):
-        """Helper method to fetch model efficiency data in separate thread"""
+        """Helper method to fetch model efficiency data in separate thread."""
+
         import asyncio
+
         asyncio.set_event_loop(loop)
-        model_widget = loop.run_until_complete(
-            self.telemetry_widgets.get_widget_data(TelemetryWidgetType.MODEL_EFFICIENCY)
+
+        coroutine = self.telemetry_widgets.get_widget_data(
+            TelemetryWidgetType.MODEL_EFFICIENCY
         )
+
+        if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+            logger.warning(
+                "Expected coroutine from telemetry widget get_widget_data(), got %s",
+                type(coroutine),
+            )
+            return getattr(coroutine, "data", None)
+
+        model_widget = loop.run_until_complete(coroutine)
         return model_widget.data if model_widget else None
 
     def _get_local_jsonl_stats(self) -> Dict[str, Any]:
@@ -3436,7 +3464,8 @@ if __name__ == "__main__":
                 'success_rate': success_rate,
                 'active_agents': str(active_agents),
                 'total_cost': f"${total_cost:.2f}",
-                'total_errors': error_count
+                'total_errors': error_count,
+                'raw_total_tokens': total_tokens
             }
             
         except Exception as e:
@@ -3448,7 +3477,8 @@ if __name__ == "__main__":
                 'success_rate': "0%", 
                 'active_agents': "0",
                 'total_cost': "$0.00",
-                'total_errors': 1
+                'total_errors': 1,
+                'raw_total_tokens': 0
             }
 
     def _get_current_performance_metrics(self) -> Dict[str, Any]:
@@ -3494,6 +3524,83 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Performance metrics error: {e}")
             raise create_error_response(str(e), "PERFORMANCE_METRICS_ERROR")
+
+    def _apply_definitive_total_tokens(self, response_data: Dict[str, Any], stats_source: Dict[str, Any]) -> None:
+        """Ensure overview totals reflect the highest available token count."""
+
+        telemetry_total = self._extract_numeric_total(stats_source)
+        authoritative_total = self._get_authoritative_total_tokens()
+
+        candidates = [value for value in (telemetry_total, authoritative_total) if value is not None]
+        definitive_total = max(candidates) if candidates else 0
+
+        response_data['raw_total_tokens'] = definitive_total
+        response_data['total_tokens'] = f"{definitive_total:,}" if definitive_total else "0"
+
+    def _get_authoritative_total_tokens(self) -> Optional[int]:
+        """Compute the highest-fidelity total tokens available on this host."""
+
+        candidates: List[int] = []
+
+        try:
+            enhanced = self._analyze_token_usage()
+            if isinstance(enhanced, dict):
+                tokens = enhanced.get('total_tokens')
+                if isinstance(tokens, dict):
+                    tokens = tokens.get('total')
+                tokens_int = self._safe_int(tokens)
+                if tokens_int is not None and tokens_int > 0:
+                    candidates.append(tokens_int)
+        except Exception as analysis_error:
+            logger.debug(f"Enhanced token analysis unavailable: {analysis_error}")
+
+        try:
+            if getattr(self, 'context_analyzer', None):
+                usage = self.context_analyzer.get_total_context_usage()
+                tokens_int = self._safe_int(usage.get('estimated_total_tokens'))
+                if tokens_int is not None and tokens_int > 0:
+                    candidates.append(tokens_int)
+        except Exception as usage_error:
+            logger.debug(f"Context usage totals unavailable: {usage_error}")
+
+        return max(candidates) if candidates else None
+
+    def _extract_numeric_total(self, stats_source: Optional[Dict[str, Any]]) -> Optional[int]:
+        """Extract an integer token total from a stats payload."""
+
+        if not stats_source:
+            return None
+
+        if 'raw_total_tokens' in stats_source:
+            return self._safe_int(stats_source.get('raw_total_tokens'))
+
+        if 'total_tokens' in stats_source:
+            return self._safe_int(stats_source.get('total_tokens'))
+
+        return None
+
+    def _safe_int(self, value: Any) -> Optional[int]:
+        """Convert formatted totals to integers without raising."""
+
+        if value is None:
+            return None
+
+        if isinstance(value, bool):
+            return int(value)
+
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        if isinstance(value, str):
+            normalized = value.replace(',', '').strip()
+            if not normalized or not any(ch.isdigit() for ch in normalized):
+                return None
+            try:
+                return int(float(normalized))
+            except ValueError:
+                return None
+
+        return None
 
     def _generate_plotly_chart(self, chart_type: str) -> Dict[str, Any]:
         """Generate Plotly chart data for various chart types."""

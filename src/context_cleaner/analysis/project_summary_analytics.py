@@ -42,6 +42,7 @@ class ProjectSummaryAnalytics:
             # Discover and parse summary files
             summary_files = self._discover_summary_files(search_paths)
             summaries = self._parse_all_summaries(summary_files)
+            summaries = self._deduplicate_summaries(summaries)
             
             # Cache results
             self._cached_summaries = summaries
@@ -115,6 +116,53 @@ class ProjectSummaryAnalytics:
                 logger.warning(f"Error parsing summary file {file_path}: {e}")
                 
         return all_summaries
+
+    def _deduplicate_summaries(self, summaries: List[ProjectSummary]) -> List[ProjectSummary]:
+        """Remove duplicate summaries, preferring the most recent entry."""
+
+        if not summaries:
+            return []
+
+        deduped: List[ProjectSummary] = []
+        seen_leaf_ids = set()
+        seen_fallback_keys = set()
+        seen_descriptions = set()
+
+        for summary in sorted(summaries, key=lambda s: s.timestamp, reverse=True):
+            leaf_uuid = (summary.leaf_uuid or "").strip()
+
+            normalized_description = (summary.description or "").strip().lower()
+
+            if leaf_uuid:
+                if leaf_uuid in seen_leaf_ids:
+                    continue
+                if normalized_description and normalized_description in seen_descriptions:
+                    continue
+                seen_leaf_ids.add(leaf_uuid)
+            else:
+                title_key = (summary.title or "").strip().lower()
+                fallback_key = (title_key, normalized_description[:200])
+
+                if fallback_key in seen_fallback_keys or (
+                    normalized_description and normalized_description in seen_descriptions
+                ):
+                    continue
+                seen_fallback_keys.add(fallback_key)
+
+            deduped.append(summary)
+            if normalized_description:
+                seen_descriptions.add(normalized_description)
+
+        if len(deduped) != len(summaries):
+            logger.info(
+                "Deduplicated project summaries: %s -> %s unique entries",
+                len(summaries),
+                len(deduped),
+            )
+
+        # Maintain deterministic ordering (newest first)
+        deduped.sort(key=lambda s: s.timestamp, reverse=True)
+        return deduped
 
     def _generate_overview(self, summaries: List[ProjectSummary]) -> Dict[str, Any]:
         """Generate overview statistics."""

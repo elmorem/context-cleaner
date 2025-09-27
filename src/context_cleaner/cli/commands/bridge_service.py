@@ -270,14 +270,31 @@ def sync_command(clickhouse_url, watch_directory, interval, once, start_monitori
                 bridge_service=bridge_service,
                 watch_directory=watch_directory
             )
-            
+
+            async def ensure_context_rot_backfill() -> None:
+                """Run the historical context rot backfill once if needed."""
+                if not sync_service.needs_context_rot_backfill:
+                    return
+
+                click.echo("🧮 Performing context rot historical backfill...")
+                try:
+                    events_generated = await sync_service.backfill_context_rot()
+                except Exception as backfill_error:
+                    click.echo(f"❌ Context rot backfill failed: {backfill_error}")
+                    raise
+
+                click.echo(
+                    f"   Context rot backfill complete ({events_generated} events recorded)"
+                )
+
             if once:
                 # Single sync operation
+                await ensure_context_rot_backfill()
                 click.echo("🔍 Running single incremental sync...")
                 files_synced = await sync_service.sync_incremental_changes()
-                
+
                 click.echo(f"✅ Sync complete! {files_synced} files processed")
-                
+
                 status = sync_service.get_sync_status()
                 stats = status['stats']
                 click.echo(f"   Files monitored: {stats['files_monitored']}")
@@ -288,11 +305,12 @@ def sync_command(clickhouse_url, watch_directory, interval, once, start_monitori
                 
             elif start_monitoring:
                 # Real-time monitoring
+                await ensure_context_rot_backfill()
                 click.echo("👁️  Starting real-time file monitoring...")
                 click.echo("   Press Ctrl+C to stop")
-                
+
                 await sync_service.start_file_monitoring()
-                
+
                 try:
                     # Keep running until interrupted - no timeout for service mode
                     while True:
@@ -319,9 +337,10 @@ def sync_command(clickhouse_url, watch_directory, interval, once, start_monitori
                     
             else:
                 # Scheduled sync
+                await ensure_context_rot_backfill()
                 click.echo(f"⏰ Starting scheduled sync every {interval} minutes...")
                 click.echo("   Press Ctrl+C to stop")
-                
+
                 try:
                     await sync_service.run_scheduled_sync(interval_minutes=interval)
                 except KeyboardInterrupt:

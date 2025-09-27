@@ -1068,6 +1068,172 @@
             margin-bottom: 1rem;
             border-radius: 0.5rem;
         }
+
+        /* Data exploration modal styling */
+        .data-exploration-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            z-index: 2000;
+            backdrop-filter: blur(6px);
+            animation: modalFadeIn 0.18s ease-out;
+        }
+
+        .data-exploration-modal .modal-content {
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.45);
+            max-width: min(960px, 95vw);
+            width: 100%;
+            max-height: min(85vh, 760px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .data-exploration-modal .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0));
+        }
+
+        .data-exploration-modal .modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .data-exploration-modal .close-modal {
+            border: none;
+            background: transparent;
+            font-size: 1.5rem;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .data-exploration-modal .close-modal:hover {
+            color: var(--danger-color);
+        }
+
+        .data-exploration-modal .modal-body {
+            padding: 1.25rem;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        .data-exploration-modal .detail-section {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.6);
+        }
+
+        .data-exploration-modal .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .data-exploration-modal .stat-card {
+            background: #f1f5f9;
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+        }
+
+        .data-exploration-modal .stat-card .label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            color: var(--text-secondary);
+        }
+
+        .data-exploration-modal .stat-card .value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .data-exploration-modal .table-container {
+            margin-top: 1rem;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        .data-exploration-modal table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .data-exploration-modal thead {
+            background: #f1f5f9;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: 0.75rem;
+            color: #475569;
+        }
+
+        .data-exploration-modal th,
+        .data-exploration-modal td {
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+            text-align: left;
+        }
+
+        .data-exploration-modal tbody tr:hover {
+            background: rgba(37, 99, 235, 0.06);
+        }
+
+        .data-exploration-modal pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 10px;
+            overflow: auto;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.4);
+        }
+
+        .data-exploration-modal .empty-state {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .data-exploration-modal .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+            margin: 0.25rem 0.35rem 0 0;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -3744,7 +3910,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
 
                 ${dataPoints > 0 ? `
                     <div class="data-exploration">
-                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'error-monitor')">
                             📊 Explore ${dataPoints} Data Points
                         </button>
                     </div>
@@ -3850,7 +4016,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
 
                 ${dataPoints > 0 ? `
                     <div class="data-exploration">
-                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'timeout-risk')">
                             ⏱️ Explore ${dataPoints} Timeout Data Points
                         </button>
                     </div>
@@ -3903,7 +4069,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
 
                 ${dataPoints > 0 ? `
                     <div class="data-exploration">
-                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;">
+                        <button class="explore-btn" style="background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.375rem; cursor: pointer;" onclick="showDataPoints('${data.title}', 'tool-optimizer')">
                             🔧 Explore ${dataPoints} Tool Usage Data Points
                         </button>
                     </div>
@@ -4026,28 +4192,58 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
         function renderContextRotWidget(container, data) {
             const statusColor = data.status === 'healthy' ? '#059669' : data.status === 'warning' ? '#d97706' : '#dc2626';
             const statusIcon = data.status === 'healthy' ? '✅' : data.status === 'warning' ? '⚠️' : '🚨';
-            // Show measurements_count from performance feedback integration
-            const dataPoints = (data.data && data.data.measurements_count) || 
-                              (data.data && data.data.context_measurements) ||
-                              (data.data && data.data.session_count) || 0;
-            
+
+            const contextData = (data.data && data.data.context_rot) || {};
+            const systemMetrics = (data.data && data.data.system_metrics) || {};
+            const analysisLatency = data.data?.analysis_latency_ms || 0;
+
+            const dataPoints = contextData.measurements_count || 0;
+            const rotScorePercent = contextData.current_rot_score != null
+                ? (contextData.current_rot_score * 100).toFixed(1)
+                : '0.0';
+            const attentionAlerts = contextData.attention_alerts ?? 0;
+            const confidencePercent = contextData.confidence_level != null
+                ? Math.round(contextData.confidence_level * 100)
+                : 0;
+            const trendDirection = contextData.trend_direction
+                ? contextData.trend_direction.charAt(0).toUpperCase() + contextData.trend_direction.slice(1)
+                : 'Stable';
+            const timeWindow = contextData.time_window_minutes != null
+                ? (contextData.time_window_minutes >= 60
+                    ? `${(contextData.time_window_minutes / 60).toFixed(
+                        contextData.time_window_minutes % 60 === 0 ? 0 : 1
+                      )}h`
+                    : `${contextData.time_window_minutes}m`)
+                : '—';
+
+            const lastUpdated = systemMetrics.last_updated || new Date().toLocaleTimeString();
+            const recommendations = Array.isArray(contextData.recommendations) ? contextData.recommendations : [];
+
             container.innerHTML = `
                 <div class="widget-status-header" style="color: ${statusColor}; font-weight: 600; margin-bottom: 1rem;">
                     ${statusIcon} ${data.title}
                 </div>
-                
+
                 <div class="widget-metrics">
                     <div class="metric-row">
                         <span class="metric-label">Context Rot Score:</span>
-                        <span class="metric-value">${data.data?.rot_score || 0}%</span>
+                        <span class="metric-value">${rotScorePercent}%</span>
                     </div>
                     <div class="metric-row">
-                        <span class="metric-label">Stale Sessions:</span>
-                        <span class="metric-value">${data.data?.stale_sessions || 0}</span>
+                        <span class="metric-label">Confidence:</span>
+                        <span class="metric-value">${confidencePercent}%</span>
                     </div>
                     <div class="metric-row">
-                        <span class="metric-label">Avg Session Age:</span>
-                        <span class="metric-value">${data.data?.avg_session_age_hours || 0}h</span>
+                        <span class="metric-label">Attention Alerts:</span>
+                        <span class="metric-value">${attentionAlerts}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Trend:</span>
+                        <span class="metric-value">${trendDirection}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Time Window:</span>
+                        <span class="metric-value">${timeWindow}</span>
                     </div>
                     <div class="metric-row">
                         <span class="metric-label">Measurements:</span>
@@ -4057,7 +4253,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
 
                 <div class="widget-status-info">
                     <div class="status-badge status-${data.status}">${data.status.toUpperCase()}</div>
-                    <div class="last-updated">Last updated: ${(data.data && data.data.last_updated) || new Date().toLocaleTimeString()}</div>
+                    <div class="last-updated">Last updated: ${lastUpdated} • Latency: ${analysisLatency.toFixed(1)}ms</div>
                 </div>
 
                 ${dataPoints > 0 ? `
@@ -4072,6 +4268,7 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                     <strong>About this widget:</strong> Measures context deterioration in long-running conversations. 
                     Identifies when context becomes stale, tracks session aging patterns, and recommends cleanup strategies.
                     Essential for maintaining conversation quality and preventing context pollution.
+                    ${recommendations.length > 0 ? '<br><strong>Recommendations:</strong> ' + recommendations.join('; ') : ''}
                     ${data.alerts && data.alerts.length > 0 ? '<br><strong>Alerts:</strong> ' + data.alerts.join(', ') : ''}
                 </div>
             `;
@@ -4172,42 +4369,528 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             `;
         }
 
+        // ---------- Data point exploration helpers ----------
+        const currencyFormatter = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+
+        const escapeHtml = (value) => {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        const formatNumber = (value, digits = 0) => {
+            if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+                return '—';
+            }
+            return Number(value).toLocaleString(undefined, {
+                minimumFractionDigits: digits,
+                maximumFractionDigits: digits,
+            });
+        };
+
+        const formatPercent = (value, digits = 1, treatAsRatio = true) => {
+            if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+                return '—';
+            }
+            const numeric = Number(value);
+            const percentage = treatAsRatio && Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
+            return `${percentage.toFixed(digits)}%`;
+        };
+
+        const formatCurrency = (value) => {
+            if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+                return '—';
+            }
+            return currencyFormatter.format(Number(value));
+        };
+
+        const formatDurationMs = (value) => {
+            if (value === null || value === undefined || value === '' || isNaN(Number(value))) {
+                return '—';
+            }
+            const ms = Number(value);
+            if (ms < 1000) {
+                return `${ms.toFixed(0)} ms`;
+            }
+            if (ms < 60000) {
+                return `${(ms / 1000).toFixed(2)} s`;
+            }
+            return `${(ms / 60000).toFixed(2)} min`;
+        };
+
+        const getTelemetryTimeRange = () => {
+            const el = document.getElementById('telemetry-time-range');
+            return el ? el.value : '7days';
+        };
+
+        const renderList = (items, emptyMessage = 'No data available.') => {
+            if (!Array.isArray(items) || items.length === 0) {
+                return `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
+            }
+            return `
+                <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary);">
+                    ${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+                </ul>
+            `;
+        };
+
+        const buildDetailContent = (widgetType, payload) => {
+            const data = payload?.data || {};
+
+            switch (widgetType) {
+                case 'model-efficiency': {
+                    const models = data.models || {};
+                    const summaryCards = `
+                        <div class="detail-grid" style="margin-bottom: 1rem;">
+                            <div class="stat-card">
+                                <span class="label">Efficiency Score</span>
+                                <span class="value">${formatPercent(data.efficiency_score, 1)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Total Requests</span>
+                                <span class="value">${formatNumber(data.total_requests)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Total Cost</span>
+                                <span class="value">${formatCurrency(data.total_cost)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Haiku Usage</span>
+                                <span class="value">${formatPercent(data.haiku_usage_percentage, 1, false)}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    const modelRows = Object.entries(models).map(([model, info]) => `
+                        <tr>
+                            <td>${escapeHtml(info.display_name || model)}</td>
+                            <td>${formatNumber(info.request_count)}</td>
+                            <td>${formatCurrency(info.total_cost)}</td>
+                            <td>${formatDurationMs(info.avg_duration)}</td>
+                            <td>${formatPercent(info.cost_efficiency_score * 100, 1, false)}</td>
+                            <td>${formatNumber(info.tokens_per_dollar, 1)}</td>
+                            <td>${escapeHtml(info.most_used_tool || '—')}</td>
+                        </tr>
+                    `).join('');
+
+                    const recommendationChips = Array.isArray(data.recommendations)
+                        ? data.recommendations.map(rec => `<span class="chip">💡 ${escapeHtml(rec)}</span>`).join('')
+                        : '';
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Model Efficiency Insights</h4>
+                            ${summaryCards}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Model</th>
+                                            <th>Requests</th>
+                                            <th>Total Cost</th>
+                                            <th>Avg Duration</th>
+                                            <th>Cost Efficiency</th>
+                                            <th>Tokens / $</th>
+                                            <th>Top Tool</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${modelRows || '<tr><td colspan="7">No model analytics available.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            ${recommendationChips ? `<div style="margin-top: 1rem;">${recommendationChips}</div>` : ''}
+                        </div>
+                    `;
+                }
+
+                case 'error-monitor': {
+                    const recentErrors = Array.isArray(data.recent_errors) ? data.recent_errors : [];
+                    const summaryCards = `
+                        <div class="detail-grid" style="margin-bottom: 1rem;">
+                            <div class="stat-card">
+                                <span class="label">Current Error Rate</span>
+                                <span class="value">${formatPercent(data.current_error_rate, 2)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Recovery Success</span>
+                                <span class="value">${formatPercent(data.recovery_success_rate, 2)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Trend</span>
+                                <span class="value">${escapeHtml((data.error_trend || 'stable').toUpperCase())}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Last Error</span>
+                                <span class="value">${escapeHtml(data.last_error_time || '—')}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    const errorRows = recentErrors.map(err => `
+                        <tr>
+                            <td>${escapeHtml(err.timestamp || '—')}</td>
+                            <td>${escapeHtml(err.session_id || '—')}</td>
+                            <td>${escapeHtml(err.error_type || '—')}</td>
+                            <td>${escapeHtml(err.model || '—')}</td>
+                        </tr>
+                    `).join('');
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">API Error Timeline</h4>
+                            ${summaryCards}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Session</th>
+                                            <th>Error</th>
+                                            <th>Model</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${errorRows || '<tr><td colspan="4">No recent errors recorded.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                case 'timeout-risk': {
+                    const riskFactors = Array.isArray(data.risk_factors) ? data.risk_factors : [];
+                    const recommendations = Array.isArray(data.recommended_actions) ? data.recommended_actions : [];
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Timeout Risk Detail</h4>
+                            <div class="detail-grid" style="margin-bottom: 1rem;">
+                                <div class="stat-card">
+                                    <span class="label">Risk Level</span>
+                                    <span class="value">${escapeHtml((data.risk_level || 'low').toUpperCase())}</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Avg Response Time</span>
+                                    <span class="value">${formatDurationMs(data.avg_response_time)}</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Slow Requests</span>
+                                    <span class="value">${formatNumber(data.slow_requests_count)}</span>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 1rem;">
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Risk Factors</h5>
+                                ${renderList(riskFactors, 'No elevated risk factors detected.')}
+                            </div>
+                            <div>
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Recommended Actions</h5>
+                                ${renderList(recommendations, 'No immediate actions required.')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                case 'tool-optimizer': {
+                    const sequences = Array.isArray(data.common_sequences) ? data.common_sequences : [];
+                    const toolStats = data.tool_usage_stats || {};
+                    const suggestions = Array.isArray(data.optimization_suggestions) ? data.optimization_suggestions : [];
+
+                    const sequenceRows = sequences.map(seq => `
+                        <tr>
+                            <td>${escapeHtml((seq.sequence || []).join(' → ') || '—')}</td>
+                            <td>${formatNumber(seq.count)}</td>
+                            <td>${formatPercent(seq.efficiency, 1)}</td>
+                        </tr>
+                    `).join('');
+
+                    const toolRows = Object.entries(toolStats).map(([tool, count]) => `
+                        <tr>
+                            <td>${escapeHtml(tool)}</td>
+                            <td>${formatNumber(count)}</td>
+                        </tr>
+                    `).join('');
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Tool Usage Insights</h4>
+                            <div class="detail-grid" style="margin-bottom: 1rem;">
+                                <div class="stat-card">
+                                    <span class="label">Efficiency Score</span>
+                                    <span class="value">${formatPercent(data.efficiency_score, 1)}</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Unique Tools</span>
+                                    <span class="value">${formatNumber(Object.keys(toolStats).length)}</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Sequences Analyzed</span>
+                                    <span class="value">${formatNumber(sequences.length)}</span>
+                                </div>
+                            </div>
+                            <div class="table-container" style="margin-bottom: 1rem;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Common Sequence</th>
+                                            <th>Occurrences</th>
+                                            <th>Efficiency</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${sequenceRows || '<tr><td colspan="3">No common sequences identified.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="table-container" style="margin-bottom: 1rem;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Tool</th>
+                                            <th>Usage Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${toolRows || '<tr><td colspan="2">No tool usage captured.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Optimization Suggestions</h5>
+                                ${renderList(suggestions, 'No optimization suggestions at this time.')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                case 'code-pattern-analysis': {
+                    const languages = data.language_distribution || {};
+                    const languageCards = Object.entries(languages).map(([lang, pct]) => `
+                        <div class="stat-card">
+                            <span class="label">${escapeHtml(lang)}</span>
+                            <span class="value">${formatPercent(pct, 1, false)}</span>
+                        </div>
+                    `).join('');
+
+                    const patterns = Array.isArray(data.common_patterns)
+                        ? data.common_patterns.map(pattern => `
+                            <tr>
+                                <td>${escapeHtml(pattern.pattern)}</td>
+                                <td>${formatPercent(pattern.frequency, 1, false)}</td>
+                                <td>${escapeHtml(pattern.description || '')}</td>
+                            </tr>
+                        `).join('')
+                        : '';
+
+                    const suggestions = Array.isArray(data.optimization_suggestions)
+                        ? data.optimization_suggestions
+                        : [];
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Code Pattern Breakdown</h4>
+                            <div class="detail-grid" style="margin-bottom: 1rem;">
+                                ${languageCards || '<div class="empty-state" style="grid-column: 1 / -1;">No language distribution available.</div>'}
+                            </div>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Pattern</th>
+                                            <th>Frequency</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${patterns || '<tr><td colspan="3">No recurring patterns detected.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style="margin-top: 1.25rem;">
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Optimization Opportunities</h5>
+                                ${renderList(suggestions, 'No optimization suggestions at this time.')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                case 'context-rot-meter': {
+                    const ctx = data.context_rot || {};
+                    const hourly = Array.isArray(ctx.hourly_averages) ? ctx.hourly_averages : [];
+                    const statCards = `
+                        <div class="detail-grid" style="margin-bottom: 1rem;">
+                            <div class="stat-card">
+                                <span class="label">Context Rot Score</span>
+                                <span class="value">${formatPercent(ctx.current_rot_score, 1)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Confidence Level</span>
+                                <span class="value">${formatPercent(ctx.confidence_level, 1)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Measurements</span>
+                                <span class="value">${formatNumber(ctx.measurements_count)}</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="label">Attention Alerts</span>
+                                <span class="value">${formatNumber(ctx.attention_alerts)}</span>
+                            </div>
+                        </div>
+                    `;
+
+                    const hourlyRows = hourly.map(row => `
+                        <tr>
+                            <td>${escapeHtml(row.hour !== undefined ? row.hour : '—')}</td>
+                            <td>${formatPercent(row.avg_rot, 2)}</td>
+                            <td>${formatNumber(row.measurements)}</td>
+                        </tr>
+                    `).join('');
+
+                    const recommendations = Array.isArray(ctx.recommendations) ? ctx.recommendations : [];
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Context Stability Overview</h4>
+                            ${statCards}
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Hour</th>
+                                            <th>Average Rot</th>
+                                            <th>Measurements</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${hourlyRows || '<tr><td colspan="3">No hourly metrics recorded yet.</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style="margin-top: 1.25rem;">
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Recommended Actions</h5>
+                                ${renderList(recommendations, 'No recommendations at this time – context health looks good!')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                case 'content-search-widget': {
+                    const stats = data.indexed_content_stats || {};
+                    const performance = data.search_performance || {};
+                    const suggestions = Array.isArray(data.search_suggestions) ? data.search_suggestions : [];
+                    const categories = data.content_categories || {};
+
+                    const categoryCards = Object.entries(categories).map(([name, count]) => `
+                        <div class="stat-card">
+                            <span class="label">${escapeHtml(name)}</span>
+                            <span class="value">${formatNumber(count)}</span>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Search Index Overview</h4>
+                            <div class="detail-grid" style="margin-bottom: 1rem;">
+                                ${categoryCards || '<div class="empty-state" style="grid-column: 1 / -1;">No indexed content detected.</div>'}
+                            </div>
+                            <div class="detail-grid" style="margin-bottom: 1rem;">
+                                <div class="stat-card">
+                                    <span class="label">Avg Response Time</span>
+                                    <span class="value">${formatNumber(performance.avg_response_time_ms, 0)} ms</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Index Size</span>
+                                    <span class="value">${formatNumber(performance.index_size_mb, 2)} MB</span>
+                                </div>
+                                <div class="stat-card">
+                                    <span class="label">Search Accuracy</span>
+                                    <span class="value">${formatPercent(performance.search_accuracy, 1)}</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 1.25rem;">
+                                <h5 style="margin: 0 0 0.5rem 0; color: var(--text-secondary);">Popular Search Prompts</h5>
+                                ${renderList(suggestions, 'No popular searches captured yet.')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                default:
+                    return `
+                        <div class="detail-section">
+                            <h4 style="margin: 0 0 0.75rem 0;">Raw Data</h4>
+                            <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+                        </div>
+                    `;
+            }
+        };
+
         // Data point exploration function
-        function showDataPoints(title, widgetType) {
-            // Create modal or expanded view for data points
+        window.showDataPoints = function(title, widgetType) {
+            const safeTitle = escapeHtml(title || 'Telemetry Details');
             const modal = document.createElement('div');
             modal.className = 'data-exploration-modal';
             modal.innerHTML = `
-                <div class="modal-content">
+                <div class="modal-content" role="dialog" aria-modal="true">
                     <div class="modal-header">
-                        <h3>🔍 ${title} - Detailed Data</h3>
-                        <button class="close-modal" onclick="this.closest('.data-exploration-modal').remove()">×</button>
+                        <h3>🔍 ${safeTitle}</h3>
+                        <button class="close-modal" aria-label="Close">×</button>
                     </div>
                     <div class="modal-body">
-                        <div class="loading">Loading detailed data...</div>
+                        <div class="detail-section">
+                            <div class="loading">Loading detailed data...</div>
+                        </div>
                     </div>
                 </div>
             `;
-            
+
+            const closeModal = () => {
+                modal.remove();
+                document.removeEventListener('keydown', escHandler);
+            };
+
+            const escHandler = (event) => {
+                if (event.key === 'Escape') {
+                    closeModal();
+                }
+            };
+
             document.body.appendChild(modal);
-            
-            // Load detailed data
-            fetch(`/api/telemetry-widget/${widgetType}?detailed=true`)
-                .then(response => response.json())
-                .then(data => {
-                    const modalBody = modal.querySelector('.modal-body');
-                    modalBody.innerHTML = `
-                        <div class="detailed-data">
-                            <h4>Raw Data Points:</h4>
-                            <pre>${JSON.stringify(data.data, null, 2)}</pre>
-                        </div>
-                    `;
+            document.addEventListener('keydown', escHandler);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            modal.querySelector('.close-modal').addEventListener('click', closeModal);
+
+            const modalBody = modal.querySelector('.modal-body');
+            const timeRange = getTelemetryTimeRange();
+
+            fetch(`/api/telemetry-widget/${widgetType}?timeRange=${encodeURIComponent(timeRange)}&detailed=true`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Request failed with status ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(payload => {
+                    modalBody.innerHTML = buildDetailContent(widgetType, payload);
                 })
                 .catch(error => {
-                    const modalBody = modal.querySelector('.modal-body');
-                    modalBody.innerHTML = `<div class="error">Error loading detailed data: ${error}</div>`;
+                    modalBody.innerHTML = `
+                        <div class="detail-section empty-state">
+                            Unable to load detailed data: ${escapeHtml(error.message || error)}
+                        </div>
+                    `;
                 });
-        }
+        };
 
         // Render orchestration widget with real data
         function renderOrchestrationWidget(widgetType, data) {

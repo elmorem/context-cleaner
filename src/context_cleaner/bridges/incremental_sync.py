@@ -52,6 +52,8 @@ except ImportError:
 # Internal imports
 from .token_analysis_bridge import TokenAnalysisBridgeService, TokenUsageSummaryRecord
 from ..analysis.dashboard_integration import get_enhanced_token_analysis_sync
+from ..telemetry.context_rot import ContextRotAnalyzer
+from ..telemetry.error_recovery.manager import ErrorRecoveryManager
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,7 @@ class SyncStats:
     sync_operations: int = 0
     last_sync_time: Optional[datetime] = None
     errors: List[str] = field(default_factory=list)
+    context_rot_events: int = 0
 
 class JSONLFileHandler(FileSystemEventHandler):
     """Handle file system events for JSONL files."""
@@ -119,21 +122,46 @@ class IncrementalSyncService:
         self.observer: Optional[Observer] = None
         self.running = False
         self._sync_lock = asyncio.Lock()
-        
+
         # Event loop and threading for cross-thread async communication
         self._main_loop: Optional[asyncio.AbstractEventLoop] = None
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="jsonl-sync")
-        
+
+        # Metadata for persisted state
+        self.state_metadata: Dict[str, Any] = {
+            "context_rot_backfill_complete": False
+        }
+
+        # Initialize context rot analyzer if telemetry components are available
+        self.context_rot_analyzer: Optional[ContextRotAnalyzer] = None
+        try:
+            if self.bridge_service.clickhouse_client is not None:
+                error_manager = ErrorRecoveryManager(self.bridge_service.clickhouse_client)
+                self.context_rot_analyzer = ContextRotAnalyzer(
+                    self.bridge_service.clickhouse_client,
+                    error_manager,
+                )
+                logger.info("Context Rot Analyzer initialized for incremental sync service")
+        except Exception as analyzer_error:
+            logger.warning(
+                "Context Rot Analyzer initialization failed: %s",
+                analyzer_error,
+            )
+
         # Load existing state
         self._load_state()
-        
+
+        self._context_rot_backfill_completed = self.state_metadata.get(
+            "context_rot_backfill_complete", False
+        )
+
     def _load_state(self):
         """Load processing state from disk."""
         try:
             if self.state_file.exists():
                 with open(self.state_file, 'r') as f:
                     state_data = json.load(f)
-                    
+
                 # Reconstruct file states
                 for file_path, state_dict in state_data.get('file_states', {}).items():
                     self.file_states[file_path] = FileProcessingState(
@@ -145,11 +173,15 @@ class IncrementalSyncService:
                         total_tokens=state_dict.get('total_tokens', 0),
                         last_sync_time=datetime.fromisoformat(state_dict['last_sync_time']) if state_dict.get('last_sync_time') else None
                     )
-                    
+
                 logger.info(f"Loaded state for {len(self.file_states)} files")
+
+                metadata = state_data.get('metadata', {})
+                if isinstance(metadata, dict):
+                    self.state_metadata.update(metadata)
         except Exception as e:
             logger.warning(f"Could not load sync state: {e}")
-            
+
     def _save_state(self):
         """Save processing state to disk."""
         try:
@@ -166,12 +198,13 @@ class IncrementalSyncService:
                     }
                     for file_path, state in self.file_states.items()
                 },
+                'metadata': self.state_metadata,
                 'last_save': datetime.now().isoformat()
             }
-            
+
             # Ensure directory exists
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
-            
+
             with open(self.state_file, 'w') as f:
                 json.dump(state_data, f, indent=2)
                 
@@ -348,6 +381,16 @@ class IncrementalSyncService:
                 logger.info(f"Conversation processing complete: {conversations_processed} messages processed")
             except Exception as e:
                 logger.error(f"Error processing conversations for {file_path}: {e}")
+
+            # Feed context rot analyzer with new conversation data
+            context_rot_events = await self._process_context_rot_entries(new_lines)
+            if context_rot_events:
+                self.stats.context_rot_events += context_rot_events
+                logger.info(
+                    "Context rot metrics generated: %s events for %s",
+                    context_rot_events,
+                    file_path,
+                )
             
             # Enhanced logging for observability
             logger.info(f"File processing complete: {file_path}")
@@ -441,11 +484,25 @@ class IncrementalSyncService:
         """
         # Capture the current event loop for cross-thread communication
         self._main_loop = asyncio.get_running_loop()
-        
+
         if self.running:
             logger.warning("File monitoring already running")
             return
-            
+
+        if self.needs_context_rot_backfill:
+            try:
+                logger.info("Running context rot historical backfill before enabling monitoring")
+                events_generated = await self.backfill_context_rot()
+                logger.info(
+                    "Context rot historical backfill complete: %s events generated",
+                    events_generated,
+                )
+            except Exception as backfill_error:
+                logger.error(
+                    "Context rot backfill failed; proceeding with monitoring: %s",
+                    backfill_error,
+                )
+
         if not _WATCHDOG_AVAILABLE:
             logger.warning("Watchdog library not available - using polling mode instead")
             # Fall back to polling mode
@@ -479,8 +536,22 @@ class IncrementalSyncService:
     async def _start_polling_mode(self):
         """Fallback polling mode when watchdog is not available."""
         logger.info("Starting polling mode file monitoring (checking every 30 seconds)")
+        if self.needs_context_rot_backfill:
+            try:
+                logger.info("Running context rot historical backfill in polling mode")
+                events_generated = await self.backfill_context_rot()
+                logger.info(
+                    "Context rot historical backfill complete: %s events generated",
+                    events_generated,
+                )
+            except Exception as backfill_error:
+                logger.error(
+                    "Context rot backfill failed in polling mode: %s",
+                    backfill_error,
+                )
+
         self.running = True
-        
+
         while self.running:
             try:
                 await self.sync_incremental_changes()
@@ -534,23 +605,40 @@ class IncrementalSyncService:
     async def run_scheduled_sync(self, interval_minutes: int = 15):
         """
         Run scheduled incremental sync operations.
-        
+
         Implements the automated synchronization service from Sept 9th analysis.
         """
         logger.info(f"Starting scheduled sync every {interval_minutes} minutes")
-        
+
+        if self.needs_context_rot_backfill:
+            try:
+                logger.info("Running context rot historical backfill prior to scheduled sync loop")
+                events_generated = await self.backfill_context_rot()
+                logger.info(
+                    "Context rot historical backfill complete: %s events generated",
+                    events_generated,
+                )
+            except Exception as backfill_error:
+                logger.error(
+                    "Context rot backfill failed before scheduled sync loop: %s",
+                    backfill_error,
+                )
+
+        if not self.running:
+            self.running = True
+
         while self.running:
             try:
                 await self.sync_incremental_changes()
                 await asyncio.sleep(interval_minutes * 60)
-                
+
             except asyncio.CancelledError:
                 logger.info("Scheduled sync cancelled")
                 break
             except Exception as e:
                 logger.error(f"Scheduled sync error: {e}")
                 await asyncio.sleep(60)  # Wait 1 minute before retry
-                
+
     def get_sync_status(self) -> Dict[str, Any]:
         """Get current synchronization status."""
         return {
@@ -565,7 +653,8 @@ class IncrementalSyncService:
                 "tokens_synced": self.stats.tokens_synced,
                 "sync_operations": self.stats.sync_operations,
                 "last_sync_time": self.stats.last_sync_time.isoformat() if self.stats.last_sync_time else None,
-                "errors": len(self.stats.errors)
+                "errors": len(self.stats.errors),
+                "context_rot_events": self.stats.context_rot_events,
             },
             "file_states_count": len(self.file_states),
             "capabilities": {
@@ -575,6 +664,141 @@ class IncrementalSyncService:
                 "state_persistence": True
             }
         }
+
+    async def _process_context_rot_entries(self, entries: List[Dict[str, Any]]) -> int:
+        """Feed conversation entries into the context rot analyzer."""
+
+        if not self.context_rot_analyzer:
+            return 0
+
+        events_recorded = 0
+        for entry in entries:
+            try:
+                session_id = (
+                    entry.get('session_id')
+                    or entry.get('sessionId')
+                    or entry.get('sessionID')
+                )
+                if not session_id:
+                    continue
+
+                message = entry.get('message', {}) or {}
+                role = message.get('role') or entry.get('role')
+                # Focus on user/assistant messages
+                if role and role not in {'user', 'assistant'}:
+                    continue
+
+                content = message.get('content')
+                if isinstance(content, str):
+                    text_content = content.strip()
+                elif isinstance(content, list):
+                    parts: List[str] = []
+                    for item in content:
+                        if isinstance(item, dict):
+                            if item.get('type') == 'text' and 'text' in item:
+                                parts.append(item['text'])
+                            elif 'text' in item:
+                                parts.append(str(item['text']))
+                    text_content = '\n'.join(part for part in parts if part).strip()
+                elif content is not None:
+                    text_content = str(content).strip()
+                else:
+                    text_content = ''
+
+                if not text_content:
+                    continue
+
+                metric = await self.context_rot_analyzer.analyze_realtime(
+                    session_id=session_id,
+                    content=text_content,
+                )
+                if metric:
+                    events_recorded += 1
+
+            except Exception as context_error:
+                logger.debug(
+                    "Context rot analysis skipped for entry due to error: %s",
+                    context_error,
+                )
+
+        return events_recorded
+
+    async def backfill_context_rot(self) -> int:
+        """Run context rot analysis across all historical JSONL files once."""
+
+        if self._context_rot_backfill_completed:
+            logger.info("Context rot backfill already completed previously; skipping")
+            return 0
+
+        if not self.context_rot_analyzer:
+            logger.info("Context Rot Analyzer unavailable; skipping historical backfill")
+            self._context_rot_backfill_completed = True
+            self.state_metadata["context_rot_backfill_complete"] = True
+            self._save_state()
+            return 0
+
+        logger.info("Starting context rot historical backfill across JSONL files")
+        total_events = 0
+        try:
+            jsonl_files = sorted(self.watch_directory.glob("**/*.jsonl"))
+            batch: List[Dict[str, Any]] = []
+            batch_size = 500
+
+            for file_path in jsonl_files:
+                file_path_str = str(file_path)
+                logger.info(f"Context rot backfill processing: {file_path_str}")
+
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as handle:
+                        for line_number, line in enumerate(handle, 1):
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                entry = json.loads(line)
+                                batch.append(entry)
+                            except json.JSONDecodeError as parse_error:
+                                logger.debug(
+                                    "Skipping malformed JSON during backfill (file=%s, line=%s): %s",
+                                    file_path_str,
+                                    line_number,
+                                    parse_error,
+                                )
+                                continue
+
+                            if len(batch) >= batch_size:
+                                total_events += await self._process_context_rot_entries(batch)
+                                batch.clear()
+
+                    if batch:
+                        total_events += await self._process_context_rot_entries(batch)
+                        batch.clear()
+
+                except Exception as file_error:
+                    logger.error(
+                        "Error during context rot backfill for %s: %s",
+                        file_path_str,
+                        file_error,
+                    )
+                    continue
+
+            logger.info(
+                "Context rot backfill complete: %s events generated across %s files",
+                total_events,
+                len(jsonl_files),
+            )
+
+        finally:
+            self._context_rot_backfill_completed = True
+            self.state_metadata["context_rot_backfill_complete"] = True
+            self._save_state()
+
+        return total_events
+
+    @property
+    def needs_context_rot_backfill(self) -> bool:
+        """Whether historical backfill should run."""
+        return not self._context_rot_backfill_completed
 
 # Factory function
 async def create_incremental_sync_service(
