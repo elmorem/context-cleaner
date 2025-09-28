@@ -1944,380 +1944,39 @@
         <!-- Data Explorer Section -->
         <section id="data-explorer" class="dashboard-section">
             <h2>🔎 Data Explorer</h2>
-            
-            <!-- Quick Reference Widget -->
-            <div class="widget-grid">
-                <div class="widget-card" style="grid-column: 1 / -1;">
-                    <div class="widget-header">
-                        <h3 class="widget-title">📋 Available Data Components</h3>
-                        <div class="status-indicator status-healthy"></div>
-                    </div>
-                    <div class="widget-content">
-                        <!-- 1. Things to SELECT Section -->
-                        <div style="margin-bottom: 2rem;">
-                            <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem; font-weight: 600;">🎯 Things to SELECT</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-                                
-                                <div style="padding: 0.75rem; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #059669;">
-                                    <h5 style="margin: 0 0 0.5rem 0; color: #059669; font-size: 0.875rem; font-weight: 600;">📊 Core Session Fields</h5>
-                                    <div style="font-size: 0.75rem; color: #374151; line-height: 1.5; font-family: monospace;">
-                                        <div><code>LogAttributes['session.id']</code> - Session identifier</div>
-                                        <div><code>LogAttributes['user.id']</code> - User identifier</div>
-                                        <div><code>LogAttributes['user.email']</code> - User email</div>
-                                        <div><code>Timestamp</code> - Event timestamp</div>
-                                        <div><code>TimestampTime</code> - Formatted timestamp</div>
-                                        <div><code>ServiceName</code> - Service name</div>
-                                        <div><code>Body</code> - Event type/message</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: #eff6ff; border-radius: 8px; border-left: 4px solid #2563eb;">
-                                    <h5 style="margin: 0 0 0.5rem 0; color: #2563eb; font-size: 0.875rem; font-weight: 600;">🛠️ Tool & Performance</h5>
-                                    <div style="font-size: 0.75rem; color: #374151; line-height: 1.5; font-family: monospace;">
-                                        <div><code>LogAttributes['tool_name']</code> - Tool used</div>
-                                        <div><code>LogAttributes['duration_ms']</code> - Execution time</div>
-                                        <div><code>LogAttributes['success']</code> - Success status</div>
-                                        <div><code>LogAttributes['decision_type']</code> - Decision outcome</div>
-                                        <div><code>LogAttributes['terminal.type']</code> - Terminal type</div>
-                                        <div><code>LogAttributes['event.name']</code> - Event name</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: #fefce8; border-radius: 8px; border-left: 4px solid #d97706;">
-                                    <h5 style="margin: 0 0 0.5rem 0; color: #d97706; font-size: 0.875rem; font-weight: 600;">💰 Cost & Usage</h5>
-                                    <div style="font-size: 0.75rem; color: #374151; line-height: 1.5; font-family: monospace;">
-                                        <div><code>LogAttributes['cost_usd']</code> - Cost in USD</div>
-                                        <div><code>LogAttributes['token_count']</code> - Token usage</div>
-                                        <div><code>LogAttributes['model_name']</code> - AI model used</div>
-                                        <div><code>LogAttributes['cache_hit']</code> - Cache status</div>
-                                        <div><code>LogAttributes['response_time']</code> - Response time</div>
-                                        <div><code>LogAttributes['context_size']</code> - Context size</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: #fef7ff; border-radius: 8px; border-left: 4px solid #a855f7;">
-                                    <h5 style="margin: 0 0 0.5rem 0; color: #a855f7; font-size: 0.875rem; font-weight: 600;">💬 Messages & Content</h5>
-                                    <div style="font-size: 0.75rem; color: #374151; line-height: 1.5; font-family: monospace;">
-                                        <div><code>LogAttributes['prompt']</code> - User prompt content</div>
-                                        <div><code>LogAttributes['prompt_length']</code> - Prompt character count</div>
-                                        <div><code>LogAttributes['input_tokens']</code> - Input token count</div>
-                                        <div><code>LogAttributes['output_tokens']</code> - Response token count</div>
-                                        <div><code>LogAttributes['cache_read_tokens']</code> - Cached tokens</div>
-                                        <div><code>LogAttributes['cache_creation_tokens']</code> - New cache tokens</div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: #fdf4ff; border-radius: 8px; border-left: 4px solid #7c3aed;">
-                                    <h5 style="margin: 0 0 0.5rem 0; color: #7c3aed; font-size: 0.875rem; font-weight: 600;">🚨 Error & Status</h5>
-                                    <div style="font-size: 0.75rem; color: #374151; line-height: 1.5; font-family: monospace;">
-                                        <div><code>LogAttributes['error_type']</code> - Error type</div>
-                                        <div><code>LogAttributes['error_message']</code> - Error details</div>
-                                        <div><code>SeverityText</code> - Log severity</div>
-                                        <div><code>SeverityNumber</code> - Severity level</div>
-                                        <div><code>TraceId</code> - Trace identifier</div>
-                                        <div><code>SpanId</code> - Span identifier</div>
-                                    </div>
-                                </div>
-                                
-                            </div>
+            <div id="data-explorer-root">
+                <div class="widget-grid">
+                    <div class="widget-card" style="grid-column: 1 / -1;">
+                        <div class="widget-header">
+                            <h3 class="widget-title">Loading Data Explorer…</h3>
+                            <div class="status-indicator status-warning"></div>
                         </div>
-
-                        <!-- 2. Tables to SELECT FROM Section -->
-                        <div style="margin-bottom: 2rem;">
-                            <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem; font-weight: 600;">🗂️ Tables to SELECT FROM</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
-                                
-                                <div style="padding: 1rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1f2937; font-size: 0.875rem; font-weight: 600;">📝 <code>otel.otel_logs</code></h5>
-                                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem;">Primary table for all Claude Code events and telemetry</div>
-                                    <div style="font-size: 0.7rem; color: #059669; font-family: monospace;">
-                                        <strong>Use for:</strong> Sessions, tools, errors, performance, user activity
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1f2937; font-size: 0.875rem; font-weight: 600;">🔗 <code>otel.otel_traces</code></h5>
-                                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem;">Distributed tracing data for request flows</div>
-                                    <div style="font-size: 0.7rem; color: #2563eb; font-family: monospace;">
-                                        <strong>Use for:</strong> Request tracing, span analysis, performance debugging
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1f2937; font-size: 0.875rem; font-weight: 600;">📊 <code>otel.otel_metrics_*</code></h5>
-                                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem;">Metrics tables (gauge, histogram, sum, summary)</div>
-                                    <div style="font-size: 0.7rem; color: #d97706; font-family: monospace;">
-                                        <strong>Use for:</strong> Quantitative measurements, counters, histograms
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1f2937; font-size: 0.875rem; font-weight: 600;">💾 <code>otel.logs</code></h5>
-                                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem;">Alternative logs view with different schema</div>
-                                    <div style="font-size: 0.7rem; color: #7c3aed; font-family: monospace;">
-                                        <strong>Use for:</strong> Alternative log analysis, backup data source
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1f2937; font-size: 0.875rem; font-weight: 600;">📈 <code>otel.daily_trace_summary</code></h5>
-                                    <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem;">Aggregated daily trace summaries</div>
-                                    <div style="font-size: 0.7rem; color: #dc2626; font-family: monospace;">
-                                        <strong>Use for:</strong> Daily reports, trend analysis, performance summaries
-                                    </div>
-                                </div>
-                                
-                            </div>
-                        </div>
-
-                        <!-- 3. WHERE Clause Modifiers Section -->
-                        <div style="margin-bottom: 2rem;">
-                            <h4 style="margin: 0 0 1rem 0; color: #1f2937; font-size: 1rem; font-weight: 600;">🔍 WHERE Clause Modifiers</h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
-                                
-                                <div style="padding: 1rem; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #92400e; font-size: 0.875rem; font-weight: 600;">⏰ Time Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #451a03; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE Timestamp >= now() - INTERVAL 1 HOUR</code></div>
-                                        <div><code>WHERE Timestamp >= now() - INTERVAL 1 DAY</code></div>
-                                        <div><code>WHERE Timestamp >= now() - INTERVAL 1 WEEK</code></div>
-                                        <div><code>WHERE TimestampTime BETWEEN '2025-09-01' AND '2025-09-03'</code></div>
-                                        <div><code>WHERE toDate(Timestamp) = today()</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #ecfdf5; border-radius: 8px; border-left: 4px solid #059669;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #065f46; font-size: 0.875rem; font-weight: 600;">👤 User & Session Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #064e3b; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE LogAttributes['user.email'] = 'user@example.com'</code></div>
-                                        <div><code>WHERE LogAttributes['session.id'] = 'abc123'</code></div>
-                                        <div><code>WHERE LogAttributes['user.id'] IS NOT NULL</code></div>
-                                        <div><code>WHERE ServiceName = 'claude-code'</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #eff6ff; border-radius: 8px; border-left: 4px solid #2563eb;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #1e40af; font-size: 0.875rem; font-weight: 600;">🛠️ Tool & Event Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #1e3a8a; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE LogAttributes['tool_name'] = 'Bash'</code></div>
-                                        <div><code>WHERE LogAttributes['success'] = 'true'</code></div>
-                                        <div><code>WHERE Body = 'claude_code.tool_result'</code></div>
-                                        <div><code>WHERE LogAttributes['event.name'] LIKE '%error%'</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #fdf2f8; border-radius: 8px; border-left: 4px solid #ec4899;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #be185d; font-size: 0.875rem; font-weight: 600;">📊 Performance Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #9d174d; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE LogAttributes['duration_ms'] > 5000</code></div>
-                                        <div><code>WHERE LogAttributes['cost_usd'] > 0.01</code></div>
-                                        <div><code>WHERE LogAttributes['cache_hit'] = 'true'</code></div>
-                                        <div><code>WHERE LogAttributes['token_count'] > 1000</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #fef2f2; border-radius: 8px; border-left: 4px solid #dc2626;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #991b1b; font-size: 0.875rem; font-weight: 600;">🚨 Error Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #7f1d1d; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE Body = 'claude_code.api_error'</code></div>
-                                        <div><code>WHERE SeverityText = 'ERROR'</code></div>
-                                        <div><code>WHERE LogAttributes['error_type'] IS NOT NULL</code></div>
-                                        <div><code>WHERE LogAttributes['success'] = 'false'</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #fefbf3; border-radius: 8px; border-left: 4px solid #a855f7;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #7e22ce; font-size: 0.875rem; font-weight: 600;">💬 Message & Content Filters</h5>
-                                    <div style="font-size: 0.75rem; color: #581c87; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE Body = 'claude_code.user_prompt'</code></div>
-                                        <div><code>WHERE Body = 'claude_code.api_request'</code></div>
-                                        <div><code>WHERE LogAttributes['prompt'] IS NOT NULL</code></div>
-                                        <div><code>WHERE LogAttributes['prompt_length'] > 500</code></div>
-                                        <div><code>WHERE LogAttributes['input_tokens'] > 1000</code></div>
-                                        <div><code>WHERE LogAttributes['output_tokens'] > 100</code></div>
-                                        <div><code>WHERE LogAttributes['cache_read_tokens'] > 0</code></div>
-                                        <div><code>WHERE LogAttributes['model'] LIKE '%sonnet%'</code></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="padding: 1rem; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
-                                    <h5 style="margin: 0 0 0.75rem 0; color: #0c4a6e; font-size: 0.875rem; font-weight: 600;">🔧 Advanced Patterns</h5>
-                                    <div style="font-size: 0.75rem; color: #164e63; line-height: 1.6; font-family: monospace;">
-                                        <div><code>WHERE LogAttributes['tool_name'] IN ('Bash', 'Read', 'Write')</code></div>
-                                        <div><code>WHERE LogAttributes['duration_ms'] BETWEEN 1000 AND 10000</code></div>
-                                        <div><code>WHERE hasAll(LogAttributes, ['session.id', 'tool_name'])</code></div>
-                                        <div><code>WHERE length(LogAttributes['error_message']) > 100</code></div>
-                                    </div>
-                                </div>
-                                
-                            </div>
-                        </div>
-
-                        <!-- 4. Example Queries Section -->
-                        <div style="padding: 1rem; background: #f0f9ff; border-radius: 8px; border: 2px solid #0ea5e9;">
-                            <h4 style="margin: 0 0 1rem 0; color: #0c4a6e; font-size: 1rem; font-weight: 600;">💡 Complete Query Examples</h4>
-                            <div style="display: grid; gap: 1rem;">
-                                
-                                <div style="padding: 0.75rem; background: white; border-radius: 6px; border-left: 4px solid #059669;">
-                                    <div style="font-weight: 600; color: #065f46; margin-bottom: 0.5rem; font-size: 0.875rem;">📊 Session Analysis</div>
-                                    <code style="font-size: 0.7rem; color: #374151; line-height: 1.5; white-space: pre-wrap; display: block;">SELECT 
-    LogAttributes['user.email'] as user,
-    COUNT(DISTINCT LogAttributes['session.id']) as sessions,
-    SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost
-FROM otel.otel_logs 
-WHERE Timestamp >= now() - INTERVAL 7 DAY 
-GROUP BY LogAttributes['user.email'] 
-ORDER BY total_cost DESC</code>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: white; border-radius: 6px; border-left: 4px solid #2563eb;">
-                                    <div style="font-weight: 600; color: #1e40af; margin-bottom: 0.5rem; font-size: 0.875rem;">🛠️ Tool Performance</div>
-                                    <code style="font-size: 0.7rem; color: #374151; line-height: 1.5; white-space: pre-wrap; display: block;">SELECT 
-    LogAttributes['tool_name'] as tool,
-    COUNT(*) as usage_count,
-    AVG(toInt64OrNull(LogAttributes['duration_ms'])) as avg_duration_ms,
-    COUNT(CASE WHEN LogAttributes['success'] = 'true' THEN 1 END) as success_count
-FROM otel.otel_logs 
-WHERE LogAttributes['tool_name'] IS NOT NULL 
-AND Timestamp >= now() - INTERVAL 1 DAY
-GROUP BY LogAttributes['tool_name'] 
-ORDER BY usage_count DESC</code>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: white; border-radius: 6px; border-left: 4px solid #dc2626;">
-                                    <div style="font-weight: 600; color: #991b1b; margin-bottom: 0.5rem; font-size: 0.875rem;">🚨 Error Analysis</div>
-                                    <code style="font-size: 0.7rem; color: #374151; line-height: 1.5; white-space: pre-wrap; display: block;">SELECT 
-    LogAttributes['error_type'] as error_type,
-    COUNT(*) as error_count,
-    MIN(Timestamp) as first_occurrence,
-    MAX(Timestamp) as last_occurrence,
-    COUNT(DISTINCT LogAttributes['session.id']) as affected_sessions
-FROM otel.otel_logs 
-WHERE Body = 'claude_code.api_error' 
-AND Timestamp >= now() - INTERVAL 24 HOUR
-GROUP BY LogAttributes['error_type'] 
-ORDER BY error_count DESC</code>
-                                </div>
-                                
-                                <div style="padding: 0.75rem; background: white; border-radius: 6px; border-left: 4px solid #a855f7;">
-                                    <div style="font-weight: 600; color: #7e22ce; margin-bottom: 0.5rem; font-size: 0.875rem;">💬 Message Content Analysis</div>
-                                    <code style="font-size: 0.7rem; color: #374151; line-height: 1.5; white-space: pre-wrap; display: block;">SELECT 
-    LogAttributes['user.email'] as user,
-    Body as message_type,
-    COUNT(*) as message_count,
-    AVG(toInt64OrNull(LogAttributes['prompt_length'])) as avg_prompt_length,
-    SUM(toInt64OrNull(LogAttributes['input_tokens'])) as total_input_tokens,
-    SUM(toInt64OrNull(LogAttributes['output_tokens'])) as total_output_tokens,
-    SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost,
-    LogAttributes['model'] as model_used
-FROM otel.otel_logs 
-WHERE Body IN ('claude_code.user_prompt', 'claude_code.api_request')
-AND Timestamp >= now() - INTERVAL 7 DAY
-GROUP BY LogAttributes['user.email'], Body, LogAttributes['model']
-ORDER BY message_count DESC</code>
-                                </div>
-                                
-                            </div>
+                        <div class="widget-content" style="padding: 2rem; text-align: center; color: #64748b;">
+                            Initializing interactive explorer. If this message persists, ensure the dedicated Data Explorer bundle is available.<br><br>
+                            Reference: <code>docs/data_explorer_reference.md</code>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Query Interface -->
-            <div class="widget-grid">
-                <div class="widget-card" style="grid-column: 1 / -1;">
+            <noscript>
+                <div class="widget-card" style="margin-top: 1rem;">
                     <div class="widget-header">
-                        <h3 class="widget-title">🔍 SQL Query Interface</h3>
-                        <div class="status-indicator status-healthy"></div>
+                        <h3 class="widget-title">JavaScript Required</h3>
                     </div>
                     <div class="widget-content">
-                        <div style="margin-bottom: 1rem;">
-                            <textarea id="sql-query-input" placeholder="Enter your SQL query here... (e.g., SELECT * FROM otel.otel_logs WHERE Timestamp >= now() - INTERVAL 1 HOUR LIMIT 10)" 
-                                style="width: 100%; height: 120px; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.875rem; resize: vertical;"
-                                >SELECT 
-    LogAttributes['session.id'] as session,
-    LogAttributes['tool_name'] as tool,
-    Timestamp,
-    LogAttributes['cost_usd'] as cost
-FROM otel.otel_logs 
-WHERE Timestamp >= now() - INTERVAL 1 HOUR 
-ORDER BY Timestamp DESC 
-LIMIT 20</textarea>
-                        </div>
-                        
-                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                            <button id="execute-query-btn" onclick="executeCustomQuery()" 
-                                style="background: #059669; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                                ▶️ Execute Query
-                            </button>
-                            <button onclick="clearQueryResults()" 
-                                style="background: #6b7280; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                                🗑️ Clear Results
-                            </button>
-                            <button onclick="exportQueryResults()" 
-                                style="background: #2563eb; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                                📊 Export CSV
-                            </button>
-                        </div>
-                        
-                        <div id="query-status" style="margin-bottom: 1rem; font-size: 0.875rem;"></div>
+                        Enable JavaScript to use the Data Explorer interface.
                     </div>
                 </div>
-            </div>
-
-            <!-- Results Display -->
-            <div class="widget-grid">
-                <div class="widget-card" style="grid-column: 1 / -1;">
-                    <div class="widget-header">
-                        <h3 class="widget-title">📊 Query Results</h3>
-                        <div class="status-indicator" id="results-status"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div id="query-results" style="min-height: 200px; font-family: 'Monaco', 'Menlo', monospace; font-size: 0.875rem;">
-                            <div style="color: #6b7280; text-align: center; padding: 2rem;">
-                                Execute a query to see results here...
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Visualization Options -->
-            <div class="widget-grid">
-                <div class="widget-card" style="grid-column: 1 / -1;">
-                    <div class="widget-header">
-                        <h3 class="widget-title">📈 Data Visualization</h3>
-                        <div class="status-indicator status-healthy"></div>
-                    </div>
-                    <div class="widget-content">
-                        <div style="margin-bottom: 1rem;">
-                            <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Chart Type:</label>
-                            <select id="chart-type-select" style="padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; margin-right: 1rem;">
-                                <option value="table">Table View</option>
-                                <option value="bar">Bar Chart</option>
-                                <option value="line">Line Chart</option>
-                                <option value="pie">Pie Chart</option>
-                                <option value="scatter">Scatter Plot</option>
-                            </select>
-                            <button onclick="generateVisualization()" 
-                                style="background: #7c3aed; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
-                                📊 Generate Chart
-                            </button>
-                        </div>
-                        <div id="data-visualization" style="min-height: 300px;">
-                            <div style="color: #6b7280; text-align: center; padding: 2rem;">
-                                Run a query and generate a visualization to see charts here...
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </noscript>
         </section>
+
     </div>
 
     <button class="refresh-button" onclick="refreshAllData()" title="Refresh All Data">
         ↻
     </button>
+
+    <script src="{{ url_for('static', filename='js/data_explorer.js') }}" defer></script>
 
     <script>
         // DEBUG: Test if JavaScript is working
@@ -3271,29 +2930,60 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
         };
 
         // Optimized reload filtered widgets with batch requests
+        function showAnalyticsLoadingState() {
+            const loadingHtml = '<div class="loading">⚡ Applying filters...</div>';
+            ['conversation-timeline-widget', 'code-pattern-analysis-widget', 'content-search-widget']
+                .forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.innerHTML = loadingHtml;
+                    }
+                });
+        }
+
+        function buildFilterQueryParams(filters) {
+            const params = new URLSearchParams();
+            if (filters.timeRange) {
+                params.set('timeRange', filters.timeRange);
+            }
+            if (filters.language) {
+                params.set('language', filters.language);
+            }
+            if (filters.sessionType) {
+                params.set('sessionType', filters.sessionType);
+            }
+            if (filters.contentType) {
+                params.set('contentType', filters.contentType);
+            }
+            if (filters.logic) {
+                params.set('logic', filters.logic);
+            }
+            return params.toString();
+        }
+
         async function reloadFilteredWidgets() {
             console.log('♻️ Reloading widgets with filters:', window.dashboardFilters);
-            
-            // Show loading indicators  
-            document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
-                content.innerHTML = '<div class="loading">⚡ Applying filters...</div>';
-            });
+
+            showAnalyticsLoadingState();
 
             try {
+                const filterQuery = buildFilterQueryParams(window.dashboardFilters);
+                const querySuffix = filterQuery ? `?${filterQuery}` : '';
+
                 // Batch all widget requests for better performance
                 const requests = [
                     { 
-                        url: '/api/telemetry-widget/conversation-timeline', 
+                        url: `/api/telemetry-widget/conversation-timeline${querySuffix}`, 
                         cacheKey: `timeline-${JSON.stringify(window.dashboardFilters)}`,
                         ttl: 2 // Shorter cache for filtered data
                     },
                     { 
-                        url: '/api/telemetry-widget/code-pattern-analysis', 
+                        url: `/api/telemetry-widget/code-pattern-analysis${querySuffix}`, 
                         cacheKey: `codepattern-${JSON.stringify(window.dashboardFilters)}`,
                         ttl: 2 
                     },
                     { 
-                        url: '/api/telemetry-widget/content-search-widget', 
+                        url: `/api/telemetry-widget/content-search-widget${querySuffix}`, 
                         cacheKey: `contentsearch-${JSON.stringify(window.dashboardFilters)}`,
                         ttl: 2 
                     }
@@ -3314,14 +3004,22 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
                 });
 
                 // Track performance
-                const filterDuration = window.performanceOptimizer.endTiming('filterApplication');
-                console.log(`✅ Filter application completed in ${filterDuration}ms`);
+                const duration = window.performanceOptimizer.endTiming('filterApplication');
+                console.log(`✅ Filter application completed in ${duration}ms`);
 
             } catch (error) {
                 console.error('❌ Failed to reload filtered widgets:', error);
-                document.querySelectorAll('.priority-widget .widget-content').forEach(content => {
-                    content.innerHTML = '<div style="color: #dc2626;">❌ Failed to apply filters</div>';
-                });
+                ['conversation-timeline-widget', 'code-pattern-analysis-widget', 'content-search-widget']
+                    .forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.innerHTML = '<div style="color: #dc2626;">❌ Failed to apply filters</div>';
+                        }
+                    });
+            } finally {
+                if (window.performanceOptimizer.loadTimes && window.performanceOptimizer.loadTimes.has('filterApplication')) {
+                    window.performanceOptimizer.endTiming('filterApplication');
+                }
             }
         }
 

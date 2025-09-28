@@ -44,7 +44,7 @@ else:
     _native_threading = threading
 
 # Flask and SocketIO imports for real-time dashboard
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO, emit
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
@@ -1525,6 +1525,20 @@ class ComprehensiveHealthDashboard:
                     'directories': []
                 })
 
+        @self.app.route('/docs/data-explorer-reference')
+        def data_explorer_reference():
+            """Serve the Data Explorer reference markdown."""
+            try:
+                repo_root = Path(__file__).resolve().parent.parent.parent.parent
+                doc_path = repo_root / 'docs' / 'data_explorer_reference.md'
+                if not doc_path.exists():
+                    logger.error("Data Explorer reference document not found at %s", doc_path)
+                    return jsonify({"error": "Reference document not found"}), 404
+                return send_file(doc_path, mimetype='text/markdown')
+            except Exception as e:
+                logger.error(f"Failed to serve data explorer reference: {e}")
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/data-explorer/query", methods=['GET', 'POST'])
         def execute_custom_query():
             """Execute custom SQL query for data exploration."""
@@ -1545,6 +1559,7 @@ class ComprehensiveHealthDashboard:
                 
                 data = request.get_json()
                 query = data.get('query', '').strip()
+                logger.info("Data Explorer query requested (length=%s)", len(query))
                 
                 if not query:
                     return jsonify({"error": "Query cannot be empty"}), 400
@@ -1581,13 +1596,15 @@ class ComprehensiveHealthDashboard:
                         if data_rows and len(data_rows) > 0:
                             columns = list(data_rows[0].keys())
                         
-                        return jsonify({
+                        response_payload = {
                             "success": True,
                             "data": data_rows,
                             "row_count": len(data_rows),
                             "columns": columns,
                             "query_executed": query
-                        })
+                        }
+                        logger.info("Data Explorer query succeeded (rows=%s)", len(data_rows))
+                        return jsonify(response_payload)
                         
                     except Exception as ch_error:
                         logger.error(f"ClickHouse query error: {ch_error}")
