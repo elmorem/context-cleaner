@@ -60,11 +60,11 @@ pip install -e .
 
 ### **Unified Dashboard Access** 🎯
 ```bash
-# Launch the comprehensive dashboard (recommended)
-context-cleaner dashboard
+# Launch the comprehensive dashboard with full orchestration (recommended)
+context-cleaner run
 
-# Alternative: Direct launch script
-python start_context_cleaner.py
+# Example: override the dashboard port
+context-cleaner run --dashboard-port 8110
 ```
 
 The unified dashboard provides **everything in one place**:
@@ -78,10 +78,10 @@ The unified dashboard provides **everything in one place**:
 
 ### **Command Line Tools** (Optional)
 ```bash
-# Traditional CLI commands still available
-context-cleaner start          # Start tracking
-context-cleaner health-check   # System diagnostics  
-context-cleaner effectiveness  # View stats
+# Frequently used CLI commands
+context-cleaner session start      # Begin tracking
+context-cleaner health-check       # System diagnostics  
+context-cleaner effectiveness      # View optimization stats
 ```
 
 ## 📊 **New Analytics Features** ⭐
@@ -148,15 +148,15 @@ context-cleaner [OPTIONS] COMMAND [ARGS]...
   effectiveness      Display optimization effectiveness statistics
   
 # Session Management:
-  session-start      Start new tracking session
-  session-end        End current tracking session
-  session-stats      Show session statistics
-  session-list       List recent sessions
+  session start      Start new tracking session
+  session end        End current tracking session
+  session stats      Show session statistics
+  session list       List recent sessions
   
 # Monitoring:  
-  monitor            Start real-time monitoring
-  monitor-status     Show monitoring status
-  live-dashboard     Live dashboard with real-time updates
+  monitor start      Start real-time monitoring
+  monitor status     Show monitoring status
+  monitor live       Live dashboard with real-time updates
   
 # Data Management:
   analyze            Analyze productivity trends
@@ -168,28 +168,28 @@ context-cleaner [OPTIONS] COMMAND [ARGS]...
 ### **Session Management Examples**
 ```bash
 # Start named session for specific project
-context-cleaner session-start --session-id "api-refactor" --project-path ./my-project
+context-cleaner session start --session-id "api-refactor" --project-path ./my-project
 
 # View session statistics
-context-cleaner session-stats --days 7
+context-cleaner session stats --days 7
 
 # List recent sessions
-context-cleaner session-list --limit 10
+context-cleaner session list --limit 10
 
 # End current session
-context-cleaner session-end
+context-cleaner session end
 ```
 
 ### **Advanced Monitoring**
 ```bash
 # Start real-time monitoring
-context-cleaner monitor --watch-dirs ./src ./tests
+context-cleaner monitor start --watch-dirs ./src --watch-dirs ./tests
 
 # Check monitoring status
-context-cleaner monitor-status
+context-cleaner monitor status
 
-# Launch live dashboard with 10-second refresh
-context-cleaner live-dashboard --refresh 10
+# Launch live console dashboard with 10-second refresh
+context-cleaner monitor live --refresh 10
 ```
 
 ## 📈 **Dashboard Features**
@@ -230,7 +230,7 @@ analysis:
 
 # Dashboard Configuration  
 dashboard:
-  port: 8548
+  port: 8110
   host: localhost
   auto_refresh: true
   cache_duration: 300

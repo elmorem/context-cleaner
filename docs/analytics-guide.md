@@ -50,7 +50,7 @@ tracking:
 ### **Start Your First Tracked Session**
 ```bash
 # Begin tracking for a project
-context-cleaner session-start --project-path ./my-project --session-id "feature-dev"
+context-cleaner session start --project-path ./my-project --session-id "feature-dev"
 
 # Perform some optimization
 context-cleaner optimize --quick
@@ -164,7 +164,7 @@ context-cleaner health-check --detailed --fix-issues
 ### **Accessing Enhanced Dashboard**
 ```bash
 # Launch dashboard with analytics features
-context-cleaner dashboard --interactive --operations
+context-cleaner run --dev-mode
 ```
 
 ### **Dashboard Sections**
@@ -314,7 +314,7 @@ context-cleaner export-analytics --days 90 --include-sessions \
 context-cleaner health-check --detailed > health-$(date +%Y-%m-%d).log
 
 # Track resource usage
-context-cleaner monitor-status --format json > monitor-status.json
+context-cleaner monitor status --format json > monitor-status.json
 ```
 
 ## 📋 **Common Analytics Workflows**
@@ -328,7 +328,7 @@ context-cleaner monitor-status --format json > monitor-status.json
 context-cleaner health-check --fix-issues
 
 # Start tracking session
-context-cleaner session-start --project-path "$(pwd)" --session-id "daily-$(date +%Y%m%d)"
+context-cleaner session start --project-path "$(pwd)" --session-id "daily-$(date +%Y%m%d)"
 
 # At end of day, review effectiveness
 context-cleaner effectiveness --days 1
@@ -337,7 +337,7 @@ context-cleaner effectiveness --days 1
 context-cleaner export-analytics --days 1 --output "daily-$(date +%Y%m%d).json"
 
 # End session
-context-cleaner session-end
+context-cleaner session end
 ```
 
 ### **Weekly Team Review**
@@ -413,7 +413,7 @@ context-cleaner config-show | grep -A 5 "tracking:"
 ls -la ~/.context_cleaner/data/
 
 # Start a test session
-context-cleaner session-start --session-id "test"
+context-cleaner session start --session-id "test"
 context-cleaner optimize --preview
 context-cleaner effectiveness --days 1
 ```
@@ -436,7 +436,7 @@ jq . export-file.json > /dev/null && echo "Valid JSON" || echo "Invalid JSON"
 context-cleaner health-check --detailed
 
 # Monitor resource usage
-context-cleaner monitor-status
+context-cleaner monitor status
 
 # Clear analytics cache if needed
 rm -rf ~/.context_cleaner/data/cache/

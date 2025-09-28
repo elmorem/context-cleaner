@@ -46,7 +46,7 @@ Context Cleaner works out-of-the-box with secure defaults. No configuration requ
 context-cleaner config-show
 
 # Create data directory and initialize system
-context-cleaner start
+context-cleaner run
 ```
 
 **What this creates:**
@@ -76,7 +76,7 @@ context-cleaner optimize --preview
 context-cleaner optimize --quick
 
 # Show enhanced dashboard with analytics
-context-cleaner dashboard --interactive --operations
+context-cleaner run --dev-mode
 ```
 
 ### 2. New Analytics Commands ⭐ v0.2.0
@@ -94,9 +94,9 @@ context-cleaner export-analytics --output my-analytics.json
 ### 3. Enhanced Web Dashboard
 ```bash
 # Launch interactive dashboard with analytics
-context-cleaner dashboard --interactive
+context-cleaner run --dev-mode
 
-# Dashboard with enhanced features at: http://localhost:8548
+# Dashboard with enhanced features at: http://localhost:8110
 # Now includes effectiveness tracking and ROI metrics
 ```
 
@@ -105,10 +105,10 @@ context-cleaner dashboard --interactive
 ### Step 1: Start Tracked Session
 ```bash
 # Begin productivity tracking with session ID
-context-cleaner session-start --project-path ./my-project --session-id "first-session"
+context-cleaner session start --project-path ./my-project --session-id "first-session"
 
 # Verify tracking is active
-context-cleaner session-list
+context-cleaner session list
 ```
 
 ### Step 2: Perform Optimizations with Tracking
@@ -142,7 +142,7 @@ context-cleaner effectiveness --days 1
 context-cleaner export-analytics --include-sessions --output first-session-report.json
 
 # End your tracking session
-context-cleaner session-end
+context-cleaner session end
 ```
 
 ## 📈 Enhanced Dashboard Overview ⭐ NEW
@@ -150,7 +150,7 @@ context-cleaner session-end
 Launch the enhanced dashboard with analytics:
 
 ```bash
-context-cleaner dashboard --interactive --operations
+context-cleaner run --dev-mode
 ```
 
 ### New Dashboard Features v0.2.0:
@@ -213,16 +213,16 @@ context-cleaner privacy --delete-all
 ### Dashboard Themes
 ```bash
 # Dark theme (default)
-context-cleaner dashboard --theme dark
+context-cleaner run --no-browser  # set theme via dashboard settings
 
 # Light theme  
-context-cleaner dashboard --theme light
+context-cleaner run --no-browser  # set theme via dashboard settings
 ```
 
 ### Custom Port
 ```bash
 # Use custom port for dashboard
-context-cleaner dashboard --port 8547
+context-cleaner run --dashboard-port 8111
 ```
 
 ### Analysis Periods
@@ -253,14 +253,14 @@ Now that you're set up, explore more advanced features:
 ### For Daily Development
 ```bash
 # Morning routine: start tracking
-context-cleaner start
+context-cleaner run
 
 # Work with Claude Code using /clean-context as needed
 # Context Cleaner tracks automatically in background
 
 # End of day: view productivity insights  
 context-cleaner analyze --days 1
-context-cleaner dashboard  # Visual review
+context-cleaner run  # Visual review
 ```
 
 ### For Project Analysis
@@ -275,7 +275,7 @@ context-cleaner export --format csv
 ### For Performance Optimization
 ```bash
 # Monitor system performance impact
-context-cleaner monitor --performance
+context-cleaner monitor status --format json
 
 # Get optimization recommendations
 context-cleaner optimize --preview --format json

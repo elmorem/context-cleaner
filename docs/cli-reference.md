@@ -93,32 +93,6 @@ context-cleaner stop --service dashboard
 context-cleaner stop --service jsonl_bridge --no-dependents
 ```
 
-### **`start`**
-Start productivity tracking for the current development session.
-
-```bash
-context-cleaner start [OPTIONS]
-
-Options:
-  --help    Show help message
-```
-
-**Examples:**
-```bash
-# Basic start
-context-cleaner start
-
-# With verbose output
-context-cleaner --verbose start
-```
-
-**Output:**
-```
-✅ Context Cleaner started
-📊 Dashboard available at: http://localhost:8548
-📈 Use 'context-cleaner dashboard' to view insights
-```
-
 ### **`run`** ⭐ UPDATED
 Full-service orchestrator entry point. Bootstraps the supervisor, orchestrator,
 Docker services, JSONL bridge, dashboard, and watchdog monitoring in one command.
@@ -161,35 +135,28 @@ context-cleaner run --no-docker
 - JSON mode returns a schema with `orchestrator`, `services`, `services_summary`,
   and `watchdog` keys so CI tooling or dashboards can consume the data directly.
 
-### **`dashboard`**
-Launch the productivity dashboard web interface.
+### **Dashboard access**
+The standalone `dashboard` command has been retired. Launch the web dashboard
+through the unified `run` entry point and tailor behaviour with the supported
+flags:
 
 ```bash
-context-cleaner dashboard [OPTIONS]
+# Launch dashboard with orchestration (default port 8110)
+context-cleaner run
 
-Options:
-  --port, -p INTEGER      Dashboard port (overrides config)
-  --host, -h TEXT         Dashboard host (overrides config)  
-  --no-browser           Don't open browser automatically
-  --interactive          Enable interactive dashboard mode
-  --operations           Show available operations
-  --help                 Show help message
+# Use a different port without editing config
+context-cleaner run --dashboard-port 8080
+
+# Start quietly and open the URL yourself
+context-cleaner run --no-browser
+
+# Enable verbose logs and developer tooling
+context-cleaner run --dev-mode
 ```
 
-**Examples:**
-```bash
-# Launch dashboard on default port (8548)
-context-cleaner dashboard
-
-# Use custom port
-context-cleaner dashboard --port 8080
-
-# Enable interactive mode with operations
-context-cleaner dashboard --interactive --operations
-
-# Launch without opening browser
-context-cleaner dashboard --no-browser
-```
+Need to bind to another host? Update `dashboard.host` in
+`~/.context_cleaner/config.yaml` or export `CONTEXT_CLEANER_HOST=0.0.0.0`
+before invoking `context-cleaner run`.
 
 ### **`optimize`**
 Context optimization and health analysis (equivalent to `/clean-context`).
@@ -259,7 +226,7 @@ context-cleaner health-check --format json
 ✅ Storage System: Operational (3.2MB used)
 ✅ Analytics Engine: Running
 ✅ Session Tracking: Active
-⚠️  Dashboard: Not running (start with 'context-cleaner dashboard')
+⚠️  Dashboard: Not running (start with 'context-cleaner run')
 
 📊 SYSTEM STATUS: HEALTHY
 🔧 Issues Found: 0
@@ -354,11 +321,11 @@ context-cleaner effectiveness --detailed --format json
 
 ## 👥 **Session Management**
 
-### **`session-start`**
+### **`session start`**
 Start a new productivity tracking session.
 
 ```bash
-context-cleaner session-start [OPTIONS]
+context-cleaner session start [OPTIONS]
 
 Options:
   --session-id TEXT      Custom session identifier
@@ -371,20 +338,20 @@ Options:
 **Examples:**
 ```bash
 # Start session with auto-generated ID
-context-cleaner session-start
+context-cleaner session start
 
 # Start named session for specific project
-context-cleaner session-start --session-id "api-refactor" --project-path ./my-api
+context-cleaner session start --session-id "api-refactor" --project-path ./my-api
 
 # Track specific AI model usage
-context-cleaner session-start --model "claude-3-5-sonnet" --project-path ./frontend
+context-cleaner session start --model "claude-3-5-sonnet" --project-path ./frontend
 ```
 
-### **`session-end`**
+### **`session end`**
 End the current or specified tracking session.
 
 ```bash
-context-cleaner session-end [OPTIONS]
+context-cleaner session end [OPTIONS]
 
 Options:
   --session-id TEXT      Session ID to end (current if not specified)
@@ -394,17 +361,17 @@ Options:
 **Examples:**
 ```bash
 # End current session
-context-cleaner session-end
+context-cleaner session end
 
 # End specific session
-context-cleaner session-end --session-id "api-refactor"
+context-cleaner session end --session-id "api-refactor"
 ```
 
-### **`session-stats`**
+### **`session stats`**
 Show productivity statistics and session analytics.
 
 ```bash
-context-cleaner session-stats [OPTIONS]
+context-cleaner session stats [OPTIONS]
 
 Options:
   --days INTEGER         Number of days to analyze (default: 7)
@@ -415,17 +382,17 @@ Options:
 **Examples:**
 ```bash
 # Show stats for last week
-context-cleaner session-stats
+context-cleaner session stats
 
 # Monthly stats in JSON format
-context-cleaner session-stats --days 30 --format json
+context-cleaner session stats --days 30 --format json
 ```
 
-### **`session-list`**
+### **`session list`**
 List recent tracking sessions.
 
 ```bash
-context-cleaner session-list [OPTIONS]
+context-cleaner session list [OPTIONS]
 
 Options:
   --limit INTEGER        Maximum number of sessions to show (default: 10)
@@ -436,19 +403,19 @@ Options:
 **Examples:**
 ```bash
 # List last 10 sessions
-context-cleaner session-list
+context-cleaner session list
 
 # List last 20 sessions in JSON format
-context-cleaner session-list --limit 20 --format json
+context-cleaner session list --limit 20 --format json
 ```
 
 ## 📡 **Monitoring Commands**
 
-### **`monitor`**
+### **`monitor start`**
 Start real-time session monitoring and observation.
 
 ```bash
-context-cleaner monitor [OPTIONS]
+context-cleaner monitor start [OPTIONS]
 
 Options:
   --watch-dirs PATH      Directories to monitor (multiple allowed)
@@ -459,20 +426,20 @@ Options:
 **Examples:**
 ```bash
 # Monitor current directory
-context-cleaner monitor
+context-cleaner monitor start
 
 # Monitor specific directories
-context-cleaner monitor --watch-dirs ./src --watch-dirs ./tests
+context-cleaner monitor start --watch-dirs ./src --watch-dirs ./tests
 
 # Monitor without file observer (lower resource usage)
-context-cleaner monitor --no-observer
+context-cleaner monitor start --no-observer
 ```
 
-### **`monitor-status`**
+### **`monitor status`**
 Show monitoring status and statistics.
 
 ```bash
-context-cleaner monitor-status [OPTIONS]
+context-cleaner monitor status [OPTIONS]
 
 Options:
   --format TEXT         Output format (text/json)
@@ -482,17 +449,17 @@ Options:
 **Examples:**
 ```bash
 # Show monitoring status
-context-cleaner monitor-status
+context-cleaner monitor status
 
 # Status in JSON format
-context-cleaner monitor-status --format json
+context-cleaner monitor status --format json
 ```
 
-### **`live-dashboard`**
+### **`monitor live`**
 Show live dashboard with real-time updates.
 
 ```bash
-context-cleaner live-dashboard [OPTIONS]
+context-cleaner monitor live [OPTIONS]
 
 Options:
   --refresh INTEGER     Refresh interval in seconds (default: 5)
@@ -502,10 +469,10 @@ Options:
 **Examples:**
 ```bash
 # Live dashboard with 5-second refresh
-context-cleaner live-dashboard
+context-cleaner monitor live
 
 # Fast refresh every 2 seconds
-context-cleaner live-dashboard --refresh 2
+context-cleaner monitor live --refresh 2
 ```
 
 ## 📊 **Data Management**
@@ -597,23 +564,23 @@ Options:
 ### **Daily Development Workflow**
 ```bash
 # Morning: Start tracking
-context-cleaner session-start --project-path ./my-project
+context-cleaner session start --project-path ./my-project
 
 # Throughout the day: Use optimization as needed
 context-cleaner optimize --quick
 
 # End of day: Review productivity
 context-cleaner effectiveness --days 1
-context-cleaner dashboard
+context-cleaner run
 
 # End session
-context-cleaner session-end
+context-cleaner session end
 ```
 
 ### **Project Analysis**
 ```bash
 # Analyze project productivity over 2 weeks
-context-cleaner session-stats --days 14
+context-cleaner session stats --days 14
 
 # Export detailed analytics for stakeholders
 context-cleaner export-analytics --days 14 --include-sessions --output project-metrics.json
@@ -640,7 +607,7 @@ context-cleaner export-analytics --days 90 --output backup-$(date +%Y%m%d).json
 context-cleaner health-check --format json | jq '.status'
 
 # Export metrics for analysis
-context-cleaner session-stats --days 7 --format json > weekly-metrics.json
+context-cleaner session stats --days 7 --format json > weekly-metrics.json
 
 # Automated optimization check
 context-cleaner optimize --preview --format json > optimization-preview.json
@@ -655,7 +622,7 @@ context-cleaner export-analytics --days 30 --output team-metrics.json
 context-cleaner effectiveness --detailed --format json > strategy-analysis.json
 
 # Monitor team productivity trends
-context-cleaner session-stats --days 30 --format json
+context-cleaner session stats --days 30 --format json
 ```
 
 ## 🔄 **Command Chaining**
@@ -664,17 +631,17 @@ Context Cleaner commands can be chained for powerful workflows:
 
 ```bash
 # Start session, run health check, and launch dashboard
-context-cleaner session-start --project-path . && \
+context-cleaner session start --project-path . && \
 context-cleaner health-check && \
-context-cleaner dashboard
+context-cleaner run
 
 # Export analytics and immediately analyze them
 context-cleaner export-analytics --output latest.json && \
 jq '.effectiveness_summary.success_rate' latest.json
 
 # Monitor and track in background
-context-cleaner session-start --session-id "monitoring" && \
-context-cleaner monitor --watch-dirs ./src &
+context-cleaner session start --session-id "monitoring" && \
+context-cleaner monitor start --watch-dirs ./src &
 ```
 
 ## ❓ **Getting Help**
@@ -687,7 +654,7 @@ context-cleaner COMMAND --help
 # Examples:
 context-cleaner effectiveness --help
 context-cleaner export-analytics --help
-context-cleaner session-start --help
+context-cleaner session start --help
 ```
 
 ### **Global Help**
@@ -713,7 +680,7 @@ chmod 600 ~/.context_cleaner/data/*
 **Port Already in Use:**
 ```bash
 # Use different port for dashboard
-context-cleaner dashboard --port 8549
+context-cleaner run --dashboard-port 8111
 ```
 
 **Configuration Issues:**

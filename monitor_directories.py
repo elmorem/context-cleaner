@@ -1,64 +1,39 @@
 #!/usr/bin/env python3
-"""
-Directory Monitor for Context Cleaner Real-World Usage
-Monitors multiple directories and triggers analysis
-"""
+"""Deprecated multi-directory monitoring helper."""
 
-import asyncio
-import time
-from pathlib import Path
+from __future__ import annotations
+
 import sys
+import textwrap
+import warnings
 
-# Add context cleaner to path
-sys.path.insert(0, "/Users/markelmore/_code/context-cleaner/src")
+_DEPRECATION_MESSAGE = textwrap.dedent(
+    """
+    📁 Directory monitoring script deprecated
 
-from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
-from context_cleaner.config.settings import ContextCleanerConfig
+    Continuous monitoring is now available through the CLI:
 
-class MultiDirectoryMonitor:
-    def __init__(self):
-        self.monitored_dirs = ['/Users/markelmore/code', '/Users/markelmore/projects', '/Users/markelmore/workspace']
-        self.config = ContextCleanerConfig.default()
-        self.dashboard = ComprehensiveHealthDashboard(config=self.config)
-    
-    async def monitor_directories(self):
-        """Monitor all configured directories"""
-        print("🔍 Starting directory monitoring...")
-        
-        for directory in self.monitored_dirs:
-            dir_path = Path(directory)
-            if dir_path.exists():
-                print(f"📁 Monitoring: {directory}")
-            else:
-                print(f"⚠️  Directory not found: {directory}")
-        
-        # Start monitoring loop
-        while True:
-            await self.scan_directories()
-            await asyncio.sleep(300)  # Scan every 5 minutes
-    
-    async def scan_directories(self):
-        """Scan directories for changes and update analytics"""
-        for directory in self.monitored_dirs:
-            dir_path = Path(directory)
-            if dir_path.exists():
-                # Trigger analysis for this directory
-                print(f"🔍 Scanning {directory}...")
-                # Add your analysis logic here
-    
-    def start_dashboard(self):
-        """Start the web dashboard"""
-        print("🌐 Starting dashboard at http://localhost:8080")
-        self.dashboard.run(host="localhost", port=8080)
+        context-cleaner monitor start [--watch-dirs PATH ...]
+        context-cleaner monitor status
 
-if __name__ == "__main__":
-    monitor = MultiDirectoryMonitor()
-    
-    # Start dashboard in separate thread
-    import threading
-    dashboard_thread = threading.Thread(target=monitor.start_dashboard)
-    dashboard_thread.daemon = True
-    dashboard_thread.start()
-    
-    # Start monitoring
-    asyncio.run(monitor.monitor_directories())
+    The standalone `monitor_directories.py` helper is no longer maintained.
+    """
+)
+
+
+def _warn() -> None:
+    warnings.warn(
+        "monitor_directories.py is deprecated; use the `context-cleaner monitor` commands.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+
+def main() -> int:
+    _warn()
+    print(_DEPRECATION_MESSAGE)
+    return 1
+
+
+if __name__ == "__main__":  # pragma: no cover - manual invocation only
+    sys.exit(main())

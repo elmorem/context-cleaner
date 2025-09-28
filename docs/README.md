@@ -105,7 +105,7 @@ Context Cleaner is an advanced productivity tracking and context optimization to
 
 4. **View your dashboard**:
    ```bash
-   context-cleaner dashboard
+   context-cleaner run
    ```
 
 ## 🔗 Additional Resources

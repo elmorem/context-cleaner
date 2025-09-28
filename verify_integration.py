@@ -33,11 +33,11 @@ def main():
     tests = [
         ("context-cleaner --help", "CLI Help Command"),
         ("context-cleaner optimize --help", "Optimize Command Help"),
-        ("context-cleaner optimize --dashboard", "Dashboard Functionality"),
         ("context-cleaner optimize --dashboard --format json", "JSON Dashboard Output"),
         ("context-cleaner optimize --quick", "Quick Optimization"),
         ("context-cleaner optimize --preview", "Preview Mode"),
-        ("context-cleaner dashboard --help", "Dashboard Server Help"),
+        ("context-cleaner run --help", "Run Command Help"),
+        ("context-cleaner run --status-only --json", "Run Status JSON"),
         ("context-cleaner analyze --help", "Analysis Command Help"),
     ]
     
@@ -55,10 +55,10 @@ def main():
         print("🎉 ALL TESTS PASSED - Integration is working correctly!")
         print()
         print("🎯 Available Commands:")
-        print("   context-cleaner optimize --dashboard  # Context health dashboard")
+        print("   context-cleaner optimize --dashboard --format json  # Dashboard data feed")
         print("   context-cleaner optimize --quick      # Fast cleanup")
         print("   context-cleaner optimize --preview    # Preview changes")
-        print("   context-cleaner dashboard            # Web dashboard")
+        print("   context-cleaner run --status-only --json  # Service status snapshot")
         print("   context-cleaner analyze              # Productivity analysis")
         print()
         print("🔗 For Claude Code integration, run:")

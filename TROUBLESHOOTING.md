@@ -238,18 +238,18 @@ context-cleaner optimize --quick
 #### Solution A: Use Different Port
 ```bash
 # Try different port
-context-cleaner dashboard --port 8547 --no-browser
+context-cleaner run --dashboard-port 8111 --no-browser
 
-# Then manually open: http://localhost:8547
+# Then manually open: http://localhost:8111
 ```
 
 #### Solution B: Kill Existing Processes
 ```bash
 # Find and kill processes using default port
-lsof -ti:8546 | xargs kill -9
+lsof -ti:8110 | xargs kill -9
 
-# Restart dashboard
-context-cleaner dashboard
+# Restart dashboard orchestration
+context-cleaner run
 ```
 
 ---
@@ -331,8 +331,8 @@ pip install context-cleaner
 
 # Run basic tests
 context-cleaner optimize --preview
-context-cleaner dashboard --no-browser &
-curl http://localhost:8546/health
+context-cleaner run --no-browser &
+curl http://localhost:8110/health
 ```
 
 ---
@@ -392,7 +392,7 @@ After resolving issues, verify everything works:
 
 - [ ] `context-cleaner --version` shows correct version
 - [ ] `context-cleaner optimize --preview` completes successfully
-- [ ] `context-cleaner dashboard --no-browser` starts without errors
+- [ ] `context-cleaner run --no-browser` starts without errors
 - [ ] `python ~/.claude/commands/clean-context.py --help` shows usage
 - [ ] No error messages in `~/.context_cleaner/logs/`
 - [ ] Performance is acceptable (< 2 seconds for basic operations)

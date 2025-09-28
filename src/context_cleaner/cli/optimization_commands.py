@@ -575,7 +575,7 @@ class OptimizationCommandHandler:
 
                     if result.operations_executed > 0:
                         click.echo(
-                            "\n📊 Run 'context-cleaner dashboard' to view updated metrics"
+                            "\n📊 Run 'context-cleaner run' to view updated metrics"
                         )
                 else:
                     click.echo("❌ Context optimization failed:")

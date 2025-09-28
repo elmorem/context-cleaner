@@ -380,7 +380,7 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
             handler.handle_full_optimization()
 
         if verbose:
-            click.echo("📊 Run 'context-cleaner dashboard' to view updated metrics")
+            click.echo("📊 Run 'context-cleaner run' to view updated metrics")
 
     except Exception as e:
         click.echo(f"❌ Context optimization failed: {e}", err=True)
@@ -2062,7 +2062,7 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
     
     # Comprehensive patterns based on all Context Cleaner startup methods
     search_patterns = [
-        # Direct script invocations
+        # Direct script invocations (legacy helpers now deprecated but keep for cleanup)
         "python start_context_cleaner.py",
         "python start_context_cleaner_production.py",
         "start_context_cleaner.py",

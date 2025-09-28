@@ -30,7 +30,7 @@ context-cleaner --version
 context-cleaner config-show
 
 # List recent sessions
-context-cleaner session-list --limit 5
+context-cleaner session list --limit 5
 ```
 
 ## 🚨 **Installation Issues**
@@ -103,7 +103,7 @@ chmod 700 ~/.context_cleaner
 chmod 700 ~/.context_cleaner/data
 
 # 3. Use custom data directory
-context-cleaner --data-dir ./my-analytics-data start
+context-cleaner --data-dir ./my-analytics-data run
 
 # 4. Check disk space
 df -h ~/.context_cleaner
@@ -124,10 +124,10 @@ python -c "import yaml; yaml.safe_load(open('~/.context_cleaner/config.yaml'))"
 
 # 3. Reset to defaults (removes custom config)
 rm ~/.context_cleaner/config.yaml
-context-cleaner start
+context-cleaner run
 
 # 4. Use environment variables instead
-export CONTEXT_CLEANER_PORT=8549
+export CONTEXT_CLEANER_PORT=8111
 export CONTEXT_CLEANER_DATA_DIR=~/custom-data
 ```
 
@@ -136,14 +136,14 @@ export CONTEXT_CLEANER_DATA_DIR=~/custom-data
 # Problem: Dashboard port already in use
 
 # 1. Use different port
-context-cleaner dashboard --port 8549
+context-cleaner run --dashboard-port 8111
 
-# 2. Kill process using port 8548
-lsof -ti:8548 | xargs kill -9  # Linux/Mac
-netstat -ano | findstr :8548   # Windows
+# 2. Kill process using port 8110
+lsof -ti:8110 | xargs kill -9  # Linux/Mac
+netstat -ano | findstr :8110   # Windows
 
 # 3. Set permanent custom port
-export CONTEXT_CLEANER_PORT=8549
+export CONTEXT_CLEANER_PORT=8111
 ```
 
 ## 📊 **Analytics & Tracking Issues**
@@ -156,11 +156,11 @@ export CONTEXT_CLEANER_PORT=8549
 context-cleaner config-show | grep -A 5 "tracking:"
 
 # 2. Check if sessions exist
-context-cleaner session-list
+context-cleaner session list
 ls -la ~/.context_cleaner/data/
 
 # 3. Start a test session
-context-cleaner session-start --session-id "test-session"
+context-cleaner session start --session-id "test-session"
 context-cleaner optimize --preview
 context-cleaner effectiveness --days 1
 
@@ -204,7 +204,7 @@ context-cleaner effectiveness --days 7 --detailed
 
 # 4. Clear cache and rebuild
 rm -rf ~/.context_cleaner/data/cache/
-context-cleaner start
+context-cleaner run
 ```
 
 ## 🌐 **Dashboard Issues**
@@ -214,17 +214,17 @@ context-cleaner start
 # Problem: dashboard command fails or doesn't open browser
 
 # 1. Check port availability
-netstat -tuln | grep 8548  # Linux
-netstat -an | findstr :8548  # Windows
+netstat -tuln | grep 8110  # Linux
+netstat -an | findstr :8110  # Windows
 
 # 2. Start with verbose logging
-context-cleaner --verbose dashboard
+context-cleaner --verbose run
 
 # 3. Try different host/port
-context-cleaner dashboard --host 127.0.0.1 --port 8549
+CONTEXT_CLEANER_HOST=127.0.0.1 context-cleaner run --dashboard-port 8111
 
 # 4. Start without browser auto-open
-context-cleaner dashboard --no-browser
+context-cleaner run --no-browser
 
 # 5. Check firewall settings (Windows)
 # Allow Python/context-cleaner through Windows Firewall
@@ -259,14 +259,14 @@ top | grep python  # Linux/Mac
 # Task Manager on Windows
 
 # 2. Reduce data load
-context-cleaner dashboard --cache-duration 60
+context-cleaner run --no-docker --no-jsonl
 
 # 3. Clear old analytics data
 context-cleaner export-analytics --days 90 --output backup.json
 # Then remove old data files
 
 # 4. Monitor resource usage
-context-cleaner monitor-status
+context-cleaner monitor status
 ```
 
 ## 🔒 **Security & Privacy Issues**
@@ -332,7 +332,7 @@ context-cleaner privacy delete-all
 # Problem: context-cleaner using too much CPU
 
 # 1. Check monitoring status
-context-cleaner monitor-status
+context-cleaner monitor status
 
 # 2. Stop real-time monitoring if running
 pkill -f "context-cleaner monitor"
@@ -352,7 +352,7 @@ htop | grep context  # Linux
 # Problem: Memory usage growing over time
 
 # 1. Check for memory leaks
-context-cleaner monitor-status --format json | jq '.memory_usage'
+context-cleaner monitor status --format json | jq '.memory_usage'
 
 # 2. Clear session cache
 rm -rf ~/.context_cleaner/data/cache/
@@ -361,8 +361,8 @@ rm -rf ~/.context_cleaner/data/cache/
 # Edit config: data_retention_days: 30  # Reduce from 90
 
 # 4. Restart monitoring
-context-cleaner session-end  # End current session
-context-cleaner start  # Start fresh
+context-cleaner session end  # End current session
+context-cleaner run  # Start fresh
 ```
 
 ### **Slow Analytics Queries**
@@ -377,7 +377,7 @@ context-cleaner effectiveness --days 7  # Instead of 30
 
 # 3. Rebuild session index
 rm ~/.context_cleaner/data/effectiveness/sessions_index.json
-context-cleaner start
+context-cleaner run
 
 # 4. Monitor I/O performance
 iostat -x 1  # Linux
@@ -504,7 +504,7 @@ tail -f ~/.context_cleaner/logs/context-cleaner.log
 ### **Trace File Operations**
 ```bash
 # Linux: Monitor file operations
-strace -e file context-cleaner start 2>&1 | grep context_cleaner
+strace -e file context-cleaner run 2>&1 | grep context_cleaner
 
 # macOS: Use fs_usage
 sudo fs_usage -w -f filesys | grep context_cleaner
@@ -570,7 +570,7 @@ context-cleaner config-show
 echo
 
 echo "=== Recent Sessions ==="
-context-cleaner session-list --limit 5 --format json
+context-cleaner session list --limit 5 --format json
 echo
 
 echo "=== Data Directory ==="
