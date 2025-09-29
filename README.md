@@ -58,6 +58,17 @@ cd context-cleaner
 pip install -e .
 ```
 
+### **Telemetry Setup (Recommended)**
+```bash
+# Provision local ClickHouse + OpenTelemetry stack
+context-cleaner telemetry init
+
+# Load telemetry environment variables for the current shell session
+source ~/.context_cleaner/telemetry/telemetry-env.sh
+```
+
+> **Docker Required**: Telemetry features rely on Docker and Docker Compose. Install Docker Desktop (macOS/Windows) or Docker Engine (Linux) and ensure it is running before initialising telemetry.
+
 ### **Unified Dashboard Access** 🎯
 ```bash
 # Launch the comprehensive dashboard with full orchestration (recommended)

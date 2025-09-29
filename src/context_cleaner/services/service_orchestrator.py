@@ -33,6 +33,7 @@ import socket
 import urllib.request
 import urllib.error
 
+
 try:  # Some platforms (e.g. Windows) do not expose resource
     import resource
 except ImportError:  # pragma: no cover - platform fallback
@@ -42,6 +43,8 @@ StopCallbackType = Callable[[], Union[bool, Awaitable[bool], None]]
 from .api_ui_consistency_checker import APIUIConsistencyChecker
 from .port_conflict_manager import PortConflictManager, PortConflictStrategy, get_port_registry
 from context_cleaner.telemetry.collector import get_collector
+from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+from .telemetry_resources import stage_telemetry_resources
 from .process_registry import (
     ProcessEntry,
     ProcessRegistryDatabase,
@@ -137,7 +140,7 @@ class ServiceOrchestrator:
     """
 
     def __init__(self, config: Optional[Any] = None, verbose: bool = False):
-        self.config = config
+        self.config = config or ApplicationConfig.default()
         self.verbose = verbose
         self.logger = logging.getLogger(__name__)
 
@@ -180,6 +183,13 @@ class ServiceOrchestrator:
         # Centralized Port Registry
         self.port_registry = get_port_registry()
 
+        # Stage packaged telemetry resources for docker-compose usage
+        self.telemetry_resource_dir = stage_telemetry_resources(self.config, verbose=verbose)
+        self.compose_file_path = self.telemetry_resource_dir / "docker-compose.yml"
+
+        # Default working directory for docker compose commands
+        self.docker_working_directory = str(self.telemetry_resource_dir)
+
         # Lifecycle timestamps
         self.started_at: Optional[datetime] = None
 
@@ -197,7 +207,7 @@ class ServiceOrchestrator:
         self._async_loop_thread.start()
         self._async_loop_ready.wait()
 
-        # Initialize service definitions
+        # Initialize telemetry/compose assets and service definitions
         self._initialize_service_definitions()
 
         # Register signal handlers
@@ -211,7 +221,7 @@ class ServiceOrchestrator:
         """
         if self.verbose:
             print("🧹 Cleaning up existing Context Cleaner processes (registry-aware)...")
-        
+
         try:
             # 1. Discover all current Context Cleaner processes
             discovered_processes = self.discovery_engine.discover_all_processes()
@@ -302,6 +312,7 @@ class ServiceOrchestrator:
             required=True,
             startup_delay=0,
             category="docker",
+            working_directory=self.docker_working_directory,
         )
         
         # 2. OTEL Collector (if applicable) - Enhanced with ClickHouse dependency awareness
@@ -319,6 +330,7 @@ class ServiceOrchestrator:
             required=False,
             startup_delay=10,  # Increased to allow ClickHouse DDL completion
             category="docker",
+            working_directory=self.docker_working_directory,
         )
         
         # 3. JSONL Bridge Service
@@ -787,10 +799,11 @@ class ServiceOrchestrator:
         """
         if self.verbose:
             print("🐳 Ensuring Docker environment is ready...")
-        
+
         # 1. Check Docker daemon status
         daemon_status = await self._check_docker_daemon_status()
         if daemon_status != DockerDaemonStatus.RUNNING:
+            message_prefix = "   " if self.verbose else "❌ "
             if self.verbose:
                 print(f"   Docker daemon status: {daemon_status.value}")
                 
@@ -798,14 +811,13 @@ class ServiceOrchestrator:
                 if self.verbose:
                     print("   🔄 Starting Docker daemon...")
                 if not await self._start_docker_daemon():
+                    print(f"{message_prefix}Docker daemon is not running. Start Docker Desktop or enable the docker service and retry.")
                     return False
             elif daemon_status == DockerDaemonStatus.NOT_INSTALLED:
-                if self.verbose:
-                    print("   ❌ Docker is not installed or not in PATH")
+                print(f"{message_prefix}Docker is not installed or not on PATH. Install Docker Desktop (macOS/Windows) or Docker Engine (Linux) before running telemetry services.")
                 return False
             else:
-                if self.verbose:
-                    print("   ❌ Docker daemon is not accessible")
+                print(f"{message_prefix}Docker daemon is not accessible (docker info failed). Ensure Docker is running and that you have permission to use it.")
                 return False
         
         # 2. Discover containers dynamically and attach to running ones or start as needed
@@ -894,14 +906,20 @@ class ServiceOrchestrator:
                         
                         if self.verbose:
                             print("   ⏰ Timeout waiting for Docker daemon to start")
+                        else:
+                            print("❌ Timeout waiting for Docker Desktop to start. Launch Docker manually and retry.")
                         return False
                     else:
                         if self.verbose:
                             print("   ❌ Failed to start Docker Desktop")
+                        else:
+                            print("❌ Failed to start Docker Desktop automatically. Launch Docker Desktop manually and retry.")
                         return False
                 else:
                     if self.verbose:
                         print("   ❌ Docker Desktop not found at expected location")
+                    else:
+                        print("❌ Docker Desktop not found at /Applications/Docker.app. Install Docker Desktop and retry.")
                     return False
                     
             elif system == "linux":
@@ -928,15 +946,21 @@ class ServiceOrchestrator:
                     
                     if self.verbose:
                         print("   ⏰ Timeout waiting for Docker service to start")
+                    else:
+                        print("❌ Timeout waiting for docker.service to start. Start Docker manually (e.g., sudo systemctl start docker) and retry.")
                     return False
                 else:
                     if self.verbose:
                         print("   ❌ Failed to start Docker service")
+                    else:
+                        print("❌ Failed to start docker.service automatically. Start Docker manually and retry.")
                     return False
                     
             else:
                 if self.verbose:
                     print(f"   ❓ Unsupported platform: {system}")
+                else:
+                    print("❌ Automatic Docker startup not supported on this platform. Start Docker manually and retry.")
                 return False
                 
         except Exception as e:
@@ -1936,27 +1960,25 @@ class ServiceOrchestrator:
         return filtered_containers
     
     async def _discover_compose_containers(self) -> List[str]:
-        """Discover containers from docker-compose.yml if it exists."""
-        compose_file = "docker-compose.yml"
-        containers = []
-        
-        if not os.path.exists(compose_file):
+        """Discover containers from the staged docker-compose file if it exists."""
+        compose_file = self.compose_file_path
+        containers: List[str] = []
+
+        if not compose_file.exists():
             return containers
-        
+
         try:
-            # Simple parsing approach - look for 'container_name:' entries
-            with open(compose_file, 'r') as f:
-                content = f.read()
-                container_names = self._simple_compose_parse(content)
-                containers.extend(container_names)
-                
-                if self.verbose and container_names:
-                    print(f"   📄 Found in docker-compose.yml: {', '.join(container_names)}")
-                    
-        except Exception as e:
+            content = compose_file.read_text()
+            container_names = self._simple_compose_parse(content)
+            containers.extend(container_names)
+
+            if self.verbose and container_names:
+                print(f"   📄 Found in docker-compose.yml: {', '.join(container_names)}")
+
+        except Exception as e:  # pragma: no cover - defensive
             if self.verbose:
                 print(f"   ⚠️  Could not parse docker-compose.yml: {e}")
-        
+
         return containers
     
     def _simple_compose_parse(self, content: str) -> List[str]:
@@ -2190,7 +2212,8 @@ class ServiceOrchestrator:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                limit=1024 * 1024  # 1MB limit for output
+                limit=1024 * 1024,  # 1MB limit for output
+                cwd=self.docker_working_directory
             )
             
             # Wait for command completion with configurable timeout

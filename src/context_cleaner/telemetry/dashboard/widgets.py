@@ -331,12 +331,12 @@ class TelemetryWidgetManager:
             'agent_selector': self._is_real_service(agent_selector, 'AgentSelector')
         }
 
-        # Detect if we're in fallback mode (--no-docker or similar flags)
+        # Detect if we're in fallback mode (telemetry stack unavailable)
         self._fallback_mode = not self._service_availability['telemetry_client']
         if self._fallback_mode:
             widget_logger.warning("🔄 FALLBACK MODE DETECTED: Telemetry client unavailable - widgets will show demo/empty data")
-            widget_logger.warning("   This usually means Context Cleaner is running with --no-docker or --no-jsonl flags")
-            widget_logger.warning("   To get real data, restart without these flags to enable ClickHouse database")
+            widget_logger.warning("   This usually means the telemetry stack has not been initialised")
+            widget_logger.warning("   Run 'context-cleaner telemetry init' to start ClickHouse and the OTEL collector")
 
         # Log initialization state
         widget_logger.info(f"TelemetryWidgetManager initialized with services: {self._service_availability}")

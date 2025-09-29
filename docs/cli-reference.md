@@ -103,8 +103,6 @@ context-cleaner run [OPTIONS]
 Options:
   --dashboard-port, -p INTEGER   Dashboard port (default: 8110)
   --no-browser                   Don't open browser automatically
-  --no-docker                    Skip Docker services (ClickHouse + OTEL)
-  --no-jsonl                     Skip JSONL processing service
   --status-only                  Show service status and exit
   --json                         With --status-only, output machine-readable JSON
   --config-file PATH             Load custom configuration file
@@ -122,9 +120,6 @@ context-cleaner run --status-only
 
 # Structured status output for tooling / dashboards
 context-cleaner run --status-only --json | jq '.watchdog'
-
-# Skip Docker-based telemetry stack
-context-cleaner run --no-docker
 ```
 
 **Status output:**

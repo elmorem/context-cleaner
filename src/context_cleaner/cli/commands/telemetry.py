@@ -2,10 +2,15 @@
 
 import asyncio
 import click
-import sys
-from typing import Optional
 import logging
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Optional
 
+from context_cleaner.services.telemetry_resources import stage_telemetry_resources
 from context_cleaner.telemetry import ClickHouseClient, ErrorRecoveryManager, CostOptimizationEngine
 from context_cleaner.telemetry.cost_optimization.models import BudgetConfig
 
@@ -26,9 +31,8 @@ async def get_telemetry_client() -> ClickHouseClient:
     # Check if telemetry system is available
     if not await client.health_check():
         raise click.ClickException(
-            "Telemetry system is not available. Please ensure the telemetry infrastructure is running:\n"
-            "  docker compose ps\n"
-            "  ./install-telemetry.sh"
+            "Telemetry system is not available. Initialise it with:\n"
+            "  context-cleaner telemetry init"
         )
     
     return client
@@ -38,6 +42,179 @@ async def get_telemetry_client() -> ClickHouseClient:
 def telemetry():
     """Telemetry and cost optimization commands."""
     pass
+
+
+def _ensure_docker_available(verbose: bool = False) -> None:
+    """Ensure Docker and Compose are available before provisioning telemetry."""
+
+    if not shutil.which("docker"):
+        raise click.ClickException(
+            "Docker executable not found. Install Docker Desktop or Docker Engine before continuing."
+        )
+
+    try:
+        info_result = subprocess.run(
+            ["docker", "info"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired as exc:  # pragma: no cover - defensive
+        raise click.ClickException("Docker daemon did not respond within 10 seconds") from exc
+
+    if info_result.returncode != 0:
+        raise click.ClickException(
+            "Unable to communicate with the Docker daemon. Start Docker and retry."
+        )
+
+    compose_result = subprocess.run(
+        ["docker", "compose", "version"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    if compose_result.returncode != 0:
+        raise click.ClickException(
+            "Docker Compose is unavailable. Install Docker Compose v2 and retry."
+        )
+
+    if verbose and compose_result.stdout:
+        click.echo(f"   ✅ Docker Compose detected: {compose_result.stdout.strip()}")
+
+
+def _run_compose_command(
+    telemetry_dir: Path,
+    args: list[str],
+    verbose: bool = False,
+    timeout: int = 60,
+) -> subprocess.CompletedProcess:
+    cmd = ["docker", "compose"] + args
+    if verbose:
+        click.echo(f"   🐳 Running: {' '.join(cmd)}")
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=str(telemetry_dir),
+    )
+
+    if result.returncode != 0:
+        if verbose and result.stderr:
+            click.echo(result.stderr, err=True)
+        raise click.ClickException(
+            f"Docker Compose command failed (exit {result.returncode}): {' '.join(cmd)}"
+        )
+
+    return result
+
+
+def _wait_for_clickhouse(verbose: bool = False, retries: int = 12, delay: float = 5.0) -> None:
+    """Poll ClickHouse container until it responds to a simple query."""
+
+    for attempt in range(1, retries + 1):
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "clickhouse-otel",
+                "clickhouse-client",
+                "--query",
+                "SELECT 1",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode == 0:
+            if verbose:
+                click.echo("   ✅ ClickHouse responded successfully")
+            return
+
+        if verbose:
+            click.echo(f"   ⏳ Waiting for ClickHouse ({attempt}/{retries})...")
+        time.sleep(delay)
+
+    raise click.ClickException(
+        "ClickHouse container did not become healthy. Check `docker compose logs clickhouse`."
+    )
+
+
+def _write_env_file(destination: Path, verbose: bool = False) -> Path:
+    env_file = destination / "telemetry-env.sh"
+    content = "\n".join(
+        [
+            "# Context Cleaner telemetry environment",
+            "export CLAUDE_CODE_ENABLE_TELEMETRY=1",
+            "export OTEL_METRICS_EXPORTER=otlp",
+            "export OTEL_LOGS_EXPORTER=otlp",
+            "export OTEL_TRACES_EXPORTER=otlp",
+            "export OTEL_EXPORTER_OTLP_PROTOCOL=grpc",
+            "export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317",
+            "export OTEL_SERVICE_NAME=claude-code",
+            "export OTEL_RESOURCE_ATTRIBUTES=service.name=claude-code,service.version=1.0.98",
+            "export OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta",
+            "export OTEL_METRIC_EXPORT_INTERVAL=10000",
+            "export OTEL_LOGS_EXPORT_INTERVAL=5000",
+            "export OTEL_BSP_SCHEDULE_DELAY=5000",
+            "",
+        ]
+    )
+    env_file.write_text(content)
+
+    if verbose:
+        click.echo(f"   🧾 Wrote telemetry env file: {env_file}")
+
+    return env_file
+
+
+@telemetry.command()
+@click.option("--pull/--no-pull", default=False, show_default=True, help="Pull container images before startup")
+@click.option("--force-recreate", is_flag=True, help="Force recreation of containers")
+@click.pass_context
+def init(ctx, pull: bool, force_recreate: bool):
+    """Provision ClickHouse/OTEL telemetry stack for Context Cleaner."""
+
+    verbose = ctx.obj.get("verbose", False)
+    config = ctx.obj.get("config")
+
+    click.echo("🚀 Initializing Context Cleaner telemetry stack...")
+
+    _ensure_docker_available(verbose=verbose)
+
+    telemetry_dir = stage_telemetry_resources(config, verbose=verbose)
+    click.echo(f"📦 Resources staged at {telemetry_dir}")
+
+    if pull:
+        _run_compose_command(
+            telemetry_dir, ["pull", "clickhouse", "otel-collector"], verbose=verbose, timeout=300
+        )
+
+    up_args = ["up", "-d"]
+    if force_recreate:
+        up_args.append("--force-recreate")
+    up_args.extend(["clickhouse", "otel-collector"])
+
+    _run_compose_command(telemetry_dir, up_args, verbose=verbose, timeout=120)
+
+    click.echo("⏳ Waiting for services to become healthy...")
+    _wait_for_clickhouse(verbose=verbose)
+
+    env_file = _write_env_file(telemetry_dir, verbose=verbose)
+
+    click.echo("✅ Telemetry stack is ready!")
+    click.echo("")
+    click.echo("Next steps:")
+    click.echo(f"  • Source telemetry environment: source {env_file}")
+    click.echo("  • Restart Claude Code / CLI to pick up the new environment")
+    click.echo("  • Launch Context Cleaner: context-cleaner run")
+    click.echo("")
+    click.echo(
+        "Use `docker compose ps` from the telemetry directory to inspect container status; telemetry commands will "
+        "integrate status reporting in a future release."
+    )
 
 
 @telemetry.command()
@@ -350,7 +527,7 @@ def health_check():
             click.echo("  1. Check if telemetry infrastructure is running:")
             click.echo("     docker compose ps")
             click.echo("  2. Restart telemetry system if needed:")
-            click.echo("     ./install-telemetry.sh")
+            click.echo("     context-cleaner telemetry init --force-recreate")
             click.echo("  3. Check logs:")
             click.echo("     docker logs otel-collector")
             sys.exit(1)

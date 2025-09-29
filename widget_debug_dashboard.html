@@ -314,9 +314,9 @@
                 updateResult('telemetry-result', result.data);
                 log('Telemetry system is available', 'success');
             } else if (result.error.includes('404')) {
-                updateStatus('telemetry-status', 'warning', 'Telemetry disabled (likely --no-docker flag)');
+                updateStatus('telemetry-status', 'warning', 'Telemetry disabled (stack not initialised)');
                 updateResult('telemetry-result', 'Telemetry not available - running in basic mode');
-                log('Telemetry disabled - likely running with --no-docker flag', 'warning');
+                log('Telemetry disabled - stack not initialised; run `context-cleaner telemetry init`', 'warning');
             } else {
                 updateStatus('telemetry-status', 'error', result.error);
                 updateResult('telemetry-result', `Error: ${result.error}`);
@@ -529,7 +529,7 @@
                 </div>
                 <div style="font-size: 14px;">
                     ${errorCount > 0 ? '❌ Critical issues detected. Check error details above.' :
-                      warningCount > 0 ? '⚠️ Some widgets showing warnings. May indicate --no-docker mode.' :
+                      warningCount > 0 ? '⚠️ Some widgets showing warnings. Initialise telemetry if needed.' :
                       '✅ All systems healthy!'}
                 </div>
             `;

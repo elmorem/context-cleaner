@@ -5,13 +5,16 @@ A production-ready OpenTelemetry infrastructure for collecting and analyzing Cla
 ## Quick Start
 
 ```bash
-# 1. Install and start telemetry infrastructure
-./install-telemetry.sh
+# 1. Install Context Cleaner and initialise telemetry
+pip install context-cleaner
+context-cleaner telemetry init
 
-# 2. Restart Claude Code with telemetry enabled
-exit
-source ./setup-telemetry.sh  
+# 2. Apply environment variables for Claude Code (bash/zsh)
+source ~/.context_cleaner/telemetry/telemetry-env.sh
+
+# 3. Restart Claude Code (or your shell) and launch the dashboard
 claude
+context-cleaner run
 ```
 
 ## What It Does
@@ -58,6 +61,7 @@ docker exec clickhouse-otel clickhouse-client --query "SELECT ServiceName, SpanN
 
 ```bash
 # View status
+cd ~/.context_cleaner/telemetry
 docker compose ps
 
 # Monitor logs
@@ -73,8 +77,7 @@ docker compose down
 - `otel-simple.yaml` - OpenTelemetry Collector config
 - `clickhouse-users.xml` - ClickHouse authentication
 - `otel-clickhouse-init.sql` - Database schema
-- `setup-telemetry.sh` - Environment configuration
-- `install-telemetry.sh` - Automated installer
+- `telemetry-env.sh` - Environment configuration helper
 
 ## Integration
 

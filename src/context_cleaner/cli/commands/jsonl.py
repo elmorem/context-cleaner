@@ -20,9 +20,8 @@ async def get_jsonl_service(privacy_level: str = 'standard') -> JsonlProcessorSe
     # Check if telemetry system is available
     if not await client.health_check():
         raise click.ClickException(
-            "Telemetry system is not available. Please ensure the telemetry infrastructure is running:\n"
-            "  docker compose ps\n"
-            "  ./install-telemetry.sh"
+            "Telemetry system is not available. Initialise it with:\n"
+            "  context-cleaner telemetry init"
         )
     
     return JsonlProcessorService(client, privacy_level)

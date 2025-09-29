@@ -29,6 +29,7 @@ import click
 from context_cleaner.telemetry.context_rot.config import get_config, ApplicationConfig
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 from context_cleaner.dashboard.web_server import ProductivityDashboard
+from context_cleaner.services.telemetry_resources import stage_telemetry_resources
 try:
     from context_cleaner.services.service_supervisor import ServiceSupervisor, SupervisorConfig
     _SUPERVISOR_IMPORT_ERROR = None
@@ -1012,7 +1013,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
 
     This command analyzes why dashboard widgets might be showing zeros or stale data
     and provides clear guidance on how to resolve the issues. It detects common
-    problems like running with --no-docker flags that disable real telemetry data.
+    problems such as telemetry services not being initialised or containers being offline.
 
     Examples:
         context-cleaner update-data                    # Diagnose and fix issues
@@ -1089,13 +1090,13 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
             results["diagnosis"]["telemetry"] = {"available": False, "reason": "telemetry_disabled"}
             output_result("❌ Telemetry system unavailable", "error")
             output_result("   Reason: telemetry_disabled", "warning")
-            output_result("\n💡 ROOT CAUSE IDENTIFIED: Context Cleaner running with --no-docker flag", "warning")
+            output_result("\n💡 ROOT CAUSE IDENTIFIED: Telemetry stack not initialised", "warning")
             output_result("\n🚀 SOLUTION:")
             output_result("   1. Stop current Context Cleaner: context-cleaner stop")
-            output_result("   2. Start with full services: context-cleaner run")
-            output_result("   3. This will enable ClickHouse database for real telemetry data")
+            output_result("   2. Initialise telemetry: context-cleaner telemetry init")
+            output_result("   3. Restart Context Cleaner: context-cleaner run")
 
-            results["recommendations"].append("restart_with_full_services")
+            results["recommendations"].append("initialise_telemetry_stack")
 
             if format == "json":
                 click.echo(json.dumps(results, indent=2))
@@ -1223,7 +1224,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
 
     if not results["diagnosis"]["telemetry"].get("available"):
         if results["diagnosis"]["telemetry"].get("reason") == "telemetry_disabled":
-            recommendations.append("CRITICAL: Restart Context Cleaner without --no-docker flag to enable real data")
+            recommendations.append("CRITICAL: Initialise telemetry via 'context-cleaner telemetry init'")
         else:
             recommendations.append("Check ClickHouse container status and telemetry service logs")
 
@@ -1448,6 +1449,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
     supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
+    telemetry_dir = stage_telemetry_resources(config, verbose=verbose)
 
     if supervisor_enabled and _SUPERVISOR_IMPORT_ERROR is not None:
         click.echo(
@@ -1811,7 +1813,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     click.echo(f"      - {issue}")
 
         # Traditional compose cleanup as fallback/supplement
-        compose_file = Path("docker-compose.yml")
+        compose_file = telemetry_dir / "docker-compose.yml"
         if compose_file.exists():
             try:
                 if verbose:
@@ -1819,7 +1821,10 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
 
                 result = subprocess.run(
                     ["docker", "compose", "down"],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(telemetry_dir)
                 )
 
                 if result.returncode == 0:
@@ -1833,8 +1838,8 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 if verbose:
                     click.echo("   ⚠️  Docker compose down timed out, trying force methods...")
                 try:
-                    subprocess.run(["docker", "compose", "kill"], timeout=10)
-                    subprocess.run(["docker", "compose", "down"], timeout=10)
+                    subprocess.run(["docker", "compose", "kill"], timeout=10, cwd=str(telemetry_dir))
+                    subprocess.run(["docker", "compose", "down"], timeout=10, cwd=str(telemetry_dir))
                     if verbose:
                         click.echo("   ✅ Docker services force-stopped with compose")
                 except Exception as e:
@@ -2390,8 +2395,10 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
     if verbose:
         print("   🐳 Starting robust ClickHouse container shutdown...")
 
+    telemetry_dir = stage_telemetry_resources(None, verbose=verbose)
+
     # Method 1: Docker Compose shutdown (standard approach)
-    compose_file = Path("docker-compose.yml")
+    compose_file = telemetry_dir / "docker-compose.yml"
     if compose_file.exists():
         try:
             if verbose:
@@ -2400,7 +2407,10 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
             # Stop ClickHouse service specifically first
             result = subprocess.run(
                 ["docker", "compose", "stop", "clickhouse"],
-                capture_output=True, text=True, timeout=15
+                capture_output=True,
+                text=True,
+                timeout=15,
+                cwd=str(telemetry_dir)
             )
 
             if result.returncode == 0:
@@ -2411,13 +2421,19 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                 # Also stop otel-collector which depends on ClickHouse
                 subprocess.run(
                     ["docker", "compose", "stop", "otel-collector"],
-                    capture_output=True, text=True, timeout=10
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    cwd=str(telemetry_dir)
                 )
 
                 # Full compose down for cleanup
                 subprocess.run(
                     ["docker", "compose", "down"],
-                    capture_output=True, text=True, timeout=20
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
+                    cwd=str(telemetry_dir)
                 )
 
             else:
@@ -2632,14 +2648,12 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
 @main.command()
 @click.option("--dashboard-port", "-p", type=int, default=8110, help="Dashboard port")
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
-@click.option("--no-docker", is_flag=True, help="Skip Docker service startup")
-@click.option("--no-jsonl", is_flag=True, help="Skip JSONL processing service")
 @click.option("--status-only", is_flag=True, help="Show service status and exit")
 @click.option("--json", "status_json", is_flag=True, help="Output status-only data as JSON")
 @click.option("--config-file", type=click.Path(exists=True), help="Custom configuration file")
 @click.option("--dev-mode", is_flag=True, help="Enable development mode with debug logging")
 @click.pass_context
-def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, status_json, config_file, dev_mode):
+def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, dev_mode):
     """
     🚀 SINGLE ENTRY POINT - Start all Context Cleaner services with orchestration.
     
@@ -2660,7 +2674,6 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
     QUICK START:
       context-cleaner run                    # Start everything
       context-cleaner run --status-only      # Check service status
-      context-cleaner run --no-docker        # Skip Docker services
       context-cleaner debug service-health   # Troubleshoot issues
       context-cleaner stop                   # Stop all services
     
@@ -2833,24 +2846,7 @@ def run(ctx, dashboard_port, no_browser, no_docker, no_jsonl, status_only, statu
         
         return
     
-    # Disable specific services if requested
-    click.echo("🔍 DEBUG: Configuring services...")
-    if no_docker:
-        click.echo("🔍 DEBUG: Disabling docker services (clickhouse, otel)...")
-        orchestrator.services.pop("clickhouse", None)
-        orchestrator.services.pop("otel", None)
-        
-        # Automatically disable JSONL service when Docker is disabled 
-        # since it depends on ClickHouse
-        if "jsonl_bridge" in orchestrator.services:
-            click.echo("🔍 DEBUG: Auto-disabling jsonl_bridge service (depends on ClickHouse)...")
-            orchestrator.services.pop("jsonl_bridge", None)
-    
-    if no_jsonl:
-        click.echo("🔍 DEBUG: Disabling jsonl_bridge service...")
-        orchestrator.services.pop("jsonl_bridge", None)
-    
-    click.echo("✅ DEBUG: Service configuration completed")
+    click.echo("🔍 DEBUG: Service configuration completed")
 
     supervisor_config = SupervisorConfig(
         endpoint=default_supervisor_endpoint(),

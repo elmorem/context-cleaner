@@ -258,8 +258,9 @@ chmod -R 600 ~/.context_cleaner/data/
 top | grep python  # Linux/Mac
 # Task Manager on Windows
 
-# 2. Reduce data load
-context-cleaner run --no-docker --no-jsonl
+# 2. Reduce data load (temporarily stop telemetry containers)
+cd ~/.context_cleaner/telemetry
+docker compose stop otel-collector
 
 # 3. Clear old analytics data
 context-cleaner export-analytics --days 90 --output backup.json

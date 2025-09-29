@@ -167,7 +167,7 @@ cd /Users/markelmore/_code/context-cleaner
 git status
 
 # Start development server if needed
-PYTHONPATH=/Users/markelmore/_code/context-cleaner/src context-cleaner run --dev-mode --dashboard-port 8080 --no-browser --no-docker
+PYTHONPATH=/Users/markelmore/_code/context-cleaner/src context-cleaner telemetry init
 
 # Run specific tests
 PYTHONPATH=/Users/markelmore/_code/context-cleaner/src python -m pytest tests/ -v

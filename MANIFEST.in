@@ -25,7 +25,7 @@ recursive-include src/context_cleaner/static *.js *.css *.html *.png *.ico *.svg
 recursive-include static *.js *.css *.html *.png *.ico *.svg
 
 # Data and configuration files
-recursive-include src/context_cleaner *.json *.yaml *.yml *.txt *.md
+recursive-include src/context_cleaner *.json *.yaml *.yml *.txt *.md *.sql *.xml
 
 # Installation scripts
 include install_claude_integration.py

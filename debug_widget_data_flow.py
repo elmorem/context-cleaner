@@ -62,7 +62,7 @@ class WidgetDataFlowTester:
         try:
             response = self.session.get(f"{self.base_url}/api/telemetry/data-freshness")
             if response.status_code == 404:
-                logger.warning("Telemetry not available (404) - likely running with --no-docker flag")
+                logger.warning("Telemetry not available (404) - telemetry stack may not be initialised")
                 return {"available": False, "reason": "telemetry_disabled"}
 
             response.raise_for_status()
@@ -355,10 +355,10 @@ class WidgetDataFlowTester:
 
         if not telemetry_avail.get("available"):
             print("  1. ⚠️  CRITICAL: Telemetry system is disabled")
-            print("     - You're likely running with --no-docker flag")
-            print("     - This disables ClickHouse database which provides real data")
-            print("     - Widgets will show zeros or fallback demo data")
-            print("     - Solution: Run without --no-docker flag to enable real data")
+            print("     - The telemetry stack may not be initialised")
+            print("     - ClickHouse database is required for live widget data")
+            print("     - Widgets will show zeros or fallback demo data until enabled")
+            print("     - Solution: Run 'context-cleaner telemetry init' and restart the dashboard")
 
         if fallback_widgets > 0:
             print(f"  2. ⚠️  {fallback_widgets} widgets in fallback mode")

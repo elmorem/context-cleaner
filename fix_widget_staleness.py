@@ -68,7 +68,7 @@ class WidgetStalenessAnalyzer:
             print(f"   Reason: {telemetry_status.get('reason', 'unknown')}")
 
             if telemetry_status.get("reason") == "telemetry_disabled":
-                print("\n💡 ROOT CAUSE IDENTIFIED: Context Cleaner running with --no-docker flag")
+                print("\n💡 ROOT CAUSE IDENTIFIED: Telemetry stack not initialised")
                 print("\n🚀 SOLUTION:")
                 print("   1. Stop current Context Cleaner: context-cleaner stop")
                 print("   2. Start with full services: context-cleaner run")
@@ -267,7 +267,7 @@ class WidgetStalenessAnalyzer:
 
         if not telemetry_status.get("available"):
             if telemetry_status.get("reason") == "telemetry_disabled":
-                recommendations.append("CRITICAL: Restart Context Cleaner without --no-docker flag to enable real data")
+                recommendations.append("CRITICAL: Run 'context-cleaner telemetry init' to enable real data")
             else:
                 recommendations.append("Check ClickHouse container status and telemetry service logs")
 
