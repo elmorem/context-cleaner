@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS claude_message_content (
     INDEX idx_content_search (message_content) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = MergeTree()
-ORDER BY (session_id, timestamp)
+ORDER BY (message_uuid, session_id, timestamp)
 PARTITION BY toDate(timestamp)
 TTL timestamp + INTERVAL 30 DAY;
 
@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS claude_file_content (
     INDEX idx_content_search (file_content) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = ReplacingMergeTree() -- Use ReplacingMergeTree for file deduplication
-ORDER BY (file_path, file_content_hash)
+ORDER BY (file_access_uuid, file_path, file_content_hash)
 PARTITION BY toDate(timestamp)
 TTL timestamp + INTERVAL 30 DAY;
 
@@ -207,6 +207,6 @@ CREATE TABLE IF NOT EXISTS claude_tool_results (
     INDEX idx_output_search (tool_output) TYPE tokenbf_v1(32768, 3, 0) GRANULARITY 1
     
 ) ENGINE = MergeTree()
-ORDER BY (session_id, timestamp, tool_name)
+ORDER BY (tool_result_uuid, session_id, timestamp)
 PARTITION BY toDate(timestamp)  
 TTL timestamp + INTERVAL 30 DAY;

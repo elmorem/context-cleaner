@@ -37,6 +37,21 @@ dependencies = [
     "psutil>=5.9.0",
     "protobuf>=4.25.0",
     "eventlet>=0.33.0,<0.40",
+    "croniter>=1.4.0",
+    "fastapi>=0.110.0",
+    "orjson>=3.9.0",
+    "matplotlib>=3.8.0",
+    "PyYAML>=6.0",
+    "aiohttp>=3.9.0",
+    "websockets>=10.0",
+    "requests>=2.31.0",
+    "redis>=5.0.0",
+    "aiofiles>=23.1.0",
+    "nltk>=3.8.1",
+    "scikit-learn>=1.3.0",
+    "textblob>=0.17.1",
+    "python-dateutil>=2.8.2",
+    "pytz>=2023.3",
 ]
 
 [project.optional-dependencies]
@@ -69,11 +84,19 @@ path = "src/context_cleaner/__init__.py"
 packages = ["src/context_cleaner"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/context_cleaner/resources/telemetry" = "context_cleaner/resources/telemetry"
+"src/context_cleaner/resources/telemetry/docker-compose.yml" = "context_cleaner/resources/telemetry/docker-compose.yml"
+"src/context_cleaner/resources/telemetry/otel-simple.yaml" = "context_cleaner/resources/telemetry/otel-simple.yaml"
+"src/context_cleaner/resources/telemetry/otel-clickhouse-init.sql" = "context_cleaner/resources/telemetry/otel-clickhouse-init.sql"
+"src/context_cleaner/resources/telemetry/clickhouse-users.xml" = "context_cleaner/resources/telemetry/clickhouse-users.xml"
 
 [tool.hatch.build.targets.sdist]
 include = [
     "src/context_cleaner/**/*.py",
+    "src/context_cleaner/resources/telemetry/*.yaml",
+    "src/context_cleaner/resources/telemetry/*.yml",
+    "src/context_cleaner/resources/telemetry/*.sql",
+    "src/context_cleaner/resources/telemetry/*.xml",
+    "src/context_cleaner/resources/telemetry/docker-compose.yml",
     "README.md",
     "LICENSE", 
     "CHANGELOG.md",

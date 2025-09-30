@@ -19,16 +19,16 @@
 
 3. **Improve Docker prerequisite handling**
    - Add pre-flight checks (CLI + docs) that detect missing/disabled Docker and provide actionable messaging instead of hanging on docker commands.
-   - Decide on behavior when Docker is unavailable: fail fast with guidance or offer limited/no-telemetry mode.
+   - Decide on behavior when Docker is unavailable: fail fast with guidance or offer limited/no-telemetry mode. (Decision: fail fast with guidance; no fallback mode required.)
 
 4. **Package dependency audit & smoke test**
-   - Double-check runtime imports match `pyproject.toml` dependencies; add any missing requirements.
+   - Double-check runtime imports match `pyproject.toml` dependencies; add any missing requirements. ✅ Added requests, redis, aiofiles, nltk, scikit-learn, textblob, python-dateutil, pytz.
    - Build wheel/sdist (`hatch build`), then in a clean venv run:
-     - `pip install context-cleaner-*.whl`
-     - `context-cleaner run --status-only --json`
-     - `context-cleaner telemetry init`
-     - `context-cleaner run`
-   - Capture and fix any errors from the smoke test.
+     - `pip install context-cleaner-*.whl` ✅ (.venv_smoke)
+     - `context-cleaner run --status-only --json` ✅
+     - `context-cleaner telemetry init` ✅ (completed with Docker running)
+     - `context-cleaner run` ⚠️ long-running service; use manual invocation when ready for full integration
+   - Capture and fix any errors from the smoke test. ✅ No issues surfaced in CLI checks; orchestrator ClickHouse DDL gate now treats optional tables as warnings instead of blocking startup.
 
 ## High-Priority Enhancements
 

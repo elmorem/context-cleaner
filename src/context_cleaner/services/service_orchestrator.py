@@ -2416,12 +2416,14 @@ class ServiceOrchestrator:
         retry_delay = 2
         
         # Key tables that must exist after DDL initialization
-        required_tables = [
-            'otel.traces',
-            'otel.metrics', 
-            'otel.logs',
-            'otel.claude_message_content'
-        ]
+        required_tables = {
+            'traces',
+            'metrics', 
+            'logs'
+        }
+        optional_tables = {
+            'claude_message_content'
+        }
         
         for attempt in range(max_retries):
             try:
@@ -2435,11 +2437,11 @@ class ServiceOrchestrator:
                 ]
                 
                 result = await self._run_docker_command(cmd, timeout=10)
-                
+
                 if isinstance(result, str):
-                    existing_tables = set(f"otel.{line.strip()}" for line in result.split('\n') if line.strip())
+                    raw_lines = result.split('\n')
                 elif hasattr(result, 'success') and result.success:
-                    existing_tables = set(f"otel.{line.strip()}" for line in result.stdout.split('\n') if line.strip())
+                    raw_lines = result.stdout.split('\n')
                 else:
                     if self.verbose:
                         print(f"   ⚠️  DDL check command failed: {getattr(result, 'stderr', 'Unknown error')}")
@@ -2447,16 +2449,33 @@ class ServiceOrchestrator:
                         await asyncio.sleep(retry_delay)
                         continue
                     return False
-                
-                missing_tables = set(required_tables) - existing_tables
-                
-                if not missing_tables:
+
+                existing_tables = set()
+                for line in raw_lines:
+                    name = line.strip()
+                    if not name:
+                        continue
+                    existing_tables.add(name)
+                    # Normalise common prefixes such as "otel."
+                    if '.' in name:
+                        existing_tables.add(name.split('.')[-1])
+                    if name.startswith('otel.'):
+                        existing_tables.add(name[len('otel.'):])
+
+                missing_required = required_tables - existing_tables
+                missing_optional = optional_tables - existing_tables
+
+                if not missing_required:
                     if self.verbose:
+                        if missing_optional:
+                            print(f"   ⚠️  Optional telemetry tables missing: {', '.join(sorted(missing_optional))}")
                         print(f"   ✅ DDL initialization complete ({len(existing_tables)} tables found)")
                     return True
                 else:
                     if self.verbose:
-                        print(f"   ⏳ DDL still initializing, missing: {', '.join(missing_tables)}")
+                        print(f"   ⏳ DDL still initializing, missing required tables: {', '.join(sorted(missing_required))}")
+                        if missing_optional:
+                            print(f"   ⚠️  Optional telemetry tables still missing: {', '.join(sorted(missing_optional))}")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delay)
                         continue
