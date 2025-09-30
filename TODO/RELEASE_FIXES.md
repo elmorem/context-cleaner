@@ -28,7 +28,7 @@
      - `context-cleaner run --status-only --json` ✅
      - `context-cleaner telemetry init` ✅ (completed with Docker running)
      - `context-cleaner run` ⚠️ long-running service; use manual invocation when ready for full integration
-   - Capture and fix any errors from the smoke test. ✅ No issues surfaced in CLI checks; orchestrator ClickHouse DDL gate now treats optional tables as warnings instead of blocking startup.
+   - Capture and fix any errors from the smoke test. ✅ Gunicorn now included and stale PID cleanup added; latest `context-cleaner run --dev-mode --no-browser` completed with all services and widgets healthy (see run_dev.log).
 
 ## High-Priority Enhancements
 

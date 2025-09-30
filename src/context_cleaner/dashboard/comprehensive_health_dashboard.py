@@ -3127,6 +3127,15 @@ class ComprehensiveHealthDashboard:
                     2.0, lambda: webbrowser.open(f"http://{host}:{port}")
                 ).start()
             
+            # Ensure stale gunicorn PID file doesn't block restart
+            pid_file = Path('/tmp/context_cleaner_dashboard.pid')
+            if pid_file.exists():
+                try:
+                    logger.debug("🔍 Removing stale Gunicorn PID file at %s", pid_file)
+                    pid_file.unlink()
+                except OSError as pid_error:
+                    logger.warning("⚠️  Could not remove stale Gunicorn PID file %s: %s", pid_file, pid_error)
+
             # Gunicorn command
             cmd = [
                 sys.executable,
