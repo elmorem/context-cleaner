@@ -6,9 +6,9 @@
     "Phase 3: Advanced Orchestration & ML Learning"
   ],
   "directories_configured": [
-    "/Users/markelmore/code",
-    "/Users/markelmore/projects",
-    "/Users/markelmore/workspace"
+    "~/code",
+    "~/projects",
+    "~/workspace"
   ],
   "dashboard_status": "operational",
   "telemetry_status": "operational"

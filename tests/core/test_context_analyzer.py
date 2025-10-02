@@ -132,11 +132,15 @@ class TestContextAnalyzer:
     @pytest.mark.asyncio
     async def test_analyze_context_timeout(self):
         """Test context analysis timeout handling."""
+
         # Mock slow components to force timeout
+        async def slow_operation(*args, **kwargs):
+            await asyncio.sleep(10)
+
         with patch.object(
             self.analyzer.redundancy_detector, "analyze_redundancy"
         ) as mock_redundancy:
-            mock_redundancy.return_value = AsyncMock(side_effect=asyncio.sleep(10))
+            mock_redundancy.side_effect = slow_operation
 
             # Set very short timeout
             self.analyzer.MAX_ANALYSIS_TIME = 0.1
@@ -240,14 +244,23 @@ class TestContextAnalyzer:
 
     def test_get_analysis_summary(self):
         """Test analysis summary generation."""
-        # Create mock result
+        # Create mock result with properly configured nested attributes
+        focus_metrics = Mock()
+        focus_metrics.focus_score = 85
+        focus_metrics.priority_alignment_score = 75
+
+        redundancy_report = Mock()
+        redundancy_report.duplicate_content_percentage = 15
+
+        recency_report = Mock()
+        recency_report.stale_context_percentage = 10
+
         result = Mock(spec=ContextAnalysisResult)
         result.get_health_status.return_value = "Excellent"
         result.get_size_category.return_value = "Medium"
-        result.focus_metrics.focus_score = 85
-        result.focus_metrics.priority_alignment_score = 75
-        result.redundancy_report.duplicate_content_percentage = 15
-        result.recency_report.stale_context_percentage = 10
+        result.focus_metrics = focus_metrics
+        result.redundancy_report = redundancy_report
+        result.recency_report = recency_report
         result.optimization_potential = 0.3
         result.cleanup_impact_estimate = 3000
 

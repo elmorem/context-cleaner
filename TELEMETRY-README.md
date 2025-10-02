@@ -15,6 +15,15 @@ source ~/.context_cleaner/telemetry/telemetry-env.sh
 # 3. Restart Claude Code (or your shell) and launch the dashboard
 claude
 context-cleaner run
+
+# Windows PowerShell (set variables)
+Get-Content "$env:USERPROFILE\.context_cleaner\telemetry\telemetry-env.sh" |
+  ForEach-Object {
+    if ($_ -match '^export\s+(\w+)=(.+)$') {
+      Set-Item -Path Env:$($matches[1]) -Value $matches[2].Trim('"')
+    }
+  }
+context-cleaner run
 ```
 
 ## What It Does

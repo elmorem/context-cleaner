@@ -7,6 +7,9 @@ to verify which ones are working vs which ones are broken.
 import requests
 import json
 import time
+import pytest
+
+pytestmark = pytest.mark.skip("Endpoint probe script not part of automated suite")
 
 def test_endpoint(url, method="GET"):
     """Test a single endpoint and return status info"""

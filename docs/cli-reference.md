@@ -41,10 +41,10 @@ Use `--verbose` to see the detailed streaming updates.
 ### **Examples:**
 ```bash
 # Use custom configuration file
-context-cleaner --config ~/my-config.yaml dashboard
+context-cleaner --config ~/my-config.yaml run
 
 # Use custom data directory
-context-cleaner --data-dir ~/my-analytics-data start
+context-cleaner --data-dir ~/my-analytics-data run
 
 # Enable verbose output for debugging
 context-cleaner --verbose health-check --detailed

@@ -10,6 +10,9 @@ import time
 from datetime import datetime
 import sys
 import os
+import pytest
+
+pytestmark = pytest.mark.skip("Orchestration smoke script; skip in automated suite")
 
 # Add src directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))

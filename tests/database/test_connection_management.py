@@ -15,7 +15,7 @@ from src.context_cleaner.telemetry.clients.clickhouse_client import (
     ClickHouseClient,
     ConnectionStatus,
     ConnectionMetrics,
-    ConnectionPool,
+    AdaptiveConnectionPool,
 )
 
 
@@ -60,17 +60,19 @@ class TestConnectionMetrics:
         assert metrics.failure_rate == 100.0
 
 
-class TestConnectionPool:
-    """Test suite for ConnectionPool class."""
+class TestAdaptiveConnectionPool:
+    """Test suite for AdaptiveConnectionPool class."""
 
     def test_connection_pool_initialization(self):
-        """Test ConnectionPool initialization."""
-        pool = ConnectionPool()
+        """Test AdaptiveConnectionPool initialization."""
+        pool = AdaptiveConnectionPool()
 
-        assert pool.max_connections == 5
+        assert pool.min_connections == 2
+        assert pool.max_connections == 10
+        assert pool.initial_connections == 5
         assert pool.connection_timeout_seconds == 30
         assert pool.query_timeout_seconds == 60
-        assert pool.health_check_interval_seconds == 60
+        assert pool.health_check_interval_seconds == 30
         assert pool.max_consecutive_failures == 3
         assert pool.active_connections == 0
         assert isinstance(pool.metrics, ConnectionMetrics)

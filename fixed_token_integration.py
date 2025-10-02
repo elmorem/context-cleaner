@@ -4,7 +4,17 @@ Quick fix to integrate 2.7B token count into dashboard
 Uses the results from our successful local analysis
 """
 
+import os
+from pathlib import Path
+
 from src.context_cleaner.analysis.dashboard_integration import get_enhanced_token_analysis_sync
+
+
+def _project_path(slug: str) -> str:
+    """Resolve project directory inside Claude's project cache."""
+    root_env = os.environ.get("CLAUDE_PROJECT_ROOT")
+    project_root = Path(root_env).expanduser() if root_env else Path.home() / ".claude" / "projects"
+    return str(project_root / slug)
 
 def inject_correct_token_count():
     """Force the correct 2.7B token count into the dashboard system"""
@@ -17,7 +27,7 @@ def inject_correct_token_count():
         "categories": [
             {
                 "name": "FowlData Project",
-                "path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-fowldata",
+                "path": _project_path("-Users-markelmore--code-fowldata"),
                 "input_tokens": 96_000,
                 "output_tokens": 2_100_000,
                 "cache_creation_tokens": 89_000_000,
@@ -27,7 +37,7 @@ def inject_correct_token_count():
             },
             {
                 "name": "Context Cleaner Project", 
-                "path": "/Users/markelmore/.claude/projects/-Users-markelmore--code-context-cleaner",
+                "path": _project_path("-Users-markelmore--code-context-cleaner"),
                 "input_tokens": 15_000,
                 "output_tokens": 450_000,
                 "cache_creation_tokens": 12_000_000,

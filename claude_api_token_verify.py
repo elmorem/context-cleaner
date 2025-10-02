@@ -14,8 +14,11 @@ import sys
 import os
 from datetime import datetime
 
-# Add the project to path so we can import Claude Code modules
-sys.path.insert(0, '/Users/markelmore/_code/context-cleaner/src')
+# Add the source tree to sys.path for local imports when running from scripts/
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 def create_script_error(message: str, error_code: str = "SCRIPT_ERROR") -> dict:
     """Create standardized error dict for script usage"""
@@ -194,16 +197,22 @@ def main():
     print("Using Claude Code's authentication to verify token counts")
     print("=" * 70)
     
-    # Test with recent FowlData file
-    test_files = [
-        "/Users/markelmore/.claude/projects/-Users-markelmore--code-fowldata/6559d7c1-f76b-4c92-8da5-79e1cd00a621.jsonl"
-    ]
-    
-    # Add context-cleaner files if they exist
+    # Locate candidate JSONL files from Claude projects directory
+    project_root_env = os.environ.get("CLAUDE_PROJECT_ROOT")
+    if project_root_env:
+        project_root = Path(project_root_env).expanduser()
+    else:
+        project_root = Path.home() / ".claude" / "projects"
+
     import glob
-    context_files = glob.glob("/Users/markelmore/.claude/projects/*context*cleaner*/*.jsonl")
+    fowldata_files = sorted(glob.glob(str(project_root / "*fowldata*" / "*.jsonl")))
+    context_files = sorted(glob.glob(str(project_root / "*context*cleaner*" / "*.jsonl")))
+
+    test_files = []
+    if fowldata_files:
+        test_files.append(fowldata_files[0])
     if context_files:
-        test_files.extend(context_files[:1])  # Add one context-cleaner file
+        test_files.append(context_files[0])
     
     print(f"📂 Testing {len(test_files)} files with live API calls...")
     

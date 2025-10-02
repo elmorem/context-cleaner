@@ -33,12 +33,12 @@
     },
     "directories": {
       "monitored_paths": [
-        "/Users/markelmore/_code/context-cleaner",
-        "/Users/markelmore/_code/fowldata",
-        "/Users/markelmore/_code/deep_homework",
-        "/Users/markelmore/_code/deep_homework_ios",
-        "/Users/markelmore/_code/claude-code-hooks-mastery",
-        "/Users/markelmore/_code/advanced_rag"
+        "~/code/context-cleaner",
+        "~/code/fowldata",
+        "~/code/deep_homework",
+        "~/code/deep_homework_ios",
+        "~/code/claude-code-hooks-mastery",
+        "~/code/advanced_rag"
       ],
       "exclude_patterns": [
         "node_modules/**",

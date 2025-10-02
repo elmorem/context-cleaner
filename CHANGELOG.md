@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-09-30
+
+### Added
+- Single-entry `context-cleaner run` orchestration workflow documented across README and CLI reference
+- Windows PowerShell guidance for sourcing telemetry environment variables
+- Telemetry resources packaged with ClickHouse schema fixes and optional-table handling
+
+### Changed
+- Included Gunicorn in runtime dependencies and removed stale PID files before launches to stabilise dashboard startup
+- Sanitised developer utilities to derive Claude project paths from environment rather than hard-coded user directories
+
+### Fixed
+- Verified packaged dashboard assets within the wheel and ensured integration verification passes against the rebuilt distribution
+
 ## [0.2.0] - 2025-08-31
 
 ### Added

@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple
 from datetime import datetime
 
+PROJECT_ROOT = Path(os.environ.get("CLAUDE_PROJECT_ROOT", Path.home() / ".claude" / "projects")).expanduser()
+
 def create_script_error(message: str, error_code: str = "SCRIPT_ERROR") -> dict:
     """Create standardized error dict for script usage"""
     return {
@@ -208,16 +210,18 @@ def main():
     print("=" * 60)
     
     # Test files
-    test_files = [
-        "/Users/markelmore/.claude/projects/-Users-markelmore--code-fowldata/6559d7c1-f76b-4c92-8da5-79e1cd00a621.jsonl"
-    ]
-    
-    # Add context-cleaner files if they exist
-    context_cleaner_pattern = "/Users/markelmore/.claude/projects/*context*cleaner*/*.jsonl"
     import glob
-    context_files = glob.glob(context_cleaner_pattern)
+    fowldata_glob = str(PROJECT_ROOT / "*fowldata*" / "*.jsonl")
+    context_cleaner_glob = str(PROJECT_ROOT / "*context*cleaner*" / "*.jsonl")
+
+    test_files = []
+    fowldata_files = glob.glob(fowldata_glob)
+    if fowldata_files:
+        test_files.append(fowldata_files[0])
+
+    context_files = glob.glob(context_cleaner_glob)
     if context_files:
-        test_files.extend(context_files[:2])  # Add up to 2 context-cleaner files
+        test_files.extend(context_files[:2])  # Add up to two context-cleaner files
     
     total_our_tokens = 0
     total_api_verified = 0

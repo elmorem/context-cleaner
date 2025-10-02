@@ -5,6 +5,7 @@ Local Token Analysis - Analyze JSONL files for token counts without API calls
 
 import json
 import glob
+import os
 from pathlib import Path
 from typing import Dict, List, Any
 
@@ -97,10 +98,16 @@ def main():
     print("🔍 Local JSONL Token Analysis")
     print("=" * 70)
     
-    # Find all JSONL files
+    # Find all JSONL files relative to Claude project root
+    project_root_env = os.environ.get("CLAUDE_PROJECT_ROOT")
+    if project_root_env:
+        project_root = Path(project_root_env).expanduser()
+    else:
+        project_root = Path.home() / ".claude" / "projects"
+
     patterns = [
-        "/Users/markelmore/.claude/projects/*fowldata*/*.jsonl",
-        "/Users/markelmore/.claude/projects/*context*cleaner*/*.jsonl"
+        str(project_root / "*fowldata*" / "*.jsonl"),
+        str(project_root / "*context*cleaner*" / "*.jsonl")
     ]
     
     all_files = []

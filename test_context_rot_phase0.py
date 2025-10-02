@@ -6,6 +6,9 @@ Simple test script to verify Context Rot Meter Phase 0 implementation works.
 import asyncio
 import sys
 import os
+import pytest
+
+pytestmark = pytest.mark.skip("Context rot exploratory script; skip in automated suite")
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))

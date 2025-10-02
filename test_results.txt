@@ -1,0 +1,5 @@
+F............FFFF.........FF.F..FF...FF.......F...F.FFFFF.F....FFFFFFFFF [  4%]
+FFFF..FFFF.FFFF..FF.........................FFFFFFFFF.FFFFFFF.FFFFFFF... [  8%]
+..............EEEEEEEEEEEEE..F..........F....................F.........E [ 12%]
+EEEEEEEEEEEEEEEEEEEEEEEE.......FF....................................... [ 17%]
+.

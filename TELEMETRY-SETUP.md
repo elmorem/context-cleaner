@@ -45,6 +45,17 @@ This document outlines the OpenTelemetry infrastructure we've set up for collect
    claude
    ```
 
+   ```powershell
+   # PowerShell equivalent
+   Get-Content "$env:USERPROFILE\.context_cleaner\telemetry\telemetry-env.sh" |
+     ForEach-Object {
+       if ($_ -match '^export\s+(\w+)=(.+)$') {
+         Set-Item -Path Env:$($matches[1]) -Value $matches[2].Trim('"')
+       }
+     }
+   claude
+   ```
+
 2. **Verify Telemetry Data Flow**: Once restarted, perform Claude Code operations and monitor:
    ```bash
    # Monitor collector logs for incoming data

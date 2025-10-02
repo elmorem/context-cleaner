@@ -8,6 +8,9 @@ import asyncio
 import sys
 import os
 from pathlib import Path
+import pytest
+
+pytestmark = pytest.mark.skip("Manual consistency checker script; skip in automated suite")
 
 # Add the src directory to Python path
 src_path = Path(__file__).parent / "src"

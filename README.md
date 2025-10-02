@@ -63,11 +63,22 @@ pip install -e .
 # Provision local ClickHouse + OpenTelemetry stack
 context-cleaner telemetry init
 
-# Load telemetry environment variables for the current shell session
+# Load telemetry environment variables (bash/zsh)
 source ~/.context_cleaner/telemetry/telemetry-env.sh
 ```
 
 > **Docker Required**: Telemetry features rely on Docker and Docker Compose. Install Docker Desktop (macOS/Windows) or Docker Engine (Linux) and ensure it is running before initialising telemetry.
+>
+> **Windows PowerShell**: Import the environment variables after `telemetry init`:
+> ```powershell
+> Get-Content "$env:USERPROFILE\.context_cleaner\telemetry\telemetry-env.sh" |
+>   ForEach-Object {
+>     if ($_ -match '^export\s+(\w+)=(.+)$') {
+>       Set-Item -Path Env:$($matches[1]) -Value $matches[2].Trim('"')
+>     }
+>   }
+> ```
+> Then restart Claude Code or your terminal so the variables take effect.
 
 ### **Unified Dashboard Access** 🎯
 ```bash
@@ -90,9 +101,10 @@ The unified dashboard provides **everything in one place**:
 ### **Command Line Tools** (Optional)
 ```bash
 # Frequently used CLI commands
-context-cleaner session start      # Begin tracking
-context-cleaner health-check       # System diagnostics  
-context-cleaner effectiveness      # View optimization stats
+context-cleaner run --status-only --json   # Snapshot orchestrator health
+context-cleaner health-check               # System diagnostics
+context-cleaner effectiveness --days 7     # Optimization stats
+context-cleaner stop                       # Graceful shutdown
 ```
 
 ## 📊 **New Analytics Features** ⭐
@@ -148,32 +160,32 @@ context-cleaner health-check --format json
 ```bash
 context-cleaner [OPTIONS] COMMAND [ARGS]...
 
-# Primary Commands:
-  start              Start productivity tracking
-  dashboard          Launch web dashboard  
-  optimize           Context optimization and health analysis
-  
-# New Analytics Commands (v0.2.0):
-  health-check       Perform system health check and validation
-  export-analytics   Export comprehensive analytics data  
-  effectiveness      Display optimization effectiveness statistics
-  
+# Orchestration & Telemetry:
+  run                      Orchestrate services and launch the dashboard
+  stop                     Gracefully shut down orchestrated services
+  telemetry init           Provision ClickHouse/OTEL stack from packaged assets
+
+# Analytics & Health:
+  health-check             Perform system health diagnostics
+  effectiveness            Display optimization effectiveness statistics
+  export-analytics         Export analytics data for archival/analysis
+
 # Session Management:
-  session start      Start new tracking session
-  session end        End current tracking session
-  session stats      Show session statistics
-  session list       List recent sessions
-  
-# Monitoring:  
-  monitor start      Start real-time monitoring
-  monitor status     Show monitoring status
-  monitor live       Live dashboard with real-time updates
-  
-# Data Management:
-  analyze            Analyze productivity trends
-  export             Export all data
-  privacy            Privacy and data management
-  config-show        Show current configuration
+  session start            Begin tracking a development session
+  session end              End the current session
+  session stats            Show session statistics for a time window
+  session list             List recent sessions
+
+# File/Directory Monitoring:
+  monitor start            Begin real-time context monitoring
+  monitor status           Show monitoring status
+  monitor live             Stream live metrics in the terminal
+
+# Data & Configuration:
+  analyze                  Analyze productivity trends
+  export                   Export all recorded data
+  privacy                  Manage privacy and data retention
+  config-show              Show current configuration values
 ```
 
 ### **Session Management Examples**

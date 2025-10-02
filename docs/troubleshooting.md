@@ -211,7 +211,7 @@ context-cleaner run
 
 ### **Dashboard Won't Start**
 ```bash
-# Problem: dashboard command fails or doesn't open browser
+# Problem: `context-cleaner run` fails or doesn't open browser
 
 # 1. Check port availability
 netstat -tuln | grep 8110  # Linux

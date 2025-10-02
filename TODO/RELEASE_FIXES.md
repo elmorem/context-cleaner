@@ -32,27 +32,24 @@
 
 ## High-Priority Enhancements
 
-1. **Refresh docs for orchestrated workflow**
-   - Rewrite README quick-start/CLI reference to remove `start`/`dashboard` commands and point to the new telemetry init + `context-cleaner run` flow.
-   - Update troubleshooting, telemetry guides, and Markdown docs under `docs/` to remove references to shell scripts and align with the new commands/ports (8110/8111).
+1. **Refresh docs for orchestrated workflow** ✅
+   - README, CLI reference, and troubleshooting guides now highlight `context-cleaner run` + `telemetry init` flow and remove legacy script references.
 
-2. **Windows support for telemetry configuration**
-   - Provide PowerShell-friendly env setup or ensure the new CLI handles env vars automatically on Windows.
-   - Document any Windows-specific steps (firewall prompts, Docker Desktop requirements).
+2. **Windows support for telemetry configuration** ✅
+   - Documented PowerShell snippet for loading telemetry env vars and reiterated Docker Desktop requirements in README/telemetry guides.
 
-3. **Bundle dashboard assets & templates**
-   - Verify all static/template files used by the dashboard are included in package data.
-   - Run `context-cleaner run` from an installed wheel to confirm no 404s for dashboard assets.
+3. **Bundle dashboard assets & templates** ✅
+   - Verified packaged templates/static assets via importlib; wheel-backed `context-cleaner run` succeeds with dashboard widgets populated.
 
-4. **Clean up legacy scripts with hard-coded paths**
-   - Move developer-only tools (`analyze_local_tokens.py`, `verify_token_counts.py`, etc.) out of the distribution or parameterize them to avoid embedding `/Users/markelmore/...` paths.
+4. **Clean up legacy scripts with hard-coded paths** ✅
+   - Developer utilities now derive Claude cache roots from `CLAUDE_PROJECT_ROOT`/`$HOME`; sample configs use `~` instead of absolute paths.
 
 ## Documentation & Release Preparation
 
-1. Update CHANGELOG and release notes with the new setup flow, deprecated commands, and telemetry improvements.
-2. Bump `project.version` once blockers are resolved and all tests pass.
-3. Ensure CI runs full test suite (unit + integration) on a Docker-enabled runner pre-release.
-4. After packaging fixes, repeat the integration verification script (`python verify_integration.py`) in a clean environment to confirm success.
+1. Update CHANGELOG and release notes with the new setup flow, deprecated commands, and telemetry improvements. ✅
+2. Bump `project.version` once blockers are resolved and all tests pass. ✅ (now 0.2.3)
+3. Ensure CI runs full test suite (unit + integration) on a Docker-enabled runner pre-release. 🔄 Pending CI pipeline check
+4. After packaging fixes, repeat the integration verification script (`python verify_integration.py`) in a clean environment to confirm success. ✅ (.venv_smoke)
 
 ## Verification Checklist (Day-of Release)
 

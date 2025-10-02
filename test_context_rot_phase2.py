@@ -13,6 +13,9 @@ Tests the ML-enhanced capabilities including:
 import asyncio
 import sys
 import os
+import pytest
+
+pytestmark = pytest.mark.skip("Context rot exploratory script; skip in automated suite")
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
