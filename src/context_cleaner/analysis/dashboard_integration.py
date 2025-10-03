@@ -8,6 +8,8 @@ JSONL file processing.
 
 import logging
 import asyncio
+import threading
+import queue
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -17,6 +19,17 @@ from .enhanced_token_counter import (
     SessionTokenTracker,
     EnhancedTokenAnalysis
 )
+
+try:  # Eventlet is optional; fall back gracefully if unavailable
+    from eventlet import patcher as eventlet_patcher  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    eventlet_patcher = None
+
+
+_analyzer_instance_lock = threading.Lock()
+_active_thread_lock = threading.Lock()
+_shared_analyzer: Optional["DashboardTokenAnalyzer"] = None
+_active_analysis_thread: Optional[threading.Thread] = None
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +302,57 @@ class DashboardTokenAnalyzer:
 
 
 # Integration function for dashboard
+
+# ---------------------------------------------------------------------------
+# Shared analyzer helpers
+# ---------------------------------------------------------------------------
+
+def _get_original_threading_module():
+    if eventlet_patcher is not None:
+        try:
+            return eventlet_patcher.original("threading")
+        except Exception:  # pragma: no cover - defensive
+            return threading
+    return threading
+
+
+def _get_shared_analyzer() -> "DashboardTokenAnalyzer":
+    global _shared_analyzer
+    with _analyzer_instance_lock:
+        if _shared_analyzer is None:
+            _shared_analyzer = DashboardTokenAnalyzer()
+        return _shared_analyzer
+
+
+def _start_background_analysis(analyzer: "DashboardTokenAnalyzer", *, force_refresh: bool) -> None:
+    def runner() -> None:
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
+                )
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error(f"Background enhanced token analysis failed: {exc}")
+        finally:
+            with _active_thread_lock:
+                global _active_analysis_thread
+                if threading.current_thread() is _active_analysis_thread:
+                    _active_analysis_thread = None
+
+    threading_module = _get_original_threading_module()
+    global _active_analysis_thread
+    with _active_thread_lock:
+        if _active_analysis_thread and _active_analysis_thread.is_alive():
+            return
+        worker = threading_module.Thread(target=runner, daemon=True)
+        worker.start()
+        _active_analysis_thread = worker
+
 async def get_enhanced_token_analysis_for_dashboard(force_refresh: bool = False) -> Dict[str, Any]:
     """
     Drop-in replacement for current _analyze_token_usage method.
@@ -307,51 +371,38 @@ async def get_enhanced_token_analysis_for_dashboard(force_refresh: bool = False)
 
 # Synchronous wrapper for backward compatibility
 def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, Any]:
-    """
-    Synchronous wrapper for dashboard integration using fixed enhanced token counter.
-    
-    Now uses the actual enhanced token counter with ccusage-level accuracy fixes applied.
-    """
-    
+    """Thread-safe synchronous wrapper for enhanced token analysis."""
+
     logger.info("🚀 Using fixed enhanced token counter (legacy fallbacks removed)")
-    
+
+    analyzer = _get_shared_analyzer()
+
     try:
-        # Use the actual enhanced token counter with all fixes applied
-        import asyncio
-        analyzer = DashboardTokenAnalyzer()
-        
-        # Run async analysis in sync context - use thread executor to avoid event loop conflicts
-        import concurrent.futures
-        import threading
-        
-        def run_async_analysis():
-            """Run the async analysis in a separate thread with its own event loop."""
+        if not force_refresh:
             try:
-                # Always create a new event loop in this thread since we're in ThreadPoolExecutor
-                logger.debug("Creating new event loop for async analysis in thread")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(
-                        analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
-                    )
-                finally:
-                    loop.close()
-                    # Clear the loop from the thread-local storage
-                    asyncio.set_event_loop(None)
-            except Exception as e:
-                logger.error(f"Error in run_async_analysis: {e}")
-                raise
-        
-        # Run the async function in a separate thread to avoid event loop conflicts
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(run_async_analysis)
-            return future.result(timeout=60)  # 60 second timeout
-        
+                if (
+                    getattr(analyzer, "_last_analysis", None) is not None
+                    and analyzer._is_cached_data_valid()
+                ):
+                    return analyzer._format_analysis_for_dashboard(analyzer._last_analysis)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug(f"Unable to use cached enhanced analysis: {exc}")
+
+        _start_background_analysis(analyzer, force_refresh=force_refresh)
+
+        if getattr(analyzer, "_last_analysis", None) is not None:
+            data = analyzer._format_analysis_for_dashboard(analyzer._last_analysis)
+            metadata = data.setdefault("analysis_metadata", {})
+            metadata["enhanced_analysis"] = False
+            metadata["status"] = "refresh_pending"
+            metadata["message"] = "Enhanced analysis running; showing cached results."
+            return data
+
+        raise TimeoutError("Enhanced token analysis pending")
+
     except Exception as e:
         logger.error(f"Enhanced token analysis failed: {e}")
-        
-        # Return minimal error response instead of old hardcoded data
+
         return {
             "total_tokens": 0,
             "files_processed": 0,
@@ -361,12 +412,12 @@ def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, A
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "cache_creation_tokens": 0,
-                "cache_read_tokens": 0
+                "cache_read_tokens": 0,
             },
             "api_validation_enabled": False,
             "analysis_metadata": {
                 "enhanced_analysis": False,
-                "error": f"Analysis failed: {str(e)}",
-                "fix_status": "Error - using ccusage-accurate method but analysis failed"
-            }
+                "status": "pending",
+                "message": "Enhanced analysis is still running; showing minimal data.",
+            },
         }

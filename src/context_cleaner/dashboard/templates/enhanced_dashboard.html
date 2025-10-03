@@ -2416,7 +2416,8 @@
             // Fetch dashboard metrics which contains orchestration data
             fetch('/api/dashboard-metrics')
                 .then(response => response.json())
-                .then(data => {
+                .then(raw => {
+                    const data = raw?.data || raw || {};
                     widgets.forEach(widget => {
                         const element = document.getElementById(`${widget.id}-widget`);
                         if (element) {
@@ -2445,13 +2446,13 @@
                             } else if (widget.id === 'agent-utilization') {
                                 content += `
                                     <div style="font-weight: 600; color: #059669; margin-bottom: 0.5rem;">
-                                        🤖 ${data.data.active_agents || 0} Active Agents
+                                        🤖 ${data.active_agents || 0} Active Agents
                                     </div>
                                     <div style="font-size: 0.875rem; color: #6b7280;">
-                                        Total Sessions: ${data.data.total_sessions || 0}
+                                        Total Sessions: ${data.total_sessions || 0}
                                     </div>
                                     <div style="font-size: 0.875rem; color: #6b7280;">
-                                        Processing ${data.data.total_tokens || 0} tokens
+                                        Processing ${data.total_tokens || 0} tokens
                                     </div>
                                 `;
                             } else if (widget.id === 'workflow-performance') {

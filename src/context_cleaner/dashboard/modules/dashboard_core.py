@@ -46,6 +46,7 @@ class DashboardConfigurationManager:
     def __init__(self, config=None):
         # Create default config if None provided (backwards compatibility)
         from context_cleaner.telemetry.context_rot.config import ApplicationConfig
+
         self.config = config or ApplicationConfig.default()
 
         # Server configuration
@@ -80,10 +81,7 @@ class DashboardConfigurationManager:
 
     def get_socketio_config(self) -> Dict[str, Any]:
         """Get SocketIO configuration"""
-        return {
-            "cors_allowed_origins": "*",
-            "async_mode": "eventlet"
-        }
+        return {"cors_allowed_origins": "*", "async_mode": "eventlet"}
 
     def get_basic_dashboard_metrics(self) -> Dict[str, Any]:
         """Get basic dashboard metrics for monitoring"""
@@ -128,11 +126,21 @@ class DashboardServiceIntegrator:
         try:
             from context_cleaner.analysis.cache_discovery import CacheDiscoveryService
             from context_cleaner.analysis.usage_patterns import UsagePatternAnalyzer
-            from context_cleaner.analysis.token_efficiency import TokenEfficiencyAnalyzer
-            from context_cleaner.analysis.temporal_context import TemporalContextAnalyzer
-            from context_cleaner.analysis.enhanced_context import EnhancedContextAnalyzer
-            from context_cleaner.scoring.context_health_scorer import ContextHealthScorer
-            from context_cleaner.recognition.advanced_pattern_recognizer import AdvancedPatternRecognizer
+            from context_cleaner.analysis.token_efficiency import (
+                TokenEfficiencyAnalyzer,
+            )
+            from context_cleaner.analysis.temporal_context import (
+                TemporalContextAnalyzer,
+            )
+            from context_cleaner.analysis.enhanced_context import (
+                EnhancedContextAnalyzer,
+            )
+            from context_cleaner.scoring.context_health_scorer import (
+                ContextHealthScorer,
+            )
+            from context_cleaner.recognition.advanced_pattern_recognizer import (
+                AdvancedPatternRecognizer,
+            )
 
             # Initialize core services
             self.cache_discovery = CacheDiscoveryService()
@@ -152,7 +160,10 @@ class DashboardServiceIntegrator:
         """Initialize optional analysis services with graceful fallback"""
         # Context Window Analysis
         try:
-            from context_cleaner.analysis.context_window_analyzer import ContextWindowAnalyzer
+            from context_cleaner.analysis.context_window_analyzer import (
+                ContextWindowAnalyzer,
+            )
+
             self.context_analyzer = ContextWindowAnalyzer()
             logger.info("✅ Context window analyzer initialized")
         except ImportError:
@@ -161,7 +172,10 @@ class DashboardServiceIntegrator:
 
         # Project Summary Analytics
         try:
-            from context_cleaner.analysis.project_summary_analytics import ProjectSummaryAnalytics
+            from context_cleaner.analysis.project_summary_analytics import (
+                ProjectSummaryAnalytics,
+            )
+
             self.project_summary_analytics = ProjectSummaryAnalytics()
             logger.info("✅ Project summary analytics initialized")
         except ImportError:
@@ -171,13 +185,15 @@ class DashboardServiceIntegrator:
     def initialize_cache_services(self):
         """Initialize cache dashboard and management services"""
         try:
-            from context_cleaner.optimization.cache_dashboard import CacheEnhancedDashboard
+            from context_cleaner.optimization.cache_dashboard import (
+                CacheEnhancedDashboard,
+            )
             from .dashboard_cache import DashboardCache, CacheCoordinator
 
             self.cache_dashboard = CacheEnhancedDashboard()
             self.dashboard_cache = DashboardCache(
                 cache_dashboard=self.cache_dashboard,
-                telemetry_widgets=None  # Will be set after telemetry initialization
+                telemetry_widgets=None,  # Will be set after telemetry initialization
             )
             self.cache_coordinator = CacheCoordinator(self.dashboard_cache)
 
@@ -192,8 +208,7 @@ class DashboardServiceIntegrator:
             from .dashboard_realtime import DashboardRealtime, RealtimeCoordinator
 
             self.realtime_manager = DashboardRealtime(
-                dashboard_instance=dashboard_instance,
-                socketio=socketio
+                dashboard_instance=dashboard_instance, socketio=socketio
             )
             self.realtime_coordinator = RealtimeCoordinator(self.realtime_manager)
 
@@ -209,7 +224,7 @@ class DashboardServiceIntegrator:
 
             self.analytics_manager = DashboardAnalytics(
                 dashboard_cache=self.dashboard_cache,
-                realtime_manager=self.realtime_manager
+                realtime_manager=self.realtime_manager,
             )
             self.analytics_coordinator = AnalyticsCoordinator(self.analytics_manager)
 
@@ -225,13 +240,15 @@ class DashboardServiceIntegrator:
 
             self.telemetry_manager = DashboardTelemetry(
                 dashboard_cache=self.dashboard_cache,
-                realtime_manager=self.realtime_manager
+                realtime_manager=self.realtime_manager,
             )
             self.telemetry_coordinator = TelemetryCoordinator(self.telemetry_manager)
 
             # Link telemetry widgets to cache for delegation
             if self.dashboard_cache and self.telemetry_manager.telemetry_enabled:
-                self.dashboard_cache.telemetry_widgets = self.telemetry_manager.initializer.telemetry_widgets
+                self.dashboard_cache.telemetry_widgets = (
+                    self.telemetry_manager.initializer.telemetry_widgets
+                )
 
             logger.info("✅ Telemetry services initialized")
 
@@ -241,17 +258,20 @@ class DashboardServiceIntegrator:
     def initialize_reliability_infrastructure(self):
         """Initialize enhanced reliability infrastructure"""
         try:
-            from context_cleaner.core.enhanced_health_monitor import EnhancedHealthMonitor
-            from context_cleaner.core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
+            from context_cleaner.core.enhanced_health_monitor import (
+                EnhancedHealthMonitor,
+            )
+            from context_cleaner.core.circuit_breaker import (
+                CircuitBreaker,
+                CircuitBreakerConfig,
+            )
 
             # Initialize health monitor for dependency checking
             self.health_monitor = EnhancedHealthMonitor()
 
             # Initialize circuit breaker for dashboard metrics endpoint
             dashboard_metrics_config = CircuitBreakerConfig(
-                name="dashboard_metrics",
-                failure_threshold=3,
-                recovery_timeout=30
+                name="dashboard_metrics", failure_threshold=3, recovery_timeout=30
             )
             self.dashboard_metrics_breaker = CircuitBreaker(dashboard_metrics_config)
 
@@ -291,7 +311,8 @@ class DashboardServiceIntegrator:
             "telemetry_manager": self.telemetry_manager is not None,
             "health_monitor": self.health_monitor is not None,
             "context_analyzer": self.context_analyzer is not None,
-            "project_summary_analytics": hasattr(self, 'project_summary_analytics') and self.project_summary_analytics is not None,
+            "project_summary_analytics": hasattr(self, "project_summary_analytics")
+            and self.project_summary_analytics is not None,
         }
 
 
@@ -302,7 +323,12 @@ class DashboardServerManager:
     Supports both development and production deployment
     """
 
-    def __init__(self, app: Flask, socketio: SocketIO, config_manager: DashboardConfigurationManager):
+    def __init__(
+        self,
+        app: Flask,
+        socketio: SocketIO,
+        config_manager: DashboardConfigurationManager,
+    ):
         self.app = app
         self.socketio = socketio
         self.config_manager = config_manager
@@ -325,21 +351,31 @@ class DashboardServerManager:
         # Smart auto-detection: try production first unless explicitly disabled
         if production is None:
             production = self._should_use_production_server()
-            logger.info(f"🔍 Auto-detected server mode: {'production' if production else 'development'}")
+            logger.info(
+                f"🔍 Auto-detected server mode: {'production' if production else 'development'}"
+            )
 
         if production:
-            logger.info(f"🚀 Attempting to start with Gunicorn (production) on http://{host}:{port}")
+            logger.info(
+                f"🚀 Attempting to start with Gunicorn (production) on http://{host}:{port}"
+            )
             try:
-                self._start_production_server(host, port, gunicorn_workers, open_browser)
+                self._start_production_server(
+                    host, port, gunicorn_workers, open_browser
+                )
             except Exception as e:
                 logger.warning(f"💡 Production server failed: {e}")
                 logger.info("🔄 Falling back to development server...")
                 self._start_development_server(host, port, debug, open_browser)
         else:
-            logger.info(f"🛠️ Starting with Flask development server on http://{host}:{port}")
+            logger.info(
+                f"🛠️ Starting with Flask development server on http://{host}:{port}"
+            )
             self._start_development_server(host, port, debug, open_browser)
 
-    def _start_development_server(self, host: str, port: int, debug: bool, open_browser: bool):
+    def _start_development_server(
+        self, host: str, port: int, debug: bool, open_browser: bool
+    ):
         """Start Flask development server with Werkzeug"""
         if open_browser:
             # Open browser after a short delay
@@ -363,7 +399,9 @@ class DashboardServerManager:
             logger.error(f"Development server error: {e}")
             raise
 
-    def _start_production_server(self, host: str, port: int, workers: Optional[int], open_browser: bool):
+    def _start_production_server(
+        self, host: str, port: int, workers: Optional[int], open_browser: bool
+    ):
         """Start production server using Gunicorn"""
         try:
             logger.info("🔧 === GUNICORN STARTUP DIAGNOSTICS ===")
@@ -371,14 +409,18 @@ class DashboardServerManager:
             # Set workers count
             if workers is None:
                 workers = multiprocessing.cpu_count() * 2 + 1
-            logger.info(f"📊 Workers configuration: {workers} (CPU count: {multiprocessing.cpu_count()})")
+            logger.info(
+                f"📊 Workers configuration: {workers} (CPU count: {multiprocessing.cpu_count()})"
+            )
 
             # Check if Gunicorn is installed
-            gunicorn_path = shutil.which('gunicorn')
+            gunicorn_path = shutil.which("gunicorn")
             if gunicorn_path:
                 logger.info(f"✅ Gunicorn found at: {gunicorn_path}")
             else:
-                logger.warning("⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter")
+                logger.warning(
+                    "⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter"
+                )
 
             try:
                 subprocess.run(
@@ -386,7 +428,9 @@ class DashboardServerManager:
                     check=True,
                     capture_output=True,
                 )
-                logger.info(f"✅ Gunicorn module available in interpreter: {sys.executable}")
+                logger.info(
+                    f"✅ Gunicorn module available in interpreter: {sys.executable}"
+                )
             except Exception as exc:
                 logger.error("❌ Gunicorn invocation failed: %s", exc)
                 raise
@@ -414,17 +458,25 @@ class DashboardServerManager:
             # Build Gunicorn command
             cmd = [
                 sys.executable,
-                '-m',
-                'gunicorn',
-                '--bind', f'{host}:{port}',
-                '--workers', str(workers),
-                '--worker-class', 'eventlet',
-                '--timeout', '300',
-                '--keep-alive', '5',
-                '--access-logfile', '-',
-                '--error-logfile', '-',
-                '--log-level', 'info',
-                'context_cleaner_wsgi:application'
+                "-m",
+                "gunicorn",
+                "--bind",
+                f"{host}:{port}",
+                "--workers",
+                str(workers),
+                "--worker-class",
+                "uvicorn.workers.UvicornWorker",
+                "--timeout",
+                "300",
+                "--keep-alive",
+                "5",
+                "--access-logfile",
+                "-",
+                "--error-logfile",
+                "-",
+                "--log-level",
+                "info",
+                "context_cleaner_wsgi:application",
             ]
 
             logger.info(f"🚀 Starting Gunicorn with command: {' '.join(cmd)}")
@@ -448,29 +500,38 @@ class DashboardServerManager:
         # Check if gunicorn is available
         try:
             import subprocess
-            subprocess.run(['gunicorn', '--version'],
-                         capture_output=True, check=True, timeout=5)
+
+            subprocess.run(
+                ["gunicorn", "--version"], capture_output=True, check=True, timeout=5
+            )
             logger.debug("✅ Gunicorn is available")
             gunicorn_available = True
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        except (
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+        ):
             logger.debug("❌ Gunicorn not available or not working")
             gunicorn_available = False
 
         # Check environment indicators
         import os
+
         env_indicators = {
-            'FLASK_ENV': os.getenv('FLASK_ENV', '').lower(),
-            'ENVIRONMENT': os.getenv('ENVIRONMENT', '').lower(),
-            'DEPLOYMENT_ENV': os.getenv('DEPLOYMENT_ENV', '').lower(),
+            "FLASK_ENV": os.getenv("FLASK_ENV", "").lower(),
+            "ENVIRONMENT": os.getenv("ENVIRONMENT", "").lower(),
+            "DEPLOYMENT_ENV": os.getenv("DEPLOYMENT_ENV", "").lower(),
         }
 
         # Force development server if explicitly set
-        is_dev_env = any(env in ['development', 'dev', 'local']
-                        for env in env_indicators.values())
+        is_dev_env = any(
+            env in ["development", "dev", "local"] for env in env_indicators.values()
+        )
 
         # Force production server if explicitly set
-        is_prod_env = any(env in ['production', 'prod', 'staging']
-                         for env in env_indicators.values())
+        is_prod_env = any(
+            env in ["production", "prod", "staging"] for env in env_indicators.values()
+        )
 
         # Auto-detection logic
         if is_dev_env:
@@ -481,7 +542,9 @@ class DashboardServerManager:
             return gunicorn_available
         else:
             # Default: try production if gunicorn is available
-            logger.debug("🔍 No explicit environment set, defaulting based on gunicorn availability")
+            logger.debug(
+                "🔍 No explicit environment set, defaulting based on gunicorn availability"
+            )
             return gunicorn_available
 
     def _create_wsgi_entry_point(self):
@@ -521,7 +584,7 @@ if __name__ == "__main__":
 
         wsgi_file = Path.cwd() / "context_cleaner_wsgi.py"
         try:
-            with open(wsgi_file, 'w', encoding='utf-8') as f:
+            with open(wsgi_file, "w", encoding="utf-8") as f:
                 f.write(wsgi_content)
             logger.info(f"📝 WSGI entry point written to: {wsgi_file}")
         except Exception as e:
@@ -549,15 +612,21 @@ class DashboardCoreOrchestrator:
         self.config_manager = DashboardConfigurationManager(config)
 
         # Create Flask application
-        self.app = Flask(__name__, template_folder=self.config_manager.get_templates_directory())
+        self.app = Flask(
+            __name__, template_folder=self.config_manager.get_templates_directory()
+        )
         self.app.config.update(self.config_manager.get_flask_config())
 
         # Setup CORS headers for API access
         @self.app.after_request
         def after_request(response):
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = (
+                "GET, POST, PUT, DELETE, OPTIONS"
+            )
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, Authorization"
+            )
             return response
 
         # Initialize SocketIO for real-time updates
@@ -568,13 +637,17 @@ class DashboardCoreOrchestrator:
         self.service_integrator = DashboardServiceIntegrator(self.config_manager)
 
         # Initialize server manager
-        self.server_manager = DashboardServerManager(self.app, self.socketio, self.config_manager)
+        self.server_manager = DashboardServerManager(
+            self.app, self.socketio, self.config_manager
+        )
 
         logger.info("🚀 Dashboard core orchestrator initialized")
 
     def initialize_all_services(self, dashboard_instance) -> bool:
         """Initialize all dashboard services"""
-        return self.service_integrator.setup_all_services(self.socketio, dashboard_instance)
+        return self.service_integrator.setup_all_services(
+            self.socketio, dashboard_instance
+        )
 
     def start_realtime_infrastructure(self):
         """Start real-time infrastructure if available"""
@@ -621,10 +694,13 @@ class DashboardCoreOrchestrator:
 
 class ModuleStatus:
     """Track module extraction status"""
+
     EXTRACTION_STATUS = "extracted"
     ORIGINAL_LINES = 800  # Core infrastructure, server management, service coordination
     TARGET_LINES = 600
     REDUCTION_TARGET = "Clean service orchestration with single responsibility and eliminated duplication"
 
 
-logger.info(f"dashboard_core module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}")
+logger.info(
+    f"dashboard_core module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}"
+)

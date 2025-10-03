@@ -2119,29 +2119,24 @@ class ComprehensiveHealthDashboard:
         try:
             # Try to get real telemetry data with timeout
             if hasattr(self, 'telemetry_client') and self.telemetry_client:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
                 try:
                     # Use timeout for telemetry operations
                     with ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._fetch_telemetry_stats, loop)
+                        future = executor.submit(self._fetch_telemetry_stats)
                         stats = future.result(timeout=10)  # 10 second timeout
-                    
+
                     # Get model efficiency data with timeout
                     model_efficiency_data = None
                     if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
                         try:
                             with ThreadPoolExecutor() as executor:
-                                future = executor.submit(self._fetch_model_efficiency, loop)
+                                future = executor.submit(self._fetch_model_efficiency)
                                 model_efficiency_data = future.result(timeout=5)  # 5 second timeout
                         except (FuturesTimeoutError, Exception) as e:
                             logger.warning(f"Model efficiency data timeout: {e}")
-                    
-                    loop.close()
-                    
+
                     response_time = (datetime.now() - start_time).total_seconds() * 1000
-                    
+
                     response_data = {
                         'total_tokens': stats['total_tokens'],
                         'total_sessions': stats['total_sessions'],
@@ -2165,13 +2160,11 @@ class ComprehensiveHealthDashboard:
                         response_data,
                         "Dashboard metrics retrieved successfully"
                     ))
-                    
+
                 except FuturesTimeoutError:
-                    loop.close()
                     logger.warning("Telemetry data fetch timeout - falling back to local data")
                     # Fall through to local JSONL fallback
                 except Exception as e:
-                    loop.close()
                     logger.warning(f"Error getting real telemetry stats: {e}")
                     # Fall through to local JSONL fallback
                     
@@ -3373,10 +3366,12 @@ if __name__ == "__main__":
                 logger.warning(f"Real-time update loop error: {e}")
                 self._stop_event.wait(timeout=10.0)
 
-    def _fetch_telemetry_stats(self, loop):
+    def _fetch_telemetry_stats(self):
         """Helper method to fetch telemetry stats in separate thread."""
 
         import asyncio
+
+        loop = asyncio.new_event_loop()
 
         try:
             asyncio.set_event_loop(loop)
@@ -3393,16 +3388,15 @@ if __name__ == "__main__":
             return loop.run_until_complete(coroutine)
 
         finally:
-            # Ensure the loop is closed to avoid pending coroutine warnings on shutdown
-            try:
-                loop.close()
-            except RuntimeError:
-                pass
-    
-    def _fetch_model_efficiency(self, loop):
+            asyncio.set_event_loop(None)
+            loop.close()
+
+    def _fetch_model_efficiency(self):
         """Helper method to fetch model efficiency data in separate thread."""
 
         import asyncio
+
+        loop = asyncio.new_event_loop()
 
         try:
             asyncio.set_event_loop(loop)
@@ -3422,10 +3416,8 @@ if __name__ == "__main__":
             return model_widget.data if model_widget else None
 
         finally:
-            try:
-                loop.close()
-            except RuntimeError:
-                pass
+            asyncio.set_event_loop(None)
+            loop.close()
 
     def _get_local_jsonl_stats(self) -> Dict[str, Any]:
         """Get dashboard metrics from local JSONL files when telemetry is unavailable."""

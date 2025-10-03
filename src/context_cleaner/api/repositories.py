@@ -16,6 +16,7 @@ from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
 logger = logging.getLogger(__name__)
 
+
 class TelemetryRepository(ABC):
     """Abstract repository for telemetry data access"""
 
@@ -25,8 +26,12 @@ class TelemetryRepository(ABC):
         pass
 
     @abstractmethod
-    async def get_widget_data(self, widget_type: str, session_id: Optional[str] = None,
-                             time_range_days: int = 7) -> WidgetData:
+    async def get_widget_data(
+        self,
+        widget_type: str,
+        session_id: Optional[str] = None,
+        time_range_days: int = 7,
+    ) -> WidgetData:
         """Get data for a specific widget"""
         pass
 
@@ -45,6 +50,7 @@ class TelemetryRepository(ABC):
         """Get cost trends over specified period"""
         pass
 
+
 class ClickHouseTelemetryRepository(TelemetryRepository):
     """ClickHouse implementation of telemetry repository"""
 
@@ -59,7 +65,7 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             query = """
             WITH
                 token_data AS (
-                    SELECT SUM(Value) as total_tokens
+                    SELECT COALESCE(SUM(Value), 0) as total_tokens
                     FROM otel.otel_metrics_sum
                     WHERE MetricName = 'claude_code.token.usage'
                       AND TimeUnix >= now() - INTERVAL 30 DAY
@@ -67,7 +73,7 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
                 session_data AS (
                     SELECT
                         COUNT(DISTINCT LogAttributes['session.id']) as total_sessions,
-                        SUM(toFloat64OrNull(LogAttributes['cost_usd'])) as total_cost,
+                        COALESCE(SUM(toFloat64OrNull(LogAttributes['cost_usd'])), 0) as total_cost,
                         COUNT(*) as total_requests,
                         SUM(CASE WHEN Body = 'claude_code.api_error' THEN 1 ELSE 0 END) as errors
                     FROM otel.otel_logs
@@ -101,20 +107,24 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
 
             data = results[0]
             return DashboardMetrics(
-                total_tokens=int(data.get('total_tokens', 0)),
-                total_sessions=int(data.get('total_sessions', 0)),
-                success_rate=float(data.get('success_rate', 100.0)),
-                active_agents=int(data.get('active_agents', 0)),
-                cost=Decimal(str(data.get('total_cost', 0.0))),
-                timestamp=datetime.now()
+                total_tokens=int(data.get("total_tokens", 0)),
+                total_sessions=int(data.get("total_sessions", 0)),
+                success_rate=float(data.get("success_rate", 100.0)),
+                active_agents=int(data.get("active_agents", 0)),
+                cost=Decimal(str(data.get("total_cost", 0.0))),
+                timestamp=datetime.now(),
             )
 
         except Exception as e:
             logger.error(f"Error getting dashboard metrics: {e}")
             return self._get_default_metrics()
 
-    async def get_widget_data(self, widget_type: str, session_id: Optional[str] = None,
-                             time_range_days: int = 7) -> WidgetData:
+    async def get_widget_data(
+        self,
+        widget_type: str,
+        session_id: Optional[str] = None,
+        time_range_days: int = 7,
+    ) -> WidgetData:
         """Get data for specific widget type with caching considerations"""
         try:
             # Widget-specific data queries
@@ -123,12 +133,12 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
 
             if widget_type == "error_monitor":
                 data = await self._get_error_monitor_data(time_range_days)
-                status = "critical" if data.get('error_count', 0) > 10 else "healthy"
+                status = "critical" if data.get("error_count", 0) > 10 else "healthy"
 
             elif widget_type == "cost_tracker":
                 data = await self._get_cost_tracker_data(time_range_days)
                 # Determine status based on cost trends
-                status = "warning" if data.get('daily_cost', 0) > 50 else "healthy"
+                status = "warning" if data.get("daily_cost", 0) > 50 else "healthy"
 
             elif widget_type == "model_efficiency":
                 data = await self._get_model_efficiency_data(time_range_days)
@@ -136,8 +146,12 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
 
             elif widget_type == "timeout_risk":
                 data = await self._get_timeout_risk_data(time_range_days)
-                avg_duration = data.get('avg_duration_ms', 0)
-                status = "critical" if avg_duration > 30000 else "warning" if avg_duration > 15000 else "healthy"
+                avg_duration = data.get("avg_duration_ms", 0)
+                status = (
+                    "critical"
+                    if avg_duration > 30000
+                    else "warning" if avg_duration > 15000 else "healthy"
+                )
 
             else:
                 # Generic widget data
@@ -151,7 +165,7 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
                 status=status,
                 data=data,
                 last_updated=datetime.now(),
-                metadata={"time_range_days": time_range_days, "session_id": session_id}
+                metadata={"time_range_days": time_range_days, "session_id": session_id},
             )
 
         except Exception as e:
@@ -171,13 +185,17 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             error_rate = await self._get_error_rate()
 
             return SystemHealth(
-                overall_healthy=health_check.get('overall_healthy', False),
-                database_status=health_check.get('connection_status', 'unknown'),
-                connection_status='connected' if health_check.get('database_accessible') else 'disconnected',
-                response_time_ms=health_check.get('response_time_ms', 0.0),
+                overall_healthy=health_check.get("overall_healthy", False),
+                database_status=health_check.get("connection_status", "unknown"),
+                connection_status=(
+                    "connected"
+                    if health_check.get("database_accessible")
+                    else "disconnected"
+                ),
+                response_time_ms=health_check.get("response_time_ms", 0.0),
                 uptime_seconds=uptime_seconds,
                 error_rate=error_rate,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
         except Exception as e:
@@ -205,10 +223,10 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             results = await self.client.execute_query(query)
             return [
                 {
-                    'session_id': row['session_id'],
-                    'last_activity': row['last_activity'],
-                    'request_count': int(row['request_count']),
-                    'cost': float(row.get('session_cost', 0))
+                    "session_id": row["session_id"],
+                    "last_activity": row["last_activity"],
+                    "request_count": int(row["request_count"]),
+                    "cost": float(row.get("session_cost", 0)),
                 }
                 for row in results
             ]
@@ -233,7 +251,7 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             """
 
             results = await self.client.execute_query(query)
-            return {row['date']: float(row['daily_cost']) for row in results}
+            return {row["date"]: float(row["daily_cost"]) for row in results}
 
         except Exception as e:
             logger.error(f"Error getting cost trends: {e}")
@@ -256,12 +274,15 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
         """
 
         results = await self.client.execute_query(query)
-        total_errors = sum(row['count'] for row in results)
+        total_errors = sum(row["count"] for row in results)
 
         return {
-            'error_count': total_errors,
-            'error_types': [{'type': row['error_type'], 'count': row['count']} for row in results[:5]],
-            'trend': 'stable'  # Could be calculated from time series
+            "error_count": total_errors,
+            "error_types": [
+                {"type": row["error_type"], "count": row["count"]}
+                for row in results[:5]
+            ],
+            "trend": "stable",  # Could be calculated from time series
         }
 
     async def _get_cost_tracker_data(self, time_range_days: int) -> Dict[str, Any]:
@@ -281,19 +302,19 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
         """
 
         results = await self.client.execute_query(query)
-        total_cost = sum(float(row['model_cost']) for row in results)
+        total_cost = sum(float(row["model_cost"]) for row in results)
 
         return {
-            'total_cost': total_cost,
-            'daily_cost': total_cost / time_range_days,
-            'model_breakdown': [
+            "total_cost": total_cost,
+            "daily_cost": total_cost / time_range_days,
+            "model_breakdown": [
                 {
-                    'model': row['model'],
-                    'cost': float(row['model_cost']),
-                    'requests': int(row['request_count'])
+                    "model": row["model"],
+                    "cost": float(row["model_cost"]),
+                    "requests": int(row["request_count"]),
                 }
                 for row in results
-            ]
+            ],
         }
 
     async def _get_model_efficiency_data(self, time_range_days: int) -> Dict[str, Any]:
@@ -318,12 +339,15 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
         if results:
             data = results[0]
             return {
-                'avg_duration_ms': float(data.get('avg_duration_ms', 0)),
-                'max_duration_ms': float(data.get('max_duration_ms', 0)),
-                'slow_request_ratio': float(data.get('slow_requests', 0)) / max(float(data.get('total_requests', 1)), 1),
-                'risk_level': 'high' if float(data.get('avg_duration_ms', 0)) > 20000 else 'low'
+                "avg_duration_ms": float(data.get("avg_duration_ms", 0)),
+                "max_duration_ms": float(data.get("max_duration_ms", 0)),
+                "slow_request_ratio": float(data.get("slow_requests", 0))
+                / max(float(data.get("total_requests", 1)), 1),
+                "risk_level": (
+                    "high" if float(data.get("avg_duration_ms", 0)) > 20000 else "low"
+                ),
             }
-        return {'avg_duration_ms': 0, 'risk_level': 'unknown'}
+        return {"avg_duration_ms": 0, "risk_level": "unknown"}
 
     async def _get_error_rate(self) -> float:
         """Calculate current error rate"""
@@ -340,8 +364,8 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             results = await self.client.execute_query(query)
             if results:
                 data = results[0]
-                total = int(data.get('total_requests', 0))
-                errors = int(data.get('errors', 0))
+                total = int(data.get("total_requests", 0))
+                errors = int(data.get("errors", 0))
                 return (errors / max(total, 1)) * 100.0
             return 0.0
 
@@ -351,13 +375,13 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
     def _get_widget_title(self, widget_type: str) -> str:
         """Get human-readable title for widget type"""
         titles = {
-            'error_monitor': 'Error Monitor',
-            'cost_tracker': 'Cost Tracker',
-            'model_efficiency': 'Model Efficiency',
-            'timeout_risk': 'Timeout Risk Assessment',
-            'tool_optimizer': 'Tool Optimizer'
+            "error_monitor": "Error Monitor",
+            "cost_tracker": "Cost Tracker",
+            "model_efficiency": "Model Efficiency",
+            "timeout_risk": "Timeout Risk Assessment",
+            "tool_optimizer": "Tool Optimizer",
         }
-        return titles.get(widget_type, widget_type.replace('_', ' ').title())
+        return titles.get(widget_type, widget_type.replace("_", " ").title())
 
     def _get_default_metrics(self) -> DashboardMetrics:
         """Return default metrics when data is unavailable"""
@@ -366,8 +390,8 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             total_sessions=0,
             success_rate=100.0,
             active_agents=0,
-            cost=Decimal('0.00'),
-            timestamp=datetime.now()
+            cost=Decimal("0.00"),
+            timestamp=datetime.now(),
         )
 
     def _get_default_widget(self, widget_type: str) -> WidgetData:
@@ -379,17 +403,17 @@ class ClickHouseTelemetryRepository(TelemetryRepository):
             status="unknown",
             data={"message": "Data temporarily unavailable"},
             last_updated=datetime.now(),
-            metadata={}
+            metadata={},
         )
 
     def _get_default_health(self) -> SystemHealth:
         """Return default health status when check fails"""
         return SystemHealth(
             overall_healthy=False,
-            database_status='unknown',
-            connection_status='unknown',
+            database_status="unknown",
+            connection_status="unknown",
             response_time_ms=0.0,
             uptime_seconds=0.0,
             error_rate=0.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )

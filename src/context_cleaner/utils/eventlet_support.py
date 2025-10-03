@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 
 logger = logging.getLogger(__name__)
@@ -50,12 +51,35 @@ def get_socketio_async_mode() -> str:
         return "threading"
 
 
-def ensure_eventlet_monkey_patch(*, patch_threads: bool = True) -> None:
+def _should_patch_threads(default: bool | None) -> bool:
+    """Determine whether Eventlet should patch the threading module."""
+
+    env_value = os.getenv("CONTEXT_CLEANER_EVENTLET_PATCH_THREADS")
+    if env_value is not None:
+        normalized = env_value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        logger.warning(
+            "Unrecognised CONTEXT_CLEANER_EVENTLET_PATCH_THREADS=%s; using fallback",
+            env_value,
+        )
+
+    if default is None:
+        default = True
+
+    return default
+
+
+def ensure_eventlet_monkey_patch(*, patch_threads: bool | None = None) -> None:
     """Apply ``eventlet.monkey_patch`` exactly once when Eventlet mode is active."""
 
     if get_socketio_async_mode() != "eventlet":
         logger.debug("Skipping Eventlet monkey patch; async_mode!=eventlet")
         return
+
+    patch_threads = _should_patch_threads(patch_threads)
 
     global _patched
     if _patched:
@@ -75,8 +99,42 @@ def ensure_eventlet_monkey_patch(*, patch_threads: bool = True) -> None:
         try:
             import eventlet  # type: ignore
 
+            if sys.platform == "darwin":
+                os.environ.setdefault("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")
+
+            if "EVENTLET_HUB" not in os.environ and sys.platform == "darwin":
+                try:
+                    eventlet.hubs.use_hub("selects")
+                    logger.debug("Configured Eventlet to use 'selects' hub on macOS")
+                except Exception as exc:
+                    logger.debug("Failed to switch Eventlet hub: %s", exc)
+
             eventlet.monkey_patch(thread=patch_threads)
             logger.debug("Eventlet monkey patch applied (threads=%s)", patch_threads)
+
+            # Guard against third-party gevent imports on Python 3.13+ where
+            # get_ident may become unset during shutdown (raising TypeError).
+            try:
+                import gevent.thread as gevent_thread  # type: ignore
+
+                original_get_ident = getattr(gevent_thread, "get_ident", None)
+
+                if callable(original_get_ident):
+
+                    def _safe_gevent_get_ident(*args, **kwargs):
+                        try:
+                            return original_get_ident(*args, **kwargs)
+                        except TypeError:
+                            return threading.get_ident()
+
+                    gevent_thread.get_ident = _safe_gevent_get_ident  # type: ignore[attr-defined]
+                    logger.debug("Patched gevent.thread.get_ident for Eventlet compatibility")
+                else:
+                    gevent_thread.get_ident = threading.get_ident  # type: ignore[attr-defined]
+                    logger.debug("Set gevent.thread.get_ident fallback to threading.get_ident")
+            except ImportError:
+                pass
+
             _patched = True
         except Exception:
             # If eventlet isn't installed (e.g. during lightweight CLI use),

@@ -145,6 +145,19 @@ ORDER BY (session_id, timestamp)
 PARTITION BY toDate(timestamp)
 TTL timestamp + INTERVAL 30 DAY;
 
+-- Context rot metrics storage for conversation quality analytics
+CREATE TABLE IF NOT EXISTS context_rot_metrics (
+    timestamp DateTime,
+    session_id String,
+    rot_score Float64,
+    confidence_score Float64,
+    indicator_breakdown Map(String, Float64),
+    analysis_version UInt8,
+    requires_attention UInt8
+) ENGINE = MergeTree()
+ORDER BY (session_id, timestamp)
+TTL timestamp + INTERVAL 30 DAY;
+
 -- Complete File Content Storage
 CREATE TABLE IF NOT EXISTS claude_file_content (
     file_access_uuid String,

@@ -431,3 +431,14 @@ class SessionCacheParser:
             "errors_encountered": 0,
             "parse_time_seconds": 0.0,
         }
+
+
+# ---------------------------------------------------------------------------
+# Legacy compatibility
+# ---------------------------------------------------------------------------
+
+class SessionParser(SessionCacheParser):
+    """Backward-compatible alias for historical imports."""
+
+
+__all__ = ["SessionCacheParser", "SessionParser"]
