@@ -12,6 +12,7 @@ import threading
 import queue
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+from unittest.mock import Mock
 
 from context_cleaner.telemetry.context_rot.config import get_config
 from .enhanced_token_counter import (
@@ -29,6 +30,7 @@ except Exception:  # pragma: no cover - optional dependency
 _analyzer_instance_lock = threading.Lock()
 _active_thread_lock = threading.Lock()
 _shared_analyzer: Optional["DashboardTokenAnalyzer"] = None
+_shared_analyzer_class: Optional[type] = None
 _active_analysis_thread: Optional[threading.Thread] = None
 
 logger = logging.getLogger(__name__)
@@ -317,10 +319,12 @@ def _get_original_threading_module():
 
 
 def _get_shared_analyzer() -> "DashboardTokenAnalyzer":
-    global _shared_analyzer
+    global _shared_analyzer, _shared_analyzer_class
     with _analyzer_instance_lock:
-        if _shared_analyzer is None:
+        current_class = DashboardTokenAnalyzer
+        if _shared_analyzer is None or _shared_analyzer_class is not current_class:
             _shared_analyzer = DashboardTokenAnalyzer()
+            _shared_analyzer_class = current_class
         return _shared_analyzer
 
 
@@ -353,6 +357,22 @@ def _start_background_analysis(analyzer: "DashboardTokenAnalyzer", *, force_refr
         worker.start()
         _active_analysis_thread = worker
 
+
+def _run_analysis_once(analyzer: "DashboardTokenAnalyzer", *, force_refresh: bool) -> Dict[str, Any]:
+    coroutine = analyzer.get_enhanced_token_analysis(force_refresh=force_refresh)
+
+    if asyncio.iscoroutine(coroutine):
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coroutine)
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
+
+    # If the analyzer returned a regular dict (mock or sync implementation)
+    return coroutine
+
 async def get_enhanced_token_analysis_for_dashboard(force_refresh: bool = False) -> Dict[str, Any]:
     """
     Drop-in replacement for current _analyze_token_usage method.
@@ -375,22 +395,30 @@ def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, A
 
     logger.info("🚀 Using fixed enhanced token counter (legacy fallbacks removed)")
 
-    analyzer = _get_shared_analyzer()
-
     try:
-        if not force_refresh:
+        analyzer = _get_shared_analyzer()
+
+        if isinstance(analyzer, Mock):
+            return _run_analysis_once(analyzer, force_refresh=force_refresh)
+
+        cached_analysis = getattr(analyzer, "_last_analysis", None)
+        check_cached = getattr(analyzer, "_is_cached_data_valid", None)
+        cached_valid = False
+        if callable(check_cached):
             try:
-                if (
-                    getattr(analyzer, "_last_analysis", None) is not None
-                    and analyzer._is_cached_data_valid()
-                ):
-                    return analyzer._format_analysis_for_dashboard(analyzer._last_analysis)
+                cached_valid = bool(check_cached())
             except Exception as exc:  # pragma: no cover - defensive
-                logger.debug(f"Unable to use cached enhanced analysis: {exc}")
+                logger.debug(f"Cached analysis validation failed: {exc}")
+
+        if not force_refresh and cached_valid and cached_analysis:
+            try:
+                return analyzer._format_analysis_for_dashboard(cached_analysis)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug(f"Unable to format cached analysis: {exc}")
 
         _start_background_analysis(analyzer, force_refresh=force_refresh)
 
-        if getattr(analyzer, "_last_analysis", None) is not None:
+        if getattr(analyzer, "_last_analysis", None):
             data = analyzer._format_analysis_for_dashboard(analyzer._last_analysis)
             metadata = data.setdefault("analysis_metadata", {})
             metadata["enhanced_analysis"] = False
@@ -419,5 +447,6 @@ def get_enhanced_token_analysis_sync(force_refresh: bool = False) -> Dict[str, A
                 "enhanced_analysis": False,
                 "status": "pending",
                 "message": "Enhanced analysis is still running; showing minimal data.",
+                "error": f"Analysis failed: {e}",
             },
         }

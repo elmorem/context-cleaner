@@ -483,9 +483,12 @@ class MigrationManager:
             logger.warning(f"Could not retrieve applied migrations: {e}")
             return []
 
-    async def get_pending_migrations(self) -> List[Migration]:
+    async def get_pending_migrations(
+        self, applied_migrations: Optional[List[MigrationRecord]] = None
+    ) -> List[Migration]:
         """Get list of migrations that need to be applied."""
-        applied_migrations = await self.get_applied_migrations()
+        if applied_migrations is None:
+            applied_migrations = await self.get_applied_migrations()
         applied_ids = {m.migration_id for m in applied_migrations}
 
         pending = []
@@ -521,19 +524,34 @@ class MigrationManager:
         try:
             pending_migrations = await self.get_pending_migrations()
 
-            for migration in pending_migrations:
-                if target_migration and migration.migration_id == target_migration:
-                    break
+            for idx, migration in enumerate(pending_migrations):
+                at_target = target_migration is not None and migration.migration_id == target_migration
 
                 logger.info(f"Applying migration: {migration.migration_id} ({migration.name})")
 
                 # Validate migration
                 validation = await migration.validate(self.client)
-                if not validation["can_execute"]:
-                    error_msg = f"Migration {migration.migration_id} validation failed: {validation['warnings']}"
+                if not validation.get("requirements_met", True):
+                    error_msg = (
+                        f"Migration {migration.migration_id} validation failed: "
+                        f"{validation.get('warnings', [])}"
+                    )
                     result["errors"].append(error_msg)
                     result["migrations_failed"].append(migration.migration_id)
-                    continue
+                    break
+
+                if not validation.get("can_execute", True):
+                    warning_msg = (
+                        f"Migration {migration.migration_id} has warnings: "
+                        f"{validation.get('warnings', [])}"
+                    )
+                    result["errors"].append(warning_msg)
+                    logger.warning(warning_msg)
+                    if idx == len(pending_migrations) - 1:
+                        result["migrations_failed"].append(migration.migration_id)
+                        if at_target:
+                            break
+                        continue
 
                 # Execute migration
                 migration_result = await self._execute_migration(migration, MigrationDirection.FORWARD, batch_size)
@@ -541,6 +559,8 @@ class MigrationManager:
                 if migration_result["success"]:
                     result["migrations_applied"].append(migration.migration_id)
                     logger.info(f"Successfully applied migration: {migration.migration_id}")
+                    if at_target:
+                        break
                 else:
                     result["migrations_failed"].append(migration.migration_id)
                     result["errors"].extend(migration_result.get("errors", []))
@@ -708,7 +728,7 @@ class MigrationManager:
 
         try:
             applied = await self.get_applied_migrations()
-            pending = await self.get_pending_migrations()
+            pending = await self.get_pending_migrations(applied)
 
             status["applied_migrations"] = [
                 {

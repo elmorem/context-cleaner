@@ -142,6 +142,7 @@ class TestMigration:
         # Different migrations should have different checksums
         assert migration1.checksum != migration3.checksum
 
+    @pytest.mark.asyncio
     async def test_migration_forward_success(self):
         """Test successful forward migration."""
         migration = MockMigration(should_succeed=True)
@@ -152,6 +153,7 @@ class TestMigration:
         assert result["success"] is True
         assert migration.forward_called is True
 
+    @pytest.mark.asyncio
     async def test_migration_forward_failure(self):
         """Test failed forward migration."""
         migration = MockMigration(should_succeed=False)
@@ -162,6 +164,7 @@ class TestMigration:
         assert result["success"] is False
         assert len(result["errors"]) > 0
 
+    @pytest.mark.asyncio
     async def test_migration_backward_success(self):
         """Test successful backward migration."""
         migration = MockMigration(should_succeed=True)
@@ -172,6 +175,7 @@ class TestMigration:
         assert result["success"] is True
         assert migration.backward_called is True
 
+    @pytest.mark.asyncio
     async def test_migration_validate(self):
         """Test migration validation."""
         migration = MockMigration(should_succeed=True)
@@ -206,6 +210,7 @@ class TestInitialSchemaMigration:
         assert "Enhanced Token Analysis Schema" in migration.name
         assert migration.description != ""
 
+    @pytest.mark.asyncio
     async def test_initial_migration_forward_success(self, migration, mock_client):
         """Test successful initial schema creation."""
         mock_client.execute_query.return_value = []
@@ -219,6 +224,7 @@ class TestInitialSchemaMigration:
         # Should have called execute_query for tables, indexes, and views
         assert mock_client.execute_query.call_count > 10  # Tables + indexes + views
 
+    @pytest.mark.asyncio
     async def test_initial_migration_forward_with_errors(self, migration, mock_client):
         """Test initial schema creation with some errors."""
         # First few calls succeed, then some fail
@@ -236,6 +242,7 @@ class TestInitialSchemaMigration:
         assert len(result["errors"]) > 0
         assert "Table 2 failed" in str(result["errors"])
 
+    @pytest.mark.asyncio
     async def test_initial_migration_backward_success(self, migration, mock_client):
         """Test successful schema rollback."""
         mock_client.execute_query.return_value = []
@@ -250,6 +257,7 @@ class TestInitialSchemaMigration:
         drop_calls = [call for call in mock_client.execute_query.call_args_list if "DROP" in str(call)]
         assert len(drop_calls) > 0
 
+    @pytest.mark.asyncio
     async def test_initial_migration_validate_clean_database(self, migration, mock_client):
         """Test validation against clean database."""
         mock_client.execute_query.return_value = []  # No existing tables
@@ -259,6 +267,7 @@ class TestInitialSchemaMigration:
         assert result["can_execute"] is True
         assert len(result["conflicts"]) == 0
 
+    @pytest.mark.asyncio
     async def test_initial_migration_validate_with_conflicts(self, migration, mock_client):
         """Test validation with existing conflicting tables."""
         mock_client.execute_query.return_value = [{"name": "enhanced_token_summaries"}, {"name": "other_table"}]
@@ -269,6 +278,7 @@ class TestInitialSchemaMigration:
         assert len(result["conflicts"]) > 0
         assert len(result["warnings"]) > 0
 
+    @pytest.mark.asyncio
     async def test_initial_migration_validate_access_error(self, migration, mock_client):
         """Test validation with database access error."""
         mock_client.execute_query.side_effect = Exception("Access denied")
@@ -301,6 +311,7 @@ class TestPerformanceOptimizationMigration:
         assert migration.version == "1.1"
         assert "Performance Optimization" in migration.name
 
+    @pytest.mark.asyncio
     async def test_performance_migration_forward_success(self, migration, mock_client):
         """Test successful performance optimization."""
         mock_client.execute_query.return_value = []
@@ -314,6 +325,7 @@ class TestPerformanceOptimizationMigration:
         # Should have executed multiple optimization queries
         assert mock_client.execute_query.call_count > 3
 
+    @pytest.mark.asyncio
     async def test_performance_migration_backward_success(self, migration, mock_client):
         """Test successful performance optimization rollback."""
         mock_client.execute_query.return_value = []
@@ -327,6 +339,7 @@ class TestPerformanceOptimizationMigration:
         drop_calls = [call for call in mock_client.execute_query.call_args_list if "DROP INDEX" in str(call)]
         assert len(drop_calls) > 0
 
+    @pytest.mark.asyncio
     async def test_performance_migration_validate_ready(self, migration, mock_client):
         """Test validation when tables are ready for optimization."""
         mock_client.execute_query.side_effect = [
@@ -398,6 +411,7 @@ class TestMigrationManager:
         # But should update the migration
         assert manager.migrations["test_001"] == migration2
 
+    @pytest.mark.asyncio
     async def test_initialize_migration_tracking(self, manager, mock_client):
         """Test migration tracking table initialization."""
         await manager.initialize_migration_tracking()
@@ -407,6 +421,7 @@ class TestMigrationManager:
         assert "CREATE TABLE" in call_args
         assert "schema_migrations" in call_args
 
+    @pytest.mark.asyncio
     async def test_get_applied_migrations_success(self, manager, mock_client):
         """Test retrieval of applied migrations."""
         mock_client.execute_query.return_value = [
@@ -433,6 +448,7 @@ class TestMigrationManager:
         assert applied[0].status == MigrationStatus.SUCCESS
         assert applied[0].direction == MigrationDirection.FORWARD
 
+    @pytest.mark.asyncio
     async def test_get_applied_migrations_empty(self, manager, mock_client):
         """Test retrieval when no migrations applied."""
         mock_client.execute_query.return_value = []
@@ -441,6 +457,7 @@ class TestMigrationManager:
 
         assert len(applied) == 0
 
+    @pytest.mark.asyncio
     async def test_get_applied_migrations_error(self, manager, mock_client):
         """Test retrieval with database error."""
         mock_client.execute_query.side_effect = Exception("Database error")
@@ -449,6 +466,7 @@ class TestMigrationManager:
 
         assert len(applied) == 0  # Should handle error gracefully
 
+    @pytest.mark.asyncio
     async def test_get_pending_migrations(self, manager, mock_client):
         """Test retrieval of pending migrations."""
         # Register test migrations
@@ -480,6 +498,7 @@ class TestMigrationManager:
         assert pending[0].migration_id == "test_002"
         assert pending[1].migration_id == "test_003"
 
+    @pytest.mark.asyncio
     async def test_migrate_up_success(self, manager, mock_client):
         """Test successful forward migration."""
         # Register successful migrations
@@ -502,6 +521,7 @@ class TestMigrationManager:
         assert migration1.forward_called is True
         assert migration2.forward_called is True
 
+    @pytest.mark.asyncio
     async def test_migrate_up_with_failure(self, manager, mock_client):
         """Test forward migration with failure."""
         # Register migrations - second one fails
@@ -527,6 +547,7 @@ class TestMigrationManager:
         assert migration2.forward_called is True
         assert migration3.forward_called is False  # Should not be called
 
+    @pytest.mark.asyncio
     async def test_migrate_up_validation_failure(self, manager, mock_client):
         """Test forward migration with validation failure."""
         # Register migration that fails validation
@@ -545,6 +566,7 @@ class TestMigrationManager:
         assert migration.validate_called is True
         assert migration.forward_called is False
 
+    @pytest.mark.asyncio
     async def test_migrate_up_with_target(self, manager, mock_client):
         """Test forward migration to specific target."""
         # Register three migrations
@@ -568,6 +590,7 @@ class TestMigrationManager:
         assert migration2.forward_called is True
         assert migration3.forward_called is False
 
+    @pytest.mark.asyncio
     async def test_migrate_down_success(self, manager, mock_client):
         """Test successful backward migration."""
         # Register migrations
@@ -636,6 +659,7 @@ class TestMigrationManager:
         assert migration2.backward_called is True
         assert migration1.backward_called is False  # Target, so not rolled back
 
+    @pytest.mark.asyncio
     async def test_migrate_down_target_not_found(self, manager, mock_client):
         """Test rollback with target migration not found."""
         migration = MockMigration("test_001")
@@ -648,6 +672,7 @@ class TestMigrationManager:
         assert result["success"] is False
         assert "not found" in result["errors"][0]
 
+    @pytest.mark.asyncio
     async def test_migrate_down_with_failure(self, manager, mock_client):
         """Test rollback with failure."""
         # Register migrations - second rollback fails
@@ -715,6 +740,7 @@ class TestMigrationManager:
         assert migration2.backward_called is True
         assert migration1.backward_called is False
 
+    @pytest.mark.asyncio
     async def test_get_migration_status(self, manager, mock_client):
         """Test comprehensive migration status retrieval."""
         # Register migrations
@@ -771,6 +797,7 @@ class TestMigrationManager:
         pending = status["pending_migrations"][0]
         assert pending["id"] == "test_002"
 
+    @pytest.mark.asyncio
     async def test_record_migration_status(self, manager, mock_client):
         """Test migration status recording."""
         record = MigrationRecord(
@@ -787,6 +814,7 @@ class TestMigrationManager:
 
         mock_client.bulk_insert.assert_called_once_with("schema_migrations", [record.to_clickhouse_record()])
 
+    @pytest.mark.asyncio
     async def test_execute_migration_success(self, manager, mock_client):
         """Test successful migration execution."""
         migration = MockMigration("test_001", should_succeed=True)
@@ -799,6 +827,7 @@ class TestMigrationManager:
         # Should have recorded migration status twice (start and end)
         assert mock_client.bulk_insert.call_count == 2
 
+    @pytest.mark.asyncio
     async def test_execute_migration_failure(self, manager, mock_client):
         """Test failed migration execution."""
         migration = MockMigration("test_001", should_succeed=False)
@@ -816,6 +845,7 @@ class TestMigrationManager:
 class TestMigrationIntegration:
     """Integration tests for migration framework (require actual ClickHouse)."""
 
+    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires running ClickHouse instance")
     async def test_real_initial_schema_migration(self):
         """Test initial schema migration against real ClickHouse."""

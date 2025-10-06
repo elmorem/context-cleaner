@@ -612,6 +612,12 @@ def mock_plan_preview():
     mock_op_preview.operation_id = "op-001"
     mock_op_preview.estimated_impact = {"token_reduction": 50}
     mock_op_preview.preview_text = "Remove obsolete content: 'old data'"
+    mock_operation = Mock()
+    mock_operation.operation_id = "op-001"
+    mock_operation.operation_type = "remove"
+    mock_operation.reasoning = "Remove obsolete content"
+    mock_operation.confidence_score = 0.9
+    mock_op_preview.operation = mock_operation
     
     preview = Mock(spec=PlanPreview)
     preview.operation_previews = [mock_op_preview]

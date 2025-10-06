@@ -7,6 +7,7 @@ configuration for Enhanced Token Analysis Bridge.
 
 import pytest
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 from typing import Dict, List, Any
@@ -94,6 +95,7 @@ class TestDatabaseInitializer:
         assert isinstance(initializer.client, ClickHouseClient)
         assert initializer.client.database == "test_db"
 
+    @pytest.mark.asyncio
     async def test_verify_connection_success(self, initializer, mock_client):
         """Test successful connection verification."""
         mock_client.health_check.return_value = True
@@ -105,6 +107,7 @@ class TestDatabaseInitializer:
         mock_client.health_check.assert_called_once()
         mock_client.execute_query.assert_called_with("SELECT version()")
 
+    @pytest.mark.asyncio
     async def test_verify_connection_health_failure(self, initializer, mock_client):
         """Test connection verification with health check failure."""
         mock_client.health_check.return_value = False
@@ -112,6 +115,7 @@ class TestDatabaseInitializer:
         result = await initializer._verify_connection()
         assert result is False
 
+    @pytest.mark.asyncio
     async def test_verify_connection_query_failure(self, initializer, mock_client):
         """Test connection verification with query failure."""
         mock_client.health_check.return_value = True
@@ -120,6 +124,7 @@ class TestDatabaseInitializer:
         result = await initializer._verify_connection()
         assert result is False
 
+    @pytest.mark.asyncio
     async def test_get_existing_tables(self, initializer, mock_client):
         """Test retrieval of existing tables."""
         mock_client.execute_query.return_value = [
@@ -133,6 +138,7 @@ class TestDatabaseInitializer:
 
         mock_client.execute_query.assert_called_with("SHOW TABLES FROM test_otel")
 
+    @pytest.mark.asyncio
     async def test_get_existing_tables_error(self, initializer, mock_client):
         """Test handling of errors when getting existing tables."""
         mock_client.execute_query.side_effect = Exception("Connection failed")
@@ -162,6 +168,7 @@ class TestDatabaseInitializer:
         conflicts = initializer._check_schema_conflicts(existing_tables, force=True)
         assert conflicts == []
 
+    @pytest.mark.asyncio
     async def test_create_database_if_needed(self, initializer, mock_client):
         """Test database creation."""
         await initializer._create_database_if_needed()
@@ -169,6 +176,7 @@ class TestDatabaseInitializer:
         expected_query = "CREATE DATABASE IF NOT EXISTS test_otel"
         mock_client.execute_query.assert_called_with(expected_query)
 
+    @pytest.mark.asyncio
     async def test_create_tables_success(self, initializer, mock_client):
         """Test successful table creation."""
         mock_client.execute_query.return_value = []
@@ -181,6 +189,7 @@ class TestDatabaseInitializer:
         # Should have called execute_query for each table
         assert mock_client.execute_query.call_count == 3
 
+    @pytest.mark.asyncio
     async def test_create_tables_with_force(self, initializer, mock_client):
         """Test table creation with force flag."""
         mock_client.execute_query.return_value = []
@@ -195,6 +204,7 @@ class TestDatabaseInitializer:
         drop_calls = [call for call in mock_client.execute_query.call_args_list if "DROP TABLE" in str(call)]
         assert len(drop_calls) == 3
 
+    @pytest.mark.asyncio
     async def test_create_tables_dry_run(self, initializer, mock_client):
         """Test table creation in dry run mode."""
         initializer.dry_run = True
@@ -205,6 +215,7 @@ class TestDatabaseInitializer:
         # Should not have executed any queries in dry run mode
         mock_client.execute_query.assert_not_called()
 
+    @pytest.mark.asyncio
     async def test_create_tables_with_error(self, initializer, mock_client):
         """Test table creation with errors."""
         mock_client.execute_query.side_effect = [
@@ -219,6 +230,7 @@ class TestDatabaseInitializer:
         assert len(result["errors"]) == 1  # One failed
         assert "enhanced_token_details" in result["errors"][0]
 
+    @pytest.mark.asyncio
     async def test_create_indexes_success(self, initializer, mock_client):
         """Test successful index creation."""
         mock_client.execute_query.return_value = []
@@ -231,6 +243,7 @@ class TestDatabaseInitializer:
         # Should have called execute_query for each index
         assert mock_client.execute_query.call_count > 0
 
+    @pytest.mark.asyncio
     async def test_create_indexes_with_error(self, initializer, mock_client):
         """Test index creation with errors."""
         mock_client.execute_query.side_effect = Exception("Index creation failed")
@@ -240,6 +253,7 @@ class TestDatabaseInitializer:
         assert len(result["errors"]) > 0
         assert "Index creation failed" in str(result["errors"])
 
+    @pytest.mark.asyncio
     async def test_create_views_success(self, initializer, mock_client):
         """Test successful view creation."""
         mock_client.execute_query.return_value = []
@@ -252,6 +266,7 @@ class TestDatabaseInitializer:
 
         assert mock_client.execute_query.call_count == 4
 
+    @pytest.mark.asyncio
     async def test_create_views_with_error(self, initializer, mock_client):
         """Test view creation with errors."""
         mock_client.execute_query.side_effect = [
@@ -266,6 +281,7 @@ class TestDatabaseInitializer:
         assert len(result["created"]) == 3  # Three successful
         assert len(result["errors"]) == 1  # One failed
 
+    @pytest.mark.asyncio
     async def test_setup_schema_versioning(self, initializer, mock_client):
         """Test schema versioning setup."""
         mock_client.execute_query.return_value = []
@@ -277,6 +293,7 @@ class TestDatabaseInitializer:
         assert "schema_version" in call_args
         assert "enhanced_token_analysis" in call_args
 
+    @pytest.mark.asyncio
     async def test_validate_final_schema_success(self, initializer, mock_client):
         """Test successful final schema validation."""
         # Mock existing tables to match expected
@@ -296,6 +313,7 @@ class TestDatabaseInitializer:
         assert result["valid"] is True
         assert len(result["warnings"]) == 0
 
+    @pytest.mark.asyncio
     async def test_validate_final_schema_missing_tables(self, initializer, mock_client):
         """Test final schema validation with missing tables."""
         # Mock missing tables
@@ -327,6 +345,7 @@ class TestFullInitialization:
             clickhouse_client=mock_client, database_name="test_otel", environment="testing", dry_run=False
         )
 
+    @pytest.mark.asyncio
     async def test_initialize_database_success(self, initializer, mock_client):
         """Test successful full database initialization."""
         # Mock all sub-operations to succeed
@@ -343,6 +362,7 @@ class TestFullInitialization:
         assert len(result.errors) == 0
         assert result.execution_time_seconds > 0
 
+    @pytest.mark.asyncio
     async def test_initialize_database_connection_failure(self, initializer, mock_client):
         """Test initialization with connection failure."""
         mock_client.health_check.return_value = False
@@ -352,6 +372,7 @@ class TestFullInitialization:
         assert result.status == InitializationStatus.CONNECTION_FAILED
         assert "connection" in result.message.lower()
 
+    @pytest.mark.asyncio
     async def test_initialize_database_schema_conflicts(self, initializer, mock_client):
         """Test initialization with schema conflicts."""
         mock_client.health_check.return_value = True
@@ -364,6 +385,7 @@ class TestFullInitialization:
         assert "conflicts" in result.message.lower()
         assert len(result.warnings) > 0
 
+    @pytest.mark.asyncio
     async def test_initialize_database_with_force(self, initializer, mock_client):
         """Test initialization with force flag to override conflicts."""
         mock_client.health_check.return_value = True
@@ -376,6 +398,7 @@ class TestFullInitialization:
         assert result.status == InitializationStatus.SUCCESS
         assert len(result.tables_created) == 3
 
+    @pytest.mark.asyncio
     async def test_initialize_database_partial_success(self, initializer, mock_client):
         """Test initialization with partial success (some errors)."""
         mock_client.health_check.return_value = True
@@ -398,6 +421,7 @@ class TestFullInitialization:
         assert len(result.errors) > 0
         assert len(result.tables_created) > 0  # Some tables were created
 
+    @pytest.mark.asyncio
     async def test_initialize_database_dry_run(self, initializer, mock_client):
         """Test initialization in dry run mode."""
         initializer.dry_run = True
@@ -411,6 +435,7 @@ class TestFullInitialization:
         # The exact call count depends on verification queries only
         assert mock_client.execute_query.call_count <= 2  # Health check and version check only
 
+    @pytest.mark.asyncio
     async def test_initialize_database_exception_handling(self, initializer, mock_client):
         """Test initialization exception handling."""
         mock_client.health_check.side_effect = Exception("Unexpected error")
@@ -439,6 +464,7 @@ class TestSchemaValidation:
         """Create initializer for validation testing."""
         return DatabaseInitializer(clickhouse_client=mock_client, database_name="test_otel")
 
+    @pytest.mark.asyncio
     async def test_validate_existing_schema_compatible(self, initializer, mock_client):
         """Test validation of compatible existing schema."""
         # Mock all expected tables present
@@ -459,6 +485,7 @@ class TestSchemaValidation:
         assert len(result["missing_tables"]) == 0
         assert len(result["compatibility_issues"]) == 0
 
+    @pytest.mark.asyncio
     async def test_validate_existing_schema_missing_tables(self, initializer, mock_client):
         """Test validation with missing tables."""
         # Mock only some tables present
@@ -477,6 +504,7 @@ class TestSchemaValidation:
         assert len(result["recommendations"]) > 0
         assert "initialization" in result["recommendations"][0].lower()
 
+    @pytest.mark.asyncio
     async def test_validate_existing_schema_connection_failure(self, initializer, mock_client):
         """Test validation with connection failure."""
         mock_client.health_check.return_value = False
@@ -486,6 +514,7 @@ class TestSchemaValidation:
         assert result["compatible"] is False
         assert "connect" in result["compatibility_issues"][0].lower()
 
+    @pytest.mark.asyncio
     async def test_validate_existing_schema_version_tracking(self, initializer, mock_client):
         """Test schema version tracking validation."""
         mock_client.execute_query.side_effect = [
@@ -531,14 +560,18 @@ class TestEnvironmentConfiguration:
 
     def test_get_environment_config_production(self):
         """Test production environment configuration."""
-        with patch.dict("os.environ", {"CLICKHOUSE_HOST": "prod-host", "CLICKHOUSE_PORT": "8123"}):
+        fake_config = SimpleNamespace(
+            database=SimpleNamespace(clickhouse_host="prod-host", clickhouse_port=8123)
+        )
+
+        with patch("src.context_cleaner.database.db_init.get_config", return_value=fake_config):
             config = DatabaseInitializer.get_environment_config("production")
 
-            assert config["database_name"] == "otel"
-            assert config["host"] == "prod-host"
-            assert config["port"] == 8123
-            assert config["batch_size"] == 1000
-            assert config["ttl_days"] == 90
+        assert config["database_name"] == "otel"
+        assert config["host"] == "prod-host"
+        assert config["port"] == 8123
+        assert config["batch_size"] == 1000
+        assert config["ttl_days"] == 90
 
     def test_get_environment_config_unknown(self):
         """Test unknown environment defaults to development."""
@@ -548,6 +581,7 @@ class TestEnvironmentConfiguration:
         assert config["database_name"] == "otel_dev"
         assert config["enable_health_monitoring"] is True
 
+    @pytest.mark.asyncio
     async def test_create_client_from_environment(self):
         """Test creating client from environment configuration."""
         initializer = DatabaseInitializer(database_name="test")
@@ -574,6 +608,7 @@ class TestEnvironmentConfiguration:
 class TestDatabaseInitializationIntegration:
     """Integration tests for database initialization (require actual ClickHouse)."""
 
+    @pytest.mark.asyncio
     @pytest.mark.skip(reason="Requires running ClickHouse instance")
     async def test_real_database_initialization(self):
         """Test initialization against real ClickHouse instance."""

@@ -449,7 +449,7 @@ class ManipulationValidator:
             risk_levels = []
 
             # Basic operation validation
-            if not operation.target_keys:
+            if not operation.target_keys and operation.operation_type != "reorder":
                 errors.append("Operation has no target keys specified")
 
             if operation.confidence_score < 0 or operation.confidence_score > 1:

@@ -517,6 +517,7 @@ class CacheDiscoveryService:
             last_modified = datetime.min
 
             accessible_files = []
+            last_access_error = None
             for session_file in session_files:
                 try:
                     stat = session_file.stat()
@@ -526,9 +527,14 @@ class CacheDiscoveryService:
                     accessible_files.append(session_file)
                 except (PermissionError, OSError) as e:
                     logger.warning(f"Cannot access session file {session_file}: {e}")
+                    last_access_error = str(e)
                     continue
 
             if not accessible_files:
+                error_message = "No accessible session files"
+                if last_access_error:
+                    error_message = f"{error_message}: {last_access_error}"
+
                 return CacheLocation(
                     path=project_dir,
                     project_name=project_dir.name,
@@ -536,7 +542,7 @@ class CacheDiscoveryService:
                     last_modified=datetime.now(),
                     total_size_bytes=0,
                     is_accessible=False,
-                    error_message="No accessible session files",
+                    error_message=error_message,
                 )
 
             return CacheLocation(

@@ -49,6 +49,17 @@ class MockTelemetryClient(TelemetryClient):
     
     async def get_model_usage_stats(self, days: int = 7) -> Dict[str, Dict[str, Any]]:
         return self.model_stats
+
+    async def get_total_aggregated_stats(self, hours: int = 24) -> Dict[str, Any]:
+        """Provide aggregate telemetry stats required by modern manager."""
+        return {
+            "hours": hours,
+            "total_sessions": len(self.sessions),
+            "total_errors": len(self.errors),
+            "total_cost": sum(
+                metrics.total_cost for metrics in self.sessions.values()
+            ) if self.sessions else 0.0,
+        }
     
     def add_test_error(self, error: ErrorEvent):
         """Add test error for testing."""

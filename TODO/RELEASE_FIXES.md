@@ -47,7 +47,7 @@
 ## Documentation & Release Preparation
 
 1. Update CHANGELOG and release notes with the new setup flow, deprecated commands, and telemetry improvements. ✅
-2. Bump `project.version` once blockers are resolved and all tests pass. ✅ (now 0.2.3)
+2. Bump `project.version` once blockers are resolved and all tests pass. ✅ (now 0.3.0)
 3. Ensure CI runs full test suite (unit + integration) on a Docker-enabled runner pre-release. 🔄 Pending CI pipeline check
 4. After packaging fixes, repeat the integration verification script (`python verify_integration.py`) in a clean environment to confirm success. ✅ (.venv_smoke)
 

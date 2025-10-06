@@ -6,7 +6,7 @@ productivity through intelligent context analysis, performance tracking, and
 optimization recommendations.
 """
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 __author__ = "Context Cleaner Team"
 __email__ = "team@context-cleaner.dev"
 

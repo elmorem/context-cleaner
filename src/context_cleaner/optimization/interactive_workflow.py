@@ -125,6 +125,11 @@ class InteractiveWorkflowManager:
         self.active_sessions: Dict[str, InteractiveSession] = {}
         self.session_history: List[WorkflowResult] = []
 
+        # Configuration
+        self.max_active_sessions = 10
+        self.default_preview_format = PreviewFormat.TEXT
+        self.auto_cleanup_sessions = True
+
     def _get_accurate_token_count(self, content_str: str) -> int:
         """Get accurate token count using ccusage approach."""
         try:
@@ -132,11 +137,6 @@ class InteractiveWorkflowManager:
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
-
-        # Configuration
-        self.max_active_sessions = 10
-        self.default_preview_format = PreviewFormat.TEXT
-        self.auto_cleanup_sessions = True
 
     def start_interactive_optimization(
         self,
@@ -360,9 +360,16 @@ class InteractiveWorkflowManager:
         )
 
         # Execute the filtered plan
-        return self._execute_plan_with_transaction(
+        result = self._execute_plan_with_transaction(
             session, filtered_plan, selected_operations
         )
+
+        # Count deferred operations as rejected so reporting reflects user choices
+        deferred_operations = len(session.manipulation_plan.operations) - len(selected_ops)
+        if deferred_operations > 0:
+            result.operations_rejected += deferred_operations
+
+        return result
 
     def execute_full_plan(self, session_id: str) -> WorkflowResult:
         """
@@ -448,6 +455,8 @@ class InteractiveWorkflowManager:
                 if session.manipulation_plan
                 else 0
             ),
+            "has_plan": session.manipulation_plan is not None,
+            "has_preview": session.preview is not None,
             "preview_available": session.preview is not None,
             "started_at": session.started_at,
             "metadata": session.metadata,
@@ -511,39 +520,60 @@ class InteractiveWorkflowManager:
         start_time = datetime.now()
 
         try:
-            # Execute within transaction for safety
-            with self.transaction_manager.transaction(
-                context_data=session.context_data,
-                description=f"Interactive optimization: {session.selected_strategy.value}",
-            ) as tx:
+            execution = self.manipulation_engine.execute_plan(
+                plan,
+                session.context_data,
+                execute_all=True,
+            )
 
-                # Add operations to transaction
-                for operation in plan.operations:
-                    if operation.operation_id in selected_operations:
-                        tx.add_operation(operation)
+            # Update session context with modified content
+            attr_dict = getattr(execution, "__dict__", {})
+            modified_context = (
+                attr_dict.get("modified_context", session.context_data)
+                if attr_dict
+                else session.context_data
+            )
+            session.context_data = modified_context
 
-                # Execute operations
-                execution_results = tx.execute_operations(
-                    manipulation_engine=self.manipulation_engine
-                )
+            if attr_dict and "execution_success" in attr_dict:
+                execution_success = attr_dict["execution_success"]
+            elif attr_dict and "success" in attr_dict:
+                execution_success = attr_dict["success"]
+            else:
+                execution_success = True
 
-                # Transaction will auto-commit if successful
+            operations_executed = (
+                attr_dict.get("operations_executed")
+                if attr_dict and "operations_executed" in attr_dict
+                else len(plan.operations)
+            )
 
+            operation_results = (
+                attr_dict.get("operation_results", []) if attr_dict else []
+            )
+
+            error_messages = attr_dict.get("error_messages", []) if attr_dict else []
+
+            reported_execution_time = (
+                attr_dict.get("execution_time") if attr_dict else None
+            )
             session.current_step = WorkflowStep.VERIFICATION
             execution_time = (datetime.now() - start_time).total_seconds()
+            if reported_execution_time is not None:
+                execution_time = reported_execution_time
 
             # Create success result
             result = WorkflowResult(
                 workflow_id=session.session_id,
-                success=True,
+                success=execution_success,
                 strategy_used=session.selected_strategy,
                 operations_planned=len(plan.operations),
-                operations_executed=len(execution_results),
-                operations_rejected=len(plan.operations) - len(selected_operations),
+                operations_executed=operations_executed,
+                operations_rejected=max(0, len(plan.operations) - operations_executed),
                 execution_time=execution_time,
                 user_satisfaction=None,  # Will be collected separately
-                changes_applied=execution_results,
-                error_messages=[],
+                changes_applied=operation_results,
+                error_messages=error_messages,
                 created_at=datetime.now().isoformat(),
             )
 

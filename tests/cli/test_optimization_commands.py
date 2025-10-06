@@ -10,7 +10,8 @@ Tests the OptimizationCommandHandler class and related functionality including:
 
 import pytest
 import json
-from unittest.mock import Mock, patch, MagicMock
+from dataclasses import dataclass
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from io import StringIO
 from click.testing import CliRunner
 
@@ -84,42 +85,59 @@ class TestDashboardCommand:
         return OptimizationCommandHandler(verbose=False)
     
     @patch('context_cleaner.cli.optimization_commands.click')
-    @patch('context_cleaner.visualization.basic_dashboard.BasicDashboard')
-    def test_dashboard_text_format(self, mock_dashboard_class, mock_click, handler):
-        """Test dashboard command with text format."""
+    @patch('context_cleaner.dashboard.comprehensive_health_dashboard.ComprehensiveHealthDashboard')
+    def test_dashboard_web_launch(self, mock_dashboard_class, mock_click, handler):
+        """Test dashboard command launches the comprehensive dashboard server."""
         mock_dashboard = Mock()
-        mock_dashboard.get_formatted_output.return_value = "Dashboard output"
         mock_dashboard_class.return_value = mock_dashboard
-        
-        handler.handle_dashboard_command(format="text")
-        
+
+        handler.handle_dashboard_command(format="web", host="0.0.0.0", port=9090, debug=True)
+
         mock_dashboard_class.assert_called_once()
-        mock_dashboard.get_formatted_output.assert_called_once()
-        mock_click.echo.assert_called_with("Dashboard output")
-    
+        mock_dashboard.start_server.assert_called_once_with(
+            host="0.0.0.0", port=9090, debug=True, open_browser=True
+        )
+        messages = [call.args[0] for call in mock_click.echo.call_args_list if call.args]
+        assert any("Dashboard URL" in message for message in messages)
+
     @patch('context_cleaner.cli.optimization_commands.click')
-    @patch('context_cleaner.visualization.basic_dashboard.BasicDashboard')
     @patch('context_cleaner.cli.optimization_commands.json')
-    def test_dashboard_json_format(self, mock_json, mock_dashboard_class, mock_click, handler):
-        """Test dashboard command with JSON format."""
+    @patch('context_cleaner.dashboard.comprehensive_health_dashboard.ComprehensiveHealthDashboard')
+    def test_dashboard_json_format(self, mock_dashboard_class, mock_json, mock_click, handler):
+        """Test dashboard command with JSON output format."""
         mock_dashboard = Mock()
-        mock_dashboard.get_json_output.return_value = {"health_score": 75}
+        @dataclass
+        class FakeReport:
+            overall_status: str
+            checks_performed: int
+
+        report = FakeReport(overall_status="healthy", checks_performed=5)
+        mock_dashboard.generate_comprehensive_health_report = AsyncMock(return_value=report)
         mock_dashboard_class.return_value = mock_dashboard
-        mock_json.dumps.return_value = '{"health_score": 75}'
-        
+        mock_json.dumps.return_value = '{"overall_status": "healthy"}'
+
         handler.handle_dashboard_command(format="json")
-        
-        mock_dashboard.get_json_output.assert_called_once()
-        mock_json.dumps.assert_called_with({"health_score": 75}, indent=2)
-        mock_click.echo.assert_called_with('{"health_score": 75}')
-    
+
+        mock_dashboard_class.assert_called_once()
+        mock_dashboard.generate_comprehensive_health_report.assert_awaited_once()
+        assert mock_json.dumps.call_count == 1
+        call_args = mock_json.dumps.call_args
+        assert call_args.kwargs.get("indent") == 2
+        assert call_args.kwargs.get("default") is str
+        payload_arg = call_args.args[0]
+        assert payload_arg == {"overall_status": "healthy", "checks_performed": 5}
+        mock_click.echo.assert_called_with('{"overall_status": "healthy"}')
+
     @patch('context_cleaner.cli.optimization_commands.click')
-    def test_dashboard_error_handling(self, mock_click, handler):
+    @patch('context_cleaner.dashboard.comprehensive_health_dashboard.ComprehensiveHealthDashboard', side_effect=Exception("Dashboard error"))
+    def test_dashboard_error_handling(self, mock_dashboard_class, mock_click, handler):
         """Test dashboard error handling."""
-        with patch('context_cleaner.visualization.basic_dashboard.BasicDashboard', side_effect=Exception("Dashboard error")):
-            handler.handle_dashboard_command()
-            
-            mock_click.echo.assert_called_with("❌ Dashboard failed to load: Dashboard error", err=True)
+        handler.handle_dashboard_command()
+
+        mock_dashboard_class.assert_called_once()
+        mock_click.echo.assert_called_with(
+            "❌ Comprehensive dashboard failed to load: Dashboard error", err=True
+        )
 
 
 class TestQuickOptimization:
@@ -522,11 +540,11 @@ class TestErrorHandling:
     @patch('context_cleaner.cli.optimization_commands.click')
     def test_exception_handling_with_traceback(self, mock_click, handler):
         """Test exception handling shows traceback in verbose mode."""
-        with patch('context_cleaner.visualization.basic_dashboard.BasicDashboard', side_effect=Exception("Test error")):
+        with patch('context_cleaner.dashboard.comprehensive_health_dashboard.ComprehensiveHealthDashboard', side_effect=Exception("Test error")):
             handler.handle_dashboard_command()
         
         # Verify error message and traceback
-        error_calls = [call for call in mock_click.echo.call_args_list if "❌ Dashboard failed to load" in str(call)]
+        error_calls = [call for call in mock_click.echo.call_args_list if "❌ Comprehensive dashboard failed to load" in str(call)]
         assert len(error_calls) > 0
 
 

@@ -106,6 +106,7 @@ class TestClickHouseClient:
         assert not client.enable_health_monitoring
         assert not client._is_initialized
 
+    @pytest.mark.asyncio
     @patch("subprocess.run")
     async def test_execute_raw_query_success(self, mock_subprocess, client):
         """Test successful raw query execution."""
@@ -130,6 +131,7 @@ class TestClickHouseClient:
         assert "--format" in call_args
         assert "JSONEachRow" in call_args
 
+    @pytest.mark.asyncio
     @patch("subprocess.run")
     async def test_execute_raw_query_failure(self, mock_subprocess, client):
         """Test raw query execution failure."""
@@ -142,6 +144,7 @@ class TestClickHouseClient:
         with pytest.raises(RuntimeError, match="ClickHouse query failed"):
             await client._execute_raw_query("SELECT 1")
 
+    @pytest.mark.asyncio
     @patch("subprocess.run")
     async def test_execute_raw_query_timeout(self, mock_subprocess, client):
         """Test raw query timeout handling."""
@@ -152,6 +155,7 @@ class TestClickHouseClient:
         with pytest.raises(RuntimeError, match="ClickHouse query timed out"):
             await client._execute_raw_query("SELECT 1", timeout=30)
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient._execute_raw_query")
     async def test_health_check_success(self, mock_execute, client):
         """Test successful health check."""
@@ -165,6 +169,7 @@ class TestClickHouseClient:
         assert client.pool.metrics.successful_queries > 0
         assert client.pool.metrics.consecutive_failures == 0
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient._execute_raw_query")
     async def test_health_check_failure(self, mock_execute, client):
         """Test health check failure."""
@@ -177,6 +182,7 @@ class TestClickHouseClient:
         assert client.pool.metrics.failed_queries > 0
         assert client.pool.metrics.consecutive_failures > 0
 
+    @pytest.mark.asyncio
     async def test_circuit_breaker_functionality(self, client):
         """Test circuit breaker tripping and recovery."""
         # Simulate consecutive failures to trip circuit breaker
@@ -195,6 +201,7 @@ class TestClickHouseClient:
         client._reset_circuit_breaker()
         assert not client._is_circuit_breaker_open()
 
+    @pytest.mark.asyncio
     async def test_circuit_breaker_timeout_recovery(self, client):
         """Test circuit breaker timeout-based recovery."""
         # Trip circuit breaker
@@ -209,6 +216,7 @@ class TestClickHouseClient:
         # Circuit breaker should allow test query
         assert not client._is_circuit_breaker_open()
 
+    @pytest.mark.asyncio
     async def test_connection_status_healthy(self, client):
         """Test connection status calculation - healthy."""
         # Set up healthy metrics
@@ -219,6 +227,7 @@ class TestClickHouseClient:
         status = await client.get_connection_status()
         assert status == ConnectionStatus.HEALTHY
 
+    @pytest.mark.asyncio
     async def test_connection_status_degraded(self, client):
         """Test connection status calculation - degraded."""
         # Set up degraded metrics
@@ -229,6 +238,7 @@ class TestClickHouseClient:
         status = await client.get_connection_status()
         assert status == ConnectionStatus.DEGRADED
 
+    @pytest.mark.asyncio
     async def test_connection_status_unhealthy(self, client):
         """Test connection status calculation - unhealthy."""
         # Set up unhealthy metrics
@@ -239,6 +249,7 @@ class TestClickHouseClient:
         status = await client.get_connection_status()
         assert status == ConnectionStatus.UNHEALTHY
 
+    @pytest.mark.asyncio
     async def test_connection_status_circuit_breaker_open(self, client):
         """Test connection status with circuit breaker open."""
         client.pool._circuit_breaker_open = True
@@ -246,6 +257,7 @@ class TestClickHouseClient:
         status = await client.get_connection_status()
         assert status == ConnectionStatus.UNHEALTHY
 
+    @pytest.mark.asyncio
     async def test_get_connection_metrics(self, client):
         """Test comprehensive connection metrics retrieval."""
         # Set up some metrics
@@ -269,6 +281,7 @@ class TestClickHouseClient:
         assert "last_success" in metrics
         assert "connection_established_at" in metrics
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient._execute_raw_query")
     async def test_comprehensive_health_check(self, mock_execute, client):
         """Test comprehensive health check functionality."""
@@ -287,6 +300,7 @@ class TestClickHouseClient:
         assert "metrics" in result
         assert "timestamp" in result
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient._execute_raw_query")
     async def test_comprehensive_health_check_failure(self, mock_execute, client):
         """Test comprehensive health check with failures."""
@@ -299,6 +313,7 @@ class TestClickHouseClient:
         assert result["error_message"] == "Connection failed"
         assert result["response_time_ms"] > 0
 
+    @pytest.mark.asyncio
     async def test_client_initialization_lifecycle(self, client):
         """Test client initialization and shutdown lifecycle."""
         assert not client._is_initialized
@@ -317,6 +332,7 @@ class TestClickHouseClient:
         await client.close()
         assert not client._is_initialized
 
+    @pytest.mark.asyncio
     async def test_client_initialization_failure(self, client):
         """Test client initialization failure."""
         # Mock health check failure
@@ -334,6 +350,7 @@ class TestBulkOperations:
         """Create client for bulk operation testing."""
         return ClickHouseClient(database="test_otel", enable_health_monitoring=False)
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient.bulk_insert")
     async def test_bulk_insert_enhanced_success(self, mock_bulk_insert, client):
         """Test enhanced bulk insert with successful operation."""
@@ -357,6 +374,7 @@ class TestBulkOperations:
         assert result["average_records_per_second"] > 0
         assert len(result["errors"]) == 0
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient.bulk_insert")
     async def test_bulk_insert_enhanced_partial_failure(self, mock_bulk_insert, client):
         """Test enhanced bulk insert with partial failure."""
@@ -379,6 +397,7 @@ class TestBulkOperations:
         assert result["batches_failed"] == 1
         assert len(result["errors"]) > 0
 
+    @pytest.mark.asyncio
     async def test_bulk_insert_enhanced_empty_records(self, client):
         """Test enhanced bulk insert with empty records list."""
         result = await client.bulk_insert_enhanced("test_table", [])
@@ -390,6 +409,7 @@ class TestBulkOperations:
         assert result["processing_time_seconds"] >= 0
         assert len(result["errors"]) == 0
 
+    @pytest.mark.asyncio
     @patch("src.context_cleaner.telemetry.clients.clickhouse_client.ClickHouseClient.bulk_insert")
     async def test_bulk_insert_enhanced_with_retries(self, mock_bulk_insert, client):
         """Test enhanced bulk insert retry mechanism."""
@@ -416,6 +436,7 @@ class TestHealthMonitoring:
         """Create client with health monitoring enabled."""
         return ClickHouseClient(database="test_otel", enable_health_monitoring=True)
 
+    @pytest.mark.asyncio
     async def test_health_monitor_task_creation(self, client_with_monitoring):
         """Test health monitoring task is created during initialization."""
         client = client_with_monitoring
@@ -426,6 +447,7 @@ class TestHealthMonitoring:
             assert client._health_check_task is not None
             assert not client._health_check_task.done()
 
+    @pytest.mark.asyncio
     async def test_health_monitor_task_cleanup(self, client_with_monitoring):
         """Test health monitoring task is properly cleaned up."""
         client = client_with_monitoring
@@ -439,6 +461,7 @@ class TestHealthMonitoring:
             # Task should be cancelled
             assert task.cancelled() or task.done()
 
+    @pytest.mark.asyncio
     async def test_health_monitor_loop_exception_handling(self, client_with_monitoring):
         """Test health monitor loop handles exceptions gracefully."""
         client = client_with_monitoring
@@ -461,6 +484,7 @@ class TestConnectionRecovery:
         """Create client for recovery testing."""
         return ClickHouseClient(database="test_otel", enable_health_monitoring=False)
 
+    @pytest.mark.asyncio
     async def test_automatic_reconnection_after_failure(self, client):
         """Test automatic reconnection after connection failure."""
         # Simulate initial connection failure, then success
@@ -482,6 +506,7 @@ class TestConnectionRecovery:
             # This would succeed if the mock was set up for multiple calls
             # In real implementation, this would demonstrate recovery
 
+    @pytest.mark.asyncio
     async def test_metric_recording_accuracy(self, client):
         """Test that connection metrics are recorded accurately."""
         initial_total = client.pool.metrics.total_queries
@@ -505,6 +530,7 @@ class TestConnectionRecovery:
         assert client.pool.metrics.failed_queries == initial_failed + 1
         assert client.pool.metrics.consecutive_failures == 1
 
+    @pytest.mark.asyncio
     async def test_response_time_exponential_moving_average(self, client):
         """Test response time calculation using exponential moving average."""
         # First response time
@@ -518,10 +544,12 @@ class TestConnectionRecovery:
 
 
 @pytest.mark.integration
+@pytest.mark.asyncio
 class TestConnectionIntegration:
     """Integration tests for connection management (require actual ClickHouse)."""
 
     @pytest.mark.skip(reason="Requires running ClickHouse instance")
+    @pytest.mark.asyncio
     async def test_real_connection_health_check(self):
         """Test health check against real ClickHouse instance."""
         client = ClickHouseClient(host="localhost", port=9000, database="default")
@@ -538,6 +566,7 @@ class TestConnectionIntegration:
             await client.close()
 
     @pytest.mark.skip(reason="Requires running ClickHouse instance")
+    @pytest.mark.asyncio
     async def test_real_bulk_operations(self):
         """Test bulk operations against real ClickHouse instance."""
         client = ClickHouseClient(host="localhost", port=9000, database="default")

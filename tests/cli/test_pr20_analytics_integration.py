@@ -224,35 +224,27 @@ class TestAnalyticsCommandHandler:
             assert output_data["total_sessions"] == 2
             assert output_data["success_rate_percentage"] == 100.0
     
-    def test_enhanced_dashboard_command(self, handler, capsys):
-        """Test enhanced dashboard functionality."""
-        with patch.object(handler, '_get_enhanced_dashboard_data') as mock_dashboard:
-            mock_dashboard.return_value = {
-                "timestamp": datetime.now().isoformat(),
-                "system_health": {"overall_status": "healthy"},
-                "recent_effectiveness": {
-                    "total_sessions": 5, 
-                    "success_rate_percentage": 90.0,
-                    "average_metrics": {"size_reduction_percentage": 35.0}
-                },
-                "available_operations": {
-                    "quick_optimization": "Fast cleanup",
-                    "aggressive_optimization": "Maximum optimization"
-                },
-                "smart_recommendations": ["Try using Focus mode", "Enable cache integration"]
-            }
-            
-            handler.handle_enhanced_dashboard_command(
-                interactive=False,
-                operations=True,
-                format="text"
-            )
-            
-            captured = capsys.readouterr()
-            assert "ENHANCED CONTEXT CLEANER DASHBOARD" in captured.out
-            assert "System Status:" in captured.out
-            assert "AVAILABLE OPERATIONS" in captured.out
-            assert "Recent success rate:" in captured.out
+    @patch('context_cleaner.cli.analytics_commands.click')
+    @patch('context_cleaner.dashboard.comprehensive_health_dashboard.ComprehensiveHealthDashboard')
+    def test_enhanced_dashboard_command(self, mock_dashboard_class, mock_click, handler):
+        """Test enhanced dashboard launches the comprehensive server."""
+        mock_dashboard = Mock()
+        mock_dashboard_class.return_value = mock_dashboard
+
+        handler.handle_enhanced_dashboard_command(
+            interactive=False,
+            operations=True,
+            format="web",
+            host="0.0.0.0",
+            port=9090,
+        )
+
+        mock_dashboard_class.assert_called_once()
+        mock_dashboard.start_server.assert_called_once_with(
+            host="0.0.0.0", port=9090, debug=False, open_browser=True
+        )
+        messages = [call.args[0] for call in mock_click.echo.call_args_list if call.args]
+        assert any("Dashboard URL: http://0.0.0.0:9090" in message for message in messages)
 
 
 class TestEffectivenessTracker:
@@ -578,7 +570,7 @@ class TestCLIIntegration:
             
             assert result.exit_code == 0
             mock_handler.handle_export_analytics_command.assert_called_once_with(
-                output_path='test.json', days=7, include_sessions=True, format='json'
+                output_path='test.json', days=7, include_sessions=False, format='json'
             )
     
     def test_effectiveness_command_cli(self):
@@ -598,18 +590,18 @@ class TestCLIIntegration:
             )
     
     def test_enhanced_dashboard_cli(self):
-        """Test enhanced dashboard options through CLI."""
+        """Test dashboard shortcut routes through optimization handler."""
         from context_cleaner.cli.main import main
-        
+
         runner = CliRunner()
-        with patch('context_cleaner.cli.analytics_commands.AnalyticsCommandHandler') as mock_handler_class:
+        with patch('context_cleaner.cli.optimization_commands.OptimizationCommandHandler') as mock_handler_class:
             mock_handler = Mock()
             mock_handler_class.return_value = mock_handler
-            
-            result = runner.invoke(main, ['dashboard', '--interactive', '--operations'])
-            
-            # Should call enhanced dashboard instead of regular dashboard
-            mock_handler.handle_enhanced_dashboard_command.assert_called_once()
+
+            result = runner.invoke(main, ['optimize', '--dashboard'])
+
+            assert result.exit_code == 0
+            mock_handler.handle_dashboard_command.assert_called_once_with(format='text')
 
 
 if __name__ == "__main__":

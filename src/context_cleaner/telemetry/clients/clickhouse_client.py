@@ -44,6 +44,7 @@ class ConnectionMetrics:
     last_failure_timestamp: Optional[datetime] = None
     consecutive_failures: int = 0
     connection_established_at: datetime = field(default_factory=datetime.now)
+    last_error_message: Optional[str] = None
     
     @property
     def success_rate(self) -> float:
@@ -239,30 +240,38 @@ class ClickHouseClient(TelemetryClient):
         finally:
             lock.release()
     
-    async def initialize(self) -> bool:
+    async def initialize(self, skip_health_check: bool = False) -> bool:
         """Initialize the client with connection pooling and health monitoring."""
         if self._is_initialized:
             return True
-        
+
         try:
             async with self._lock_context():
                 if self._is_initialized:
                     return True
-                
-                # Test initial connection
-                health_ok = await self._perform_health_check()
+
+                health_ok = True
+                if not skip_health_check:
+                    try:
+                        health_ok = await self._perform_health_check()
+                    except Exception as exc:
+                        logger.error("Failed initial health check during initialization: %s", exc)
+                        self._record_failed_query(str(exc))
+                        health_ok = False
+
+                # Start health monitoring task even if initial check fails so it can recover
+                if self.enable_health_monitoring:
+                    if not self._health_check_task or self._health_check_task.done():
+                        self._health_check_task = asyncio.create_task(self._health_monitor_loop())
+
                 if not health_ok:
                     logger.error("Failed initial health check during initialization")
                     return False
-                
-                # Start health monitoring task
-                if self.enable_health_monitoring:
-                    self._health_check_task = asyncio.create_task(self._health_monitor_loop())
-                
+
                 self._is_initialized = True
                 logger.info("ClickHouseClient initialization completed successfully")
                 return True
-                
+
         except Exception as e:
             logger.error(f"Failed to initialize ClickHouseClient: {e}")
             return False
@@ -324,6 +333,7 @@ class ClickHouseClient(TelemetryClient):
         metrics.successful_queries += 1
         metrics.consecutive_failures = 0
         metrics.last_success_timestamp = datetime.now()
+        metrics.last_error_message = None
         
         # Update average response time (exponential moving average)
         if metrics.average_response_time_ms == 0:
@@ -340,6 +350,7 @@ class ClickHouseClient(TelemetryClient):
         metrics.failed_queries += 1
         metrics.consecutive_failures += 1
         metrics.last_failure_timestamp = datetime.now()
+        metrics.last_error_message = error_message
 
         logger.warning(f"Query failed: {error_message}")
 
@@ -447,6 +458,7 @@ class ClickHouseClient(TelemetryClient):
             "circuit_breaker_open": self.pool._circuit_breaker_open,
             "last_success": metrics.last_success_timestamp.isoformat() if metrics.last_success_timestamp else None,
             "last_failure": metrics.last_failure_timestamp.isoformat() if metrics.last_failure_timestamp else None,
+            "last_error_message": metrics.last_error_message,
             "connection_established_at": metrics.connection_established_at.isoformat(),
             "max_connections": self.pool.max_connections,
             "active_connections": self.pool.active_connections,
@@ -519,12 +531,18 @@ class ClickHouseClient(TelemetryClient):
                            cache_key: Optional[str] = None, cache_ttl: int = 300) -> List[Dict[str, Any]]:
         """Execute a query with adaptive pooling, caching, and performance monitoring."""
         # Check if client is initialized
-        if not self._is_initialized:
-            await self.initialize()
-
-        # Check circuit breaker
+        # Check circuit breaker before attempting initialization so failures surface immediately
         if self._is_circuit_breaker_open():
             raise RuntimeError("Circuit breaker is open due to consecutive failures")
+
+        if not self._is_initialized:
+            initialized = await self.initialize(skip_health_check=True)
+            if not initialized:
+                logger.warning("Proceeding with query execution despite initialization failure")
+
+            # Re-check circuit breaker in case initialization opened it
+            if self._is_circuit_breaker_open():
+                raise RuntimeError("Circuit breaker is open due to consecutive failures")
 
         # Try cache first if enabled and cache_key provided
         if self.enable_query_caching and cache_key and self._cache_service:
@@ -938,6 +956,8 @@ class ClickHouseClient(TelemetryClient):
             # Basic connectivity test
             basic_health = await self._perform_health_check()
             health_results["overall_healthy"] = basic_health
+            if not basic_health and self.pool.metrics.last_error_message:
+                health_results["error_message"] = self.pool.metrics.last_error_message
             
             # Get connection status
             status = await self.get_connection_status()
@@ -951,6 +971,8 @@ class ClickHouseClient(TelemetryClient):
             except Exception as e:
                 health_results["database_accessible"] = False
                 health_results["database_error"] = str(e)
+                if not health_results.get("error_message"):
+                    health_results["error_message"] = str(e)
             
             health_results["response_time_ms"] = (time.time() - start_time) * 1000
             

@@ -496,10 +496,10 @@ class AdaptiveThresholdManager:
         
         # People might be more frustrated late at night or early morning
         if current_hour < 6 or current_hour > 22:
-            config.time_of_day_factor = 0.9  # Lower thresholds (more sensitive)
-            config.warning_threshold *= config.time_of_day_factor
-            config.critical_threshold *= config.time_of_day_factor
-        
+            config.time_of_day_factor = 0.9  # Signal lower thresholds (more sensitive)
+        else:
+            config.time_of_day_factor = 1.0
+
         return config
     
     async def update_user_sensitivity(self, user_id: str, feedback: str) -> bool:

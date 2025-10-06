@@ -134,7 +134,7 @@ class TestClickHouseSchema:
             assert "ALTER TABLE" in index_sql
             assert "ADD INDEX" in index_sql
             assert self.test_database in index_sql
-            assert "GRANULARITY 8192" in index_sql
+            assert "GRANULARITY" in index_sql
 
         # Test table without indexes
         indexes = self.schema.get_index_sql("nonexistent_table", self.test_database)

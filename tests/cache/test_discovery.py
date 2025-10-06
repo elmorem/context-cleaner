@@ -122,7 +122,8 @@ class TestCacheDiscoveryService:
             
             assert location is not None
             assert location.is_accessible is False
-            assert location.error_message == "No accessible session files"
+            assert location.error_message is not None
+            assert "access denied" in location.error_message.lower()
             assert len(location.session_files) == 0
     
     def test_get_project_cache(self):

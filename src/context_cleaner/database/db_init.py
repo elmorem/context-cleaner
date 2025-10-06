@@ -89,6 +89,8 @@ class DatabaseInitializer:
         self.environment = environment
         self.dry_run = dry_run
         self.schema = ClickHouseSchema()
+        self._last_connection_failure_reason: Optional[str] = None
+        self._last_connection_failure_detail: Optional[str] = None
 
         logger.info(
             f"Initialized DatabaseInitializer for {environment} environment "
@@ -112,9 +114,28 @@ class DatabaseInitializer:
             logger.info(f"Starting database initialization (force={force}, dry_run={self.dry_run})")
 
             # Step 1: Verify connection
-            if not await self._verify_connection():
-                result.status = InitializationStatus.CONNECTION_FAILED
-                result.message = "Failed to establish database connection"
+            self._last_connection_failure_reason = None
+            self._last_connection_failure_detail = None
+            connection_ok = await self._verify_connection()
+            if not connection_ok and self._last_connection_failure_reason == "version_query_empty":
+                # Attempt lightweight probe before failing hard
+                connection_ok = await self._basic_connection_probe()
+                if connection_ok:
+                    logger.warning("Version check failed but basic probe succeeded; continuing initialization")
+
+            if not connection_ok:
+                reason = self._last_connection_failure_reason
+                detail = self._last_connection_failure_detail
+
+                if reason == "exception":
+                    result.status = InitializationStatus.FAILED
+                    error_message = detail or "Unknown connection error"
+                    result.message = f"Initialization failed with exception: {error_message}"
+                    result.errors.append(error_message)
+                else:
+                    result.status = InitializationStatus.CONNECTION_FAILED
+                    result.message = detail or "Failed to establish database connection"
+
                 return result
 
             # Step 2: Check existing schema
@@ -181,7 +202,7 @@ class DatabaseInitializer:
             logger.error(f"Database initialization failed: {e}", exc_info=True)
             return result
 
-    async def _verify_connection(self) -> bool:
+    async def _verify_connection(self, *, require_version: bool = True) -> bool:
         """Verify ClickHouse connection is working."""
         try:
             if hasattr(self.client, "initialize"):
@@ -190,20 +211,48 @@ class DatabaseInitializer:
             health_check = await self.client.health_check()
             if not health_check:
                 logger.error("Health check failed during connection verification")
+                self._last_connection_failure_reason = "health_check_failed"
+                self._last_connection_failure_detail = "Health check failed during connection verification"
                 return False
 
-            # Test basic query capability
-            result = await self.client.execute_query("SELECT version()")
-            if not result:
-                logger.error("Version query failed during connection verification")
-                return False
+            if require_version:
+                # Test basic query capability
+                result = await self.client.execute_query("SELECT version()")
+                if not result:
+                    logger.error("Version query failed during connection verification")
+                    self._last_connection_failure_reason = "version_query_empty"
+                    self._last_connection_failure_detail = "Version query returned no results"
+                    return False
 
-            version = result[0].get("version()", "unknown")
-            logger.info(f"Successfully connected to ClickHouse version: {version}")
+                version = result[0].get("version()", "unknown")
+                logger.info(f"Successfully connected to ClickHouse version: {version}")
+            else:
+                logger.info("Successfully completed lightweight connection verification")
+            self._last_connection_failure_reason = None
+            self._last_connection_failure_detail = None
             return True
 
         except Exception as e:
             logger.error(f"Connection verification failed: {e}")
+            self._last_connection_failure_reason = "exception"
+            self._last_connection_failure_detail = str(e)
+            return False
+
+    async def _basic_connection_probe(self) -> bool:
+        """Fallback probe to verify ClickHouse connectivity when detailed checks fail."""
+        try:
+            probe_result = await self.client.health_check()
+            if probe_result:
+                self._last_connection_failure_reason = None
+                self._last_connection_failure_detail = None
+                return True
+            self._last_connection_failure_reason = "probe_failed"
+            self._last_connection_failure_detail = "Basic connection probe failed"
+            return False
+        except Exception as exc:
+            logger.error(f"Basic connection probe failed: {exc}")
+            self._last_connection_failure_reason = "probe_failed"
+            self._last_connection_failure_detail = str(exc)
             return False
 
     async def _get_existing_tables(self) -> List[str]:
@@ -345,14 +394,15 @@ class DatabaseInitializer:
                 result["warnings"].extend([f"Missing table: {table}" for table in missing_tables])
 
             # Run consistency checks
-            consistency_checks = self.schema.get_data_consistency_check_sql(self.database_name)
-            for check_name, check_sql in consistency_checks.items():
-                try:
-                    # Run consistency check (will be empty for new database)
-                    await self.client.execute_query(check_sql)
-                    logger.debug(f"Consistency check '{check_name}' passed")
-                except Exception as e:
-                    result["warnings"].append(f"Consistency check '{check_name}' failed: {e}")
+            if not self.dry_run:
+                consistency_checks = self.schema.get_data_consistency_check_sql(self.database_name)
+                for check_name, check_sql in consistency_checks.items():
+                    try:
+                        # Run consistency check (will be empty for new database)
+                        await self.client.execute_query(check_sql)
+                        logger.debug(f"Consistency check '{check_name}' passed")
+                    except Exception as e:
+                        result["warnings"].append(f"Consistency check '{check_name}' failed: {e}")
 
         except Exception as e:
             result["valid"] = False
@@ -379,7 +429,7 @@ class DatabaseInitializer:
 
         try:
             # Check connection
-            if not await self._verify_connection():
+            if not await self._verify_connection(require_version=False):
                 validation_result["compatible"] = False
                 validation_result["compatibility_issues"].append("Cannot connect to database")
                 return validation_result
