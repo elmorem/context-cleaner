@@ -14,7 +14,10 @@ from context_cleaner.utils.eventlet_support import (
 
 ensure_eventlet_monkey_patch()
 import logging
-logging.getLogger(__name__).debug("Eventlet monkey patch ensured in comprehensive health dashboard module")
+
+logging.getLogger(__name__).debug(
+    "Eventlet monkey patch ensured in comprehensive health dashboard module"
+)
 
 try:
     import eventlet  # type: ignore
@@ -52,16 +55,30 @@ from plotly.utils import PlotlyJSONEncoder
 # API Response Formatting
 from ..core.api_response_formatter import APIResponseFormatter
 from context_cleaner.api.models import (
-    create_no_data_error, create_unsupported_error, create_error_response
+    create_no_data_error,
+    create_unsupported_error,
+    create_error_response,
 )
 
 # Phase 2.2 Extraction: Import extracted data models and enums
 from .modules.dashboard_models import (
-    WidgetType, UpdateFrequency, WidgetConfig, DataSource,
-    ProductivityDataSource, HealthDataSource, TaskDataSource,
-    ContextAnalysisError, SecurityError, DataValidationError,
-    HealthColor, ContextCategory, FocusMetrics, RedundancyAnalysis,
-    RecencyIndicators, SizeOptimizationMetrics, ComprehensiveHealthReport
+    WidgetType,
+    UpdateFrequency,
+    WidgetConfig,
+    DataSource,
+    ProductivityDataSource,
+    HealthDataSource,
+    TaskDataSource,
+    ContextAnalysisError,
+    SecurityError,
+    DataValidationError,
+    HealthColor,
+    ContextCategory,
+    FocusMetrics,
+    RedundancyAnalysis,
+    RecencyIndicators,
+    SizeOptimizationMetrics,
+    ComprehensiveHealthReport,
 )
 
 # Phase 2.3 Extraction: Import extracted cache management
@@ -92,56 +109,66 @@ except ImportError:
         def __init__(self, **kwargs):
             pass
 
+
 # Context Window Analysis imports
 try:
     from ..analysis.context_window_analyzer import ContextWindowAnalyzer
+
     CONTEXT_ANALYZER_AVAILABLE = True
 except ImportError:
     CONTEXT_ANALYZER_AVAILABLE = False
-    
+
     class ContextWindowAnalyzer:
         def __init__(self, **kwargs):
             pass
-        
+
         def get_directory_context_stats(self):
             return {}
-        
+
         def get_total_context_usage(self):
             return {
-                'total_size_mb': 0,
-                'estimated_total_tokens': 0,
-                'active_directories': 0,
-                'directory_breakdown': {}
+                "total_size_mb": 0,
+                "estimated_total_tokens": 0,
+                "active_directories": 0,
+                "directory_breakdown": {},
             }
+
 
 # Project Summary Analytics imports
 try:
-    from context_cleaner.analysis.project_summary_analytics import ProjectSummaryAnalytics
+    from context_cleaner.analysis.project_summary_analytics import (
+        ProjectSummaryAnalytics,
+    )
+
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = True
 except ImportError:
     PROJECT_SUMMARY_ANALYTICS_AVAILABLE = False
-    
+
     class ProjectSummaryAnalytics:
         def __init__(self):
             pass
-        
+
         def get_project_categories_summary(self):
             return {"categories": [], "total": 0}
-        
+
         def get_completion_metrics(self):
             return {"completed": 0, "in_progress": 0, "completion_rate": 0}
-        
+
         def get_recent_projects(self, limit=10):
             return []
 
-# Telemetry dashboard imports  
+
+# Telemetry dashboard imports
 try:
     from ..telemetry.clients.clickhouse_client import ClickHouseClient
     from ..telemetry.cost_optimization.engine import CostOptimizationEngine
     from ..telemetry.error_recovery.manager import ErrorRecoveryManager
-    from ..telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
+    from ..telemetry.dashboard.widgets import (
+        TelemetryWidgetManager,
+        TelemetryWidgetType,
+    )
     from ..telemetry.cost_optimization.models import BudgetConfig
-    
+
     # Phase 3: Orchestration components
     from ..telemetry.orchestration.task_orchestrator import TaskOrchestrator
     from ..telemetry.orchestration.workflow_learner import WorkflowLearner
@@ -155,37 +182,37 @@ except ImportError:
     class ClickHouseClient:
         def __init__(self, **kwargs):
             pass
-    
+
     class CostOptimizationEngine:
         def __init__(self, **kwargs):
             pass
-    
+
     class ErrorRecoveryManager:
         def __init__(self, **kwargs):
             pass
-    
+
     class TelemetryWidgetManager:
         def __init__(self, **kwargs):
             pass
-        
+
         async def get_all_widget_data(self, **kwargs):
             return {}
-    
+
     class TelemetryWidgetType:
         pass
-    
+
     class BudgetConfig:
         pass
-    
+
     # Phase 3: Orchestration component stubs
     class TaskOrchestrator:
         def __init__(self, **kwargs):
             pass
-    
+
     class WorkflowLearner:
         def __init__(self, **kwargs):
             pass
-    
+
     class AgentSelector:
         def __init__(self, **kwargs):
             pass
@@ -248,8 +275,6 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-
-
 class ComprehensiveHealthDashboard:
     """
     Comprehensive Context Health Dashboard
@@ -280,12 +305,16 @@ class ComprehensiveHealthDashboard:
         self.token_analyzer = TokenEfficiencyAnalyzer()
         self.temporal_analyzer = TemporalContextAnalyzer()
         self.enhanced_analyzer = EnhancedContextAnalyzer()
-        
+
         # Context Window Analysis
-        self.context_analyzer = ContextWindowAnalyzer() if CONTEXT_ANALYZER_AVAILABLE else None
-        
+        self.context_analyzer = (
+            ContextWindowAnalyzer() if CONTEXT_ANALYZER_AVAILABLE else None
+        )
+
         # Project Summary Analytics
-        self.project_summary_analytics = ProjectSummaryAnalytics() if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else None
+        self.project_summary_analytics = (
+            ProjectSummaryAnalytics() if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else None
+        )
         self._project_summary_cache_last_run: Optional[datetime] = None
         # Refresh analytics periodically to avoid scanning the filesystem on every request
         self._project_summary_cache_ttl = timedelta(minutes=5)
@@ -300,9 +329,13 @@ class ComprehensiveHealthDashboard:
         # Add CORS headers for API access from test pages
         @self.app.after_request
         def after_request(response):
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = (
+                "GET, POST, PUT, DELETE, OPTIONS"
+            )
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, Authorization"
+            )
             return response
 
         # SocketIO for real-time updates (async mode configurable via env)
@@ -329,11 +362,14 @@ class ComprehensiveHealthDashboard:
             else:  # pragma: no cover - propagate unexpected failure
                 raise
 
-        logger.debug("SocketIO initialized with async_mode=%s", self.socketio.async_mode)
+        logger.debug(
+            "SocketIO initialized with async_mode=%s", self.socketio.async_mode
+        )
 
         # Dashboard configuration
         # Create default config if None provided (backwards compatibility)
         from ..telemetry.context_rot.config import ApplicationConfig
+
         self.config = config or ApplicationConfig.default()
         self.host = "127.0.0.1"
         self.port = 8080
@@ -341,7 +377,9 @@ class ComprehensiveHealthDashboard:
 
         # Real-time dashboard state
         self._is_running = False
-        self._start_time = time.time()  # Track dashboard start time for uptime calculations
+        self._start_time = (
+            time.time()
+        )  # Track dashboard start time for uptime calculations
         self._alert_thresholds = {
             "memory_mb": 50.0,
             "cpu_percent": 5.0,
@@ -369,40 +407,37 @@ class ComprehensiveHealthDashboard:
             "health": HealthDataSource("health", {}),
             "tasks": TaskDataSource("tasks", {}),
         }
-        
+
         # Phase 3: Enhanced reliability infrastructure
         try:
             from ..core.enhanced_health_monitor import EnhancedHealthMonitor
             from ..core.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
-            
+
             # Initialize health monitor for dependency checking
             self.health_monitor = EnhancedHealthMonitor()
-            
+
             # Initialize circuit breaker for dashboard metrics endpoint
             dashboard_metrics_config = CircuitBreakerConfig(
-                name="dashboard_metrics",
-                failure_threshold=3,
-                recovery_timeout=30
+                name="dashboard_metrics", failure_threshold=3, recovery_timeout=30
             )
             self.dashboard_metrics_breaker = CircuitBreaker(dashboard_metrics_config)
-            
+
             logger.info("Enhanced reliability infrastructure initialized for dashboard")
         except ImportError as e:
             logger.warning(f"Enhanced reliability features not available: {e}")
             self.health_monitor = None
             self.dashboard_metrics_breaker = None
-        
+
         # Phase 2.3: Initialize unified cache management
         self.dashboard_cache = DashboardCache(
             cache_dashboard=self.cache_dashboard,
-            telemetry_widgets=None  # Will be set after telemetry initialization
+            telemetry_widgets=None,  # Will be set after telemetry initialization
         )
         self.cache_coordinator = CacheCoordinator(self.dashboard_cache)
 
         # Phase 2.4: Initialize WebSocket-first real-time management
         self.realtime_manager = DashboardRealtime(
-            dashboard_instance=self,
-            socketio=self.socketio
+            dashboard_instance=self, socketio=self.socketio
         )
         self.realtime_coordinator = RealtimeCoordinator(self.realtime_manager)
 
@@ -412,42 +447,51 @@ class ComprehensiveHealthDashboard:
             try:
                 # Initialize telemetry components
                 self.telemetry_client = ClickHouseClient()
-                
+
                 # Initialize cost optimization with default budget
                 budget_config = BudgetConfig(
                     session_limit=5.0,  # $5 per session
-                    daily_limit=25.0,   # $25 per day
+                    daily_limit=25.0,  # $25 per day
                     auto_switch_haiku=True,
-                    auto_context_optimization=True
+                    auto_context_optimization=True,
                 )
-                self.cost_engine = CostOptimizationEngine(self.telemetry_client, budget_config)
+                self.cost_engine = CostOptimizationEngine(
+                    self.telemetry_client, budget_config
+                )
                 self.recovery_manager = ErrorRecoveryManager(self.telemetry_client)
-                
+
                 # Phase 3: Initialize orchestration components (respecting dependencies)
                 try:
                     self.task_orchestrator = TaskOrchestrator(self.telemetry_client)
                     self.workflow_learner = WorkflowLearner(self.telemetry_client)
-                    self.agent_selector = AgentSelector(self.telemetry_client, self.workflow_learner)
+                    self.agent_selector = AgentSelector(
+                        self.telemetry_client, self.workflow_learner
+                    )
                     logger.info("Phase 3 orchestration components initialized")
                 except Exception as e:
-                    logger.warning(f"Orchestration components failed to initialize: {e}")
+                    logger.warning(
+                        f"Orchestration components failed to initialize: {e}"
+                    )
                     self.task_orchestrator = None
                     self.workflow_learner = None
                     self.agent_selector = None
-                
+
                 # Initialize telemetry widget manager with orchestration support
                 self.telemetry_widgets = TelemetryWidgetManager(
                     self.telemetry_client,
-                    self.cost_engine, 
+                    self.cost_engine,
                     self.recovery_manager,
                     self.task_orchestrator,
                     self.workflow_learner,
-                    self.agent_selector
+                    self.agent_selector,
                 )
-                
+
                 # Initialize JSONL processor service for real-time processing dashboard
                 try:
-                    from ..telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+                    from ..telemetry.jsonl_enhancement.jsonl_processor_service import (
+                        JsonlProcessorService,
+                    )
+
                     self.jsonl_processor = JsonlProcessorService(self.telemetry_client)
                     logger.info("JSONL processor service initialized")
                 except Exception as e:
@@ -459,7 +503,7 @@ class ComprehensiveHealthDashboard:
                 self.telemetry_enabled = False
         else:
             logger.info("Telemetry dashboard not available - running in basic mode")
-        
+
         # Setup Flask routes and WebSocket-first real-time events
         self._setup_routes()
         self.realtime_coordinator.setup_realtime_infrastructure()
@@ -482,7 +526,9 @@ class ComprehensiveHealthDashboard:
                 try:
                     loop.run_until_complete(loop.shutdown_asyncgens())
                 except Exception:
-                    logger.debug("shutdown_asyncgens failed in dashboard helper", exc_info=True)
+                    logger.debug(
+                        "shutdown_asyncgens failed in dashboard helper", exc_info=True
+                    )
                 asyncio.set_event_loop(None)
                 loop.close()
 
@@ -523,13 +569,15 @@ class ComprehensiveHealthDashboard:
                 "timestamp": datetime.utcnow().isoformat(),
                 "active_data_sources": len(self.data_sources),
                 "telemetry_enabled": self.telemetry_enabled,
-                "websocket_connected": hasattr(self, 'socketio') and self.socketio is not None,
-                "uptime_seconds": time.time() - getattr(self, '_start_time', time.time())
+                "websocket_connected": hasattr(self, "socketio")
+                and self.socketio is not None,
+                "uptime_seconds": time.time()
+                - getattr(self, "_start_time", time.time()),
             }
 
             # Add basic counts if available
             try:
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     metrics["database_connected"] = True
                 else:
                     metrics["database_connected"] = False
@@ -544,7 +592,7 @@ class ComprehensiveHealthDashboard:
                 "active_data_sources": 0,
                 "telemetry_enabled": False,
                 "websocket_connected": False,
-                "error": str(e)
+                "error": str(e),
             }
 
     def _get_project_summary_search_paths(self) -> List[Path]:
@@ -574,7 +622,9 @@ class ComprehensiveHealthDashboard:
 
         return search_paths
 
-    def _refresh_project_summary_cache(self, force: bool = False) -> Optional[Dict[str, Any]]:
+    def _refresh_project_summary_cache(
+        self, force: bool = False
+    ) -> Optional[Dict[str, Any]]:
         """Run project summary analysis if cache is stale."""
         if not (self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE):
             return None
@@ -583,12 +633,15 @@ class ComprehensiveHealthDashboard:
         if (
             not force
             and self._project_summary_cache_last_run is not None
-            and now - self._project_summary_cache_last_run < self._project_summary_cache_ttl
+            and now - self._project_summary_cache_last_run
+            < self._project_summary_cache_ttl
         ):
             return None
 
         search_paths = self._get_project_summary_search_paths()
-        analytics_data = self.project_summary_analytics.analyze_project_summaries(search_paths)
+        analytics_data = self.project_summary_analytics.analyze_project_summaries(
+            search_paths
+        )
 
         if analytics_data.get("error"):
             logger.warning(
@@ -652,7 +705,7 @@ class ComprehensiveHealthDashboard:
             """Get all telemetry widget data for Phase 2 dashboard."""
             if not self.telemetry_enabled:
                 return jsonify({"error": "Telemetry not available"}), 404
-                
+
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -660,19 +713,19 @@ class ComprehensiveHealthDashboard:
                     self.telemetry_widgets.get_all_widget_data()
                 )
                 loop.close()
-                
+
                 # Convert widgets to JSON-serializable format
                 widgets_dict = {}
                 for widget_type, widget_data in widgets.items():
                     widgets_dict[widget_type] = {
-                        'widget_type': widget_data.widget_type.value,
-                        'title': widget_data.title,
-                        'status': widget_data.status,
-                        'data': widget_data.data,
-                        'last_updated': widget_data.last_updated.isoformat(),
-                        'alerts': widget_data.alerts
+                        "widget_type": widget_data.widget_type.value,
+                        "title": widget_data.title,
+                        "status": widget_data.status,
+                        "data": widget_data.data,
+                        "last_updated": widget_data.last_updated.isoformat(),
+                        "alerts": widget_data.alerts,
                     }
-                
+
                 return jsonify(widgets_dict)
             except Exception as e:
                 logger.error(f"Telemetry widgets failed: {e}")
@@ -683,49 +736,59 @@ class ComprehensiveHealthDashboard:
             """Get real-time cost burn rate data."""
             if not self.telemetry_enabled:
                 return jsonify({"error": "Telemetry not available"}), 404
-                
+
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 cost_widget = loop.run_until_complete(
-                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.COST_TRACKER)
+                    self.telemetry_widgets.get_widget_data(
+                        TelemetryWidgetType.COST_TRACKER
+                    )
                 )
                 loop.close()
-                
-                return jsonify({
-                    'current_cost': cost_widget.data.get('current_session_cost', 0),
-                    'burn_rate': cost_widget.data.get('burn_rate_per_hour', 0),
-                    'budget_remaining': cost_widget.data.get('budget_remaining', 0),
-                    'projection': cost_widget.data.get('cost_projection', 0),
-                    'status': cost_widget.status,
-                    'alerts': cost_widget.alerts
-                })
+
+                return jsonify(
+                    {
+                        "current_cost": cost_widget.data.get("current_session_cost", 0),
+                        "burn_rate": cost_widget.data.get("burn_rate_per_hour", 0),
+                        "budget_remaining": cost_widget.data.get("budget_remaining", 0),
+                        "projection": cost_widget.data.get("cost_projection", 0),
+                        "status": cost_widget.status,
+                        "alerts": cost_widget.alerts,
+                    }
+                )
             except Exception as e:
                 logger.error(f"Cost burn rate failed: {e}")
                 return jsonify({"error": str(e)}), 500
 
-        @self.app.route("/api/telemetry/error-monitor")  
+        @self.app.route("/api/telemetry/error-monitor")
         def get_error_monitor():
             """Get error monitoring data."""
             if not self.telemetry_enabled:
                 return jsonify({"error": "Telemetry not available"}), 404
-                
+
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 error_widget = loop.run_until_complete(
-                    self.telemetry_widgets.get_widget_data(TelemetryWidgetType.ERROR_MONITOR)
+                    self.telemetry_widgets.get_widget_data(
+                        TelemetryWidgetType.ERROR_MONITOR
+                    )
                 )
                 loop.close()
-                
-                return jsonify({
-                    'error_rate': error_widget.data.get('current_error_rate', 0),
-                    'trend': error_widget.data.get('error_trend', 'stable'),
-                    'recent_errors': error_widget.data.get('recent_errors', []),
-                    'recovery_rate': error_widget.data.get('recovery_success_rate', 0),
-                    'status': error_widget.status,
-                    'alerts': error_widget.alerts
-                })
+
+                return jsonify(
+                    {
+                        "error_rate": error_widget.data.get("current_error_rate", 0),
+                        "trend": error_widget.data.get("error_trend", "stable"),
+                        "recent_errors": error_widget.data.get("recent_errors", []),
+                        "recovery_rate": error_widget.data.get(
+                            "recovery_success_rate", 0
+                        ),
+                        "status": error_widget.status,
+                        "alerts": error_widget.alerts,
+                    }
+                )
             except Exception as e:
                 logger.error(f"Error monitor failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -733,16 +796,21 @@ class ComprehensiveHealthDashboard:
         @self.app.route("/api/telemetry/data-freshness")
         def get_data_freshness():
             """Get comprehensive data freshness report for debugging widget staleness."""
-            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
-                return jsonify({
-                    "error": "Telemetry not available",
-                    "telemetry_enabled": self.telemetry_enabled,
-                    "widgets_available": hasattr(self, 'telemetry_widgets'),
-                    "debug_info": {
-                        "clickhouse_available": TELEMETRY_DASHBOARD_AVAILABLE,
-                        "service_mode": "fallback"
-                    }
-                }), 404
+            if not self.telemetry_enabled or not hasattr(self, "telemetry_widgets"):
+                return (
+                    jsonify(
+                        {
+                            "error": "Telemetry not available",
+                            "telemetry_enabled": self.telemetry_enabled,
+                            "widgets_available": hasattr(self, "telemetry_widgets"),
+                            "debug_info": {
+                                "clickhouse_available": TELEMETRY_DASHBOARD_AVAILABLE,
+                                "service_mode": "fallback",
+                            },
+                        }
+                    ),
+                    404,
+                )
 
             try:
                 report = self.telemetry_widgets.get_data_freshness_report()
@@ -754,20 +822,31 @@ class ComprehensiveHealthDashboard:
         @self.app.route("/api/telemetry/widget-health")
         def get_widget_health():
             """Get widget health summary for quick debugging."""
-            if not self.telemetry_enabled or not hasattr(self, 'telemetry_widgets'):
-                return jsonify({
-                    "error": "Telemetry not available",
-                    "all_widgets_status": "offline",
-                    "reason": "no_telemetry"
-                }), 404
+            if not self.telemetry_enabled or not hasattr(self, "telemetry_widgets"):
+                return (
+                    jsonify(
+                        {
+                            "error": "Telemetry not available",
+                            "all_widgets_status": "offline",
+                            "reason": "no_telemetry",
+                        }
+                    ),
+                    404,
+                )
 
             try:
                 summary = self.telemetry_widgets.get_widget_health_summary()
-                return jsonify({
-                    "widget_health": summary,
-                    "overall_status": "mixed" if any("Error" in status for status in summary.values()) else "healthy",
-                    "timestamp": datetime.now().isoformat()
-                })
+                return jsonify(
+                    {
+                        "widget_health": summary,
+                        "overall_status": (
+                            "mixed"
+                            if any("Error" in status for status in summary.values())
+                            else "healthy"
+                        ),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Widget health summary failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -780,12 +859,17 @@ class ComprehensiveHealthDashboard:
                 success = self.dashboard_cache.clear_widget_cache()
                 if success:
                     logger.info("Widget cache cleared via unified cache management")
-                    return jsonify({
-                        "message": "Widget cache cleared successfully",
-                        "timestamp": datetime.now().isoformat()
-                    })
+                    return jsonify(
+                        {
+                            "message": "Widget cache cleared successfully",
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
                 else:
-                    return jsonify({"error": "Widget cache clearing not available"}), 404
+                    return (
+                        jsonify({"error": "Widget cache clearing not available"}),
+                        404,
+                    )
             except Exception as e:
                 logger.error(f"Cache clear failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -795,18 +879,18 @@ class ComprehensiveHealthDashboard:
             """Get detailed error information for analysis."""
             if not self.telemetry_enabled:
                 return jsonify({"error": "Telemetry not available"}), 404
-                
+
             try:
-                hours = request.args.get('hours', 24, type=int)
+                hours = request.args.get("hours", 24, type=int)
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     # Get detailed error events
                     recent_errors = loop.run_until_complete(
                         self.telemetry_client.get_recent_errors(hours=hours)
                     )
-                    
+
                     # Get error type breakdown
                     error_breakdown_query = f"""
                     SELECT 
@@ -823,61 +907,78 @@ class ComprehensiveHealthDashboard:
                     ORDER BY count DESC
                     LIMIT 20
                     """
-                    
+
                     error_breakdown = loop.run_until_complete(
                         self.telemetry_client.execute_query(error_breakdown_query)
                     )
-                    
+
                     # Process error types for categorization
                     categorized_errors = {}
                     for error in error_breakdown:
-                        error_type = error['error_type'] or 'Unknown'
-                        
+                        error_type = error["error_type"] or "Unknown"
+
                         # Categorize error types
-                        if '429' in error_type or 'rate_limit' in error_type.lower():
-                            category = 'Rate Limiting'
-                        elif '400' in error_type or 'invalid_request' in error_type.lower():
-                            category = 'Invalid Request'
-                        elif 'abort' in error_type.lower() or 'timeout' in error_type.lower():
-                            category = 'Connection Issues'
-                        elif '500' in error_type or 'internal_server' in error_type.lower():
-                            category = 'Server Errors'
+                        if "429" in error_type or "rate_limit" in error_type.lower():
+                            category = "Rate Limiting"
+                        elif (
+                            "400" in error_type
+                            or "invalid_request" in error_type.lower()
+                        ):
+                            category = "Invalid Request"
+                        elif (
+                            "abort" in error_type.lower()
+                            or "timeout" in error_type.lower()
+                        ):
+                            category = "Connection Issues"
+                        elif (
+                            "500" in error_type
+                            or "internal_server" in error_type.lower()
+                        ):
+                            category = "Server Errors"
                         else:
-                            category = 'Other'
-                        
+                            category = "Other"
+
                         if category not in categorized_errors:
                             categorized_errors[category] = []
-                        
+
                         # Extract meaningful error message
                         if '"message":"' in error_type:
                             try:
                                 import json
-                                parsed = json.loads(error_type.split(' ', 1)[1])
-                                message = parsed.get('error', {}).get('message', error_type)
+
+                                parsed = json.loads(error_type.split(" ", 1)[1])
+                                message = parsed.get("error", {}).get(
+                                    "message", error_type
+                                )
                             except:
                                 message = error_type
                         else:
                             message = error_type
-                        
+
                         error_entry = {
-                            'message': message,
-                            'status_code': error['status_code'],
-                            'count': int(error['count']),
-                            'avg_duration_ms': float(error['avg_duration'] or 0),
-                            'first_occurrence': error['first_occurrence'],
-                            'last_occurrence': error['last_occurrence']
+                            "message": message,
+                            "status_code": error["status_code"],
+                            "count": int(error["count"]),
+                            "avg_duration_ms": float(error["avg_duration"] or 0),
+                            "first_occurrence": error["first_occurrence"],
+                            "last_occurrence": error["last_occurrence"],
                         }
-                        
+
                         # Add special handling for "prompt too long" errors
-                        if 'prompt is too long' in error_type.lower():
+                        if "prompt is too long" in error_type.lower():
                             # Extract token count from error message
                             import re
-                            token_match = re.search(r'(\d+) tokens > (\d+) maximum', error_type)
+
+                            token_match = re.search(
+                                r"(\d+) tokens > (\d+) maximum", error_type
+                            )
                             if token_match:
-                                error_entry['actual_tokens'] = int(token_match.group(1))
-                                error_entry['max_tokens'] = int(token_match.group(2))
-                                error_entry['token_excess'] = int(token_match.group(1)) - int(token_match.group(2))
-                            
+                                error_entry["actual_tokens"] = int(token_match.group(1))
+                                error_entry["max_tokens"] = int(token_match.group(2))
+                                error_entry["token_excess"] = int(
+                                    token_match.group(1)
+                                ) - int(token_match.group(2))
+
                             # Get session context - find sessions that had this error and get their API request data
                             error_session_query = f"""
                             SELECT DISTINCT LogAttributes['session.id'] as session_id
@@ -885,13 +986,15 @@ class ComprehensiveHealthDashboard:
                             WHERE LogAttributes['error'] = '{error['error_type']}'
                                 AND Body = 'claude_code.api_error'
                             """
-                            
+
                             error_sessions = loop.run_until_complete(
                                 self.telemetry_client.execute_query(error_session_query)
                             )
-                            
+
                             if error_sessions:
-                                session_ids = "', '".join([s['session_id'] for s in error_sessions[:5]])
+                                session_ids = "', '".join(
+                                    [s["session_id"] for s in error_sessions[:5]]
+                                )
                                 session_query = f"""
                                 SELECT 
                                     LogAttributes['session.id'] as session_id,
@@ -906,54 +1009,61 @@ class ComprehensiveHealthDashboard:
                                 ORDER BY max_total_tokens DESC
                                 LIMIT 5
                                 """
-                            
+
                             session_context = loop.run_until_complete(
                                 self.telemetry_client.execute_query(session_query)
                             )
-                            
-                            error_entry['affected_sessions'] = [
+
+                            error_entry["affected_sessions"] = [
                                 {
-                                    'session_id': s['session_id'],
-                                    'request_count': int(s['request_count']),
-                                    'max_input_tokens': int(s['max_total_tokens'] or 0),
-                                    'avg_input_tokens': int(s['avg_total_tokens'] or 0),
-                                    'total_session_tokens': int(s['total_session_tokens'] or 0)
-                                } for s in session_context
+                                    "session_id": s["session_id"],
+                                    "request_count": int(s["request_count"]),
+                                    "max_input_tokens": int(s["max_total_tokens"] or 0),
+                                    "avg_input_tokens": int(s["avg_total_tokens"] or 0),
+                                    "total_session_tokens": int(
+                                        s["total_session_tokens"] or 0
+                                    ),
+                                }
+                                for s in session_context
                             ]
                         else:
-                            error_entry['affected_sessions'] = []
-                        
+                            error_entry["affected_sessions"] = []
+
                         categorized_errors[category].append(error_entry)
-                    
+
                     loop.close()
-                    
-                    return jsonify({
-                        'error_summary': {
-                            'total_errors': len(recent_errors),
-                            'hours_analyzed': hours,
-                            'unique_error_types': len(error_breakdown),
-                        },
-                        'recent_errors': [
-                            {
-                                'timestamp': err.timestamp.isoformat(),
-                                'session_id': err.session_id,
-                                'error_type': err.error_type,
-                                'duration_ms': err.duration_ms,
-                                'model': err.model,
-                                'input_tokens': err.input_tokens,
-                                'terminal_type': err.terminal_type
-                            } for err in recent_errors[:50]  # Limit to most recent 50
-                        ],
-                        'error_breakdown': categorized_errors,
-                        'raw_breakdown': error_breakdown
-                    })
-                    
+
+                    return jsonify(
+                        {
+                            "error_summary": {
+                                "total_errors": len(recent_errors),
+                                "hours_analyzed": hours,
+                                "unique_error_types": len(error_breakdown),
+                            },
+                            "recent_errors": [
+                                {
+                                    "timestamp": err.timestamp.isoformat(),
+                                    "session_id": err.session_id,
+                                    "error_type": err.error_type,
+                                    "duration_ms": err.duration_ms,
+                                    "model": err.model,
+                                    "input_tokens": err.input_tokens,
+                                    "terminal_type": err.terminal_type,
+                                }
+                                for err in recent_errors[:50]  # Limit to most recent 50
+                            ],
+                            "error_breakdown": categorized_errors,
+                            "raw_breakdown": error_breakdown,
+                        }
+                    )
+
                 loop.close()
                 return jsonify({"error": "No telemetry client available"}), 500
-                
+
             except Exception as e:
                 logger.error(f"Error details endpoint failed: {e}")
                 import traceback
+
                 traceback.print_exc()
                 return jsonify({"error": str(e)}), 500
 
@@ -963,15 +1073,15 @@ class ComprehensiveHealthDashboard:
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 # Get the tool optimizer data
                 widget_data = loop.run_until_complete(
                     self.telemetry_widgets._get_tool_optimizer_data()
                 )
                 loop.close()
-                
+
                 return jsonify(widget_data.data)
-                
+
             except Exception as e:
                 logger.error(f"Tool analytics endpoint failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -982,15 +1092,15 @@ class ComprehensiveHealthDashboard:
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 # Get the model efficiency data
                 widget_data = loop.run_until_complete(
                     self.telemetry_widgets._get_model_efficiency_data()
                 )
                 loop.close()
-                
+
                 return jsonify(widget_data.data)
-                
+
             except Exception as e:
                 logger.error(f"Model analytics endpoint failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -1001,13 +1111,15 @@ class ComprehensiveHealthDashboard:
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 # Get JSONL content query handler
-                from ..telemetry.jsonl_enhancement.full_content_queries import FullContentQueries
-                
+                from ..telemetry.jsonl_enhancement.full_content_queries import (
+                    FullContentQueries,
+                )
+
                 clickhouse_client = self.telemetry_widgets.clickhouse_client
                 query_handler = FullContentQueries(clickhouse_client)
-                
+
                 # Get recent conversations using this model (limit to last 50 for performance)
                 recent_conversations_query = """
                 SELECT 
@@ -1027,14 +1139,13 @@ class ComprehensiveHealthDashboard:
                 ORDER BY timestamp DESC
                 LIMIT 50
                 """
-                
+
                 conversations = loop.run_until_complete(
                     clickhouse_client.execute_query(
-                        recent_conversations_query, 
-                        {'model_name': model_name}
+                        recent_conversations_query, {"model_name": model_name}
                     )
                 )
-                
+
                 # Get token usage breakdown by query type for this model
                 token_breakdown_query = """
                 SELECT 
@@ -1058,14 +1169,13 @@ class ComprehensiveHealthDashboard:
                 GROUP BY query_type
                 ORDER BY query_count DESC
                 """
-                
+
                 token_breakdown = loop.run_until_complete(
                     clickhouse_client.execute_query(
-                        token_breakdown_query,
-                        {'model_name': model_name}
+                        token_breakdown_query, {"model_name": model_name}
                     )
                 )
-                
+
                 # Get time-based usage patterns (hourly breakdown for last 7 days)
                 usage_patterns_query = """
                 SELECT 
@@ -1079,34 +1189,42 @@ class ComprehensiveHealthDashboard:
                 GROUP BY hour_of_day
                 ORDER BY hour_of_day
                 """
-                
+
                 usage_patterns = loop.run_until_complete(
                     clickhouse_client.execute_query(
-                        usage_patterns_query,
-                        {'model_name': model_name}
+                        usage_patterns_query, {"model_name": model_name}
                     )
                 )
-                
+
                 loop.close()
-                
+
                 # Format the response
                 response_data = {
-                    'model_name': model_name,
-                    'recent_conversations': conversations,
-                    'token_usage_breakdown': token_breakdown,
-                    'usage_patterns': usage_patterns,
-                    'summary': {
-                        'total_conversations': len(conversations),
-                        'total_input_tokens': sum(conv.get('input_tokens', 0) for conv in conversations),
-                        'total_output_tokens': sum(conv.get('output_tokens', 0) for conv in conversations),
-                        'total_cost': sum(conv.get('cost_usd', 0) for conv in conversations),
-                        'avg_conversation_length': sum(conv.get('message_length', 0) for conv in conversations) / max(len(conversations), 1),
-                        'query_types_count': len(token_breakdown)
-                    }
+                    "model_name": model_name,
+                    "recent_conversations": conversations,
+                    "token_usage_breakdown": token_breakdown,
+                    "usage_patterns": usage_patterns,
+                    "summary": {
+                        "total_conversations": len(conversations),
+                        "total_input_tokens": sum(
+                            conv.get("input_tokens", 0) for conv in conversations
+                        ),
+                        "total_output_tokens": sum(
+                            conv.get("output_tokens", 0) for conv in conversations
+                        ),
+                        "total_cost": sum(
+                            conv.get("cost_usd", 0) for conv in conversations
+                        ),
+                        "avg_conversation_length": sum(
+                            conv.get("message_length", 0) for conv in conversations
+                        )
+                        / max(len(conversations), 1),
+                        "query_types_count": len(token_breakdown),
+                    },
                 }
-                
+
                 return jsonify(response_data)
-                
+
             except Exception as e:
                 logger.error(f"Model detailed analytics endpoint failed: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -1239,117 +1357,150 @@ class ComprehensiveHealthDashboard:
                 # Use existing dashboard summary data
                 summary_response = get_dashboard_summary()
                 summary_data = summary_response.get_json()
-                
+
                 # Get recent sessions for chart data (30 days for better trends)
                 sessions = self.get_recent_sessions_analytics(30)
-                
+
                 # Create chart data for trends - group by date for cleaner visualization
                 dates = []
                 productivity_scores = []
                 health_scores = []
-                
+
                 # Group sessions by date and calculate daily averages
                 from collections import defaultdict
+
                 daily_data = defaultdict(list)
-                
+
                 for session in sessions:
                     if session.get("start_time"):
                         date = session["start_time"][:10]  # Just date part
-                        daily_data[date].append({
-                            'productivity': session.get("productivity_score", 0),
-                            'health': session.get("health_score", 0)
-                        })
-                
+                        daily_data[date].append(
+                            {
+                                "productivity": session.get("productivity_score", 0),
+                                "health": session.get("health_score", 0),
+                            }
+                        )
+
                 # Calculate daily averages and sort by date
                 for date in sorted(daily_data.keys()):
                     daily_sessions = daily_data[date]
-                    avg_productivity = sum(s['productivity'] for s in daily_sessions) / len(daily_sessions)
-                    avg_health = sum(s['health'] for s in daily_sessions) / len(daily_sessions)
-                    
+                    avg_productivity = sum(
+                        s["productivity"] for s in daily_sessions
+                    ) / len(daily_sessions)
+                    avg_health = sum(s["health"] for s in daily_sessions) / len(
+                        daily_sessions
+                    )
+
                     dates.append(date)
                     productivity_scores.append(round(avg_productivity, 1))
                     health_scores.append(round(avg_health, 1))
-                
+
                 # Limit to last 14 days for readability
                 if len(dates) > 14:
                     dates = dates[-14:]
                     productivity_scores = productivity_scores[-14:]
                     health_scores = health_scores[-14:]
-                
+
                 # Generate specific, actionable recommendations with CLI commands
                 recommendations = []
                 avg_prod = summary_data.get("avg_productivity", 0)
                 total_sessions = summary_data.get("total_sessions", 0)
-                
+
                 # Context optimization recommendation
                 if total_sessions > 30:
-                    recommendations.append({
-                        "title": "Run Context Optimization",
-                        "description": f"You have {total_sessions} sessions. Run optimization to improve performance.",
-                        "command": "context-cleaner optimize",
-                        "expected_outcome": "Reduce context size by ~60-80 tokens, improve AI response speed",
-                        "priority": "high",
-                        "impact": "high"
-                    })
-                
+                    recommendations.append(
+                        {
+                            "title": "Run Context Optimization",
+                            "description": f"You have {total_sessions} sessions. Run optimization to improve performance.",
+                            "command": "context-cleaner optimize",
+                            "expected_outcome": "Reduce context size by ~60-80 tokens, improve AI response speed",
+                            "priority": "high",
+                            "impact": "high",
+                        }
+                    )
+
                 # Cache analysis for large session counts
                 if total_sessions > 50:
-                    recommendations.append({
-                        "title": "Analyze Cache Usage",
-                        "description": "Review cache distribution across projects for optimization opportunities.",
-                        "command": "context-cleaner analyze --detailed",
-                        "expected_outcome": "Identify which projects consume most context, productivity patterns",
-                        "priority": "medium",
-                        "impact": "medium"
-                    })
-                
+                    recommendations.append(
+                        {
+                            "title": "Analyze Cache Usage",
+                            "description": "Review cache distribution across projects for optimization opportunities.",
+                            "command": "context-cleaner analyze --detailed",
+                            "expected_outcome": "Identify which projects consume most context, productivity patterns",
+                            "priority": "medium",
+                            "impact": "medium",
+                        }
+                    )
+
                 # Productivity improvement suggestions
                 if avg_prod < 85:
-                    recommendations.append({
-                        "title": "Monitor Productivity Trends",
-                        "description": f"Your productivity is {avg_prod:.1f}%. Track real-time metrics to identify patterns.",
-                        "command": "context-cleaner monitor --real-time",
-                        "expected_outcome": "Real-time alerts on productivity drops, session insights",
-                        "priority": "medium", 
-                        "impact": "medium"
-                    })
-                
+                    recommendations.append(
+                        {
+                            "title": "Monitor Productivity Trends",
+                            "description": f"Your productivity is {avg_prod:.1f}%. Track real-time metrics to identify patterns.",
+                            "command": "context-cleaner monitor --real-time",
+                            "expected_outcome": "Real-time alerts on productivity drops, session insights",
+                            "priority": "medium",
+                            "impact": "medium",
+                        }
+                    )
+
                 # Export data for deeper analysis
                 if len(dates) > 10:  # If we have substantial trend data
-                    recent_trend = productivity_scores[-3:] if len(productivity_scores) >= 3 else []
-                    if recent_trend and sum(recent_trend) / len(recent_trend) < avg_prod - 5:
-                        recommendations.append({
-                            "title": "Export Analytics for Review",
-                            "description": "Recent productivity decline detected. Export data for deeper analysis.",
-                            "command": "context-cleaner export-analytics --format json",
-                            "expected_outcome": "Detailed JSON report for external analysis, trend identification",
-                            "priority": "low",
-                            "impact": "high"
-                        })
-                
+                    recent_trend = (
+                        productivity_scores[-3:]
+                        if len(productivity_scores) >= 3
+                        else []
+                    )
+                    if (
+                        recent_trend
+                        and sum(recent_trend) / len(recent_trend) < avg_prod - 5
+                    ):
+                        recommendations.append(
+                            {
+                                "title": "Export Analytics for Review",
+                                "description": "Recent productivity decline detected. Export data for deeper analysis.",
+                                "command": "context-cleaner export-analytics --format json",
+                                "expected_outcome": "Detailed JSON report for external analysis, trend identification",
+                                "priority": "low",
+                                "impact": "high",
+                            }
+                        )
+
                 # Health check recommendation
                 if total_sessions > 40:
-                    recommendations.append({
-                        "title": "Run System Health Check",
-                        "description": "Verify context-cleaner is running optimally with comprehensive diagnostics.",
-                        "command": "context-cleaner health-check --comprehensive",
-                        "expected_outcome": "System status report, configuration validation, performance metrics",
-                        "priority": "low",
-                        "impact": "medium"
-                    })
-                
+                    recommendations.append(
+                        {
+                            "title": "Run System Health Check",
+                            "description": "Verify context-cleaner is running optimally with comprehensive diagnostics.",
+                            "command": "context-cleaner health-check --comprehensive",
+                            "expected_outcome": "System status report, configuration validation, performance metrics",
+                            "priority": "low",
+                            "impact": "medium",
+                        }
+                    )
+
                 # Get project summary widgets
                 project_widgets = {}
-                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+                if (
+                    self.project_summary_analytics
+                    and PROJECT_SUMMARY_ANALYTICS_AVAILABLE
+                ):
                     try:
-                        categories_data = self.project_summary_analytics.get_project_categories_summary()
-                        completion_data = self.project_summary_analytics.get_completion_metrics()
-                        recent_projects_data = self.project_summary_analytics.get_recent_projects(limit=3)
-                        
+                        categories_data = (
+                            self.project_summary_analytics.get_project_categories_summary()
+                        )
+                        completion_data = (
+                            self.project_summary_analytics.get_completion_metrics()
+                        )
+                        recent_projects_data = (
+                            self.project_summary_analytics.get_recent_projects(limit=3)
+                        )
+
                         project_widgets = {
-                            'project_categories': categories_data,
-                            'completion_metrics': completion_data,
-                            'recent_projects': recent_projects_data
+                            "project_categories": categories_data,
+                            "completion_metrics": completion_data,
+                            "recent_projects": recent_projects_data,
                         }
                     except Exception as e:
                         logger.warning(f"Error loading project widgets: {e}")
@@ -1363,59 +1514,102 @@ class ComprehensiveHealthDashboard:
                         "avg_health_score": summary_data.get("avg_health_score", 0),
                         "active_recommendations": len(recommendations),
                         "project_summary": {
-                            "total_projects": project_widgets.get('project_categories', {}).get('total', 0),
-                            "completion_rate": project_widgets.get('completion_metrics', {}).get('completion_rate', 0),
-                            "recent_count": len(project_widgets.get('recent_projects', []))
-                        }
+                            "total_projects": project_widgets.get(
+                                "project_categories", {}
+                            ).get("total", 0),
+                            "completion_rate": project_widgets.get(
+                                "completion_metrics", {}
+                            ).get("completion_rate", 0),
+                            "recent_count": len(
+                                project_widgets.get("recent_projects", [])
+                            ),
+                        },
                     },
                     "trends": {
-                        "productivity": {"direction": "stable" if len(productivity_scores) < 2 else ("upward" if productivity_scores[-1] > productivity_scores[0] else "downward")},
-                        "health_score": {"direction": "stable" if len(health_scores) < 2 else ("upward" if health_scores[-1] > health_scores[0] else "downward")}
+                        "productivity": {
+                            "direction": (
+                                "stable"
+                                if len(productivity_scores) < 2
+                                else (
+                                    "upward"
+                                    if productivity_scores[-1] > productivity_scores[0]
+                                    else "downward"
+                                )
+                            )
+                        },
+                        "health_score": {
+                            "direction": (
+                                "stable"
+                                if len(health_scores) < 2
+                                else (
+                                    "upward"
+                                    if health_scores[-1] > health_scores[0]
+                                    else "downward"
+                                )
+                            )
+                        },
                     },
                     "charts": {
                         "productivity_chart": {
                             "labels": dates,
-                            "data": productivity_scores
+                            "data": productivity_scores,
                         },
-                        "health_score_chart": {
-                            "labels": dates,
-                            "data": health_scores
-                        }
+                        "health_score_chart": {"labels": dates, "data": health_scores},
                     },
                     "project_widgets": project_widgets,
                     "recommendations": recommendations,
-                    "insights": self._generate_insights(dates, productivity_scores, health_scores, total_sessions, avg_prod),
-                    "patterns": self._generate_patterns(dates, productivity_scores, health_scores, total_sessions),
-                    "timestamp": summary_data.get("timestamp")
+                    "insights": self._generate_insights(
+                        dates,
+                        productivity_scores,
+                        health_scores,
+                        total_sessions,
+                        avg_prod,
+                    ),
+                    "patterns": self._generate_patterns(
+                        dates, productivity_scores, health_scores, total_sessions
+                    ),
+                    "timestamp": summary_data.get("timestamp"),
                 }
                 return jsonify(dashboard_data)
             except Exception as e:
                 logger.error(f"Dashboard data API failed: {e}")
-                return jsonify({"sessions": 0, "productivity": 0, "health": 0, "recommendations": 0}), 500
+                return (
+                    jsonify(
+                        {
+                            "sessions": 0,
+                            "productivity": 0,
+                            "health": 0,
+                            "recommendations": 0,
+                        }
+                    ),
+                    500,
+                )
 
         @self.app.route("/api/session-timeline")
         def get_session_timeline():
             """Get session timeline data for frontend charts in Plotly format."""
             try:
-                days = request.args.get('days', 7, type=int)
-                chart_type = request.args.get('type', 'daily_summary', type=str)
+                days = request.args.get("days", 7, type=int)
+                chart_type = request.args.get("type", "daily_summary", type=str)
                 sessions = self.get_recent_sessions_analytics(days)
-                
+
                 if not sessions:
                     return jsonify({"error": "No session data available"})
-                
+
                 # Generate different chart types based on request
-                if chart_type == 'daily_summary':
+                if chart_type == "daily_summary":
                     plotly_data = self._create_daily_summary_chart(sessions, days)
-                elif chart_type == 'session_volume':
+                elif chart_type == "session_volume":
                     plotly_data = self._create_session_volume_chart(sessions, days)
-                elif chart_type == 'productivity_focus':
+                elif chart_type == "productivity_focus":
                     plotly_data = self._create_productivity_focus_chart(sessions, days)
-                elif chart_type == 'trend_comparison':
+                elif chart_type == "trend_comparison":
                     plotly_data = self._create_trend_comparison_chart(sessions, days)
                 else:
-                    plotly_data = self._create_daily_summary_chart(sessions, days)  # Default
-                
+                    plotly_data = self._create_daily_summary_chart(
+                        sessions, days
+                    )  # Default
+
                 return jsonify(plotly_data)
             except Exception as e:
                 logger.error(f"Session timeline API failed: {e}")
@@ -1483,135 +1677,192 @@ class ComprehensiveHealthDashboard:
             """Get context window usage for active directories."""
             try:
                 if self.context_analyzer:
-                    context_stats = self.context_analyzer.get_total_context_usage()
-                    directory_stats = context_stats.get('directory_breakdown', {})
-                    
+                    # Use comprehensive stats that includes ALL sessions, not just latest
+                    all_sessions_stats = self.context_analyzer.get_all_sessions_stats()
+                    directory_stats = all_sessions_stats.get("projects", {})
+
                     # Format for display
                     formatted_directories = []
                     for directory, stats in directory_stats.items():
-                        formatted_directories.append({
-                            'directory': directory,
-                            'size_mb': stats['file_size_mb'],
-                            'estimated_tokens': f"{stats['estimated_tokens']:,}",
-                            'last_activity': stats['last_activity'].strftime("%Y-%m-%d %H:%M:%S") if stats['last_activity'] else 'Never',
-                            'entry_count': stats['entry_count'],
-                            'tool_calls': stats['tool_calls'],
-                            'file_reads': stats['file_reads'],
-                            'session_file': stats['session_file']
-                        })
-                    
+                        formatted_directories.append(
+                            {
+                                "directory": directory,
+                                "size_mb": stats["total_size_mb"],
+                                "estimated_tokens": f"{stats['total_tokens']:,}",
+                                "last_activity": "Multiple sessions",  # All sessions, not just one
+                                "entry_count": stats[
+                                    "session_count"
+                                ],  # Show session count
+                                "tool_calls": 0,  # Not tracked in comprehensive stats
+                                "file_reads": 0,  # Not tracked in comprehensive stats
+                                "session_file": f"{stats['session_count']} sessions",
+                            }
+                        )
+
                     # Sort by size descending
-                    formatted_directories.sort(key=lambda x: x['size_mb'], reverse=True)
-                    
-                    return jsonify({
-                        'success': True,
-                        'total_size_mb': context_stats['total_size_mb'],
-                        'estimated_total_tokens': f"{context_stats['estimated_total_tokens']:,}",
-                        'active_directories': context_stats['active_directories'],
-                        'directories': formatted_directories[:10]  # Top 10 by size
-                    })
+                    formatted_directories.sort(key=lambda x: x["size_mb"], reverse=True)
+
+                    return jsonify(
+                        {
+                            "success": True,
+                            "total_size_mb": all_sessions_stats["total_size_mb"],
+                            "estimated_total_tokens": f"{all_sessions_stats['total_tokens']:,}",
+                            "active_directories": all_sessions_stats["project_count"],
+                            "directories": formatted_directories[:10],  # Top 10 by size
+                        }
+                    )
                 else:
-                    return jsonify({
-                        'success': False,
-                        'error': 'Context analyzer not available',
-                        'directories': []
-                    })
-                    
+                    return jsonify(
+                        {
+                            "success": False,
+                            "error": "Context analyzer not available",
+                            "directories": [],
+                        }
+                    )
+
             except Exception as e:
                 logger.error(f"Context window analysis failed: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': str(e),
-                    'directories': []
-                })
+                return jsonify({"success": False, "error": str(e), "directories": []})
 
-        @self.app.route('/docs/data-explorer-reference')
+        @self.app.route("/api/all-sessions-stats")
+        def get_all_sessions_stats():
+            """Get comprehensive statistics across ALL session files."""
+            try:
+                if self.context_analyzer:
+                    all_stats = self.context_analyzer.get_all_sessions_stats()
+
+                    return jsonify(
+                        {
+                            "success": True,
+                            "total_tokens": all_stats["total_tokens"],
+                            "total_sessions": all_stats["total_sessions"],
+                            "total_size_mb": all_stats["total_size_mb"],
+                            "project_count": all_stats["project_count"],
+                            "projects": all_stats["projects"],
+                        }
+                    )
+                else:
+                    return jsonify(
+                        {"success": False, "error": "Context analyzer not available"}
+                    )
+
+            except Exception as e:
+                logger.error(f"All sessions stats failed: {e}")
+                return jsonify({"success": False, "error": str(e)})
+
+        @self.app.route("/docs/data-explorer-reference")
         def data_explorer_reference():
             """Serve the Data Explorer reference markdown."""
             try:
                 repo_root = Path(__file__).resolve().parent.parent.parent.parent
-                doc_path = repo_root / 'docs' / 'data_explorer_reference.md'
+                doc_path = repo_root / "docs" / "data_explorer_reference.md"
                 if not doc_path.exists():
-                    logger.error("Data Explorer reference document not found at %s", doc_path)
+                    logger.error(
+                        "Data Explorer reference document not found at %s", doc_path
+                    )
                     return jsonify({"error": "Reference document not found"}), 404
-                return send_file(doc_path, mimetype='text/markdown')
+                return send_file(doc_path, mimetype="text/markdown")
             except Exception as e:
                 logger.error(f"Failed to serve data explorer reference: {e}")
                 return jsonify({"error": str(e)}), 500
 
-        @self.app.route("/api/data-explorer/query", methods=['GET', 'POST'])
+        @self.app.route("/api/data-explorer/query", methods=["GET", "POST"])
         def execute_custom_query():
             """Execute custom SQL query for data exploration."""
             try:
                 # Handle GET request for health check
-                if request.method == 'GET':
-                    return jsonify({
-                        'status': 'healthy',
-                        'message': 'Data explorer query endpoint is available. Use POST with JSON query to explore data.',
-                        'example_query': 'SELECT COUNT(*) FROM otel.messages LIMIT 10',
-                        'supported_methods': ['POST'],
-                        'last_updated': datetime.now().isoformat()
-                    })
-                
+                if request.method == "GET":
+                    return jsonify(
+                        {
+                            "status": "healthy",
+                            "message": "Data explorer query endpoint is available. Use POST with JSON query to explore data.",
+                            "example_query": "SELECT COUNT(*) FROM otel.messages LIMIT 10",
+                            "supported_methods": ["POST"],
+                            "last_updated": datetime.now().isoformat(),
+                        }
+                    )
+
                 # Handle POST request for actual queries
                 if not request.is_json:
                     return jsonify({"error": "Request must be JSON"}), 400
-                
+
                 data = request.get_json()
-                query = data.get('query', '').strip()
+                query = data.get("query", "").strip()
                 logger.info("Data Explorer query requested (length=%s)", len(query))
-                
+
                 if not query:
                     return jsonify({"error": "Query cannot be empty"}), 400
-                
+
                 # Basic security checks
-                forbidden_keywords = ['DELETE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'CREATE', 'TRUNCATE']
+                forbidden_keywords = [
+                    "DELETE",
+                    "DROP",
+                    "ALTER",
+                    "INSERT",
+                    "UPDATE",
+                    "CREATE",
+                    "TRUNCATE",
+                ]
                 query_upper = query.upper()
                 for keyword in forbidden_keywords:
                     if keyword in query_upper:
-                        return jsonify({"error": f"Forbidden SQL keyword: {keyword}"}), 400
-                
+                        return (
+                            jsonify({"error": f"Forbidden SQL keyword: {keyword}"}),
+                            400,
+                        )
+
                 # Limit query length
                 if len(query) > 5000:
-                    return jsonify({"error": "Query too long (max 5000 characters)"}), 400
-                
+                    return (
+                        jsonify({"error": "Query too long (max 5000 characters)"}),
+                        400,
+                    )
+
                 # Execute query against ClickHouse
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     try:
                         # Add LIMIT if not present
-                        if 'LIMIT' not in query_upper:
-                            query = query.rstrip(';') + ' LIMIT 1000'
-                        
+                        if "LIMIT" not in query_upper:
+                            query = query.rstrip(";") + " LIMIT 1000"
+
                         # Execute async query using asyncio
                         import asyncio
+
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         data_rows = loop.run_until_complete(
                             self.telemetry_client.execute_query(query)
                         )
                         loop.close()
-                        
+
                         # Get column names from first row if data exists
                         columns = []
                         if data_rows and len(data_rows) > 0:
                             columns = list(data_rows[0].keys())
-                        
+
                         response_payload = {
                             "success": True,
                             "data": data_rows,
                             "row_count": len(data_rows),
                             "columns": columns,
-                            "query_executed": query
+                            "query_executed": query,
                         }
-                        logger.info("Data Explorer query succeeded (rows=%s)", len(data_rows))
+                        logger.info(
+                            "Data Explorer query succeeded (rows=%s)", len(data_rows)
+                        )
                         return jsonify(response_payload)
-                        
+
                     except Exception as ch_error:
                         logger.error(f"ClickHouse query error: {ch_error}")
-                        return jsonify({"error": f"Database query failed: {str(ch_error)}"}), 500
+                        return (
+                            jsonify(
+                                {"error": f"Database query failed: {str(ch_error)}"}
+                            ),
+                            500,
+                        )
                 else:
                     return jsonify({"error": "Database connection not available"}), 503
-                    
+
             except Exception as e:
                 logger.error(f"Data explorer query error: {e}")
                 return jsonify({"error": str(e)}), 500
@@ -1641,29 +1892,40 @@ class ComprehensiveHealthDashboard:
                 # Get service health status
                 services_health = {
                     "dashboard": True,
-                    "websocket": hasattr(self, 'socketio') and self.socketio is not None,
+                    "websocket": hasattr(self, "socketio")
+                    and self.socketio is not None,
                     "data_sources": len(self.data_sources) > 0,
                     "cache_intelligence": CACHE_DASHBOARD_AVAILABLE,
-                    "telemetry": hasattr(self, 'telemetry_client') and self.telemetry_client is not None
+                    "telemetry": hasattr(self, "telemetry_client")
+                    and self.telemetry_client is not None,
                 }
 
-                return jsonify({
-                    "status": "healthy",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "services": services_health,
-                    "websocket_available": hasattr(self, 'socketio') and self.socketio is not None,
-                    "uptime_seconds": time.time() - getattr(self, '_start_time', time.time()),
-                    "dashboard_port": getattr(self, '_current_port', 8080)
-                })
+                return jsonify(
+                    {
+                        "status": "healthy",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "services": services_health,
+                        "websocket_available": hasattr(self, "socketio")
+                        and self.socketio is not None,
+                        "uptime_seconds": time.time()
+                        - getattr(self, "_start_time", time.time()),
+                        "dashboard_port": getattr(self, "_current_port", 8080),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Detailed health check failed: {e}")
-                return jsonify({
-                    "status": "unhealthy",
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "error": str(e),
-                    "services": {},
-                    "websocket_available": False
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "status": "unhealthy",
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "error": str(e),
+                            "services": {},
+                            "websocket_available": False,
+                        }
+                    ),
+                    500,
+                )
 
         @self.app.route("/api/realtime/events")
         def realtime_events():
@@ -1675,75 +1937,98 @@ class ComprehensiveHealthDashboard:
                 # Phase 2.4: Use extracted real-time module for HTTP fallback
                 events = self.realtime_manager.get_realtime_events_fallback()
 
-                return jsonify({
-                    "events": events,
-                    "transport": "http_polling",
-                    "websocket_available": self.realtime_manager.socketio is not None,
-                    "recommendation": self.realtime_coordinator.get_transport_recommendation(),
-                    "timestamp": datetime.now().isoformat()
-                })
+                return jsonify(
+                    {
+                        "events": events,
+                        "transport": "http_polling",
+                        "websocket_available": self.realtime_manager.socketio
+                        is not None,
+                        "recommendation": self.realtime_coordinator.get_transport_recommendation(),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             except Exception as e:
                 logger.error(f"Real-time events fallback failed: {e}")
-                return jsonify({
-                    "events": [{
-                        "type": "error",
-                        "timestamp": datetime.now().isoformat(),
-                        "data": {"message": str(e)}
-                    }],
-                    "error": str(e)
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "events": [
+                                {
+                                    "type": "error",
+                                    "timestamp": datetime.now().isoformat(),
+                                    "data": {"message": str(e)},
+                                }
+                            ],
+                            "error": str(e),
+                        }
+                    ),
+                    500,
+                )
 
         # Enhanced Dashboard API Endpoints for Phase 1-3 Features
-        @self.app.route('/api/telemetry-widget/<widget_type>')
+        @self.app.route("/api/telemetry-widget/<widget_type>")
         def get_telemetry_widget(widget_type):
             """Get telemetry widget data for enhanced dashboard"""
             try:
                 # Get time range parameter from query string (default to 7days)
-                time_range = request.args.get('timeRange', '7days')
-                session_id = request.args.get('sessionId')  # Optional session ID for Context Rot Meter
-                
+                time_range = request.args.get("timeRange", "7days")
+                session_id = request.args.get(
+                    "sessionId"
+                )  # Optional session ID for Context Rot Meter
+
                 # Convert time range to days for backend processing
                 time_range_days = {
-                    'today': 1,
-                    '7days': 7, 
-                    '30days': 30,
-                    '30minutes': 1/48,    # 30 minutes = 1/48 of a day
-                    '60minutes': 1/24,    # 1 hour = 1/24 of a day
-                    '180minutes': 1/8,    # 3 hours = 1/8 of a day
-                    '360minutes': 1/4,    # 6 hours = 1/4 of a day
-                    '720minutes': 1/2     # 12 hours = 1/2 of a day
+                    "today": 1,
+                    "7days": 7,
+                    "30days": 30,
+                    "30minutes": 1 / 48,  # 30 minutes = 1/48 of a day
+                    "60minutes": 1 / 24,  # 1 hour = 1/24 of a day
+                    "180minutes": 1 / 8,  # 3 hours = 1/8 of a day
+                    "360minutes": 1 / 4,  # 6 hours = 1/4 of a day
+                    "720minutes": 1 / 2,  # 12 hours = 1/2 of a day
                 }.get(time_range, 7)
-                
+
                 # Debug logging for Context Rot Meter
-                if widget_type == 'context-rot-meter':
-                    logger.info(f"Context Rot Meter API called: hasattr={hasattr(self, 'telemetry_widgets')}, telemetry_widgets={getattr(self, 'telemetry_widgets', None) is not None}")
-                
-                if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
+                if widget_type == "context-rot-meter":
+                    logger.info(
+                        f"Context Rot Meter API called: hasattr={hasattr(self, 'telemetry_widgets')}, telemetry_widgets={getattr(self, 'telemetry_widgets', None) is not None}"
+                    )
+
+                if hasattr(self, "telemetry_widgets") and self.telemetry_widgets:
                     # Use thread-safe async widget data retrieval
-                    
+
                     widget_map = {
-                        'error-monitor': 'ERROR_MONITOR',
-                        'cost-tracker': 'COST_TRACKER', 
-                        'timeout-risk': 'TIMEOUT_RISK',
-                        'tool-optimizer': 'TOOL_OPTIMIZER',
-                        'model-efficiency': 'MODEL_EFFICIENCY',
-                        'context-rot-meter': 'CONTEXT_ROT_METER',  # Phase 3: Context Rot Meter
+                        "error-monitor": "ERROR_MONITOR",
+                        "cost-tracker": "COST_TRACKER",
+                        "timeout-risk": "TIMEOUT_RISK",
+                        "tool-optimizer": "TOOL_OPTIMIZER",
+                        "model-efficiency": "MODEL_EFFICIENCY",
+                        "context-rot-meter": "CONTEXT_ROT_METER",  # Phase 3: Context Rot Meter
                         # Phase 4: JSONL Analytics Widgets
-                        'conversation-timeline': 'CONVERSATION_TIMELINE',
-                        'code-pattern-analysis': 'CODE_PATTERN_ANALYSIS',
-                        'content-search-widget': 'CONTENT_SEARCH_WIDGET'
+                        "conversation-timeline": "CONVERSATION_TIMELINE",
+                        "code-pattern-analysis": "CODE_PATTERN_ANALYSIS",
+                        "content-search-widget": "CONTENT_SEARCH_WIDGET",
                     }
-                    
+
                     if widget_type in widget_map:
                         try:
-                            from ..telemetry.dashboard.widgets import TelemetryWidgetType
-                            widget_enum = getattr(TelemetryWidgetType, widget_map[widget_type])
-                            
+                            from ..telemetry.dashboard.widgets import (
+                                TelemetryWidgetType,
+                            )
+
+                            widget_enum = getattr(
+                                TelemetryWidgetType, widget_map[widget_type]
+                            )
+
                             # Debug logging for Context Rot Meter enum
-                            if widget_type == 'context-rot-meter':
-                                logger.info(f"Context Rot Meter: widget_enum={widget_enum}, type={type(widget_enum)}")
-                                logger.info(f"Context Rot Meter: calling get_widget_data with session_id={session_id}, time_range_days={time_range_days}")
-                            
+                            if widget_type == "context-rot-meter":
+                                logger.info(
+                                    f"Context Rot Meter: widget_enum={widget_enum}, type={type(widget_enum)}"
+                                )
+                                logger.info(
+                                    f"Context Rot Meter: calling get_widget_data with session_id={session_id}, time_range_days={time_range_days}"
+                                )
+
                             data = self._run_coroutine_blocking(
                                 self.telemetry_widgets.get_widget_data(
                                     widget_enum,
@@ -1751,97 +2036,128 @@ class ComprehensiveHealthDashboard:
                                     time_range_days=time_range_days,
                                 )
                             )
-                            return jsonify({
-                                'widget_type': data.widget_type.value,
-                                'title': data.title,
-                                'status': data.status,
-                                'data': data.data,
-                                'alerts': data.alerts,
-                                'last_updated': data.last_updated.isoformat()
-                            })
+                            return jsonify(
+                                {
+                                    "widget_type": data.widget_type.value,
+                                    "title": data.title,
+                                    "status": data.status,
+                                    "data": data.data,
+                                    "alerts": data.alerts,
+                                    "last_updated": data.last_updated.isoformat(),
+                                }
+                            )
                         except Exception as e:
                             import traceback
-                            logger.error(f"Error getting telemetry widget {widget_type}: {e}")
+
+                            logger.error(
+                                f"Error getting telemetry widget {widget_type}: {e}"
+                            )
                             logger.error(f"Traceback: {traceback.format_exc()}")
-                            if widget_type == 'context-rot-meter':
-                                logger.error(f"Context Rot Meter specific error: widget_enum={widget_enum}, exception_type={type(e)}")
+                            if widget_type == "context-rot-meter":
+                                logger.error(
+                                    f"Context Rot Meter specific error: widget_enum={widget_enum}, exception_type={type(e)}"
+                                )
 
-                return jsonify({
-                    'title': f'{widget_type.replace("-", " ").title()}',
-                    'status': 'operational',
-                    'data': {'message': 'Phase 2 telemetry system ready - live data available'},
-                    'alerts': []
-                })
-                
+                return jsonify(
+                    {
+                        "title": f'{widget_type.replace("-", " ").title()}',
+                        "status": "operational",
+                        "data": {
+                            "message": "Phase 2 telemetry system ready - live data available"
+                        },
+                        "alerts": [],
+                    }
+                )
+
             except Exception as e:
-                return jsonify({
-                    'title': f'{widget_type.replace("-", " ").title()}',
-                    'status': 'error',
-                    'data': {},
-                    'alerts': [f'Error: {str(e)}']
-                })
+                return jsonify(
+                    {
+                        "title": f'{widget_type.replace("-", " ").title()}',
+                        "status": "error",
+                        "data": {},
+                        "alerts": [f"Error: {str(e)}"],
+                    }
+                )
 
-        @self.app.route('/api/orchestration-widget/<widget_type>')
+        @self.app.route("/api/orchestration-widget/<widget_type>")
         def get_orchestration_widget(widget_type):
             """Get orchestration widget data for enhanced dashboard"""
             try:
-                if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
+                if hasattr(self, "telemetry_widgets") and self.telemetry_widgets:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     widget_map = {
-                        'orchestration-status': 'ORCHESTRATION_STATUS',
-                        'agent-utilization': 'AGENT_UTILIZATION',
+                        "orchestration-status": "ORCHESTRATION_STATUS",
+                        "agent-utilization": "AGENT_UTILIZATION",
                     }
-                    
+
                     if widget_type in widget_map:
                         try:
-                            from ..telemetry.dashboard.widgets import TelemetryWidgetType
-                            widget_enum = getattr(TelemetryWidgetType, widget_map[widget_type])
+                            from ..telemetry.dashboard.widgets import (
+                                TelemetryWidgetType,
+                            )
+
+                            widget_enum = getattr(
+                                TelemetryWidgetType, widget_map[widget_type]
+                            )
                             data = loop.run_until_complete(
                                 self.telemetry_widgets.get_widget_data(widget_enum)
                             )
                             loop.close()
-                            return jsonify({
-                                'widget_type': data.widget_type.value,
-                                'title': data.title,
-                                'status': data.status,
-                                'data': data.data,
-                                'alerts': data.alerts,
-                                'last_updated': data.last_updated.isoformat()
-                            })
+                            return jsonify(
+                                {
+                                    "widget_type": data.widget_type.value,
+                                    "title": data.title,
+                                    "status": data.status,
+                                    "data": data.data,
+                                    "alerts": data.alerts,
+                                    "last_updated": data.last_updated.isoformat(),
+                                }
+                            )
                         except Exception as e:
                             loop.close()
-                            logger.warning(f"Error getting orchestration widget {widget_type}: {e}")
-                            
-                return jsonify({
-                    'title': f'{widget_type.replace("-", " ").title()}',
-                    'status': 'operational',
-                    'data': {
-                        'message': 'Phase 3 orchestration system active',
-                        'features': ['ML Learning Engine', 'Intelligent Agent Selection', 'Workflow Optimization'],
-                        'success_rate': '95%'
-                    },
-                    'alerts': []
-                })
-                
-            except Exception as e:
-                return jsonify({
-                    'title': f'{widget_type.replace("-", " ").title()}',
-                    'status': 'error', 
-                    'data': {},
-                    'alerts': [f'Error: {str(e)}']
-                })
+                            logger.warning(
+                                f"Error getting orchestration widget {widget_type}: {e}"
+                            )
 
-        @self.app.route('/api/analytics/context-health')
+                return jsonify(
+                    {
+                        "title": f'{widget_type.replace("-", " ").title()}',
+                        "status": "operational",
+                        "data": {
+                            "message": "Phase 3 orchestration system active",
+                            "features": [
+                                "ML Learning Engine",
+                                "Intelligent Agent Selection",
+                                "Workflow Optimization",
+                            ],
+                            "success_rate": "95%",
+                        },
+                        "alerts": [],
+                    }
+                )
+
+            except Exception as e:
+                return jsonify(
+                    {
+                        "title": f'{widget_type.replace("-", " ").title()}',
+                        "status": "error",
+                        "data": {},
+                        "alerts": [f"Error: {str(e)}"],
+                    }
+                )
+
+        @self.app.route("/api/analytics/context-health")
         def get_context_health_metrics():
             """Get real context health metrics from telemetry data"""
             try:
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
                         # Query real telemetry data for context metrics
                         query = """
@@ -1859,62 +2175,84 @@ class ComprehensiveHealthDashboard:
                         FROM otel.otel_logs
                         WHERE Timestamp >= now() - INTERVAL 24 HOUR
                         """
-                        
-                        results = loop.run_until_complete(self.telemetry_client.execute_query(query))
+
+                        results = loop.run_until_complete(
+                            self.telemetry_client.execute_query(query)
+                        )
                         loop.close()
-                        
+
                         if results and len(results) > 0:
                             data = results[0]
-                            context_size = float(data.get('avg_context_size', 45.2) or 45.2) / 1024  # Convert to KB
-                            sessions = int(data.get('sessions_today', 0))
-                            total_events = int(data.get('total_events', 0))
-                            error_events = int(data.get('error_events', 0))
-                            compression = float(data.get('avg_compression', 0.73) or 0.73) * 100
-                            tools_used = int(data.get('unique_tools_used', 12))
-                            
+                            context_size = (
+                                float(data.get("avg_context_size", 45.2) or 45.2) / 1024
+                            )  # Convert to KB
+                            sessions = int(data.get("sessions_today", 0))
+                            total_events = int(data.get("total_events", 0))
+                            error_events = int(data.get("error_events", 0))
+                            compression = (
+                                float(data.get("avg_compression", 0.73) or 0.73) * 100
+                            )
+                            tools_used = int(data.get("unique_tools_used", 12))
+
                             # Calculate relevance score based on tool diversity and error rate
-                            error_rate = (error_events / total_events * 100) if total_events > 0 else 0
-                            relevance_score = max(60, min(95, 100 - error_rate + (tools_used * 2)))
-                            
-                            status = "healthy" if relevance_score >= 80 and error_rate < 10 else "warning"
-                            
-                            return jsonify({
-                                'status': status,
-                                'context_size_kb': round(context_size, 1),
-                                'compression_rate': round(compression, 0),
-                                'relevance_score': round(relevance_score, 0),
-                                'sessions_today': sessions,
-                                'error_rate': round(error_rate, 1)
-                            })
+                            error_rate = (
+                                (error_events / total_events * 100)
+                                if total_events > 0
+                                else 0
+                            )
+                            relevance_score = max(
+                                60, min(95, 100 - error_rate + (tools_used * 2))
+                            )
+
+                            status = (
+                                "healthy"
+                                if relevance_score >= 80 and error_rate < 10
+                                else "warning"
+                            )
+
+                            return jsonify(
+                                {
+                                    "status": status,
+                                    "context_size_kb": round(context_size, 1),
+                                    "compression_rate": round(compression, 0),
+                                    "relevance_score": round(relevance_score, 0),
+                                    "sessions_today": sessions,
+                                    "error_rate": round(error_rate, 1),
+                                }
+                            )
                     except Exception as e:
                         loop.close()
                         logger.error(f"Error getting context health metrics: {e}")
-                
+
                 # Return fallback data if no telemetry client
-                return jsonify({
-                    'status': 'healthy',
-                    'context_size_kb': 45.2,
-                    'compression_rate': 73,
-                    'relevance_score': 87,
-                    'sessions_today': 3,
-                    'error_rate': 2.1
-                })
+                return jsonify(
+                    {
+                        "status": "healthy",
+                        "context_size_kb": 45.2,
+                        "compression_rate": 73,
+                        "relevance_score": 87,
+                        "sessions_today": 3,
+                        "error_rate": 2.1,
+                    }
+                )
             except Exception as e:
                 logger.error(f"Error in context health metrics: {e}")
-                return jsonify({
-                    'status': 'error',
-                    'context_size_kb': 0,
-                    'compression_rate': 0,
-                    'relevance_score': 0,
-                    'sessions_today': 0,
-                    'error_rate': 100
-                })
+                return jsonify(
+                    {
+                        "status": "error",
+                        "context_size_kb": 0,
+                        "compression_rate": 0,
+                        "relevance_score": 0,
+                        "sessions_today": 0,
+                        "error_rate": 100,
+                    }
+                )
 
-        @self.app.route('/api/analytics/performance-trends')  
+        @self.app.route("/api/analytics/performance-trends")
         def get_performance_trends():
             """Get real performance trends from telemetry data"""
             try:
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     try:
                         # Query real performance data
                         query = """
@@ -1957,133 +2295,178 @@ class ComprehensiveHealthDashboard:
                         results = self._run_coroutine_blocking(
                             self.telemetry_client.execute_query(query)
                         )
-                        
+
                         if results and len(results) > 0:
                             data = results[0]
-                            events_this_week = int(data.get('events_this_week', 0))
-                            events_prev_week = int(data.get('events_prev_week', 1))
-                            avg_duration = float(data.get('avg_duration_ms', 1200) or 1200) / 1000  # Convert to seconds
-                            cache_hits = int(data.get('cache_hits', 92))
-                            total_requests = int(data.get('total_requests', 100))
-                            
+                            events_this_week = int(data.get("events_this_week", 0))
+                            events_prev_week = int(data.get("events_prev_week", 1))
+                            avg_duration = (
+                                float(data.get("avg_duration_ms", 1200) or 1200) / 1000
+                            )  # Convert to seconds
+                            cache_hits = int(data.get("cache_hits", 92))
+                            total_requests = int(data.get("total_requests", 100))
+
                             # Calculate throughput change
-                            throughput_change = ((events_this_week - events_prev_week) / events_prev_week * 100) if events_prev_week > 0 else 15
-                            
+                            throughput_change = (
+                                (
+                                    (events_this_week - events_prev_week)
+                                    / events_prev_week
+                                    * 100
+                                )
+                                if events_prev_week > 0
+                                else 15
+                            )
+
                             # Calculate cache hit rate
-                            cache_hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 92
-                            
-                            status = "improving" if throughput_change > 0 and cache_hit_rate > 80 else "warning"
-                            
-                            return jsonify({
-                                'status': status,
-                                'response_time_seconds': round(avg_duration, 1),
-                                'throughput_change_percent': round(throughput_change, 0),
-                                'cache_hit_rate': round(cache_hit_rate, 0),
-                                'events_this_week': events_this_week,
-                                'events_prev_week': events_prev_week
-                            })
+                            cache_hit_rate = (
+                                (cache_hits / total_requests * 100)
+                                if total_requests > 0
+                                else 92
+                            )
+
+                            status = (
+                                "improving"
+                                if throughput_change > 0 and cache_hit_rate > 80
+                                else "warning"
+                            )
+
+                            return jsonify(
+                                {
+                                    "status": status,
+                                    "response_time_seconds": round(avg_duration, 1),
+                                    "throughput_change_percent": round(
+                                        throughput_change, 0
+                                    ),
+                                    "cache_hit_rate": round(cache_hit_rate, 0),
+                                    "events_this_week": events_this_week,
+                                    "events_prev_week": events_prev_week,
+                                }
+                            )
                     except Exception as e:
                         logger.error(f"Error getting performance trends: {e}")
-                
+
                 # Return fallback data if no telemetry client
-                return jsonify({
-                    'status': 'improving',
-                    'response_time_seconds': 1.2,
-                    'throughput_change_percent': 15,
-                    'cache_hit_rate': 92,
-                    'events_this_week': 850,
-                    'events_prev_week': 740
-                })
+                return jsonify(
+                    {
+                        "status": "improving",
+                        "response_time_seconds": 1.2,
+                        "throughput_change_percent": 15,
+                        "cache_hit_rate": 92,
+                        "events_this_week": 850,
+                        "events_prev_week": 740,
+                    }
+                )
             except Exception as e:
                 logger.error(f"Error in performance trends: {e}")
-                return jsonify({
-                    'status': 'error',
-                    'response_time_seconds': 0,
-                    'throughput_change_percent': 0,
-                    'cache_hit_rate': 0,
-                    'events_this_week': 0,
-                    'events_prev_week': 0
-                })
+                return jsonify(
+                    {
+                        "status": "error",
+                        "response_time_seconds": 0,
+                        "throughput_change_percent": 0,
+                        "cache_hit_rate": 0,
+                        "events_this_week": 0,
+                        "events_prev_week": 0,
+                    }
+                )
 
-        @self.app.route('/api/dashboard-metrics')
+        @self.app.route("/api/dashboard-metrics")
         def get_dashboard_metrics():
             """Enhanced dashboard metrics with health monitoring, circuit breaker protection, and graceful degradation"""
             import asyncio
-            
+
             start_time = datetime.now()
-            
+
             # Check system health first
             try:
-                if hasattr(self, 'health_monitor') and self.health_monitor:
+                if hasattr(self, "health_monitor") and self.health_monitor:
                     # Create event loop for health checks
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
                         # Check dashboard dependencies health
                         dashboard_health = loop.run_until_complete(
-                            self.health_monitor.check_service_health("dashboard_metrics")
+                            self.health_monitor.check_service_health(
+                                "dashboard_metrics"
+                            )
                         )
                         clickhouse_health = loop.run_until_complete(
                             self.health_monitor.check_service_health("clickhouse")
                         )
                         telemetry_health = loop.run_until_complete(
-                            self.health_monitor.check_service_health("telemetry_service")
+                            self.health_monitor.check_service_health(
+                                "telemetry_service"
+                            )
                         )
                     finally:
                         loop.close()
-                        
+
                     # Determine overall health status
                     critical_services_failing = (
-                        clickhouse_health.status.value == "failing" or 
-                        telemetry_health.status.value == "failing"
+                        clickhouse_health.status.value == "failing"
+                        or telemetry_health.status.value == "failing"
                     )
                     services_degraded = (
-                        clickhouse_health.status.value == "degraded" or 
-                        telemetry_health.status.value == "degraded"
+                        clickhouse_health.status.value == "degraded"
+                        or telemetry_health.status.value == "degraded"
                     )
-                    
+
                     # Apply circuit breaker logic
-                    if hasattr(self, 'dashboard_metrics_breaker'):
+                    if hasattr(self, "dashboard_metrics_breaker"):
                         if critical_services_failing:
                             # Force circuit open if critical services are down
-                            self.dashboard_metrics_breaker._failure_count = self.dashboard_metrics_breaker.config.failure_threshold
-                        
+                            self.dashboard_metrics_breaker._failure_count = (
+                                self.dashboard_metrics_breaker.config.failure_threshold
+                            )
+
                         # Check circuit breaker state
                         if self.dashboard_metrics_breaker.state.value == "open":
-                            response_time = (datetime.now() - start_time).total_seconds() * 1000
-                            return jsonify(APIResponseFormatter.error(
-                                "Dashboard metrics temporarily unavailable due to dependency failures",
-                                "CIRCUIT_BREAKER_OPEN",
-                                data={
-                                    "clickhouse_status": clickhouse_health.status.value,
-                                    "telemetry_status": telemetry_health.status.value,
-                                    "response_time_ms": response_time,
-                                    "retry_after": 30
-                                }
-                            ))
-                
+                            response_time = (
+                                datetime.now() - start_time
+                            ).total_seconds() * 1000
+                            return jsonify(
+                                APIResponseFormatter.error(
+                                    "Dashboard metrics temporarily unavailable due to dependency failures",
+                                    "CIRCUIT_BREAKER_OPEN",
+                                    data={
+                                        "clickhouse_status": clickhouse_health.status.value,
+                                        "telemetry_status": telemetry_health.status.value,
+                                        "response_time_ms": response_time,
+                                        "retry_after": 30,
+                                    },
+                                )
+                            )
+
             except Exception as health_error:
-                logger.warning(f"Health check failed in dashboard-metrics: {health_error}")
+                logger.warning(
+                    f"Health check failed in dashboard-metrics: {health_error}"
+                )
                 # Continue with degraded mode if health monitoring fails
                 critical_services_failing = False
                 services_degraded = True
-            
+
             # Apply circuit breaker protection with safer error handling
             try:
-                if hasattr(self, 'dashboard_metrics_breaker') and self.dashboard_metrics_breaker:
+                if (
+                    hasattr(self, "dashboard_metrics_breaker")
+                    and self.dashboard_metrics_breaker
+                ):
                     # Check circuit breaker state manually (synchronous approach)
                     if self.dashboard_metrics_breaker.is_open:
-                        response_time = (datetime.now() - start_time).total_seconds() * 1000
-                        return jsonify(APIResponseFormatter.error(
-                            "Dashboard metrics temporarily unavailable due to circuit breaker",
-                            "CIRCUIT_BREAKER_OPEN",
-                            data={
-                                "response_time_ms": response_time,
-                                "retry_after": 30
-                            }
-                        ))
-                    
+                        response_time = (
+                            datetime.now() - start_time
+                        ).total_seconds() * 1000
+                        return jsonify(
+                            APIResponseFormatter.error(
+                                "Dashboard metrics temporarily unavailable due to circuit breaker",
+                                "CIRCUIT_BREAKER_OPEN",
+                                data={
+                                    "response_time_ms": response_time,
+                                    "retry_after": 30,
+                                },
+                            )
+                        )
+
                     # Execute with manual circuit breaker logic
                     try:
                         result = self._get_dashboard_metrics_data_safe()
@@ -2093,32 +2476,39 @@ class ComprehensiveHealthDashboard:
                     except Exception as e:
                         # Manually record failure
                         self.dashboard_metrics_breaker._on_failure()
-                        logger.error(f"Dashboard metrics failed, circuit breaker updated: {e}")
+                        logger.error(
+                            f"Dashboard metrics failed, circuit breaker updated: {e}"
+                        )
                         return self._get_fallback_metrics_response(start_time, str(e))
                 else:
                     # Direct call with safety wrapper
                     return self._get_dashboard_metrics_data_safe()
-                    
+
             except Exception as e:
                 response_time = (datetime.now() - start_time).total_seconds() * 1000
-                logger.error(f"Dashboard metrics circuit breaker failed: {e}", exc_info=True)
-                
+                logger.error(
+                    f"Dashboard metrics circuit breaker failed: {e}", exc_info=True
+                )
+
                 # Enhanced graceful degradation
                 return self._get_fallback_metrics_response(start_time, str(e))
-        
+
         # Setup additional routes that were missing from main setup
         self._setup_jsonl_processing_routes()
-        
+
     def _get_dashboard_metrics_data(self):
         """Internal method to fetch dashboard metrics data with timeout protection"""
         import asyncio
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-        
+        from concurrent.futures import (
+            ThreadPoolExecutor,
+            TimeoutError as FuturesTimeoutError,
+        )
+
         start_time = datetime.now()
-        
+
         try:
             # Try to get real telemetry data with timeout
-            if hasattr(self, 'telemetry_client') and self.telemetry_client:
+            if hasattr(self, "telemetry_client") and self.telemetry_client:
                 try:
                     # Use timeout for telemetry operations
                     with ThreadPoolExecutor() as executor:
@@ -2127,85 +2517,129 @@ class ComprehensiveHealthDashboard:
 
                     # Get model efficiency data with timeout
                     model_efficiency_data = None
-                    if hasattr(self, 'telemetry_widgets') and self.telemetry_widgets:
+                    if hasattr(self, "telemetry_widgets") and self.telemetry_widgets:
                         try:
                             with ThreadPoolExecutor() as executor:
                                 future = executor.submit(self._fetch_model_efficiency)
-                                model_efficiency_data = future.result(timeout=5)  # 5 second timeout
+                                model_efficiency_data = future.result(
+                                    timeout=5
+                                )  # 5 second timeout
                         except (FuturesTimeoutError, Exception) as e:
                             logger.warning(f"Model efficiency data timeout: {e}")
 
                     response_time = (datetime.now() - start_time).total_seconds() * 1000
 
+                    # Get session file stats for comprehensive token analysis (with timeout)
+                    session_file_tokens = 0
+                    session_file_count = 0
+                    active_session_tokens = 0
+                    try:
+                        if hasattr(self, "context_analyzer") and self.context_analyzer:
+                            # Use timeout to prevent blocking
+                            with ThreadPoolExecutor() as executor:
+                                # Get all session files stats (with 5 second timeout)
+                                future_all = executor.submit(
+                                    self.context_analyzer.get_all_sessions_stats
+                                )
+                                try:
+                                    all_sessions = future_all.result(timeout=5)
+                                    session_file_tokens = all_sessions["total_tokens"]
+                                    session_file_count = all_sessions["total_sessions"]
+                                    # Use the same comprehensive stats for active session tokens
+                                    # This includes all parseable sessions (completed format)
+                                    active_session_tokens = all_sessions["total_tokens"]
+                                    logger.info(
+                                        f"✅ Active session tokens set to: {active_session_tokens:,}"
+                                    )
+                                except FuturesTimeoutError:
+                                    logger.warning(
+                                        "Session file analysis timeout - skipping comprehensive stats"
+                                    )
+                    except Exception as e:
+                        logger.warning(f"Could not fetch session file stats: {e}")
+
                     response_data = {
-                        'total_tokens': stats['total_tokens'],
-                        'total_sessions': stats['total_sessions'],
-                        'success_rate': stats['success_rate'],
-                        'active_agents': stats['active_agents'],
-                        'orchestration_status': 'operational',
-                        'telemetry_status': 'monitoring',
-                        'total_cost': stats['total_cost'],
-                        'total_errors': stats['total_errors'],
-                        'last_updated': datetime.now().isoformat(),
-                        'response_time_ms': response_time
+                        "total_tokens": stats["total_tokens"],
+                        "total_tokens_analyzed": stats[
+                            "total_tokens"
+                        ],  # Telemetry DB tokens
+                        "session_file_tokens": session_file_tokens,  # All JSONL files tokens
+                        "active_session_tokens": active_session_tokens,  # Current active tokens
+                        "total_sessions": stats["total_sessions"],
+                        "session_file_count": session_file_count,
+                        "success_rate": stats["success_rate"],
+                        "active_agents": stats["active_agents"],
+                        "orchestration_status": "operational",
+                        "telemetry_status": "monitoring",
+                        "total_cost": stats["total_cost"],
+                        "total_errors": stats["total_errors"],
+                        "last_updated": datetime.now().isoformat(),
+                        "response_time_ms": response_time,
                     }
 
                     # Add model efficiency data if available
                     if model_efficiency_data:
-                        response_data['model_efficiency'] = model_efficiency_data
+                        response_data["model_efficiency"] = model_efficiency_data
 
                     self._apply_definitive_total_tokens(response_data, stats)
 
-                    return jsonify(APIResponseFormatter.success(
-                        response_data,
-                        "Dashboard metrics retrieved successfully"
-                    ))
+                    return jsonify(
+                        APIResponseFormatter.success(
+                            response_data, "Dashboard metrics retrieved successfully"
+                        )
+                    )
 
                 except FuturesTimeoutError:
-                    logger.warning("Telemetry data fetch timeout - falling back to local data")
+                    logger.warning(
+                        "Telemetry data fetch timeout - falling back to local data"
+                    )
                     # Fall through to local JSONL fallback
                 except Exception as e:
                     logger.warning(f"Error getting real telemetry stats: {e}")
                     # Fall through to local JSONL fallback
-                    
+
             # Fallback to local JSONL data when telemetry is unavailable or times out
             local_stats = self._get_local_jsonl_stats()
             response_time = (datetime.now() - start_time).total_seconds() * 1000
-            
+
             response_payload = {
-                'total_tokens': local_stats['total_tokens'],
-                'total_sessions': local_stats['total_sessions'],
-                'success_rate': local_stats['success_rate'],
-                'active_agents': local_stats['active_agents'],
-                'orchestration_status': 'local-mode',
-                'telemetry_status': 'using-local-data',
-                'total_cost': local_stats['total_cost'],
-                'total_errors': local_stats['total_errors'],
-                'last_updated': datetime.now().isoformat(),
-                'response_time_ms': response_time
+                "total_tokens": local_stats["total_tokens"],
+                "total_sessions": local_stats["total_sessions"],
+                "success_rate": local_stats["success_rate"],
+                "active_agents": local_stats["active_agents"],
+                "orchestration_status": "local-mode",
+                "telemetry_status": "using-local-data",
+                "total_cost": local_stats["total_cost"],
+                "total_errors": local_stats["total_errors"],
+                "last_updated": datetime.now().isoformat(),
+                "response_time_ms": response_time,
             }
 
             self._apply_definitive_total_tokens(response_payload, local_stats)
 
-            return jsonify(APIResponseFormatter.degraded(
-                response_payload,
-                "Using local data due to telemetry service unavailability",
-                "TELEMETRY_FALLBACK"
-            ))
-            
+            return jsonify(
+                APIResponseFormatter.degraded(
+                    response_payload,
+                    "Using local data due to telemetry service unavailability",
+                    "TELEMETRY_FALLBACK",
+                )
+            )
+
         except Exception as e:
             response_time = (datetime.now() - start_time).total_seconds() * 1000
             logger.error(f"Critical error in dashboard metrics: {e}")
-            
-            return jsonify(APIResponseFormatter.error(
-                f"Dashboard metrics service error: {str(e)}",
-                "DASHBOARD_METRICS_ERROR",
-                data={
-                    'response_time_ms': response_time,
-                    'last_updated': datetime.now().isoformat()
-                }
-            ))
-    
+
+            return jsonify(
+                APIResponseFormatter.error(
+                    f"Dashboard metrics service error: {str(e)}",
+                    "DASHBOARD_METRICS_ERROR",
+                    data={
+                        "response_time_ms": response_time,
+                        "last_updated": datetime.now().isoformat(),
+                    },
+                )
+            )
+
     def _get_dashboard_metrics_data_safe(self):
         """Safe wrapper for dashboard metrics data with improved error handling"""
         try:
@@ -2215,133 +2649,170 @@ class ComprehensiveHealthDashboard:
             logger.error(f"Dashboard metrics data fetch failed: {e}", exc_info=True)
             # Return fallback response instead of raising
             return self._get_fallback_metrics_response(datetime.now(), str(e))
-    
+
     def _get_fallback_metrics_response(self, start_time, error_message=None):
         """Generate a fallback metrics response when telemetry services are unavailable"""
         response_time = (datetime.now() - start_time).total_seconds() * 1000
-        
-        return jsonify(APIResponseFormatter.degraded(
-            {
-                'total_tokens': 'Service Unavailable',
-                'total_sessions': '0',
-                'success_rate': 'N/A',
-                'active_agents': '0',
-                'orchestration_status': 'degraded',
-                'telemetry_status': 'unavailable',
-                'total_cost': '$0.00',
-                'total_errors': 0,
-                'last_updated': datetime.now().isoformat(),
-                'response_time_ms': response_time,
-                'fallback_reason': error_message or 'Service temporarily unavailable'
-            },
-            "Dashboard metrics operating in degraded mode - service temporarily unavailable",
-            "SERVICE_DEGRADED"
-        ))
-    
+
+        return jsonify(
+            APIResponseFormatter.degraded(
+                {
+                    "total_tokens": "Service Unavailable",
+                    "total_sessions": "0",
+                    "success_rate": "N/A",
+                    "active_agents": "0",
+                    "orchestration_status": "degraded",
+                    "telemetry_status": "unavailable",
+                    "total_cost": "$0.00",
+                    "total_errors": 0,
+                    "last_updated": datetime.now().isoformat(),
+                    "response_time_ms": response_time,
+                    "fallback_reason": error_message
+                    or "Service temporarily unavailable",
+                },
+                "Dashboard metrics operating in degraded mode - service temporarily unavailable",
+                "SERVICE_DEGRADED",
+            )
+        )
+
     def _setup_jsonl_processing_routes(self):
         """Setup JSONL processing related routes"""
-        @self.app.route('/api/jsonl-processing-status')
+
+        @self.app.route("/api/jsonl-processing-status")
         def get_jsonl_processing_status():
             """Get JSONL processing system status and metrics"""
-            if not self.telemetry_enabled or not hasattr(self, 'jsonl_processor') or not self.jsonl_processor:
-                return jsonify({
-                    "status": "unavailable", 
-                    "message": "JSONL processing service not available",
-                    "last_updated": datetime.now().isoformat()
-                })
-        
+            if (
+                not self.telemetry_enabled
+                or not hasattr(self, "jsonl_processor")
+                or not self.jsonl_processor
+            ):
+                return jsonify(
+                    {
+                        "status": "unavailable",
+                        "message": "JSONL processing service not available",
+                        "last_updated": datetime.now().isoformat(),
+                    }
+                )
+
             try:
                 import asyncio
+
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                
+
                 try:
                     # Get processing status from service
                     status_data = loop.run_until_complete(
                         self.jsonl_processor.get_processing_status()
                     )
-                    
+
                     # Get content statistics for dashboard metrics
                     content_stats = loop.run_until_complete(
                         self.jsonl_processor.get_content_statistics()
                     )
-                    
+
                     loop.close()
-                    
+
                     # Combine status and stats for comprehensive dashboard view
-                    return jsonify({
-                    "processing_status": status_data.get('status', 'unknown'),
-                    "database_healthy": status_data.get('database_connection', False),
-                    "tables_ready": status_data.get('content_tables_available', False),
-                    "privacy_level": status_data.get('privacy_level', 'standard'),
-                    
-                    # Content metrics for dashboard  
-                    "total_messages": content_stats.get('messages', {}).get('total_messages', 0),
-                    "total_files": content_stats.get('files', {}).get('unique_files', 0),
-                    "total_tools": content_stats.get('tools', {}).get('total_tool_executions', 0),
-                    "recent_activity": content_stats.get('entries_last_hour', 0),
-                    "storage_size_mb": round(content_stats.get('files', {}).get('total_file_bytes', 0) / 1024 / 1024, 2),
-                    
-                    # Processing performance metrics
-                    "processing_rate": "High",  # Will be enhanced with real metrics
-                    "error_rate": "Low",        # Will be enhanced with real metrics
-                    "system_load": "Normal",    # Will be enhanced with real metrics
-                    
-                    "last_updated": datetime.now().isoformat()
-                })
-                
+                    return jsonify(
+                        {
+                            "processing_status": status_data.get("status", "unknown"),
+                            "database_healthy": status_data.get(
+                                "database_connection", False
+                            ),
+                            "tables_ready": status_data.get(
+                                "content_tables_available", False
+                            ),
+                            "privacy_level": status_data.get(
+                                "privacy_level", "standard"
+                            ),
+                            # Content metrics for dashboard
+                            "total_messages": content_stats.get("messages", {}).get(
+                                "total_messages", 0
+                            ),
+                            "total_files": content_stats.get("files", {}).get(
+                                "unique_files", 0
+                            ),
+                            "total_tools": content_stats.get("tools", {}).get(
+                                "total_tool_executions", 0
+                            ),
+                            "recent_activity": content_stats.get(
+                                "entries_last_hour", 0
+                            ),
+                            "storage_size_mb": round(
+                                content_stats.get("files", {}).get(
+                                    "total_file_bytes", 0
+                                )
+                                / 1024
+                                / 1024,
+                                2,
+                            ),
+                            # Processing performance metrics
+                            "processing_rate": "High",  # Will be enhanced with real metrics
+                            "error_rate": "Low",  # Will be enhanced with real metrics
+                            "system_load": "Normal",  # Will be enhanced with real metrics
+                            "last_updated": datetime.now().isoformat(),
+                        }
+                    )
+
                 except Exception as e:
                     try:
                         loop.close()
                     except:
                         pass
                     raise e
-                
+
             except Exception as e:
                 try:
                     loop.close()
                 except:
                     pass
                 logger.error(f"Error getting JSONL processing status: {e}")
-                return jsonify({
-                    "status": "error",
-                    "error": str(e),
-                    "processing_status": "error",
-                    "database_healthy": False,
-                    "tables_ready": False,
-                    "total_messages": 0,
-                    "total_files": 0, 
-                    "total_tools": 0,
-                    "recent_activity": 0,
-                    "storage_size_mb": 0,
-                    "processing_rate": "Unknown",
-                    "error_rate": "Unknown",
-                    "system_load": "Unknown",
-                    "last_updated": datetime.now().isoformat()
-                }), 500
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "error": str(e),
+                            "processing_status": "error",
+                            "database_healthy": False,
+                            "tables_ready": False,
+                            "total_messages": 0,
+                            "total_files": 0,
+                            "total_tools": 0,
+                            "recent_activity": 0,
+                            "storage_size_mb": 0,
+                            "processing_rate": "Unknown",
+                            "error_rate": "Unknown",
+                            "system_load": "Unknown",
+                            "last_updated": datetime.now().isoformat(),
+                        }
+                    ),
+                    500,
+                )
 
         # ==================== CONVERSATION ANALYTICS API ENDPOINTS ====================
 
-        @self.app.route('/api/conversation-analytics')
+        @self.app.route("/api/conversation-analytics")
         def get_conversation_analytics():
             """Get conversation timeline analytics with message and session data."""
             try:
-                range_param = request.args.get('range', '7d')
-                
+                range_param = request.args.get("range", "7d")
+
                 # Convert range to ClickHouse interval
                 range_mapping = {
-                    '24h': '24 HOUR',
-                    '7d': '7 DAY', 
-                    '30d': '30 DAY',
-                    'all': '365 DAY'  # Cap at 1 year for performance
+                    "24h": "24 HOUR",
+                    "7d": "7 DAY",
+                    "30d": "30 DAY",
+                    "all": "365 DAY",  # Cap at 1 year for performance
                 }
-                interval = range_mapping.get(range_param, '7 DAY')
-                
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                interval = range_mapping.get(range_param, "7 DAY")
+
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
                         # Query conversation timeline data from ClickHouse
                         timeline_query = f"""
@@ -2357,11 +2828,11 @@ class ComprehensiveHealthDashboard:
                         ORDER BY date DESC
                         LIMIT 100
                         """
-                        
+
                         timeline_results = loop.run_until_complete(
                             self.telemetry_client.execute_query(timeline_query)
                         )
-                        
+
                         # Query summary statistics
                         summary_query = f"""
                         SELECT 
@@ -2372,80 +2843,89 @@ class ComprehensiveHealthDashboard:
                         FROM otel.claude_message_content
                         WHERE timestamp >= now() - INTERVAL {interval}
                         """
-                        
+
                         summary_results = loop.run_until_complete(
                             self.telemetry_client.execute_query(summary_query)
                         )
-                        
+
                         loop.close()
-                        
+
                         # Process timeline data
                         labels = []
                         messages = []
                         sessions = []
-                        
+
                         if timeline_results:
-                            for row in reversed(timeline_results):  # Reverse to get chronological order
-                                labels.append(str(row.get('date', '')))
-                                total_msgs = int(row.get('user_messages', 0)) + int(row.get('assistant_messages', 0))
+                            for row in reversed(
+                                timeline_results
+                            ):  # Reverse to get chronological order
+                                labels.append(str(row.get("date", "")))
+                                total_msgs = int(row.get("user_messages", 0)) + int(
+                                    row.get("assistant_messages", 0)
+                                )
                                 messages.append(total_msgs)
-                                sessions.append(int(row.get('sessions', 0)))
-                        
+                                sessions.append(int(row.get("sessions", 0)))
+
                         # Get summary data
                         summary_data = {}
                         if summary_results and len(summary_results) > 0:
                             result = summary_results[0]
                             summary_data = {
-                                'total_sessions': int(result.get('total_sessions', 0)),
-                                'total_messages': int(result.get('total_messages', 0)),
-                                'avg_session_length': f"{result.get('avg_session_length', 0)} msgs"
+                                "total_sessions": int(result.get("total_sessions", 0)),
+                                "total_messages": int(result.get("total_messages", 0)),
+                                "avg_session_length": f"{result.get('avg_session_length', 0)} msgs",
                             }
-                        
-                        return jsonify({
-                            'timeline': {
-                                'labels': labels,
-                                'messages': messages,
-                                'sessions': sessions
-                            },
-                            'summary': summary_data,
-                            'range': range_param,
-                            'last_updated': datetime.now().isoformat()
-                        })
-                        
+
+                        return jsonify(
+                            {
+                                "timeline": {
+                                    "labels": labels,
+                                    "messages": messages,
+                                    "sessions": sessions,
+                                },
+                                "summary": summary_data,
+                                "range": range_param,
+                                "last_updated": datetime.now().isoformat(),
+                            }
+                        )
+
                     except Exception as e:
                         loop.close()
                         logger.error(f"Error querying conversation analytics: {e}")
                         # Fall through to fallback data
-                
+
                 # Fallback data when no database connection
-                return jsonify({
-                    'timeline': {
-                        'labels': ['Today', 'Yesterday'],
-                        'messages': [45, 32],
-                        'sessions': [3, 2]
-                    },
-                    'summary': {
-                        'total_sessions': 5,
-                        'total_messages': 77,
-                        'avg_session_length': '15.4 msgs'
-                    },
-                    'range': range_param,
-                    'last_updated': datetime.now().isoformat()
-                })
-                
+                return jsonify(
+                    {
+                        "timeline": {
+                            "labels": ["Today", "Yesterday"],
+                            "messages": [45, 32],
+                            "sessions": [3, 2],
+                        },
+                        "summary": {
+                            "total_sessions": 5,
+                            "total_messages": 77,
+                            "avg_session_length": "15.4 msgs",
+                        },
+                        "range": range_param,
+                        "last_updated": datetime.now().isoformat(),
+                    }
+                )
+
             except Exception as e:
                 logger.error(f"Error in conversation analytics endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
+                return jsonify({"error": str(e)}), 500
 
-        @self.app.route('/api/code-patterns-analytics')
+        @self.app.route("/api/code-patterns-analytics")
         def get_code_patterns_analytics():
             """Get code pattern analysis data from JSONL content."""
             try:
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     try:
                         # Query code patterns from file content and tool results
                         patterns_query = """
@@ -2496,281 +2976,335 @@ class ComprehensiveHealthDashboard:
                         ORDER BY count DESC
                         LIMIT 15
                         """
-                        
+
                         patterns_results = loop.run_until_complete(
                             self.telemetry_client.execute_query(patterns_query)
                         )
-                        
+
                         loop.close()
-                        
+
                         # Process results
                         patterns = []
                         if patterns_results:
                             for row in patterns_results:
-                                language = row.get('language', 'Unknown')
-                                if language != 'Other':  # Filter out generic 'Other' category
-                                    patterns.append({
-                                        'language': language,
-                                        'count': int(row.get('count', 0)),
-                                        'total_size': int(row.get('total_size', 0))
-                                    })
-                        
-                        return jsonify({
-                            'patterns': patterns,
-                            'last_updated': datetime.now().isoformat()
-                        })
-                        
+                                language = row.get("language", "Unknown")
+                                if (
+                                    language != "Other"
+                                ):  # Filter out generic 'Other' category
+                                    patterns.append(
+                                        {
+                                            "language": language,
+                                            "count": int(row.get("count", 0)),
+                                            "total_size": int(row.get("total_size", 0)),
+                                        }
+                                    )
+
+                        return jsonify(
+                            {
+                                "patterns": patterns,
+                                "last_updated": datetime.now().isoformat(),
+                            }
+                        )
+
                     except Exception as e:
                         loop.close()
                         logger.error(f"Error querying code patterns: {e}")
                         # Fall through to fallback data
-                
+
                 # Fallback data when no database connection
-                return jsonify({
-                    'patterns': [
-                        {'language': 'Python', 'count': 45, 'total_size': 128500},
-                        {'language': 'TypeScript', 'count': 32, 'total_size': 95200},
-                        {'language': 'JavaScript', 'count': 28, 'total_size': 78300},
-                        {'language': 'HTML', 'count': 15, 'total_size': 45600},
-                        {'language': 'CSS', 'count': 12, 'total_size': 23400},
-                        {'language': 'JSON', 'count': 8, 'total_size': 12100}
-                    ],
-                    'last_updated': datetime.now().isoformat()
-                })
-                
+                return jsonify(
+                    {
+                        "patterns": [
+                            {"language": "Python", "count": 45, "total_size": 128500},
+                            {
+                                "language": "TypeScript",
+                                "count": 32,
+                                "total_size": 95200,
+                            },
+                            {
+                                "language": "JavaScript",
+                                "count": 28,
+                                "total_size": 78300,
+                            },
+                            {"language": "HTML", "count": 15, "total_size": 45600},
+                            {"language": "CSS", "count": 12, "total_size": 23400},
+                            {"language": "JSON", "count": 8, "total_size": 12100},
+                        ],
+                        "last_updated": datetime.now().isoformat(),
+                    }
+                )
+
             except Exception as e:
                 logger.error(f"Error in code patterns analytics endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
+                return jsonify({"error": str(e)}), 500
+
             # ==================== PROJECT SUMMARY ANALYTICS API ENDPOINTS ====================
-    
-        @self.app.route('/api/project-summary/categories')
+
+        @self.app.route("/api/project-summary/categories")
         def get_project_categories():
             """Get project categories distribution from summary analytics."""
             try:
                 if self.project_summary_analytics:
-                    data = self.project_summary_analytics.get_project_categories_summary()
-                    return jsonify({
-                        'success': True,
-                        'data': data
-                    })
+                    data = (
+                        self.project_summary_analytics.get_project_categories_summary()
+                    )
+                    return jsonify({"success": True, "data": data})
                 else:
-                    return jsonify({
-                        'success': False,
-                        'message': 'Project summary analytics not available',
-                        'data': {'categories': [], 'total': 0}
-                    })
-                    
+                    return jsonify(
+                        {
+                            "success": False,
+                            "message": "Project summary analytics not available",
+                            "data": {"categories": [], "total": 0},
+                        }
+                    )
+
             except Exception as e:
                 logger.error(f"Error in project categories endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
-        @self.app.route('/api/project-summary/completion-metrics')
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/project-summary/completion-metrics")
         def get_project_completion_metrics():
             """Get project completion metrics from summary analytics."""
             try:
                 if self.project_summary_analytics:
                     data = self.project_summary_analytics.get_completion_metrics()
-                    return jsonify({
-                        'success': True,
-                        'data': data
-                    })
+                    return jsonify({"success": True, "data": data})
                 else:
-                    return jsonify({
-                        'success': False,
-                        'message': 'Project summary analytics not available',
-                        'data': {'completed': 0, 'in_progress': 0, 'completion_rate': 0}
-                    })
-                    
+                    return jsonify(
+                        {
+                            "success": False,
+                            "message": "Project summary analytics not available",
+                            "data": {
+                                "completed": 0,
+                                "in_progress": 0,
+                                "completion_rate": 0,
+                            },
+                        }
+                    )
+
             except Exception as e:
                 logger.error(f"Error in completion metrics endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
-        @self.app.route('/api/project-summary/recent-projects')
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/project-summary/recent-projects")
         def get_recent_projects():
             """Get recent projects from summary analytics."""
             try:
-                limit = request.args.get('limit', 10, type=int)
+                limit = request.args.get("limit", 10, type=int)
                 limit = min(50, max(1, limit))  # Clamp between 1-50
-                
+
                 if self.project_summary_analytics:
-                    data = self.project_summary_analytics.get_recent_projects(limit=limit)
-                    return jsonify({
-                        'success': True,
-                        'data': data,
-                        'limit': limit
-                    })
+                    data = self.project_summary_analytics.get_recent_projects(
+                        limit=limit
+                    )
+                    return jsonify({"success": True, "data": data, "limit": limit})
                 else:
-                    return jsonify({
-                        'success': False,
-                        'message': 'Project summary analytics not available',
-                        'data': []
-                    })
-                    
+                    return jsonify(
+                        {
+                            "success": False,
+                            "message": "Project summary analytics not available",
+                            "data": [],
+                        }
+                    )
+
             except Exception as e:
                 logger.error(f"Error in recent projects endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
-        @self.app.route('/api/project-summary/full-analytics')
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/project-summary/full-analytics")
         def get_full_project_analytics():
             """Get comprehensive project summary analytics."""
             try:
-                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+                if (
+                    self.project_summary_analytics
+                    and PROJECT_SUMMARY_ANALYTICS_AVAILABLE
+                ):
                     fallback_data = {
-                        'overview': {'total_projects': 0},
-                        'categories': {},
-                        'completion_status': {},
-                        'timeline': {},
-                        'technology_trends': {},
-                        'productivity_insights': {},
-                        'metadata': {'total_summaries': 0}
+                        "overview": {"total_projects": 0},
+                        "categories": {},
+                        "completion_status": {},
+                        "timeline": {},
+                        "technology_trends": {},
+                        "productivity_insights": {},
+                        "metadata": {"total_summaries": 0},
                     }
 
                     analytics_data = self._refresh_project_summary_cache(force=True)
                     if analytics_data is None:
                         analytics_data = fallback_data
 
-                    if analytics_data.get('error'):
-                        message = analytics_data['error']
-                        logger.error(f"Error in full project analytics endpoint: {message}")
-                        return jsonify({
-                            'success': False,
-                            'message': f'Project summary analytics failed: {message}',
-                            'data': fallback_data
-                        })
+                    if analytics_data.get("error"):
+                        message = analytics_data["error"]
+                        logger.error(
+                            f"Error in full project analytics endpoint: {message}"
+                        )
+                        return jsonify(
+                            {
+                                "success": False,
+                                "message": f"Project summary analytics failed: {message}",
+                                "data": fallback_data,
+                            }
+                        )
 
-                    return jsonify({
-                        'success': True,
-                        'data': analytics_data
-                    })
+                    return jsonify({"success": True, "data": analytics_data})
                 else:
-                    return jsonify({
-                        'success': False,
-                        'message': 'Project summary analytics not available',
-                        'data': {
-                            'overview': {'total_projects': 0},
-                            'categories': {},
-                            'completion_status': {},
-                            'timeline': {},
-                            'technology_trends': {},
-                            'productivity_insights': {},
-                            'metadata': {'total_summaries': 0}
+                    return jsonify(
+                        {
+                            "success": False,
+                            "message": "Project summary analytics not available",
+                            "data": {
+                                "overview": {"total_projects": 0},
+                                "categories": {},
+                                "completion_status": {},
+                                "timeline": {},
+                                "technology_trends": {},
+                                "productivity_insights": {},
+                                "metadata": {"total_summaries": 0},
+                            },
                         }
-                    })
-                    
+                    )
+
             except Exception as e:
                 logger.error(f"Error in full project analytics endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
-        @self.app.route('/api/project-summary-widgets')
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/project-summary-widgets")
         def get_project_summary_widgets():
             """Get project summary widgets for dashboard."""
             try:
                 self._refresh_project_summary_cache()
                 widgets = {}
-                
-                if self.project_summary_analytics and PROJECT_SUMMARY_ANALYTICS_AVAILABLE:
+
+                if (
+                    self.project_summary_analytics
+                    and PROJECT_SUMMARY_ANALYTICS_AVAILABLE
+                ):
                     # Project Categories Widget
-                    categories_data = self.project_summary_analytics.get_project_categories_summary()
-                    widgets['project_categories'] = {
-                        'widget_type': 'project_categories',
-                        'title': 'Project Categories',
-                        'status': 'healthy',
-                        'data': categories_data,
-                        'last_updated': datetime.now().isoformat(),
-                        'alerts': []
+                    categories_data = (
+                        self.project_summary_analytics.get_project_categories_summary()
+                    )
+                    widgets["project_categories"] = {
+                        "widget_type": "project_categories",
+                        "title": "Project Categories",
+                        "status": "healthy",
+                        "data": categories_data,
+                        "last_updated": datetime.now().isoformat(),
+                        "alerts": [],
                     }
-                    
-                    # Completion Metrics Widget  
-                    completion_data = self.project_summary_analytics.get_completion_metrics()
-                    widgets['completion_metrics'] = {
-                        'widget_type': 'completion_metrics',
-                        'title': 'Project Completion',
-                        'status': 'healthy' if completion_data.get('completion_rate', 0) > 50 else 'warning',
-                        'data': completion_data,
-                        'last_updated': datetime.now().isoformat(),
-                        'alerts': [] if completion_data.get('completion_rate', 0) > 30 else ['Low completion rate']
+
+                    # Completion Metrics Widget
+                    completion_data = (
+                        self.project_summary_analytics.get_completion_metrics()
+                    )
+                    widgets["completion_metrics"] = {
+                        "widget_type": "completion_metrics",
+                        "title": "Project Completion",
+                        "status": (
+                            "healthy"
+                            if completion_data.get("completion_rate", 0) > 50
+                            else "warning"
+                        ),
+                        "data": completion_data,
+                        "last_updated": datetime.now().isoformat(),
+                        "alerts": (
+                            []
+                            if completion_data.get("completion_rate", 0) > 30
+                            else ["Low completion rate"]
+                        ),
                     }
-                    
+
                     # Recent Projects Widget
-                    recent_data = self.project_summary_analytics.get_recent_projects(limit=5)
-                    widgets['recent_projects'] = {
-                        'widget_type': 'recent_projects', 
-                        'title': 'Recent Projects',
-                        'status': 'healthy',
-                        'data': {'projects': recent_data, 'count': len(recent_data)},
-                        'last_updated': datetime.now().isoformat(),
-                        'alerts': []
+                    recent_data = self.project_summary_analytics.get_recent_projects(
+                        limit=5
+                    )
+                    widgets["recent_projects"] = {
+                        "widget_type": "recent_projects",
+                        "title": "Recent Projects",
+                        "status": "healthy",
+                        "data": {"projects": recent_data, "count": len(recent_data)},
+                        "last_updated": datetime.now().isoformat(),
+                        "alerts": [],
                     }
-                    
+
                 else:
                     # Fallback widgets when analytics not available
-                    widgets['project_categories'] = {
-                        'widget_type': 'project_categories',
-                        'title': 'Project Categories',
-                        'status': 'unavailable',
-                        'data': {'categories': [], 'total': 0},
-                        'last_updated': datetime.now().isoformat(),
-                        'alerts': ['Project analytics not available']
+                    widgets["project_categories"] = {
+                        "widget_type": "project_categories",
+                        "title": "Project Categories",
+                        "status": "unavailable",
+                        "data": {"categories": [], "total": 0},
+                        "last_updated": datetime.now().isoformat(),
+                        "alerts": ["Project analytics not available"],
                     }
-                
+
                 return jsonify(widgets)
-                
+
             except Exception as e:
                 logger.error(f"Error in project summary widgets endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
-    
-        @self.app.route('/api/debug/project-analytics-status')
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/debug/project-analytics-status")
         def debug_project_analytics_status():
             """Debug endpoint to check project analytics import status."""
-            return jsonify({
-                'PROJECT_SUMMARY_ANALYTICS_AVAILABLE': PROJECT_SUMMARY_ANALYTICS_AVAILABLE,
-                'project_summary_analytics_instance': self.project_summary_analytics is not None,
-                'import_test': 'success' if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else 'failed'
-            })
+            return jsonify(
+                {
+                    "PROJECT_SUMMARY_ANALYTICS_AVAILABLE": PROJECT_SUMMARY_ANALYTICS_AVAILABLE,
+                    "project_summary_analytics_instance": self.project_summary_analytics
+                    is not None,
+                    "import_test": (
+                        "success" if PROJECT_SUMMARY_ANALYTICS_AVAILABLE else "failed"
+                    ),
+                }
+            )
 
-        @self.app.route('/api/content-search', methods=['GET', 'POST'])
+        @self.app.route("/api/content-search", methods=["GET", "POST"])
         def search_content():
             """Search across conversation content, files, and tool outputs."""
             try:
                 # Handle GET request for health check
-                if request.method == 'GET':
-                    return jsonify({
-                        'results': [], 
-                        'status': 'healthy',
-                        'message': 'Content search endpoint is available. Use POST with JSON body to search.',
-                        'last_updated': datetime.now().isoformat()
-                    })
-                
+                if request.method == "GET":
+                    return jsonify(
+                        {
+                            "results": [],
+                            "status": "healthy",
+                            "message": "Content search endpoint is available. Use POST with JSON body to search.",
+                            "last_updated": datetime.now().isoformat(),
+                        }
+                    )
+
                 # Handle POST request for actual search
                 if not request.is_json:
-                    return jsonify({'error': 'Request must be JSON'}), 400
-                
+                    return jsonify({"error": "Request must be JSON"}), 400
+
                 data = request.get_json()
-                query = data.get('query', '').strip()
-                filters = data.get('filters', {
-                    'messages': True,
-                    'code': True, 
-                    'files': True,
-                    'tools': True
-                })
-                
+                query = data.get("query", "").strip()
+                filters = data.get(
+                    "filters",
+                    {"messages": True, "code": True, "files": True, "tools": True},
+                )
+
                 if not query:
-                    return jsonify({'results': []})
-                
+                    return jsonify({"results": []})
+
                 if len(query) < 2:
-                    return jsonify({'error': 'Search query too short (minimum 2 characters)'}), 400
-                
-                if hasattr(self, 'telemetry_client') and self.telemetry_client:
+                    return (
+                        jsonify(
+                            {"error": "Search query too short (minimum 2 characters)"}
+                        ),
+                        400,
+                    )
+
+                if hasattr(self, "telemetry_client") and self.telemetry_client:
                     import asyncio
+
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    
+
                     results = []
-                    
+
                     try:
                         # Search messages if enabled
-                        if filters.get('messages', True):
+                        if filters.get("messages", True):
                             message_query = f"""
                             SELECT 
                                 'message' as type,
@@ -2786,23 +3320,25 @@ class ComprehensiveHealthDashboard:
                             ORDER BY timestamp DESC
                             LIMIT 20
                             """
-                            
+
                             message_results = loop.run_until_complete(
                                 self.telemetry_client.execute_query(message_query)
                             )
-                            
+
                             for row in message_results:
-                                results.append({
-                                    'id': row.get('id', ''),
-                                    'type': 'Message',
-                                    'content': row.get('excerpt', ''),
-                                    'session_id': row.get('session_id', ''),
-                                    'timestamp': row.get('timestamp', ''),
-                                    'metadata': f"Role: {row.get('role', 'unknown')}"
-                                })
-                        
+                                results.append(
+                                    {
+                                        "id": row.get("id", ""),
+                                        "type": "Message",
+                                        "content": row.get("excerpt", ""),
+                                        "session_id": row.get("session_id", ""),
+                                        "timestamp": row.get("timestamp", ""),
+                                        "metadata": f"Role: {row.get('role', 'unknown')}",
+                                    }
+                                )
+
                         # Search files if enabled
-                        if filters.get('files', True):
+                        if filters.get("files", True):
                             file_query = f"""
                             SELECT 
                                 'file' as type,
@@ -2818,24 +3354,26 @@ class ComprehensiveHealthDashboard:
                             ORDER BY timestamp DESC
                             LIMIT 15
                             """
-                            
+
                             file_results = loop.run_until_complete(
                                 self.telemetry_client.execute_query(file_query)
                             )
-                            
+
                             for row in file_results:
-                                results.append({
-                                    'id': row.get('id', ''),
-                                    'type': 'File',
-                                    'content': row.get('excerpt', ''),
-                                    'session_id': row.get('session_id', ''),
-                                    'timestamp': row.get('timestamp', ''),
-                                    'file_path': row.get('file_path', ''),
-                                    'metadata': f"File: {row.get('file_path', 'unknown')}"
-                                })
-                        
+                                results.append(
+                                    {
+                                        "id": row.get("id", ""),
+                                        "type": "File",
+                                        "content": row.get("excerpt", ""),
+                                        "session_id": row.get("session_id", ""),
+                                        "timestamp": row.get("timestamp", ""),
+                                        "file_path": row.get("file_path", ""),
+                                        "metadata": f"File: {row.get('file_path', 'unknown')}",
+                                    }
+                                )
+
                         # Search tool outputs if enabled
-                        if filters.get('tools', True):
+                        if filters.get("tools", True):
                             tool_query = f"""
                             SELECT 
                                 'tool' as type,
@@ -2850,62 +3388,68 @@ class ComprehensiveHealthDashboard:
                             ORDER BY timestamp DESC
                             LIMIT 10
                             """
-                            
+
                             tool_results = loop.run_until_complete(
                                 self.telemetry_client.execute_query(tool_query)
                             )
-                            
+
                             for row in tool_results:
-                                results.append({
-                                    'id': row.get('id', ''),
-                                    'type': 'Tool Output',
-                                    'content': row.get('excerpt', ''),
-                                    'session_id': row.get('session_id', ''),
-                                    'timestamp': row.get('timestamp', ''),
-                                    'metadata': f"Tool: {row.get('tool_name', 'unknown')}"
-                                })
-                        
+                                results.append(
+                                    {
+                                        "id": row.get("id", ""),
+                                        "type": "Tool Output",
+                                        "content": row.get("excerpt", ""),
+                                        "session_id": row.get("session_id", ""),
+                                        "timestamp": row.get("timestamp", ""),
+                                        "metadata": f"Tool: {row.get('tool_name', 'unknown')}",
+                                    }
+                                )
+
                         loop.close()
-                        
+
                         # Sort all results by timestamp (most recent first)
-                        results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-                        
-                        return jsonify({
-                            'results': results[:50],  # Limit total results
-                            'total_found': len(results),
-                            'query': query,
-                            'filters_applied': filters,
-                            'last_updated': datetime.now().isoformat()
-                        })
-                        
+                        results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+                        return jsonify(
+                            {
+                                "results": results[:50],  # Limit total results
+                                "total_found": len(results),
+                                "query": query,
+                                "filters_applied": filters,
+                                "last_updated": datetime.now().isoformat(),
+                            }
+                        )
+
                     except Exception as e:
                         loop.close()
                         logger.error(f"Error in content search query: {e}")
                         # Fall through to fallback data
-                
+
                 # Fallback search results when no database connection
                 fallback_results = [
                     {
-                        'id': 'demo-1',
-                        'type': 'Message',
-                        'content': f'This is a demo search result for "{query}". Real search requires database connection.',
-                        'session_id': 'demo-session',
-                        'timestamp': datetime.now().isoformat(),
-                        'metadata': 'Role: assistant'
+                        "id": "demo-1",
+                        "type": "Message",
+                        "content": f'This is a demo search result for "{query}". Real search requires database connection.',
+                        "session_id": "demo-session",
+                        "timestamp": datetime.now().isoformat(),
+                        "metadata": "Role: assistant",
                     }
                 ]
-                
-                return jsonify({
-                    'results': fallback_results,
-                    'total_found': 1,
-                    'query': query,
-                    'filters_applied': filters,
-                    'last_updated': datetime.now().isoformat()
-                })
-                
+
+                return jsonify(
+                    {
+                        "results": fallback_results,
+                        "total_found": 1,
+                        "query": query,
+                        "filters_applied": filters,
+                        "last_updated": datetime.now().isoformat(),
+                    }
+                )
+
             except Exception as e:
                 logger.error(f"Error in content search endpoint: {e}")
-                return jsonify({'error': str(e)}), 500
+                return jsonify({"error": str(e)}), 500
 
     # Phase 2.4: SocketIO events extracted to dashboard_realtime module
 
@@ -2937,13 +3481,18 @@ class ComprehensiveHealthDashboard:
         if not self._is_running:
             self._is_running = True
             # Real-time infrastructure already started in setup, ensure it's running
-            if not (self.realtime_manager._update_thread and self.realtime_manager._update_thread.is_alive()):
+            if not (
+                self.realtime_manager._update_thread
+                and self.realtime_manager._update_thread.is_alive()
+            ):
                 self.realtime_manager.start_background_broadcasting()
 
         # Smart auto-detection: try production first unless explicitly disabled
         if production is None:
             production = self._should_use_production_server()
-            logger.info(f"🔍 Auto-detected server mode: {'production' if production else 'development'}")
+            logger.info(
+                f"🔍 Auto-detected server mode: {'production' if production else 'development'}"
+            )
 
         if production and self.socketio.async_mode != "eventlet":
             logger.info(
@@ -2953,18 +3502,26 @@ class ComprehensiveHealthDashboard:
             production = False
 
         if production:
-            logger.info(f"🚀 Attempting to start comprehensive dashboard with Gunicorn (production) on http://{host}:{port}")
+            logger.info(
+                f"🚀 Attempting to start comprehensive dashboard with Gunicorn (production) on http://{host}:{port}"
+            )
             try:
-                self._start_production_server(host, port, gunicorn_workers, open_browser)
+                self._start_production_server(
+                    host, port, gunicorn_workers, open_browser
+                )
             except Exception as e:
                 logger.warning(f"💡 Production server failed: {e}")
                 logger.info("🔄 Falling back to development server...")
                 self._start_development_server(host, port, debug, open_browser)
         else:
-            logger.info(f"🛠️ Starting comprehensive dashboard with Flask development server on http://{host}:{port}")
+            logger.info(
+                f"🛠️ Starting comprehensive dashboard with Flask development server on http://{host}:{port}"
+            )
             self._start_development_server(host, port, debug, open_browser)
 
-    def _start_development_server(self, host: str, port: int, debug: bool, open_browser: bool):
+    def _start_development_server(
+        self, host: str, port: int, debug: bool, open_browser: bool
+    ):
         """Start Flask development server with Werkzeug."""
         if open_browser:
             # Open browser after a short delay
@@ -2994,29 +3551,38 @@ class ComprehensiveHealthDashboard:
         # Check if gunicorn is available
         try:
             import subprocess
-            subprocess.run(['gunicorn', '--version'],
-                         capture_output=True, check=True, timeout=5)
+
+            subprocess.run(
+                ["gunicorn", "--version"], capture_output=True, check=True, timeout=5
+            )
             logger.debug("✅ Gunicorn is available")
             gunicorn_available = True
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        except (
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+        ):
             logger.debug("❌ Gunicorn not available or not working")
             gunicorn_available = False
 
         # Check environment indicators
         import os
+
         env_indicators = {
-            'FLASK_ENV': os.getenv('FLASK_ENV', '').lower(),
-            'ENVIRONMENT': os.getenv('ENVIRONMENT', '').lower(),
-            'DEPLOYMENT_ENV': os.getenv('DEPLOYMENT_ENV', '').lower(),
+            "FLASK_ENV": os.getenv("FLASK_ENV", "").lower(),
+            "ENVIRONMENT": os.getenv("ENVIRONMENT", "").lower(),
+            "DEPLOYMENT_ENV": os.getenv("DEPLOYMENT_ENV", "").lower(),
         }
 
         # Force development server if explicitly set
-        is_dev_env = any(env in ['development', 'dev', 'local']
-                        for env in env_indicators.values())
+        is_dev_env = any(
+            env in ["development", "dev", "local"] for env in env_indicators.values()
+        )
 
         # Force production server if explicitly set
-        is_prod_env = any(env in ['production', 'prod', 'staging']
-                         for env in env_indicators.values())
+        is_prod_env = any(
+            env in ["production", "prod", "staging"] for env in env_indicators.values()
+        )
 
         # Auto-detection logic
         if is_dev_env:
@@ -3027,31 +3593,39 @@ class ComprehensiveHealthDashboard:
             return gunicorn_available
         else:
             # Default: try production if gunicorn is available
-            logger.debug("🔍 No explicit environment set, defaulting based on gunicorn availability")
+            logger.debug(
+                "🔍 No explicit environment set, defaulting based on gunicorn availability"
+            )
             return gunicorn_available
 
-    def _start_production_server(self, host: str, port: int, workers: Optional[int], open_browser: bool):
+    def _start_production_server(
+        self, host: str, port: int, workers: Optional[int], open_browser: bool
+    ):
         """Start production server using Gunicorn."""
         import subprocess
         import multiprocessing
         import os
         import shutil
         from pathlib import Path
-        
+
         try:
             logger.info("🔧 === GUNICORN STARTUP DIAGNOSTICS ===")
-            
+
             # Set workers count
             if workers is None:
                 workers = multiprocessing.cpu_count() * 2 + 1
-            logger.info(f"📊 Workers configuration: {workers} (CPU count: {multiprocessing.cpu_count()})")
-            
+            logger.info(
+                f"📊 Workers configuration: {workers} (CPU count: {multiprocessing.cpu_count()})"
+            )
+
             # Check if Gunicorn is installed
-            gunicorn_path = shutil.which('gunicorn')
+            gunicorn_path = shutil.which("gunicorn")
             if gunicorn_path:
                 logger.info(f"✅ Gunicorn found at: {gunicorn_path}")
             else:
-                logger.warning("⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter")
+                logger.warning(
+                    "⚠️  Gunicorn executable not found on PATH; will invoke via current Python interpreter"
+                )
 
             # Ensure the current interpreter can load gunicorn
             try:
@@ -3060,7 +3634,9 @@ class ComprehensiveHealthDashboard:
                     check=True,
                     capture_output=True,
                 )
-                logger.info(f"✅ Gunicorn module available in interpreter: {sys.executable}")
+                logger.info(
+                    f"✅ Gunicorn module available in interpreter: {sys.executable}"
+                )
             except Exception as exc:
                 logger.error("❌ Gunicorn invocation failed: %s", exc)
                 raise
@@ -3069,7 +3645,7 @@ class ComprehensiveHealthDashboard:
             logger.info("📝 Creating WSGI entry point...")
             self._create_wsgi_entry_point()
             logger.info("✅ WSGI entry point created successfully")
-            
+
             # Check if WSGI file exists
             wsgi_file = Path.cwd() / "context_cleaner_wsgi.py"
             if wsgi_file.exists():
@@ -3077,74 +3653,97 @@ class ComprehensiveHealthDashboard:
                 logger.info(f"📏 WSGI file size: {wsgi_file.stat().st_size} bytes")
             else:
                 logger.error(f"❌ WSGI file not found: {wsgi_file}")
-            
+
             # Set environment variables
             env = os.environ.copy()
             project_root = Path(__file__).resolve().parents[3]
-            env.update({
-                'FLASK_ENV': 'production',
-                'CLAUDE_CODE_ENABLE_TELEMETRY': '1',
-                'PYTHONPATH': os.pathsep.join(filter(None, [str(project_root), env.get('PYTHONPATH')]))
-            })
+            env.update(
+                {
+                    "FLASK_ENV": "production",
+                    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+                    "PYTHONPATH": os.pathsep.join(
+                        filter(None, [str(project_root), env.get("PYTHONPATH")])
+                    ),
+                }
+            )
 
             # Ensure the Python bin directory is at the front so subcommands use matching interpreter
             python_bin = Path(sys.executable).parent
-            env['PATH'] = os.pathsep.join([str(python_bin), env.get('PATH', '')])
+            env["PATH"] = os.pathsep.join([str(python_bin), env.get("PATH", "")])
             logger.info(f"🌍 Environment variables set:")
             logger.info(f"   FLASK_ENV: {env.get('FLASK_ENV')}")
-            logger.info(f"   CLAUDE_CODE_ENABLE_TELEMETRY: {env.get('CLAUDE_CODE_ENABLE_TELEMETRY')}")
+            logger.info(
+                f"   CLAUDE_CODE_ENABLE_TELEMETRY: {env.get('CLAUDE_CODE_ENABLE_TELEMETRY')}"
+            )
             logger.info(f"   PYTHONPATH: {env.get('PYTHONPATH')}")
-            
+
             # Test WSGI application import
             logger.info("🧪 Testing WSGI application import...")
             try:
                 import importlib.util
-                spec = importlib.util.spec_from_file_location("context_cleaner_wsgi", wsgi_file)
+
+                spec = importlib.util.spec_from_file_location(
+                    "context_cleaner_wsgi", wsgi_file
+                )
                 if spec and spec.loader:
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
-                    if hasattr(module, 'application'):
+                    if hasattr(module, "application"):
                         logger.info("✅ WSGI application import test successful")
                     else:
-                        logger.error("❌ WSGI application has no 'application' attribute")
+                        logger.error(
+                            "❌ WSGI application has no 'application' attribute"
+                        )
                 else:
                     logger.error("❌ Failed to create WSGI module spec")
             except Exception as import_error:
                 logger.error("❌ WSGI application import test failed: %s", import_error)
                 logger.error("🔍 Import error type: %s", type(import_error).__name__)
-            
+
             # Open browser if requested
             if open_browser:
                 logger.info("🌐 Browser will open in 2 seconds...")
                 threading.Timer(
                     2.0, lambda: webbrowser.open(f"http://{host}:{port}")
                 ).start()
-            
+
             # Ensure stale gunicorn PID file doesn't block restart
-            pid_file = Path('/tmp/context_cleaner_dashboard.pid')
+            pid_file = Path("/tmp/context_cleaner_dashboard.pid")
             if pid_file.exists():
                 try:
                     logger.debug("🔍 Removing stale Gunicorn PID file at %s", pid_file)
                     pid_file.unlink()
                 except OSError as pid_error:
-                    logger.warning("⚠️  Could not remove stale Gunicorn PID file %s: %s", pid_file, pid_error)
+                    logger.warning(
+                        "⚠️  Could not remove stale Gunicorn PID file %s: %s",
+                        pid_file,
+                        pid_error,
+                    )
 
             # Gunicorn command
             cmd = [
                 sys.executable,
-                '-m',
-                'gunicorn',
-                '--bind', f'{host}:{port}',
-                '--workers', str(workers),
-                '--worker-class', 'eventlet',
-                '--timeout', '60',
-                '--keep-alive', '5',
-                '--access-logfile', '-',
-                '--error-logfile', '-',
-                '--log-level', 'info',
-                'context_cleaner_wsgi:application'
+                "-m",
+                "gunicorn",
+                "--bind",
+                f"{host}:{port}",
+                "--workers",
+                str(workers),
+                "--worker-class",
+                "eventlet",
+                "--timeout",
+                "60",
+                "--keep-alive",
+                "5",
+                "--access-logfile",
+                "-",
+                "--error-logfile",
+                "-",
+                "--log-level",
+                "info",
+                "context_cleaner_wsgi:application",
             ]
-            
+
             logger.info("🚀 === GUNICORN STARTUP COMMAND ===")
             logger.info(f"📋 Full command: {' '.join(cmd)}")
             logger.info(f"🔗 Binding to: {host}:{port}")
@@ -3154,23 +3753,25 @@ class ComprehensiveHealthDashboard:
             logger.info(f"💓 Keep-alive: 5 seconds")
             logger.info(f"📊 Log level: info")
             logger.info(f"📦 WSGI module: context_cleaner_wsgi:application")
-            
+
             logger.info("🔄 === STARTING GUNICORN SERVER ===")
             logger.info(f"📊 Dashboard URL: http://{host}:{port}")
             logger.info("🔄 Press Ctrl+C to stop")
-            
+
             # Start Gunicorn process
             logger.info("🎬 Executing Gunicorn command...")
             result = subprocess.run(cmd, env=env, check=True, capture_output=False)
-            logger.info(f"✅ Gunicorn process completed with return code: {result.returncode}")
-            
+            logger.info(
+                f"✅ Gunicorn process completed with return code: {result.returncode}"
+            )
+
         except subprocess.CalledProcessError as e:
             logger.error("❌ === GUNICORN STARTUP FAILED ===")
             logger.error(f"💥 CalledProcessError: {e}")
             logger.error(f"📊 Return code: {e.returncode}")
-            if hasattr(e, 'stdout') and e.stdout:
+            if hasattr(e, "stdout") and e.stdout:
                 logger.error(f"📤 Stdout: {e.stdout}")
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 logger.error(f"📥 Stderr: {e.stderr}")
             logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
@@ -3189,6 +3790,7 @@ class ComprehensiveHealthDashboard:
             logger.error(f"💥 Exception type: {type(e).__name__}")
             logger.error(f"💥 Exception message: {e}")
             import traceback
+
             logger.error("📋 Traceback\\n%s", traceback.format_exc())
             logger.info("🔄 Falling back to development server...")
             self._start_development_server(host, port, False, open_browser)
@@ -3196,6 +3798,7 @@ class ComprehensiveHealthDashboard:
     def _create_wsgi_entry_point(self):
         """Create WSGI entry point for Gunicorn."""
         import os
+
         wsgi_content = '''#!/usr/bin/env python3
 """
 WSGI entry point for Context Cleaner Dashboard (Gunicorn)
@@ -3283,7 +3886,7 @@ if __name__ == "__main__":
         wsgi_path = Path("context_cleaner_wsgi.py")
         with open(wsgi_path, "w") as f:
             f.write(wsgi_content)
-        
+
         # Make executable
         os.chmod(wsgi_path, 0o755)
         logger.info(f"✅ Created WSGI entry point: {wsgi_path}")
@@ -3300,9 +3903,13 @@ if __name__ == "__main__":
             except Exception as exc:  # pragma: no cover - best effort shutdown
                 logger.debug("SocketIO stop encountered an error: %s", exc)
 
-            if getattr(self.socketio, "async_mode", None) == "threading" and not self._shutdown_signaled:
+            if (
+                getattr(self.socketio, "async_mode", None) == "threading"
+                and not self._shutdown_signaled
+            ):
                 try:
                     import signal
+
                     os.kill(os.getpid(), signal.SIGINT)
                     self._shutdown_signaled = True
                 except Exception as exc:  # pragma: no cover - defensive
@@ -3378,7 +3985,9 @@ if __name__ == "__main__":
             coroutine = self.telemetry_client.get_total_aggregated_stats()
 
             # Defensive guard: make sure we actually got a coroutine/future back
-            if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+            if not asyncio.iscoroutine(coroutine) and not isinstance(
+                coroutine, asyncio.Future
+            ):
                 logger.warning(
                     "Expected coroutine from get_total_aggregated_stats(), got %s",
                     type(coroutine),
@@ -3405,7 +4014,9 @@ if __name__ == "__main__":
                 TelemetryWidgetType.MODEL_EFFICIENCY
             )
 
-            if not asyncio.iscoroutine(coroutine) and not isinstance(coroutine, asyncio.Future):
+            if not asyncio.iscoroutine(coroutine) and not isinstance(
+                coroutine, asyncio.Future
+            ):
                 logger.warning(
                     "Expected coroutine from telemetry widget get_widget_data(), got %s",
                     type(coroutine),
@@ -3428,90 +4039,102 @@ if __name__ == "__main__":
             import os
             import json
             from pathlib import Path
-            
+
             # Find JSONL files in common directories
             jsonl_dirs = [
                 Path.home() / ".claude",
                 Path.home() / ".claude" / "contexts",
                 Path(os.getcwd()),
-                Path(os.getcwd()) / "contexts"
+                Path(os.getcwd()) / "contexts",
             ]
-            
+
             total_tokens = 0
             total_sessions = 0
             successful_sessions = 0
             total_cost = 0.0
             error_count = 0
-            
+
             session_parser = SessionParser()
-            
+
             for jsonl_dir in jsonl_dirs:
                 if not jsonl_dir.exists():
                     continue
-                    
+
                 # Look for JSONL files recursively
                 jsonl_files = list(jsonl_dir.rglob("*.jsonl"))
-                
+
                 for jsonl_file in jsonl_files:
                     try:
-                        sessions = session_parser.parse_sessions_from_file(str(jsonl_file))
+                        sessions = session_parser.parse_sessions_from_file(
+                            str(jsonl_file)
+                        )
                         total_sessions += len(sessions)
-                        
+
                         for session in sessions:
                             # Count tokens using our enhanced counter
                             for message in session.messages:
-                                if hasattr(message, 'content') and message.content:
-                                    tokens = get_accurate_token_count(str(message.content))
+                                if hasattr(message, "content") and message.content:
+                                    tokens = get_accurate_token_count(
+                                        str(message.content)
+                                    )
                                     total_tokens += tokens
-                            
+
                             # Calculate session success (sessions with at least one assistant response)
                             has_assistant_response = any(
-                                hasattr(msg, 'role') and msg.role == 'assistant' 
+                                hasattr(msg, "role") and msg.role == "assistant"
                                 for msg in session.messages
                             )
                             if has_assistant_response:
                                 successful_sessions += 1
-                            
+
                             # Estimate cost (rough calculation: $0.01 per 1000 tokens)
                             session_tokens = sum(
-                                get_accurate_token_count(str(msg.content)) 
-                                for msg in session.messages 
-                                if hasattr(msg, 'content') and msg.content
+                                get_accurate_token_count(str(msg.content))
+                                for msg in session.messages
+                                if hasattr(msg, "content") and msg.content
                             )
                             total_cost += (session_tokens / 1000) * 0.01
-                        
+
                     except Exception as e:
                         logger.debug(f"Error parsing JSONL file {jsonl_file}: {e}")
                         error_count += 1
                         continue
-            
+
             # Calculate success rate
-            success_rate = f"{(successful_sessions / total_sessions * 100):.1f}%" if total_sessions > 0 else "0%"
-            
+            success_rate = (
+                f"{(successful_sessions / total_sessions * 100):.1f}%"
+                if total_sessions > 0
+                else "0%"
+            )
+
             # Active agents is estimated based on recent activity
-            active_agents = min(4, max(1, total_sessions // 10)) if total_sessions > 0 else 0
-            
+            active_agents = (
+                min(4, max(1, total_sessions // 10)) if total_sessions > 0 else 0
+            )
+
             return {
-                'total_tokens': f"{total_tokens:,}" if total_tokens > 0 else "No sessions found",
-                'total_sessions': str(total_sessions),
-                'success_rate': success_rate,
-                'active_agents': str(active_agents),
-                'total_cost': f"${total_cost:.2f}",
-                'total_errors': error_count,
-                'raw_total_tokens': total_tokens
+                "total_tokens": (
+                    f"{total_tokens:,}" if total_tokens > 0 else "No sessions found"
+                ),
+                "total_sessions": str(total_sessions),
+                "success_rate": success_rate,
+                "active_agents": str(active_agents),
+                "total_cost": f"${total_cost:.2f}",
+                "total_errors": error_count,
+                "raw_total_tokens": total_tokens,
             }
-            
+
         except Exception as e:
             logger.warning(f"Error getting local JSONL stats: {e}")
             # Fallback to minimal data
             return {
-                'total_tokens': "Unable to analyze",
-                'total_sessions': "0",
-                'success_rate': "0%", 
-                'active_agents': "0",
-                'total_cost': "$0.00",
-                'total_errors': 1,
-                'raw_total_tokens': 0
+                "total_tokens": "Unable to analyze",
+                "total_sessions": "0",
+                "success_rate": "0%",
+                "active_agents": "0",
+                "total_cost": "$0.00",
+                "total_errors": 1,
+                "raw_total_tokens": 0,
             }
 
     def _get_current_performance_metrics(self) -> Dict[str, Any]:
@@ -3558,17 +4181,25 @@ if __name__ == "__main__":
             logger.error(f"Performance metrics error: {e}")
             raise create_error_response(str(e), "PERFORMANCE_METRICS_ERROR")
 
-    def _apply_definitive_total_tokens(self, response_data: Dict[str, Any], stats_source: Dict[str, Any]) -> None:
+    def _apply_definitive_total_tokens(
+        self, response_data: Dict[str, Any], stats_source: Dict[str, Any]
+    ) -> None:
         """Ensure overview totals reflect the highest available token count."""
 
         telemetry_total = self._extract_numeric_total(stats_source)
         authoritative_total = self._get_authoritative_total_tokens()
 
-        candidates = [value for value in (telemetry_total, authoritative_total) if value is not None]
+        candidates = [
+            value
+            for value in (telemetry_total, authoritative_total)
+            if value is not None
+        ]
         definitive_total = max(candidates) if candidates else 0
 
-        response_data['raw_total_tokens'] = definitive_total
-        response_data['total_tokens'] = f"{definitive_total:,}" if definitive_total else "0"
+        response_data["raw_total_tokens"] = definitive_total
+        response_data["total_tokens"] = (
+            f"{definitive_total:,}" if definitive_total else "0"
+        )
 
     def _get_authoritative_total_tokens(self) -> Optional[int]:
         """Compute the highest-fidelity total tokens available on this host."""
@@ -3578,9 +4209,9 @@ if __name__ == "__main__":
         try:
             enhanced = self._analyze_token_usage()
             if isinstance(enhanced, dict):
-                tokens = enhanced.get('total_tokens')
+                tokens = enhanced.get("total_tokens")
                 if isinstance(tokens, dict):
-                    tokens = tokens.get('total')
+                    tokens = tokens.get("total")
                 tokens_int = self._safe_int(tokens)
                 if tokens_int is not None and tokens_int > 0:
                     candidates.append(tokens_int)
@@ -3588,9 +4219,9 @@ if __name__ == "__main__":
             logger.debug(f"Enhanced token analysis unavailable: {analysis_error}")
 
         try:
-            if getattr(self, 'context_analyzer', None):
+            if getattr(self, "context_analyzer", None):
                 usage = self.context_analyzer.get_total_context_usage()
-                tokens_int = self._safe_int(usage.get('estimated_total_tokens'))
+                tokens_int = self._safe_int(usage.get("estimated_total_tokens"))
                 if tokens_int is not None and tokens_int > 0:
                     candidates.append(tokens_int)
         except Exception as usage_error:
@@ -3598,17 +4229,19 @@ if __name__ == "__main__":
 
         return max(candidates) if candidates else None
 
-    def _extract_numeric_total(self, stats_source: Optional[Dict[str, Any]]) -> Optional[int]:
+    def _extract_numeric_total(
+        self, stats_source: Optional[Dict[str, Any]]
+    ) -> Optional[int]:
         """Extract an integer token total from a stats payload."""
 
         if not stats_source:
             return None
 
-        if 'raw_total_tokens' in stats_source:
-            return self._safe_int(stats_source.get('raw_total_tokens'))
+        if "raw_total_tokens" in stats_source:
+            return self._safe_int(stats_source.get("raw_total_tokens"))
 
-        if 'total_tokens' in stats_source:
-            return self._safe_int(stats_source.get('total_tokens'))
+        if "total_tokens" in stats_source:
+            return self._safe_int(stats_source.get("total_tokens"))
 
         return None
 
@@ -3625,7 +4258,7 @@ if __name__ == "__main__":
             return int(value)
 
         if isinstance(value, str):
-            normalized = value.replace(',', '').strip()
+            normalized = value.replace(",", "").strip()
             if not normalized or not any(ch.isdigit() for ch in normalized):
                 return None
             try:
@@ -3734,9 +4367,11 @@ if __name__ == "__main__":
         # Phase 2.3: Check unified cache first for performance optimization
         cached_data = self.dashboard_cache.get_session_analytics_cache()
         if cached_data is not None:
-            logger.debug(f"Returning cached session analytics ({len(cached_data)} sessions)")
+            logger.debug(
+                f"Returning cached session analytics ({len(cached_data)} sessions)"
+            )
             return cached_data
-            
+
         logger.info(f"Retrieving recent sessions for analytics dashboard ({days} days)")
         try:
             # Use real-time cache discovery system to find JSONL session files
@@ -4554,10 +5189,13 @@ if __name__ == "__main__":
             # (no crude estimation fallbacks)
             try:
                 from ..analysis.enhanced_token_counter import get_accurate_token_count
+
                 content_str = str(context_data)
                 return get_accurate_token_count(content_str)
             except ImportError:
-                logger.warning("No accurate token counting method available, returning 0 (ccusage approach)")
+                logger.warning(
+                    "No accurate token counting method available, returning 0 (ccusage approach)"
+                )
                 return 0
             except Exception:
                 return 0
@@ -5203,318 +5841,445 @@ if __name__ == "__main__":
         )
         return bool(re.match(iso_pattern, timestamp_str))
 
-    def _generate_insights(self, dates, productivity_scores, health_scores, total_sessions, avg_prod):
+    def _generate_insights(
+        self, dates, productivity_scores, health_scores, total_sessions, avg_prod
+    ):
         """Generate meaningful insights from productivity and health data."""
         insights = []
-        
+
         # Productivity insights
         if len(productivity_scores) > 1:
-            recent_prod = productivity_scores[-3:] if len(productivity_scores) >= 3 else productivity_scores
+            recent_prod = (
+                productivity_scores[-3:]
+                if len(productivity_scores) >= 3
+                else productivity_scores
+            )
             avg_recent = sum(recent_prod) / len(recent_prod)
-            
+
             if avg_recent > avg_prod + 5:
-                insights.append({
-                    "title": "Recent Productivity Surge",
-                    "value": f"Last 3 days averaged {avg_recent:.1f}%, up from {avg_prod:.1f}% overall",
-                    "trend": "upward"
-                })
+                insights.append(
+                    {
+                        "title": "Recent Productivity Surge",
+                        "value": f"Last 3 days averaged {avg_recent:.1f}%, up from {avg_prod:.1f}% overall",
+                        "trend": "upward",
+                    }
+                )
             elif avg_recent < avg_prod - 5:
-                insights.append({
-                    "title": "Recent Productivity Dip", 
-                    "value": f"Last 3 days averaged {avg_recent:.1f}%, down from {avg_prod:.1f}% overall",
-                    "trend": "downward"
-                })
-            
+                insights.append(
+                    {
+                        "title": "Recent Productivity Dip",
+                        "value": f"Last 3 days averaged {avg_recent:.1f}%, down from {avg_prod:.1f}% overall",
+                        "trend": "downward",
+                    }
+                )
+
         # Session volume insights
         if total_sessions > 40:
             sessions_per_day = total_sessions / len(dates) if dates else 0
-            insights.append({
-                "title": "High Activity Level",
-                "value": f"Averaging {sessions_per_day:.1f} sessions per day across {len(dates)} days",
-                "trend": "stable"
-            })
-        
+            insights.append(
+                {
+                    "title": "High Activity Level",
+                    "value": f"Averaging {sessions_per_day:.1f} sessions per day across {len(dates)} days",
+                    "trend": "stable",
+                }
+            )
+
         # Health vs Productivity correlation
         if len(health_scores) > 5 and len(productivity_scores) > 5:
             # Simple correlation analysis
             high_health_days = [i for i, h in enumerate(health_scores) if h > 90]
             high_prod_days = [i for i, p in enumerate(productivity_scores) if p > 90]
             correlation = len(set(high_health_days) & set(high_prod_days))
-            
+
             if correlation >= len(high_health_days) * 0.7:
-                insights.append({
-                    "title": "Strong Health-Productivity Link",
-                    "value": f"High health days ({len(high_health_days)}) correlate with high productivity {correlation} times",
-                    "trend": "stable"
-                })
-        
+                insights.append(
+                    {
+                        "title": "Strong Health-Productivity Link",
+                        "value": f"High health days ({len(high_health_days)}) correlate with high productivity {correlation} times",
+                        "trend": "stable",
+                    }
+                )
+
         # Trend analysis
         if len(productivity_scores) >= 7:
-            first_half = productivity_scores[:len(productivity_scores)//2]
-            second_half = productivity_scores[len(productivity_scores)//2:]
+            first_half = productivity_scores[: len(productivity_scores) // 2]
+            second_half = productivity_scores[len(productivity_scores) // 2 :]
             first_avg = sum(first_half) / len(first_half)
             second_avg = sum(second_half) / len(second_half)
-            
+
             improvement = second_half[-1] - first_half[0]
             if improvement > 10:
-                insights.append({
-                    "title": "Strong Improvement Trend",
-                    "value": f"Productivity improved {improvement:.1f} points from start to recent",
-                    "trend": "upward"
-                })
-        
+                insights.append(
+                    {
+                        "title": "Strong Improvement Trend",
+                        "value": f"Productivity improved {improvement:.1f} points from start to recent",
+                        "trend": "upward",
+                    }
+                )
+
         # Default insight if no specific patterns found
         if not insights:
-            insights.append({
-                "title": "Session Overview",
-                "value": f"Analyzed {total_sessions} sessions with {avg_prod:.1f}% average productivity",
-                "trend": "stable"
-            })
-        
+            insights.append(
+                {
+                    "title": "Session Overview",
+                    "value": f"Analyzed {total_sessions} sessions with {avg_prod:.1f}% average productivity",
+                    "trend": "stable",
+                }
+            )
+
         return insights
 
-    def _generate_patterns(self, dates, productivity_scores, health_scores, total_sessions):
+    def _generate_patterns(
+        self, dates, productivity_scores, health_scores, total_sessions
+    ):
         """Generate patterns from productivity and health data."""
         patterns = []
-        
+
         if len(productivity_scores) < 5:
             return patterns
-        
-        # Weekly pattern analysis (if we have enough data)  
+
+        # Weekly pattern analysis (if we have enough data)
         if len(dates) >= 7:
             # Group by day of week
             weekday_productivity = {}
             for i, date in enumerate(dates):
                 try:
                     from datetime import datetime
+
                     date_obj = datetime.strptime(date, "%Y-%m-%d")
                     weekday = date_obj.strftime("%A")
-                    
+
                     if weekday not in weekday_productivity:
                         weekday_productivity[weekday] = []
                     weekday_productivity[weekday].append(productivity_scores[i])
                 except:
                     continue
-            
+
             # Find best and worst days if we have multiple days
             if len(weekday_productivity) >= 2:
-                day_avgs = {day: sum(scores)/len(scores) for day, scores in weekday_productivity.items() if scores}
+                day_avgs = {
+                    day: sum(scores) / len(scores)
+                    for day, scores in weekday_productivity.items()
+                    if scores
+                }
                 if day_avgs:
                     best_day = max(day_avgs.items(), key=lambda x: x[1])
                     worst_day = min(day_avgs.items(), key=lambda x: x[1])
-                    
+
                     if best_day[1] - worst_day[1] > 10:  # Significant difference
-                        patterns.append({
-                            "name": "Weekly Performance Pattern",
-                            "description": f"Highest productivity on {best_day[0]} ({best_day[1]:.1f}%), lowest on {worst_day[0]} ({worst_day[1]:.1f}%)",
-                            "confidence": 75,
-                            "type": "temporal"
-                        })
-        
+                        patterns.append(
+                            {
+                                "name": "Weekly Performance Pattern",
+                                "description": f"Highest productivity on {best_day[0]} ({best_day[1]:.1f}%), lowest on {worst_day[0]} ({worst_day[1]:.1f}%)",
+                                "confidence": 75,
+                                "type": "temporal",
+                            }
+                        )
+
         # Productivity consistency pattern
         if len(productivity_scores) >= 5:
             avg = sum(productivity_scores) / len(productivity_scores)
-            std_dev = (sum((x - avg)**2 for x in productivity_scores) / len(productivity_scores)) ** 0.5
-            
+            std_dev = (
+                sum((x - avg) ** 2 for x in productivity_scores)
+                / len(productivity_scores)
+            ) ** 0.5
+
             if std_dev < 10:
-                patterns.append({
-                    "name": "Consistent Performance",
-                    "description": f"Productivity varies by only ±{std_dev:.1f} points, showing stable work patterns",
-                    "confidence": 85,
-                    "type": "stability"
-                })
+                patterns.append(
+                    {
+                        "name": "Consistent Performance",
+                        "description": f"Productivity varies by only ±{std_dev:.1f} points, showing stable work patterns",
+                        "confidence": 85,
+                        "type": "stability",
+                    }
+                )
             elif std_dev > 25:
-                patterns.append({
-                    "name": "Variable Performance", 
-                    "description": f"Productivity varies by ±{std_dev:.1f} points, indicating workload or focus fluctuations",
-                    "confidence": 80,
-                    "type": "variability"
-                })
-        
+                patterns.append(
+                    {
+                        "name": "Variable Performance",
+                        "description": f"Productivity varies by ±{std_dev:.1f} points, indicating workload or focus fluctuations",
+                        "confidence": 80,
+                        "type": "variability",
+                    }
+                )
+
         # Session volume patterns
         daily_sessions = {}
         for date in dates:
             daily_sessions[date] = daily_sessions.get(date, 0) + 1
-        
+
         if daily_sessions:
             avg_daily_sessions = sum(daily_sessions.values()) / len(daily_sessions)
             if avg_daily_sessions > 3:
-                patterns.append({
-                    "name": "High Activity Pattern",
-                    "description": f"Average {avg_daily_sessions:.1f} sessions per day suggests intensive development periods",
-                    "confidence": 70,
-                    "type": "volume"
-                })
-        
+                patterns.append(
+                    {
+                        "name": "High Activity Pattern",
+                        "description": f"Average {avg_daily_sessions:.1f} sessions per day suggests intensive development periods",
+                        "confidence": 70,
+                        "type": "volume",
+                    }
+                )
+
         return patterns
 
     def _create_daily_summary_chart(self, sessions, days):
         """Chart 1: Daily Summary - Clean daily averages with clear productivity vs health comparison"""
         from collections import defaultdict
+
         daily_data = defaultdict(list)
-        
+
         for session in sessions:
             if session.get("start_time"):
                 date = session["start_time"][:10]
-                daily_data[date].append({
-                    'productivity': session.get("productivity_score", 0),
-                    'health': session.get("health_score", 0)
-                })
-        
+                daily_data[date].append(
+                    {
+                        "productivity": session.get("productivity_score", 0),
+                        "health": session.get("health_score", 0),
+                    }
+                )
+
         dates, productivity_scores, health_scores = [], [], []
         for date in sorted(daily_data.keys()):
             day_sessions = daily_data[date]
             dates.append(date)
-            productivity_scores.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
-            health_scores.append(round(sum(s['health'] for s in day_sessions) / len(day_sessions), 1))
-        
+            productivity_scores.append(
+                round(
+                    sum(s["productivity"] for s in day_sessions) / len(day_sessions), 1
+                )
+            )
+            health_scores.append(
+                round(sum(s["health"] for s in day_sessions) / len(day_sessions), 1)
+            )
+
         return {
             "data": [
                 {
-                    "x": dates, "y": productivity_scores,
-                    "type": "scatter", "mode": "lines+markers",
-                    "name": "Daily Avg Productivity", "line": {"color": "#10B981", "width": 3},
-                    "marker": {"size": 8}
+                    "x": dates,
+                    "y": productivity_scores,
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": "Daily Avg Productivity",
+                    "line": {"color": "#10B981", "width": 3},
+                    "marker": {"size": 8},
                 },
                 {
-                    "x": dates, "y": health_scores,
-                    "type": "scatter", "mode": "lines+markers", 
-                    "name": "Daily Avg Health", "line": {"color": "#3B82F6", "width": 3},
-                    "marker": {"size": 8}, "yaxis": "y2"
-                }
+                    "x": dates,
+                    "y": health_scores,
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": "Daily Avg Health",
+                    "line": {"color": "#3B82F6", "width": 3},
+                    "marker": {"size": 8},
+                    "yaxis": "y2",
+                },
             ],
             "layout": {
                 "title": "Daily Summary: Productivity vs Health Trends",
-                "xaxis": {"title": "Date"}, 
+                "xaxis": {"title": "Date"},
                 "yaxis": {"title": "Productivity %", "side": "left", "range": [0, 100]},
-                "yaxis2": {"title": "Health %", "side": "right", "overlaying": "y", "range": [0, 100]},
-                "showlegend": True, "height": 350,
-                "annotations": [{"text": "Shows daily averages to reveal overall trends", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+                "yaxis2": {
+                    "title": "Health %",
+                    "side": "right",
+                    "overlaying": "y",
+                    "range": [0, 100],
+                },
+                "showlegend": True,
+                "height": 350,
+                "annotations": [
+                    {
+                        "text": "Shows daily averages to reveal overall trends",
+                        "x": 0.5,
+                        "y": -0.15,
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                    }
+                ],
             },
-            "explanation": "Clean daily averages showing productivity vs health trends. Removes clutter of individual sessions to focus on patterns over time."
+            "explanation": "Clean daily averages showing productivity vs health trends. Removes clutter of individual sessions to focus on patterns over time.",
         }
 
     def _create_session_volume_chart(self, sessions, days):
         """Chart 2: Session Volume & Activity - Shows work intensity patterns"""
         from collections import defaultdict
+
         daily_data = defaultdict(list)
-        
+
         for session in sessions:
             if session.get("start_time"):
                 date = session["start_time"][:10]
-                daily_data[date].append({
-                    'productivity': session.get("productivity_score", 0),
-                    'focus_time': session.get("focus_time_minutes", 0) / 60
-                })
-        
+                daily_data[date].append(
+                    {
+                        "productivity": session.get("productivity_score", 0),
+                        "focus_time": session.get("focus_time_minutes", 0) / 60,
+                    }
+                )
+
         dates, session_counts, avg_productivity, total_focus = [], [], [], []
         for date in sorted(daily_data.keys()):
             day_sessions = daily_data[date]
             dates.append(date)
             session_counts.append(len(day_sessions))
-            avg_productivity.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
-            total_focus.append(round(sum(s['focus_time'] for s in day_sessions), 1))
-        
+            avg_productivity.append(
+                round(
+                    sum(s["productivity"] for s in day_sessions) / len(day_sessions), 1
+                )
+            )
+            total_focus.append(round(sum(s["focus_time"] for s in day_sessions), 1))
+
         return {
             "data": [
                 {
-                    "x": dates, "y": session_counts,
-                    "type": "bar", "name": "Sessions per Day",
-                    "marker": {"color": "#F59E0B"}, "yaxis": "y"
+                    "x": dates,
+                    "y": session_counts,
+                    "type": "bar",
+                    "name": "Sessions per Day",
+                    "marker": {"color": "#F59E0B"},
+                    "yaxis": "y",
                 },
                 {
-                    "x": dates, "y": avg_productivity,
-                    "type": "scatter", "mode": "lines+markers",
-                    "name": "Avg Productivity", "line": {"color": "#10B981", "width": 3},
-                    "yaxis": "y2"
-                }
+                    "x": dates,
+                    "y": avg_productivity,
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": "Avg Productivity",
+                    "line": {"color": "#10B981", "width": 3},
+                    "yaxis": "y2",
+                },
             ],
             "layout": {
                 "title": "Work Intensity: Session Volume vs Performance",
                 "xaxis": {"title": "Date"},
                 "yaxis": {"title": "Number of Sessions", "side": "left"},
-                "yaxis2": {"title": "Productivity %", "side": "right", "overlaying": "y"},
-                "showlegend": True, "height": 350,
-                "annotations": [{"text": "Higher bars = busier days. Shows if more sessions correlate with better/worse productivity", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+                "yaxis2": {
+                    "title": "Productivity %",
+                    "side": "right",
+                    "overlaying": "y",
+                },
+                "showlegend": True,
+                "height": 350,
+                "annotations": [
+                    {
+                        "text": "Higher bars = busier days. Shows if more sessions correlate with better/worse productivity",
+                        "x": 0.5,
+                        "y": -0.15,
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                    }
+                ],
             },
-            "explanation": "Shows work intensity (session count) vs productivity. Helps identify if busy days lead to better or worse performance."
+            "explanation": "Shows work intensity (session count) vs productivity. Helps identify if busy days lead to better or worse performance.",
         }
 
     def _create_productivity_focus_chart(self, sessions, days):
         """Chart 3: Productivity & Focus Time - Shows efficiency patterns"""
         from collections import defaultdict
+
         daily_data = defaultdict(list)
-        
+
         for session in sessions:
             if session.get("start_time"):
                 date = session["start_time"][:10]
-                daily_data[date].append({
-                    'productivity': session.get("productivity_score", 0),
-                    'focus_time': session.get("focus_time_minutes", 0) / 60
-                })
-        
+                daily_data[date].append(
+                    {
+                        "productivity": session.get("productivity_score", 0),
+                        "focus_time": session.get("focus_time_minutes", 0) / 60,
+                    }
+                )
+
         dates, avg_productivity, total_focus, efficiency = [], [], [], []
         for date in sorted(daily_data.keys()):
             day_sessions = daily_data[date]
-            avg_prod = sum(s['productivity'] for s in day_sessions) / len(day_sessions)
-            focus_hrs = sum(s['focus_time'] for s in day_sessions)
-            
+            avg_prod = sum(s["productivity"] for s in day_sessions) / len(day_sessions)
+            focus_hrs = sum(s["focus_time"] for s in day_sessions)
+
             dates.append(date)
             avg_productivity.append(round(avg_prod, 1))
             total_focus.append(round(focus_hrs, 1))
-            efficiency.append(round((avg_prod * focus_hrs) / 100, 2) if focus_hrs > 0 else 0)  # Productivity * Focus Time
-        
+            efficiency.append(
+                round((avg_prod * focus_hrs) / 100, 2) if focus_hrs > 0 else 0
+            )  # Productivity * Focus Time
+
         return {
             "data": [
                 {
-                    "x": dates, "y": total_focus,
-                    "type": "bar", "name": "Focus Hours",
-                    "marker": {"color": "#8B5CF6"}, "yaxis": "y"
+                    "x": dates,
+                    "y": total_focus,
+                    "type": "bar",
+                    "name": "Focus Hours",
+                    "marker": {"color": "#8B5CF6"},
+                    "yaxis": "y",
                 },
                 {
-                    "x": dates, "y": avg_productivity,
-                    "type": "scatter", "mode": "lines+markers",
-                    "name": "Productivity %", "line": {"color": "#10B981", "width": 3},
-                    "yaxis": "y2"
+                    "x": dates,
+                    "y": avg_productivity,
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": "Productivity %",
+                    "line": {"color": "#10B981", "width": 3},
+                    "yaxis": "y2",
                 },
                 {
-                    "x": dates, "y": efficiency,
-                    "type": "scatter", "mode": "lines+markers",
-                    "name": "Efficiency Score", "line": {"color": "#EF4444", "width": 2, "dash": "dash"},
-                    "yaxis": "y2"
-                }
+                    "x": dates,
+                    "y": efficiency,
+                    "type": "scatter",
+                    "mode": "lines+markers",
+                    "name": "Efficiency Score",
+                    "line": {"color": "#EF4444", "width": 2, "dash": "dash"},
+                    "yaxis": "y2",
+                },
             ],
             "layout": {
                 "title": "Focus & Efficiency: Time vs Quality",
                 "xaxis": {"title": "Date"},
                 "yaxis": {"title": "Focus Hours", "side": "left"},
                 "yaxis2": {"title": "Score", "side": "right", "overlaying": "y"},
-                "showlegend": True, "height": 350,
-                "annotations": [{"text": "Purple bars = focus time. Green line = productivity. Red line = efficiency (productivity × focus)", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+                "showlegend": True,
+                "height": 350,
+                "annotations": [
+                    {
+                        "text": "Purple bars = focus time. Green line = productivity. Red line = efficiency (productivity × focus)",
+                        "x": 0.5,
+                        "y": -0.15,
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                    }
+                ],
             },
-            "explanation": "Combines focus time with productivity to show efficiency. Efficiency score (red) shows when you're both productive AND focused."
+            "explanation": "Combines focus time with productivity to show efficiency. Efficiency score (red) shows when you're both productive AND focused.",
         }
 
     def _create_trend_comparison_chart(self, sessions, days):
         """Chart 4: Trend Comparison - Shows recent vs historical performance with insights"""
         from collections import defaultdict
+
         daily_data = defaultdict(list)
-        
+
         for session in sessions:
             if session.get("start_time"):
                 date = session["start_time"][:10]
-                daily_data[date].append({
-                    'productivity': session.get("productivity_score", 0),
-                    'health': session.get("health_score", 0)
-                })
-        
+                daily_data[date].append(
+                    {
+                        "productivity": session.get("productivity_score", 0),
+                        "health": session.get("health_score", 0),
+                    }
+                )
+
         dates, productivity_scores, health_scores = [], [], []
         for date in sorted(daily_data.keys()):
             day_sessions = daily_data[date]
             dates.append(date)
-            productivity_scores.append(round(sum(s['productivity'] for s in day_sessions) / len(day_sessions), 1))
-            health_scores.append(round(sum(s['health'] for s in day_sessions) / len(day_sessions), 1))
-        
+            productivity_scores.append(
+                round(
+                    sum(s["productivity"] for s in day_sessions) / len(day_sessions), 1
+                )
+            )
+            health_scores.append(
+                round(sum(s["health"] for s in day_sessions) / len(day_sessions), 1)
+            )
+
         # Calculate moving averages and trends
         if len(productivity_scores) >= 3:
             # Simple 3-day moving average
@@ -5522,47 +6287,78 @@ if __name__ == "__main__":
             health_ma = []
             for i in range(len(productivity_scores)):
                 if i >= 2:
-                    prod_ma.append(round(sum(productivity_scores[i-2:i+1]) / 3, 1))
-                    health_ma.append(round(sum(health_scores[i-2:i+1]) / 3, 1))
+                    prod_ma.append(
+                        round(sum(productivity_scores[i - 2 : i + 1]) / 3, 1)
+                    )
+                    health_ma.append(round(sum(health_scores[i - 2 : i + 1]) / 3, 1))
                 else:
                     prod_ma.append(productivity_scores[i])
                     health_ma.append(health_scores[i])
         else:
             prod_ma = productivity_scores
             health_ma = health_scores
-        
+
         return {
             "data": [
                 {
-                    "x": dates, "y": productivity_scores,
-                    "type": "scatter", "mode": "markers", "name": "Daily Productivity",
-                    "marker": {"color": "#10B981", "size": 6, "opacity": 0.6}
+                    "x": dates,
+                    "y": productivity_scores,
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Daily Productivity",
+                    "marker": {"color": "#10B981", "size": 6, "opacity": 0.6},
                 },
                 {
-                    "x": dates, "y": prod_ma,
-                    "type": "scatter", "mode": "lines", "name": "Productivity Trend",
-                    "line": {"color": "#059669", "width": 4}
+                    "x": dates,
+                    "y": prod_ma,
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "Productivity Trend",
+                    "line": {"color": "#059669", "width": 4},
                 },
                 {
-                    "x": dates, "y": health_scores,
-                    "type": "scatter", "mode": "markers", "name": "Daily Health",
-                    "marker": {"color": "#3B82F6", "size": 6, "opacity": 0.6}, "yaxis": "y2"
+                    "x": dates,
+                    "y": health_scores,
+                    "type": "scatter",
+                    "mode": "markers",
+                    "name": "Daily Health",
+                    "marker": {"color": "#3B82F6", "size": 6, "opacity": 0.6},
+                    "yaxis": "y2",
                 },
                 {
-                    "x": dates, "y": health_ma,
-                    "type": "scatter", "mode": "lines", "name": "Health Trend",
-                    "line": {"color": "#1D4ED8", "width": 4}, "yaxis": "y2"
-                }
+                    "x": dates,
+                    "y": health_ma,
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "Health Trend",
+                    "line": {"color": "#1D4ED8", "width": 4},
+                    "yaxis": "y2",
+                },
             ],
             "layout": {
                 "title": "Trend Analysis: Daily Points vs Moving Averages",
                 "xaxis": {"title": "Date"},
                 "yaxis": {"title": "Productivity %", "side": "left", "range": [0, 100]},
-                "yaxis2": {"title": "Health %", "side": "right", "overlaying": "y", "range": [0, 100]},
-                "showlegend": True, "height": 350,
-                "annotations": [{"text": "Dots = daily scores. Lines = 3-day trends. Shows if you're improving or declining", "x": 0.5, "y": -0.15, "xref": "paper", "yref": "paper", "showarrow": False}]
+                "yaxis2": {
+                    "title": "Health %",
+                    "side": "right",
+                    "overlaying": "y",
+                    "range": [0, 100],
+                },
+                "showlegend": True,
+                "height": 350,
+                "annotations": [
+                    {
+                        "text": "Dots = daily scores. Lines = 3-day trends. Shows if you're improving or declining",
+                        "x": 0.5,
+                        "y": -0.15,
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                    }
+                ],
             },
-            "explanation": "Shows daily fluctuations vs smoothed trends. Trend lines reveal if performance is genuinely improving or just having good/bad days."
+            "explanation": "Shows daily fluctuations vs smoothed trends. Trend lines reveal if performance is genuinely improving or just having good/bad days.",
         }
 
     def _safe_get_string_content(self, item: Dict[str, Any]) -> str:
@@ -5591,41 +6387,49 @@ if __name__ == "__main__":
         """Analyze token usage across different context categories using Enhanced Token Counter."""
         try:
             # Use the enhanced token counting system
-            from ..analysis.dashboard_integration import get_enhanced_token_analysis_sync
-            
+            from ..analysis.dashboard_integration import (
+                get_enhanced_token_analysis_sync,
+            )
+
             # Get enhanced analysis with backward compatibility
             enhanced_data = get_enhanced_token_analysis_sync(force_refresh=False)
-            
-            if enhanced_data.get('error'):
+
+            if enhanced_data.get("error"):
                 # Fallback to legacy implementation if enhanced system fails
-                logging.warning(f"Enhanced token analysis failed: {enhanced_data['error']}")
+                logging.warning(
+                    f"Enhanced token analysis failed: {enhanced_data['error']}"
+                )
                 return self._legacy_analyze_token_usage()
-            
+
             # Transform enhanced data to match expected dashboard format
-            categories = enhanced_data.get('categories', [])
-            total_tokens = enhanced_data.get('total_tokens', 0)
-            
+            categories = enhanced_data.get("categories", [])
+            total_tokens = enhanced_data.get("total_tokens", 0)
+
             # Add metadata to indicate enhanced analysis is being used
             result = {
                 "total_tokens": total_tokens,
                 "categories": categories,
-                "charts": self._create_token_charts(categories, enhanced_data.get('token_breakdown', {})),
+                "charts": self._create_token_charts(
+                    categories, enhanced_data.get("token_breakdown", {})
+                ),
                 "analysis_metadata": {
                     "enhanced_analysis": True,
-                    "files_processed": enhanced_data.get('files_processed', 0),
-                    "lines_processed": enhanced_data.get('lines_processed', 0),
-                    "api_validation": enhanced_data.get('api_validation_enabled', False),
-                    "undercount_fix": "Applied - processes ALL files and ALL message types"
-                }
+                    "files_processed": enhanced_data.get("files_processed", 0),
+                    "lines_processed": enhanced_data.get("lines_processed", 0),
+                    "api_validation": enhanced_data.get(
+                        "api_validation_enabled", False
+                    ),
+                    "undercount_fix": "Applied - processes ALL files and ALL message types",
+                },
             }
-            
+
             return result
-            
+
         except Exception as e:
             logging.error(f"Enhanced token analysis error: {e}")
             # Fallback to legacy implementation
             return self._legacy_analyze_token_usage()
-    
+
     def _legacy_analyze_token_usage(self):
         """Legacy token usage analysis (original implementation with 90% undercount issue)."""
         try:
@@ -5633,182 +6437,269 @@ if __name__ == "__main__":
             cache_dir = Path.home() / ".claude" / "projects"
             if not cache_dir.exists():
                 raise create_no_data_error("Claude Code cache")
-            
-            total_tokens = {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0}
-            categories = {
-                "claude_md": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
-                "custom_agents": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
-                "mcp_tools": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
-                "system_prompts": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
-                "system_tools": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0},
-                "messages": {"input": 0, "cache_creation": 0, "cache_read": 0, "output": 0, "count": 0}
+
+            total_tokens = {
+                "input": 0,
+                "cache_creation": 0,
+                "cache_read": 0,
+                "output": 0,
             }
-            
+            categories = {
+                "claude_md": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+                "custom_agents": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+                "mcp_tools": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+                "system_prompts": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+                "system_tools": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+                "messages": {
+                    "input": 0,
+                    "cache_creation": 0,
+                    "cache_read": 0,
+                    "output": 0,
+                    "count": 0,
+                },
+            }
+
             # Analyze recent JSONL files (limit to prevent performance issues) - LIMITATION CAUSING 90% UNDERCOUNT
             jsonl_files = list(cache_dir.glob("**/*.jsonl"))
-            recent_files = sorted(jsonl_files, key=lambda x: x.stat().st_mtime, reverse=True)[:10]  # ONLY 10 FILES!
-            
+            recent_files = sorted(
+                jsonl_files, key=lambda x: x.stat().st_mtime, reverse=True
+            )[
+                :10
+            ]  # ONLY 10 FILES!
+
             for file_path in recent_files:
                 try:
                     self._analyze_file_tokens(file_path, total_tokens, categories)
                 except Exception as e:
                     logging.warning(f"Error analyzing {file_path}: {e}")
                     continue
-            
+
             # Calculate percentages and create charts
             total_all = sum(total_tokens.values())
             if total_all == 0:
                 raise create_no_data_error("token data")
-            
+
             # Create category summary
             category_data = []
             for name, data in categories.items():
-                category_total = sum(data[k] for k in ['input', 'cache_creation', 'cache_read', 'output'])
+                category_total = sum(
+                    data[k] for k in ["input", "cache_creation", "cache_read", "output"]
+                )
                 if category_total > 0:
-                    category_data.append({
-                        "name": name.replace("_", " ").title(),
-                        "tokens": category_total,
-                        "percentage": round((category_total / total_all) * 100, 1),
-                        "breakdown": {
-                            "input": data["input"],
-                            "cache_creation": data["cache_creation"],
-                            "cache_read": data["cache_read"],
-                            "output": data["output"]
-                        },
-                        "count": data["count"]
-                    })
-            
+                    category_data.append(
+                        {
+                            "name": name.replace("_", " ").title(),
+                            "tokens": category_total,
+                            "percentage": round((category_total / total_all) * 100, 1),
+                            "breakdown": {
+                                "input": data["input"],
+                                "cache_creation": data["cache_creation"],
+                                "cache_read": data["cache_read"],
+                                "output": data["output"],
+                            },
+                            "count": data["count"],
+                        }
+                    )
+
             # Sort by token count
             category_data.sort(key=lambda x: x["tokens"], reverse=True)
-            
+
             return {
                 "total_tokens": total_all,
                 "categories": category_data,
                 "charts": self._create_token_charts(category_data, total_tokens),
                 "analysis_metadata": {
                     "enhanced_analysis": False,
-                    "legacy_limitations": "Only 10 files, 1000 lines per file, assistant messages only - causes 90% undercount"
-                }
+                    "legacy_limitations": "Only 10 files, 1000 lines per file, assistant messages only - causes 90% undercount",
+                },
             }
-            
+
         except Exception as e:
             logging.error(f"Token analysis error: {e}")
             raise create_error_response(str(e), "TOKEN_ANALYSIS_ERROR")
-    
+
     def _analyze_file_tokens(self, file_path, total_tokens, categories):
         """Analyze tokens from a single JSONL file."""
         import json
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
+
+        with open(file_path, "r", encoding="utf-8") as f:
             for line_num, line in enumerate(f):
                 try:
                     if line_num > 1000:  # Limit lines per file for performance
                         break
-                        
+
                     entry = json.loads(line.strip())
-                    
+
                     if entry.get("type") == "assistant":
                         usage = entry.get("message", {}).get("usage", {})
                         if usage:
                             # Update totals
                             total_tokens["input"] += usage.get("input_tokens", 0)
-                            total_tokens["cache_creation"] += usage.get("cache_creation_input_tokens", 0)
-                            total_tokens["cache_read"] += usage.get("cache_read_input_tokens", 0)
+                            total_tokens["cache_creation"] += usage.get(
+                                "cache_creation_input_tokens", 0
+                            )
+                            total_tokens["cache_read"] += usage.get(
+                                "cache_read_input_tokens", 0
+                            )
                             total_tokens["output"] += usage.get("output_tokens", 0)
-                            
+
                             # Categorize based on context content
-                            content = str(entry.get("message", {}).get("content", [{}])[0].get("text", "")).lower()
-                            
+                            content = str(
+                                entry.get("message", {})
+                                .get("content", [{}])[0]
+                                .get("text", "")
+                            ).lower()
+
                             # Categorize the tokens
                             category = self._categorize_tokens(entry, content)
                             if category in categories:
-                                categories[category]["input"] += usage.get("input_tokens", 0)
-                                categories[category]["cache_creation"] += usage.get("cache_creation_input_tokens", 0)
-                                categories[category]["cache_read"] += usage.get("cache_read_input_tokens", 0)
-                                categories[category]["output"] += usage.get("output_tokens", 0)
+                                categories[category]["input"] += usage.get(
+                                    "input_tokens", 0
+                                )
+                                categories[category]["cache_creation"] += usage.get(
+                                    "cache_creation_input_tokens", 0
+                                )
+                                categories[category]["cache_read"] += usage.get(
+                                    "cache_read_input_tokens", 0
+                                )
+                                categories[category]["output"] += usage.get(
+                                    "output_tokens", 0
+                                )
                                 categories[category]["count"] += 1
-                            
+
                 except json.JSONDecodeError:
                     continue
                 except Exception as e:
-                    logging.warning(f"Error processing line {line_num} in {file_path}: {e}")
+                    logging.warning(
+                        f"Error processing line {line_num} in {file_path}: {e}"
+                    )
                     continue
-    
+
     def _categorize_tokens(self, entry, content):
         """Categorize tokens based on content analysis."""
         # Check for Claude.md references
         if "claude.md" in content or "claude code" in content:
             return "claude_md"
-        
-        # Check for custom agent references  
+
+        # Check for custom agent references
         agent_patterns = [
-            "task-orchestrator", "frontend-typescript", "backend-typescript", 
-            "django-migration", "ui-engineer", "test-engineer", "senior-code-reviewer"
+            "task-orchestrator",
+            "frontend-typescript",
+            "backend-typescript",
+            "django-migration",
+            "ui-engineer",
+            "test-engineer",
+            "senior-code-reviewer",
         ]
         if any(pattern in content for pattern in agent_patterns):
             return "custom_agents"
-        
+
         # Check for MCP tools
         if "mcp__" in content or "mcp_" in content:
             return "mcp_tools"
-        
+
         # Check for system prompts/instructions
-        if any(term in content for term in ["system-reminder", "instructions", "guidelines"]):
+        if any(
+            term in content
+            for term in ["system-reminder", "instructions", "guidelines"]
+        ):
             return "system_prompts"
-        
+
         # Check for system tools
         tool_patterns = ["bash", "read", "write", "edit", "grep", "glob"]
-        if any(f'"{tool}"' in content or f"tool: {tool}" in content for tool in tool_patterns):
+        if any(
+            f'"{tool}"' in content or f"tool: {tool}" in content
+            for tool in tool_patterns
+        ):
             return "system_tools"
-        
+
         # Default to messages category
         return "messages"
-    
+
     def _create_token_charts(self, category_data, total_tokens):
         """Create charts for token analysis."""
         if not category_data:
             return []
-        
+
         charts = []
-        
+
         # 1. Token Distribution Pie Chart
         labels = [cat["name"] for cat in category_data]
         values = [cat["tokens"] for cat in category_data]
-        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
-        
+        colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"]
+
         pie_chart = {
-            "data": [{
-                "type": "pie",
-                "labels": labels,
-                "values": values,
-                "marker": {"colors": colors[:len(labels)]},
-                "textinfo": "label+percent",
-                "textposition": "outside",
-                "hovertemplate": "%{label}: %{value:,} tokens (%{percent})<extra></extra>"
-            }],
+            "data": [
+                {
+                    "type": "pie",
+                    "labels": labels,
+                    "values": values,
+                    "marker": {"colors": colors[: len(labels)]},
+                    "textinfo": "label+percent",
+                    "textposition": "outside",
+                    "hovertemplate": "%{label}: %{value:,} tokens (%{percent})<extra></extra>",
+                }
+            ],
             "layout": {
                 "title": "Token Distribution by Category",
                 "height": 350,
-                "showlegend": True
-            }
+                "showlegend": True,
+            },
         }
         charts.append({"type": "distribution", "chart": pie_chart})
-        
+
         # 2. Token Type Breakdown Bar Chart
         token_types = ["input", "cache_creation", "cache_read", "output"]
-        type_colors = {"input": "#FF6B6B", "cache_creation": "#4ECDC4", "cache_read": "#45B7D1", "output": "#96CEB4"}
-        
+        type_colors = {
+            "input": "#FF6B6B",
+            "cache_creation": "#4ECDC4",
+            "cache_read": "#45B7D1",
+            "output": "#96CEB4",
+        }
+
         bar_data = []
         for token_type in token_types:
-            bar_data.append({
-                "type": "bar",
-                "name": token_type.replace("_", " ").title(),
-                "x": labels,
-                "y": [cat["breakdown"][token_type] for cat in category_data],
-                "marker": {"color": type_colors[token_type]},
-                "hovertemplate": "%{y:,} tokens<extra></extra>"
-            })
-        
+            bar_data.append(
+                {
+                    "type": "bar",
+                    "name": token_type.replace("_", " ").title(),
+                    "x": labels,
+                    "y": [cat["breakdown"][token_type] for cat in category_data],
+                    "marker": {"color": type_colors[token_type]},
+                    "hovertemplate": "%{y:,} tokens<extra></extra>",
+                }
+            )
+
         bar_chart = {
             "data": bar_data,
             "layout": {
@@ -5817,9 +6708,9 @@ if __name__ == "__main__":
                 "yaxis": {"title": "Token Count"},
                 "barmode": "stack",
                 "height": 350,
-                "showlegend": True
-            }
+                "showlegend": True,
+            },
         }
         charts.append({"type": "breakdown", "chart": bar_chart})
-        
+
         return charts
