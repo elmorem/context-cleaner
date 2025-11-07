@@ -30,8 +30,13 @@ from context_cleaner.telemetry.context_rot.config import get_config, Application
 from context_cleaner.analytics.productivity_analyzer import ProductivityAnalyzer
 from context_cleaner.dashboard.web_server import ProductivityDashboard
 from context_cleaner.services.telemetry_resources import stage_telemetry_resources
+
 try:
-    from context_cleaner.services.service_supervisor import ServiceSupervisor, SupervisorConfig
+    from context_cleaner.services.service_supervisor import (
+        ServiceSupervisor,
+        SupervisorConfig,
+    )
+
     _SUPERVISOR_IMPORT_ERROR = None
 except ModuleNotFoundError as exc:  # pragma: no cover - missing orchestrator path
     ServiceSupervisor = None  # type: ignore[assignment]
@@ -353,7 +358,9 @@ def optimize(ctx, dashboard, quick, preview, aggressive, focus, format):
         elif preview:
             # Preview mode using PR19 optimization commands
             from .optimization_commands import OptimizationCommandHandler
-            from context_cleaner.optimization.personalized_strategies import StrategyType
+            from context_cleaner.optimization.personalized_strategies import (
+                StrategyType,
+            )
 
             handler = OptimizationCommandHandler(verbose=verbose)
             # Use balanced strategy as default for preview
@@ -996,10 +1003,16 @@ def health_check(ctx, detailed, fix_issues, format):
 
 
 @main.command("update-data")
-@click.option("--dashboard-port", "-p", type=int, default=8110, help="Dashboard port to check")
+@click.option(
+    "--dashboard-port", "-p", type=int, default=8110, help="Dashboard port to check"
+)
 @click.option("--host", default="localhost", help="Dashboard host")
-@click.option("--check-only", is_flag=True, help="Only diagnose issues, don't apply fixes")
-@click.option("--clear-cache", is_flag=True, help="Clear widget cache to force fresh data")
+@click.option(
+    "--check-only", is_flag=True, help="Only diagnose issues, don't apply fixes"
+)
+@click.option(
+    "--clear-cache", is_flag=True, help="Clear widget cache to force fresh data"
+)
 @click.option("--output", type=click.Path(), help="Save detailed results to JSON file")
 @click.option(
     "--format",
@@ -1037,7 +1050,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
         "dashboard_url": base_url,
         "diagnosis": {},
         "fixes_applied": [],
-        "recommendations": []
+        "recommendations": [],
     }
 
     def output_result(message, level="info"):
@@ -1062,7 +1075,10 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
         response.raise_for_status()
 
         health_data = response.json()
-        results["diagnosis"]["connectivity"] = {"success": True, "status": health_data.get("status", "unknown")}
+        results["diagnosis"]["connectivity"] = {
+            "success": True,
+            "status": health_data.get("status", "unknown"),
+        }
         output_result("✅ Dashboard is accessible", "success")
 
     except Exception as e:
@@ -1074,7 +1090,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
         if format == "json":
             click.echo(json.dumps(results, indent=2))
         elif output:
-            with open(output, 'w') as f:
+            with open(output, "w") as f:
                 json.dump(results, f, indent=2)
             output_result(f"💾 Results saved to {output}")
 
@@ -1087,10 +1103,15 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
         response = requests.get(f"{base_url}/api/telemetry/data-freshness", timeout=10)
 
         if response.status_code == 404:
-            results["diagnosis"]["telemetry"] = {"available": False, "reason": "telemetry_disabled"}
+            results["diagnosis"]["telemetry"] = {
+                "available": False,
+                "reason": "telemetry_disabled",
+            }
             output_result("❌ Telemetry system unavailable", "error")
             output_result("   Reason: telemetry_disabled", "warning")
-            output_result("\n💡 ROOT CAUSE IDENTIFIED: Telemetry stack not initialised", "warning")
+            output_result(
+                "\n💡 ROOT CAUSE IDENTIFIED: Telemetry stack not initialised", "warning"
+            )
             output_result("\n🚀 SOLUTION:")
             output_result("   1. Stop current Context Cleaner: context-cleaner stop")
             output_result("   2. Initialise telemetry: context-cleaner telemetry init")
@@ -1101,7 +1122,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
             if format == "json":
                 click.echo(json.dumps(results, indent=2))
             elif output:
-                with open(output, 'w') as f:
+                with open(output, "w") as f:
                     json.dump(results, f, indent=2)
                 output_result(f"💾 Results saved to {output}")
 
@@ -1114,7 +1135,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
             "available": True,
             "service_availability": telemetry_data.get("service_availability", {}),
             "cache_status": telemetry_data.get("cache_status", {}),
-            "fallback_widgets": len(telemetry_data.get("fallback_detection", {}))
+            "fallback_widgets": len(telemetry_data.get("fallback_detection", {})),
         }
 
         output_result("✅ Telemetry system is available", "success")
@@ -1127,7 +1148,14 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
     # Step 3: Test individual widgets
     output_result("\n📊 Step 3: Testing individual widgets...")
 
-    widgets = ["error-monitor", "cost-tracker", "timeout-risk", "tool-optimizer", "model-efficiency", "context-rot-meter"]
+    widgets = [
+        "error-monitor",
+        "cost-tracker",
+        "timeout-risk",
+        "tool-optimizer",
+        "model-efficiency",
+        "context-rot-meter",
+    ]
     widget_results = {}
     problem_widgets = []
 
@@ -1136,18 +1164,25 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
             output_result(f"   Testing {widget}...")
 
         try:
-            response = requests.get(f"{base_url}/api/telemetry-widget/{widget}", timeout=10)
+            response = requests.get(
+                f"{base_url}/api/telemetry-widget/{widget}", timeout=10
+            )
 
             if response.status_code == 200:
                 data = response.json()
                 widget_data = data.get("data", {})
 
                 # Check for fallback indicators
-                is_fallback = widget_data.get("fallback_mode", False) or "Demo" in data.get("title", "")
+                is_fallback = widget_data.get(
+                    "fallback_mode", False
+                ) or "Demo" in data.get("title", "")
 
                 # Check for zero values
-                zero_fields = [key for key, value in widget_data.items()
-                             if isinstance(value, (int, float)) and value == 0]
+                zero_fields = [
+                    key
+                    for key, value in widget_data.items()
+                    if isinstance(value, (int, float)) and value == 0
+                ]
 
                 widget_results[widget] = {
                     "success": True,
@@ -1155,7 +1190,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
                     "title": data.get("title", ""),
                     "is_fallback": is_fallback,
                     "zero_fields": zero_fields,
-                    "alerts": data.get("alerts", [])
+                    "alerts": data.get("alerts", []),
                 }
 
                 if not widget_results[widget]["success"] or is_fallback or zero_fields:
@@ -1164,29 +1199,34 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
             else:
                 widget_results[widget] = {
                     "success": False,
-                    "error": f"HTTP {response.status_code}"
+                    "error": f"HTTP {response.status_code}",
                 }
                 problem_widgets.append(widget)
 
         except Exception as e:
-            widget_results[widget] = {
-                "success": False,
-                "error": str(e)
-            }
+            widget_results[widget] = {"success": False, "error": str(e)}
             problem_widgets.append(widget)
 
     results["diagnosis"]["widgets"] = widget_results
 
     if problem_widgets:
-        output_result(f"⚠️  Found {len(problem_widgets)} widgets with issues:", "warning")
+        output_result(
+            f"⚠️  Found {len(problem_widgets)} widgets with issues:", "warning"
+        )
         for widget in problem_widgets:
             widget_data = widget_results[widget]
             if not widget_data.get("success"):
-                output_result(f"   ❌ {widget}: Error - {widget_data.get('error', 'unknown')}", "error")
+                output_result(
+                    f"   ❌ {widget}: Error - {widget_data.get('error', 'unknown')}",
+                    "error",
+                )
             elif widget_data.get("is_fallback"):
                 output_result(f"   🔄 {widget}: Fallback mode", "warning")
             elif widget_data.get("zero_fields"):
-                output_result(f"   🚫 {widget}: Zero values in {widget_data['zero_fields']}", "warning")
+                output_result(
+                    f"   🚫 {widget}: Zero values in {widget_data['zero_fields']}",
+                    "warning",
+                )
     else:
         output_result("✅ All widgets working correctly", "success")
 
@@ -1199,7 +1239,9 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
         if clear_cache or problem_widgets:
             try:
                 output_result("   🔄 Clearing widget cache...")
-                response = requests.post(f"{base_url}/api/telemetry/clear-cache", timeout=10)
+                response = requests.post(
+                    f"{base_url}/api/telemetry/clear-cache", timeout=10
+                )
 
                 if response.status_code == 200:
                     fixes_applied.append("cache_cleared")
@@ -1207,12 +1249,19 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
 
                     # Wait and re-test one widget
                     time.sleep(2)
-                    test_response = requests.get(f"{base_url}/api/telemetry-widget/error-monitor", timeout=10)
+                    test_response = requests.get(
+                        f"{base_url}/api/telemetry-widget/error-monitor", timeout=10
+                    )
                     if test_response.status_code == 200:
                         fixes_applied.append("widget_retested")
-                        output_result("   ✅ Widget data refreshed after cache clear", "success")
+                        output_result(
+                            "   ✅ Widget data refreshed after cache clear", "success"
+                        )
                 else:
-                    output_result(f"   ❌ Cache clear failed: HTTP {response.status_code}", "error")
+                    output_result(
+                        f"   ❌ Cache clear failed: HTTP {response.status_code}",
+                        "error",
+                    )
 
             except Exception as e:
                 output_result(f"   ❌ Cache clear error: {e}", "error")
@@ -1224,21 +1273,40 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
 
     if not results["diagnosis"]["telemetry"].get("available"):
         if results["diagnosis"]["telemetry"].get("reason") == "telemetry_disabled":
-            recommendations.append("CRITICAL: Initialise telemetry via 'context-cleaner telemetry init'")
+            recommendations.append(
+                "CRITICAL: Initialise telemetry via 'context-cleaner telemetry init'"
+            )
         else:
-            recommendations.append("Check ClickHouse container status and telemetry service logs")
+            recommendations.append(
+                "Check ClickHouse container status and telemetry service logs"
+            )
 
     if problem_widgets:
-        recommendations.append(f"Investigate {len(problem_widgets)} problematic widgets")
+        recommendations.append(
+            f"Investigate {len(problem_widgets)} problematic widgets"
+        )
         recommendations.append("Monitor service logs during widget data generation")
 
-    if results["diagnosis"]["telemetry"].get("cache_status", {}).get("cached_widgets", 0) > 5:
-        recommendations.append("High cache usage detected - consider clearing cache periodically")
+    if (
+        results["diagnosis"]["telemetry"]
+        .get("cache_status", {})
+        .get("cached_widgets", 0)
+        > 5
+    ):
+        recommendations.append(
+            "High cache usage detected - consider clearing cache periodically"
+        )
 
-    service_availability = results["diagnosis"]["telemetry"].get("service_availability", {})
-    unavailable_services = [name for name, available in service_availability.items() if not available]
+    service_availability = results["diagnosis"]["telemetry"].get(
+        "service_availability", {}
+    )
+    unavailable_services = [
+        name for name, available in service_availability.items() if not available
+    ]
     if unavailable_services:
-        recommendations.append(f"Unavailable services detected: {', '.join(unavailable_services)}")
+        recommendations.append(
+            f"Unavailable services detected: {', '.join(unavailable_services)}"
+        )
 
     results["recommendations"] = recommendations
 
@@ -1255,7 +1323,7 @@ def update_data(ctx, dashboard_port, host, check_only, clear_cache, output, form
     if format == "json":
         click.echo(json.dumps(results, indent=2))
     elif output:
-        with open(output, 'w') as f:
+        with open(output, "w") as f:
             json.dump(results, f, indent=2)
         output_result(f"\n💾 Results saved to {output}")
 
@@ -1331,26 +1399,30 @@ def effectiveness(ctx, days, strategy, detailed, format):
 # Add telemetry and JSONL command groups to main CLI
 try:
     from .commands.telemetry import add_telemetry_commands
+
     add_telemetry_commands(main)
 except ImportError:
     pass  # Telemetry commands optional
 
 try:
     from .commands.jsonl import add_jsonl_commands
+
     add_jsonl_commands(main)
 except ImportError:
     pass  # JSONL commands optional
 
-# Add enhanced token analysis commands 
+# Add enhanced token analysis commands
 try:
     from .commands.enhanced_token_analysis import token_analysis
+
     main.add_command(token_analysis)
 except ImportError:
     pass  # Enhanced token analysis commands optional
 
-# Add migration commands 
+# Add migration commands
 try:
     from .commands.migration import migration
+
     main.add_command(migration)
 except ImportError:
     pass  # Migration commands optional
@@ -1358,6 +1430,7 @@ except ImportError:
 # Add bridge service commands
 try:
     from .commands.bridge_service import bridge
+
     main.add_command(bridge)
 except ImportError:
     pass  # Bridge service commands optional
@@ -1365,6 +1438,7 @@ except ImportError:
 # Add debug commands for process registry validation
 try:
     from .commands.debug import debug
+
     main.add_command(debug)
 except ImportError:
     pass  # Debug commands optional
@@ -1372,6 +1446,7 @@ except ImportError:
 # Add Phase 4 - Advanced Analytics & Reporting commands
 try:
     from .commands.analytics import analytics
+
     main.add_command(analytics)
 except ImportError:
     pass  # Phase 4 analytics commands optional
@@ -1379,13 +1454,25 @@ except ImportError:
 
 # Add the enhanced stop command for comprehensive service shutdown
 @main.command()
-@click.option("--force", is_flag=True, help="Force stop all services without confirmation")
+@click.option(
+    "--force", is_flag=True, help="Force stop all services without confirmation"
+)
 @click.option("--docker-only", is_flag=True, help="Stop only Docker services")
 @click.option("--processes-only", is_flag=True, help="Stop only background processes")
-@click.option("--no-discovery", is_flag=True, help="Skip process discovery, use basic method")
-@click.option("--show-discovery", is_flag=True, help="Show discovered processes before shutdown")
-@click.option("--registry-cleanup", is_flag=True, help="Also clean up process registry entries")
-@click.option("--use-script", is_flag=True, help="Use stop-context-cleaner.sh script for comprehensive cleanup")
+@click.option(
+    "--no-discovery", is_flag=True, help="Skip process discovery, use basic method"
+)
+@click.option(
+    "--show-discovery", is_flag=True, help="Show discovered processes before shutdown"
+)
+@click.option(
+    "--registry-cleanup", is_flag=True, help="Also clean up process registry entries"
+)
+@click.option(
+    "--use-script",
+    is_flag=True,
+    help="Use stop-context-cleaner.sh script for comprehensive cleanup",
+)
 @click.option(
     "--service",
     "services",
@@ -1398,12 +1485,23 @@ except ImportError:
     help="Do not automatically stop dependent services when targeting specific services",
 )
 @click.pass_context
-def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, registry_cleanup, use_script, services, no_dependents):
+def stop(
+    ctx,
+    force,
+    docker_only,
+    processes_only,
+    no_discovery,
+    show_discovery,
+    registry_cleanup,
+    use_script,
+    services,
+    no_dependents,
+):
     """
     🛑 ENHANCED STOP - Comprehensive service shutdown with process discovery.
-    
+
     This command provides intelligent shutdown of all Context Cleaner services:
-    
+
     ✅ ORCHESTRATED SHUTDOWN:
     • Uses service orchestrator for dependency-aware cleanup
     • Graceful termination with proper signal handling
@@ -1413,19 +1511,19 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     • Streams shutdown progress directly from the supervisor when available
     • Displays remaining services and transition progress in real time
     • Automatically falls back to legacy orchestrator shutdown if supervisor unreachable
-    
+
     ✅ PROCESS DISCOVERY:
     • Automatically discovers all Context Cleaner processes
     • Handles processes started through different pathways
     • Cleans up orphaned processes bypassing orchestration
-    
+
     ✅ COMPREHENSIVE CLEANUP:
     • Docker services (ClickHouse + OpenTelemetry)
-    • JSONL processing and bridge services  
+    • JSONL processing and bridge services
     • Dashboard web servers on all ports
     • Background monitoring processes
     • Process registry entries (optional)
-    
+
     MODES:
       context-cleaner stop                 # Full orchestrated shutdown
       context-cleaner stop --show-discovery # Preview discovered processes
@@ -1434,7 +1532,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
       context-cleaner stop --force          # Skip confirmations
       context-cleaner stop --registry-cleanup # Also clean registry
       context-cleaner stop --use-script     # Use stop-context-cleaner.sh script
-    
+
     This solves the orphaned process problem by discovering and stopping
     ALL Context Cleaner processes regardless of how they were started.
     """
@@ -1445,10 +1543,12 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     import asyncio
     import psutil
     from pathlib import Path
-    
+
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"]
-    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
+    supervisor_enabled = config.feature_flags.get(
+        "enable_supervisor_orchestration", True
+    )
     telemetry_dir = stage_telemetry_resources(config, verbose=verbose)
 
     if supervisor_enabled and _SUPERVISOR_IMPORT_ERROR is not None:
@@ -1470,7 +1570,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
     include_dependents = not no_dependents
 
     if target_services and (docker_only or processes_only):
-        raise click.UsageError("--service cannot be combined with --docker-only/--processes-only filters")
+        raise click.UsageError(
+            "--service cannot be combined with --docker-only/--processes-only filters"
+        )
 
     # Use shell script if requested
     if use_script:
@@ -1480,11 +1582,16 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         script_path = Path.cwd() / "stop-context-cleaner.sh"
         if not script_path.exists():
             click.echo(f"❌ Script not found: {script_path}", err=True)
-            click.echo("💡 Make sure stop-context-cleaner.sh is in the current directory", err=True)
+            click.echo(
+                "💡 Make sure stop-context-cleaner.sh is in the current directory",
+                err=True,
+            )
             sys.exit(1)
 
         if not force:
-            click.echo("🛑 This will run stop-context-cleaner.sh to kill all context-cleaner processes")
+            click.echo(
+                "🛑 This will run stop-context-cleaner.sh to kill all context-cleaner processes"
+            )
             if not click.confirm("Continue with shell script cleanup?"):
                 click.echo("❌ Shutdown cancelled")
                 return
@@ -1500,7 +1607,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if result.returncode == 0:
                 click.echo("✅ Shell script cleanup completed successfully")
             else:
-                click.echo(f"⚠️  Shell script completed with exit code {result.returncode}")
+                click.echo(
+                    f"⚠️  Shell script completed with exit code {result.returncode}"
+                )
         except Exception as e:
             click.echo(f"❌ Failed to run shell script: {e}", err=True)
             sys.exit(1)
@@ -1508,7 +1617,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         return
 
     if target_services and show_discovery:
-        click.echo("⚠️  --show-discovery is ignored when targeting specific services", err=True)
+        click.echo(
+            "⚠️  --show-discovery is ignored when targeting specific services", err=True
+        )
 
     perform_discovery = not no_discovery and not target_services
     discovered_processes = []
@@ -1524,10 +1635,14 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 click.echo("   Dependent services will NOT be stopped automatically")
             if perform_discovery is False and not no_discovery:
                 click.echo("   Skipping process discovery for targeted shutdown")
-    
+
     # Initialize orchestrator and discovery systems
     try:
-        from context_cleaner.services import ServiceOrchestrator, _ORCHESTRATOR_IMPORT_ERROR
+        from context_cleaner.services import (
+            ServiceOrchestrator,
+            _ORCHESTRATOR_IMPORT_ERROR,
+        )
+
         if ServiceOrchestrator is None:
             msg = _ORCHESTRATOR_IMPORT_ERROR or "Service orchestrator module missing"
             click.echo(f"❌ Service orchestrator not available: {msg}", err=True)
@@ -1539,104 +1654,132 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
         discovery_engine = orchestrator.discovery_engine
         process_registry = orchestrator.process_registry
-        
+
         if verbose:
             click.echo("✅ Service orchestrator and discovery engine initialized")
 
     except Exception as e:
         click.echo(f"❌ Failed to initialize orchestrator: {e}", err=True)
         sys.exit(1)
-    
+
     # 1. ENHANCED PROCESS DISCOVERY PHASE
     if perform_discovery:
         try:
             if verbose:
                 click.echo("\n🔍 PHASE 1: Enhanced Process Discovery")
-            
+
             # Use both the orchestrator discovery engine AND manual discovery
             discovered_processes = discovery_engine.discover_all_processes()
             registered_processes = process_registry.get_all_processes()
-            
+
             # Add comprehensive manual discovery for processes the orchestrator misses
             manual_processes = _discover_all_context_cleaner_processes(verbose)
-            
+
             # Combine and deduplicate processes
             all_pids = set()
             combined_processes = []
-            
+
             # Add orchestrator-discovered processes
             for proc in discovered_processes:
                 if proc.pid not in all_pids:
                     combined_processes.append(proc)
                     all_pids.add(proc.pid)
-            
+
             # Add manually discovered processes
             for proc in manual_processes:
                 if proc.pid not in all_pids:
                     combined_processes.append(proc)
                     all_pids.add(proc.pid)
-            
+
             discovered_processes = combined_processes
-            
+
             discovery_summary = {
                 "discovered_count": len(discovered_processes),
                 "registered_count": len(registered_processes),
-                "by_service_type": {}
+                "by_service_type": {},
             }
-            
+
             # Group discovered processes by service type
             for process in discovered_processes:
-                service_type = getattr(process, 'service_type', 'unknown')
+                service_type = getattr(process, "service_type", "unknown")
                 if service_type not in discovery_summary["by_service_type"]:
                     discovery_summary["by_service_type"][service_type] = []
-                discovery_summary["by_service_type"][service_type].append({
-                    "pid": process.pid,
-                    "name": getattr(process, 'name', 'unknown'),
-                    "path": getattr(process, 'path', 'N/A'),
-                    "command_line": process.command_line[:60] + "..." if len(process.command_line) > 60 else process.command_line
-                })
-            
+                discovery_summary["by_service_type"][service_type].append(
+                    {
+                        "pid": process.pid,
+                        "name": getattr(process, "name", "unknown"),
+                        "path": getattr(process, "path", "N/A"),
+                        "command_line": (
+                            process.command_line[:60] + "..."
+                            if len(process.command_line) > 60
+                            else process.command_line
+                        ),
+                    }
+                )
+
             if verbose:
-                click.echo(f"   📊 Found {discovery_summary['discovered_count']} running processes")
-                click.echo(f"   📝 Found {discovery_summary['registered_count']} registered processes")
-                
+                click.echo(
+                    f"   📊 Found {discovery_summary['discovered_count']} running processes"
+                )
+                click.echo(
+                    f"   📝 Found {discovery_summary['registered_count']} registered processes"
+                )
+
                 if discovery_summary["by_service_type"]:
                     click.echo("   📋 Discovered processes by type:")
-                    for service_type, processes in discovery_summary["by_service_type"].items():
-                        click.echo(f"      • {service_type}: {len(processes)} processes")
+                    for service_type, processes in discovery_summary[
+                        "by_service_type"
+                    ].items():
+                        click.echo(
+                            f"      • {service_type}: {len(processes)} processes"
+                        )
                         if verbose and show_discovery:
                             for proc in processes[:3]:  # Show first 3
-                                click.echo(f"        - PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
+                                click.echo(
+                                    f"        - PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}"
+                                )
                             if len(processes) > 3:
-                                click.echo(f"        - ... and {len(processes) - 3} more")
-            
+                                click.echo(
+                                    f"        - ... and {len(processes) - 3} more"
+                                )
+
             # Show discovery results if requested
             if show_discovery:
                 click.echo("\n📋 DISCOVERED PROCESSES PREVIEW:")
                 click.echo("=" * 50)
-                
+
                 if discovery_summary["discovered_count"] == 0:
                     click.echo("No Context Cleaner processes found running")
                 else:
-                    for service_type, processes in discovery_summary["by_service_type"].items():
-                        click.echo(f"\n🔧 {service_type.upper()} ({len(processes)} processes):")
+                    for service_type, processes in discovery_summary[
+                        "by_service_type"
+                    ].items():
+                        click.echo(
+                            f"\n🔧 {service_type.upper()} ({len(processes)} processes):"
+                        )
                         for proc in processes:
-                            click.echo(f"   PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}")
-                
+                            click.echo(
+                                f"   PID {proc['pid']} ({proc['name']}) [{proc['path']}]: {proc['command_line']}"
+                            )
+
                 click.echo("\n" + "=" * 50)
-                if not force and not click.confirm("Proceed with shutdown of these processes?"):
+                if not force and not click.confirm(
+                    "Proceed with shutdown of these processes?"
+                ):
                     click.echo("❌ Shutdown cancelled")
                     return
-        
+
         except Exception as e:
             if verbose:
                 click.echo(f"⚠️  Process discovery failed: {e}")
             if not force:
-                click.echo("💡 Use --no-discovery to skip discovery and use basic cleanup")
+                click.echo(
+                    "💡 Use --no-discovery to skip discovery and use basic cleanup"
+                )
                 sys.exit(1)
             # Continue without discovery
             discovered_processes = []
-    
+
     else:
         if verbose:
             if no_discovery:
@@ -1644,7 +1787,7 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             elif target_services:
                 click.echo("⚠️  Process discovery skipped for targeted shutdown")
         discovered_processes = []
-    
+
     # 2. CONFIRMATION PHASE
     if not force and not show_discovery:
         click.echo("\n🛑 This will stop all Context Cleaner services:")
@@ -1656,13 +1799,15 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             click.echo("   • Docker containers (ClickHouse + OpenTelemetry)")
         if registry_cleanup:
             click.echo("   • Process registry entries cleanup")
-        
+
         if perform_discovery and discovered_processes:
-            click.echo(f"\n📊 Processes to stop: {len(discovered_processes)} Context Cleaner processes")
+            click.echo(
+                f"\n📊 Processes to stop: {len(discovered_processes)} Context Cleaner processes"
+            )
             # Show summary of what will be stopped
             process_summary = {}
             for proc in discovered_processes:
-                service_type = getattr(proc, 'service_type', 'unknown')
+                service_type = getattr(proc, "service_type", "unknown")
                 if service_type not in process_summary:
                     process_summary[service_type] = []
                 process_summary[service_type].append(proc)
@@ -1670,23 +1815,27 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             for service_type, processes in process_summary.items():
                 click.echo(f"   • {service_type}: {len(processes)} process(es)")
                 for proc in processes[:2]:  # Show first 2 per type
-                    proc_name = getattr(proc, 'name', 'unknown')
-                    proc_path = getattr(proc, 'path', 'N/A')
+                    proc_name = getattr(proc, "name", "unknown")
+                    proc_path = getattr(proc, "path", "N/A")
                     click.echo(f"     - PID {proc.pid} ({proc_name}) [{proc_path}]")
                 if len(processes) > 2:
                     click.echo(f"     - ... and {len(processes) - 2} more")
         else:
             if target_services:
-                click.echo(f"\n📊 Targeted services for shutdown: {', '.join(target_services)}")
+                click.echo(
+                    f"\n📊 Targeted services for shutdown: {', '.join(target_services)}"
+                )
             else:
                 processes_count = "unknown number of"
-                click.echo(f"\n📊 Processes to stop: {processes_count} Context Cleaner processes")
+                click.echo(
+                    f"\n📊 Processes to stop: {processes_count} Context Cleaner processes"
+                )
         click.echo()
-        
+
         if not click.confirm("Continue with comprehensive shutdown?"):
             click.echo("❌ Shutdown cancelled")
             return
-    
+
     # 3. ORCHESTRATED SHUTDOWN PHASE
     shutdown_summary: Dict[str, Any] | None = None
 
@@ -1707,11 +1856,15 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     include_dependents=include_dependents,
                 )
             elif verbose:
-                click.echo("   ⚠️ Supervisor feature disabled; using orchestrator shutdown")
+                click.echo(
+                    "   ⚠️ Supervisor feature disabled; using orchestrator shutdown"
+                )
 
             if supervisor_used and not supervisor_success:
                 if verbose:
-                    click.echo("   ⚠️  Supervisor reported shutdown issues, falling back to local orchestrator")
+                    click.echo(
+                        "   ⚠️  Supervisor reported shutdown issues, falling back to local orchestrator"
+                    )
 
             if supervisor_used and supervisor_success:
                 orchestrated_success = True
@@ -1737,7 +1890,9 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     click.echo("   ✅ Orchestrated services stopped successfully")
             else:
                 if verbose:
-                    click.echo("   ⚠️  Some orchestrated services had issues during shutdown")
+                    click.echo(
+                        "   ⚠️  Some orchestrated services had issues during shutdown"
+                    )
                 if shutdown_summary and shutdown_summary.get("errors") and verbose:
                     for name, error_msg in shutdown_summary["errors"].items():
                         click.echo(f"      - {name}: {error_msg}", err=True)
@@ -1747,19 +1902,19 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             if not force:
                 click.echo("💡 Use --force to continue with manual cleanup")
                 sys.exit(1)
-    
-    # 4. DISCOVERED PROCESS CLEANUP PHASE  
+
+    # 4. DISCOVERED PROCESS CLEANUP PHASE
     if perform_discovery and discovered_processes:
         if verbose:
             click.echo("\n🧹 PHASE 3: Discovered Process Cleanup")
-        
+
         cleaned_processes = 0
         failed_cleanups = 0
-        
+
         for process in discovered_processes:
             if process.pid == os.getpid():
                 continue  # Don't kill ourselves
-            
+
             try:
                 # Check if process is still running
                 try:
@@ -1768,20 +1923,22 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                         continue  # Already stopped
                 except psutil.NoSuchProcess:
                     continue  # Already gone
-                
+
                 # Enhanced termination with signal escalation
                 success = _terminate_process_with_escalation(proc, verbose)
-                
+
                 if success:
                     cleaned_processes += 1
-                    service_type = getattr(process, 'service_type', 'unknown')
+                    service_type = getattr(process, "service_type", "unknown")
                     if verbose:
                         click.echo(f"   ✅ Stopped PID {process.pid} ({service_type})")
                 else:
                     failed_cleanups += 1
                     if verbose:
-                        click.echo(f"   ❌ Failed to stop PID {process.pid} after escalation")
-                
+                        click.echo(
+                            f"   ❌ Failed to stop PID {process.pid} after escalation"
+                        )
+
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 # Process already gone or can't access it
                 continue
@@ -1789,10 +1946,12 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                 failed_cleanups += 1
                 if verbose:
                     click.echo(f"   ❌ Failed to stop PID {process.pid}: {e}")
-        
+
         if verbose:
-            click.echo(f"   📊 Process cleanup: {cleaned_processes} stopped, {failed_cleanups} failed")
-    
+            click.echo(
+                f"   📊 Process cleanup: {cleaned_processes} stopped, {failed_cleanups} failed"
+            )
+
     # 5. DOCKER CLEANUP PHASE - Enhanced with robust ClickHouse shutdown
     if not processes_only:
         if verbose:
@@ -1804,11 +1963,17 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         # Report ClickHouse shutdown results
         if verbose:
             if clickhouse_results["containers_stopped"]:
-                click.echo(f"   📊 ClickHouse containers stopped: {', '.join(clickhouse_results['containers_stopped'])}")
+                click.echo(
+                    f"   📊 ClickHouse containers stopped: {', '.join(clickhouse_results['containers_stopped'])}"
+                )
             if clickhouse_results["processes_terminated"]:
-                click.echo(f"   📊 ClickHouse processes terminated: {len(clickhouse_results['processes_terminated'])} PIDs")
+                click.echo(
+                    f"   📊 ClickHouse processes terminated: {len(clickhouse_results['processes_terminated'])} PIDs"
+                )
             if clickhouse_results["remaining_issues"]:
-                click.echo(f"   ⚠️  ClickHouse shutdown issues: {len(clickhouse_results['remaining_issues'])}")
+                click.echo(
+                    f"   ⚠️  ClickHouse shutdown issues: {len(clickhouse_results['remaining_issues'])}"
+                )
                 for issue in clickhouse_results["remaining_issues"]:
                     click.echo(f"      - {issue}")
 
@@ -1817,14 +1982,16 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
         if compose_file.exists():
             try:
                 if verbose:
-                    click.echo("   🔄 Running traditional docker-compose down for cleanup...")
+                    click.echo(
+                        "   🔄 Running traditional docker-compose down for cleanup..."
+                    )
 
                 result = subprocess.run(
                     ["docker", "compose", "down"],
                     capture_output=True,
                     text=True,
                     timeout=30,
-                    cwd=str(telemetry_dir)
+                    cwd=str(telemetry_dir),
                 )
 
                 if result.returncode == 0:
@@ -1832,14 +1999,26 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                         click.echo("   ✅ Docker compose down completed")
                 else:
                     if verbose:
-                        click.echo(f"   ⚠️  Docker compose down had issues: {result.stderr}")
+                        click.echo(
+                            f"   ⚠️  Docker compose down had issues: {result.stderr}"
+                        )
 
             except subprocess.TimeoutExpired:
                 if verbose:
-                    click.echo("   ⚠️  Docker compose down timed out, trying force methods...")
+                    click.echo(
+                        "   ⚠️  Docker compose down timed out, trying force methods..."
+                    )
                 try:
-                    subprocess.run(["docker", "compose", "kill"], timeout=10, cwd=str(telemetry_dir))
-                    subprocess.run(["docker", "compose", "down"], timeout=10, cwd=str(telemetry_dir))
+                    subprocess.run(
+                        ["docker", "compose", "kill"],
+                        timeout=10,
+                        cwd=str(telemetry_dir),
+                    )
+                    subprocess.run(
+                        ["docker", "compose", "down"],
+                        timeout=10,
+                        cwd=str(telemetry_dir),
+                    )
                     if verbose:
                         click.echo("   ✅ Docker services force-stopped with compose")
                 except Exception as e:
@@ -1850,18 +2029,20 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     click.echo(f"   ❌ Error with docker compose: {e}")
         else:
             if verbose:
-                click.echo("   ⚠️  No docker-compose.yml found, relying on direct container shutdown")
-    
+                click.echo(
+                    "   ⚠️  No docker-compose.yml found, relying on direct container shutdown"
+                )
+
     # 6. REGISTRY CLEANUP PHASE
     if registry_cleanup:
         if verbose:
             click.echo("\n🗂️  PHASE 5: Process Registry Cleanup")
-        
+
         try:
             # Clean up stale registry entries
             all_registered = process_registry.get_all_processes()
             cleaned_entries = 0
-            
+
             for registered_process in all_registered:
                 try:
                     # Check if process is still running
@@ -1873,79 +2054,101 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     # Process is definitely gone, remove from registry
                     process_registry.unregister_process(registered_process.pid)
                     cleaned_entries += 1
-            
+
             if verbose:
-                click.echo(f"   📊 Registry cleanup: {cleaned_entries} stale entries removed")
-        
+                click.echo(
+                    f"   📊 Registry cleanup: {cleaned_entries} stale entries removed"
+                )
+
         except Exception as e:
             if verbose:
                 click.echo(f"   ❌ Registry cleanup failed: {e}")
-    
+
     # 7. POST-SHUTDOWN VERIFICATION
     if verbose:
         click.echo("\n🔍 Verifying shutdown completeness...")
-    
+
     # Enhanced verification with retry mechanism
     verification_attempts = 3
     verification_processes = []
-    
+
     for attempt in range(verification_attempts):
         try:
             # Use both discovery methods for verification
             orchestrator_processes = discovery_engine.discover_all_processes()
             manual_processes = _discover_all_context_cleaner_processes(verbose=False)
-            
+
             # Combine processes for verification
             all_verification_pids = set()
             verification_processes = []
-            
+
             for proc in orchestrator_processes + manual_processes:
                 if proc.pid == os.getpid():
                     continue  # Ignore the current stop command process
                 if proc.pid not in all_verification_pids:
                     verification_processes.append(proc)
                     all_verification_pids.add(proc.pid)
-            
+
             if len(verification_processes) == 0:
                 break  # All processes stopped
-            
+
             if attempt < verification_attempts - 1:
                 if verbose:
-                    click.echo(f"   🔄 Verification attempt {attempt + 1}: {len(verification_processes)} processes still running, retrying...")
+                    click.echo(
+                        f"   🔄 Verification attempt {attempt + 1}: {len(verification_processes)} processes still running, retrying..."
+                    )
                 import time
+
                 time.sleep(2)  # Wait before retry
             else:
                 if verbose:
-                    click.echo(f"   Found {len(verification_processes)} remaining processes after {verification_attempts} attempts")
-                    
+                    click.echo(
+                        f"   Found {len(verification_processes)} remaining processes after {verification_attempts} attempts"
+                    )
+
         except Exception as e:
             if verbose:
-                click.echo(f"   ⚠️  Verification discovery failed (attempt {attempt + 1}): {e}")
-    
+                click.echo(
+                    f"   ⚠️  Verification discovery failed (attempt {attempt + 1}): {e}"
+                )
+
     # Check if common ports are still bound (expanded range)
     remaining_ports = []
-    common_ports = list(range(8050, 8110)) + list(range(8200, 8210)) + list(range(8300, 8310)) + \
-                   list(range(8400, 8410)) + list(range(8500, 8510)) + list(range(8600, 8610)) + \
-                   list(range(8700, 8710)) + list(range(8800, 8810)) + list(range(8900, 8910)) + \
-                   list(range(9000, 9010)) + list(range(9100, 9110)) + list(range(9200, 9210)) + \
-                   list(range(9900, 10000))
-    
+    common_ports = (
+        list(range(8050, 8110))
+        + list(range(8200, 8210))
+        + list(range(8300, 8310))
+        + list(range(8400, 8410))
+        + list(range(8500, 8510))
+        + list(range(8600, 8610))
+        + list(range(8700, 8710))
+        + list(range(8800, 8810))
+        + list(range(8900, 8910))
+        + list(range(9000, 9010))
+        + list(range(9100, 9110))
+        + list(range(9200, 9210))
+        + list(range(9900, 10000))
+    )
+
     for port in common_ports:
         try:
             import socket
+
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                result = sock.connect_ex(('127.0.0.1', port))
+                result = sock.connect_ex(("127.0.0.1", port))
                 if result == 0:
                     remaining_ports.append(port)
         except:
             pass
-    
+
     # Report verification results
     shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
 
     if not shutdown_complete:
         if verbose:
-            click.echo("   ⚠️  Residual processes detected, attempting forced cleanup...")
+            click.echo(
+                "   ⚠️  Residual processes detected, attempting forced cleanup..."
+            )
         forced_cleanups = 0
         for process in verification_processes:
             if process.pid == os.getpid():
@@ -1959,10 +2162,14 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     forced_cleanups += 1
             except Exception as cleanup_error:
                 if verbose:
-                    click.echo(f"   ❌ Forced cleanup failed for PID {process.pid}: {cleanup_error}")
+                    click.echo(
+                        f"   ❌ Forced cleanup failed for PID {process.pid}: {cleanup_error}"
+                    )
 
         if forced_cleanups and verbose:
-            click.echo(f"   ✅ Forced cleanup terminated {forced_cleanups} residual process(es)")
+            click.echo(
+                f"   ✅ Forced cleanup terminated {forced_cleanups} residual process(es)"
+            )
 
         # Re-run verification once after forced cleanup
         verification_processes = []
@@ -1979,27 +2186,34 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
                     seen_pids.add(proc.pid)
         except Exception as verify_error:
             if verbose:
-                click.echo(f"   ⚠️  Verification after forced cleanup failed: {verify_error}")
+                click.echo(
+                    f"   ⚠️  Verification after forced cleanup failed: {verify_error}"
+                )
 
         for port in common_ports:
             try:
                 import socket
+
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                    result = sock.connect_ex(('127.0.0.1', port))
+                    result = sock.connect_ex(("127.0.0.1", port))
                     if result == 0:
                         remaining_ports.append(port)
             except Exception:
                 continue
 
-        shutdown_complete = len(verification_processes) == 0 and len(remaining_ports) == 0
-    
+        shutdown_complete = (
+            len(verification_processes) == 0 and len(remaining_ports) == 0
+        )
+
     if shutdown_complete:
         # Remove lingering supervisor registry entries now that the process is gone
         try:
             process_registry.prune_processes(service_type="supervisor")
         except Exception as prune_error:
             if verbose:
-                click.echo(f"   ⚠️  Failed to prune supervisor registry entries: {prune_error}")
+                click.echo(
+                    f"   ⚠️  Failed to prune supervisor registry entries: {prune_error}"
+                )
 
         # 8. FINAL SUCCESS REPORT
         click.echo("\n🎯 COMPREHENSIVE SHUTDOWN COMPLETE!")
@@ -2012,59 +2226,85 @@ def stop(ctx, force, docker_only, processes_only, no_discovery, show_discovery, 
             click.echo(f"❌ {len(verification_processes)} processes still running")
             click.echo(f"\n📋 Remaining processes:")
             for proc in verification_processes[:10]:  # Show up to 10
-                proc_name = getattr(proc, 'name', 'unknown')
-                proc_path = getattr(proc, 'path', 'N/A')
-                command_preview = proc.command_line[:60] + "..." if len(proc.command_line) > 60 else proc.command_line
-                click.echo(f"   • PID {proc.pid} ({proc_name}) [{proc_path}]: {command_preview}")
+                proc_name = getattr(proc, "name", "unknown")
+                proc_path = getattr(proc, "path", "N/A")
+                command_preview = (
+                    proc.command_line[:60] + "..."
+                    if len(proc.command_line) > 60
+                    else proc.command_line
+                )
+                click.echo(
+                    f"   • PID {proc.pid} ({proc_name}) [{proc_path}]: {command_preview}"
+                )
             if len(verification_processes) > 10:
-                click.echo(f"   • ... and {len(verification_processes) - 10} more processes")
+                click.echo(
+                    f"   • ... and {len(verification_processes) - 10} more processes"
+                )
             if verbose:
-                for i, proc in enumerate(verification_processes[:5]):  # Show first 5 in verbose
-                    proc_name = getattr(proc, 'name', 'unknown')
-                    proc_path = getattr(proc, 'path', 'N/A')
-                    click.echo(f"   [{i+1}] PID {proc.pid} ({proc_name}) [{proc_path}]: {proc.command_line}")
+                for i, proc in enumerate(
+                    verification_processes[:5]
+                ):  # Show first 5 in verbose
+                    proc_name = getattr(proc, "name", "unknown")
+                    proc_path = getattr(proc, "path", "N/A")
+                    click.echo(
+                        f"   [{i+1}] PID {proc.pid} ({proc_name}) [{proc_path}]: {proc.command_line}"
+                    )
         if remaining_ports:
-            click.echo(f"❌ {len(remaining_ports)} ports still bound: {remaining_ports}")
-        
+            click.echo(
+                f"❌ {len(remaining_ports)} ports still bound: {remaining_ports}"
+            )
+
         click.echo("\n💡 To force cleanup remaining processes:")
         if verification_processes:
             # Show specific pkill commands for the remaining processes
-            unique_names = set(getattr(proc, 'name', 'unknown') for proc in verification_processes[:5])
+            unique_names = set(
+                getattr(proc, "name", "unknown") for proc in verification_processes[:5]
+            )
             for name in unique_names:
                 click.echo(f"   sudo pkill -f '{name}'")
             if len(verification_processes) > 5:
-                click.echo("   sudo pkill -f 'start_context_cleaner'  # Catch-all for remaining")
+                click.echo(
+                    "   sudo pkill -f 'start_context_cleaner'  # Catch-all for remaining"
+                )
         else:
             click.echo("   sudo pkill -f 'start_context_cleaner'")
-        click.echo("   context-cleaner debug processes  # Check what's still running (enhanced details above)")
-    
+        click.echo(
+            "   context-cleaner debug processes  # Check what's still running (enhanced details above)"
+        )
+
     if verbose:
         click.echo("\n📋 Summary:")
         if not no_discovery:
-            click.echo(f"   • Process discovery: {len(discovered_processes)} processes found")
+            click.echo(
+                f"   • Process discovery: {len(discovered_processes)} processes found"
+            )
         click.echo("   • Orchestrated services: Stopped")
         if not processes_only:
             click.echo("   • Docker services: Stopped")
         if registry_cleanup:
             click.echo("   • Process registry: Cleaned")
-        
+
         click.echo("\n💡 To start services again:")
         click.echo("   context-cleaner run              # Full orchestrated startup")
-        click.echo("   context-cleaner debug processes  # Check for remaining processes")
+        click.echo(
+            "   context-cleaner debug processes  # Check for remaining processes"
+        )
 
 
 def _discover_all_context_cleaner_processes(verbose: bool = False):
     """Comprehensive manual process discovery for all Context Cleaner processes.
-    
+
     This function uses multiple discovery methods to find all Context Cleaner processes,
     including those started by different methods that the orchestrator might miss.
     """
     import psutil
     from collections import namedtuple
-    
-    ProcessInfo = namedtuple('ProcessInfo', ['pid', 'name', 'path', 'command_line', 'service_type'])
+
+    ProcessInfo = namedtuple(
+        "ProcessInfo", ["pid", "name", "path", "command_line", "service_type"]
+    )
     found_processes = []
-    
+
     # Comprehensive patterns based on all Context Cleaner startup methods
     search_patterns = [
         # Direct script invocations (legacy helpers now deprecated but keep for cleanup)
@@ -2072,30 +2312,24 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
         "python start_context_cleaner_production.py",
         "start_context_cleaner.py",
         "start_context_cleaner_production.py",
-
         # CLI module invocations
         "python -m context_cleaner.cli.main run",
         "context_cleaner run",
         "context_cleaner.cli.main run",
-
         # WSGI/production deployments
         "context_cleaner_wsgi",
         "gunicorn.*context_cleaner",
-
         # Dashboard services
         "ComprehensiveHealthDashboard",
         "context_cleaner.*dashboard",
-
         # Background services
         "context_cleaner.*jsonl",
         "jsonl_background_service",
         "context_cleaner.*bridge",
         "context_cleaner.*monitor",
-
         # Python path variations
         "PYTHONPATH.*context-cleaner",
         "PYTHONPATH.*context_cleaner",
-
         # Docker container processes - ClickHouse and OpenTelemetry
         "clickhouse-server",
         "/usr/bin/clickhouse-server",
@@ -2104,21 +2338,20 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
         "otel/opentelemetry-collector",
         "docker.*clickhouse",
         "containerd-shim.*clickhouse",
-
         # Docker compose processes
         "docker-compose.*clickhouse",
         "docker compose.*clickhouse",
     ]
-    
+
     try:
         # Iterate through all running processes
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'exe']):
+        for proc in psutil.process_iter(["pid", "name", "cmdline", "exe"]):
             try:
-                if not proc.info['cmdline']:
+                if not proc.info["cmdline"]:
                     continue
-                    
-                cmdline = ' '.join(proc.info['cmdline'])
-                
+
+                cmdline = " ".join(proc.info["cmdline"])
+
                 # Check against all search patterns
                 for pattern in search_patterns:
                     if pattern.lower() in cmdline.lower():
@@ -2126,32 +2359,45 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                         # These are CLI commands that manage the system, not runtime services
 
                         # Check for management subcommands (stop, debug, status, help)
-                        management_subcommands = ["stop", "debug", "status", "--help", "help"]
+                        management_subcommands = [
+                            "stop",
+                            "debug",
+                            "status",
+                            "--help",
+                            "help",
+                        ]
                         is_management_command = False
 
                         # Look for context-cleaner or context_cleaner followed by management commands
                         cmdline_lower = cmdline.lower()
-                        if any(f"context-cleaner {cmd}" in cmdline_lower or
-                               f"context_cleaner {cmd}" in cmdline_lower or
-                               f"context_cleaner.cli.main {cmd}" in cmdline_lower
-                               for cmd in management_subcommands):
+                        if any(
+                            f"context-cleaner {cmd}" in cmdline_lower
+                            or f"context_cleaner {cmd}" in cmdline_lower
+                            or f"context_cleaner.cli.main {cmd}" in cmdline_lower
+                            for cmd in management_subcommands
+                        ):
                             is_management_command = True
 
                         # Also exclude the current process (self-exclusion)
                         current_pid = os.getpid()
-                        if proc.info['pid'] == current_pid:
+                        if proc.info["pid"] == current_pid:
                             is_management_command = True
 
                         if is_management_command:
                             if verbose:
-                                print(f"   🚫 Excluding management command: PID {proc.info['pid']}")
+                                print(
+                                    f"   🚫 Excluding management command: PID {proc.info['pid']}"
+                                )
                             continue
 
                         # Determine service type from command line
                         service_type = "dashboard"
                         if "clickhouse" in cmdline.lower():
                             service_type = "clickhouse_database"
-                        elif "otel" in cmdline.lower() or "opentelemetry" in cmdline.lower():
+                        elif (
+                            "otel" in cmdline.lower()
+                            or "opentelemetry" in cmdline.lower()
+                        ):
                             service_type = "otel_collector"
                         elif "containerd-shim" in cmdline.lower():
                             service_type = "docker_container_process"
@@ -2165,37 +2411,41 @@ def _discover_all_context_cleaner_processes(verbose: bool = False):
                             service_type = "production_dashboard"
                         elif "gunicorn" in cmdline.lower() or "wsgi" in cmdline.lower():
                             service_type = "wsgi_server"
-                        
+
                         # Get process path safely
                         try:
-                            process_path = proc.info.get('exe', 'N/A')
+                            process_path = proc.info.get("exe", "N/A")
                         except (psutil.AccessDenied, psutil.NoSuchProcess):
-                            process_path = 'N/A'
+                            process_path = "N/A"
 
                         process_info = ProcessInfo(
-                            pid=proc.info['pid'],
-                            name=proc.info.get('name', 'unknown'),
+                            pid=proc.info["pid"],
+                            name=proc.info.get("name", "unknown"),
                             path=process_path,
                             command_line=cmdline,
-                            service_type=service_type
+                            service_type=service_type,
                         )
                         found_processes.append(process_info)
-                        
+
                         if verbose:
-                            proc_name = proc.info.get('name', 'unknown')
-                            print(f"   🔍 Found PID {proc.info['pid']} ({proc_name}): {service_type} - {cmdline[:60]}...")
+                            proc_name = proc.info.get("name", "unknown")
+                            print(
+                                f"   🔍 Found PID {proc.info['pid']} ({proc_name}): {service_type} - {cmdline[:60]}..."
+                            )
                         break  # Found match, move to next process
-                        
+
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 # Process disappeared or we can't access it
                 continue
-                
+
     except Exception as e:
         if verbose:
             print(f"   ⚠️  Process discovery error: {e}")
-    
+
     if verbose:
-        print(f"   📊 Manual discovery found {len(found_processes)} Context Cleaner processes")
+        print(
+            f"   📊 Manual discovery found {len(found_processes)} Context Cleaner processes"
+        )
 
     return found_processes
 
@@ -2247,7 +2497,9 @@ def _supervisor_stream_shutdown(
                 return True, True
 
             if verbose:
-                click.echo(f"   ⚠️  Supervisor reported shutdown error: {response.status}")
+                click.echo(
+                    f"   ⚠️  Supervisor reported shutdown error: {response.status}"
+                )
             return True, False
 
     except (TransportError, OSError) as exc:
@@ -2322,7 +2574,9 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
             return True  # Successfully terminated
         except psutil.TimeoutExpired:
             if verbose:
-                print(f"   ⏱️  PID {proc.pid} didn't respond to SIGTERM, escalating to SIGKILL")
+                print(
+                    f"   ⏱️  PID {proc.pid} didn't respond to SIGTERM, escalating to SIGKILL"
+                )
 
         # If still running, force kill
         if proc.is_running():
@@ -2334,13 +2588,16 @@ def _terminate_process_with_escalation(proc, verbose: bool = False):
                 return True
             except psutil.TimeoutExpired:
                 if verbose:
-                    print(f"   ⚠️  PID {proc.pid} didn't respond to SIGKILL, trying process group cleanup")
+                    print(
+                        f"   ⚠️  PID {proc.pid} didn't respond to SIGKILL, trying process group cleanup"
+                    )
 
         # If STILL running, try process group termination
         if proc.is_running():
             try:
                 # Try to kill the entire process group
                 import os
+
                 pgid = os.getpgid(proc.pid)
                 os.killpg(pgid, signal.SIGTERM)
                 time.sleep(2)
@@ -2389,7 +2646,7 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
         "containers_stopped": [],
         "processes_terminated": [],
         "remaining_issues": [],
-        "success": True
+        "success": True,
     }
 
     if verbose:
@@ -2410,7 +2667,7 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                 capture_output=True,
                 text=True,
                 timeout=15,
-                cwd=str(telemetry_dir)
+                cwd=str(telemetry_dir),
             )
 
             if result.returncode == 0:
@@ -2424,7 +2681,7 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                     capture_output=True,
                     text=True,
                     timeout=10,
-                    cwd=str(telemetry_dir)
+                    cwd=str(telemetry_dir),
                 )
 
                 # Full compose down for cleanup
@@ -2433,7 +2690,7 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                     capture_output=True,
                     text=True,
                     timeout=20,
-                    cwd=str(telemetry_dir)
+                    cwd=str(telemetry_dir),
                 )
 
             else:
@@ -2454,12 +2711,21 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
     try:
         # Find containers by ClickHouse image pattern
         result = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}", "--filter", "ancestor=clickhouse/clickhouse-server"],
-            capture_output=True, text=True, timeout=5
+            [
+                "docker",
+                "ps",
+                "--format",
+                "{{.Names}}",
+                "--filter",
+                "ancestor=clickhouse/clickhouse-server",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
 
         if result.returncode == 0 and result.stdout.strip():
-            image_containers = result.stdout.strip().split('\n')
+            image_containers = result.stdout.strip().split("\n")
             discovered_containers.extend(image_containers)
             if verbose:
                 print(f"   🔍 Found ClickHouse containers by image: {image_containers}")
@@ -2479,7 +2745,9 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
             # Check if container exists and is running
             result = subprocess.run(
                 ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
 
             if result.returncode == 0 and result.stdout.strip().lower() == "true":
@@ -2489,7 +2757,9 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                 # Try graceful stop first
                 stop_result = subprocess.run(
                     ["docker", "stop", "-t", "10", container_name],
-                    capture_output=True, text=True, timeout=15
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
 
                 if stop_result.returncode == 0:
@@ -2500,29 +2770,41 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                 else:
                     # Force kill if graceful stop failed
                     if verbose:
-                        print(f"   ⚠️  Graceful stop failed, force killing {container_name}...")
+                        print(
+                            f"   ⚠️  Graceful stop failed, force killing {container_name}..."
+                        )
 
                     kill_result = subprocess.run(
                         ["docker", "kill", container_name],
-                        capture_output=True, text=True, timeout=5
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
 
                     if kill_result.returncode == 0:
-                        shutdown_results["containers_stopped"].append(f"{container_name} (forced)")
+                        shutdown_results["containers_stopped"].append(
+                            f"{container_name} (forced)"
+                        )
                         shutdown_results["direct_container_shutdown"] = True
                         if verbose:
                             print(f"   ✅ Container {container_name} force killed")
                     else:
-                        shutdown_results["remaining_issues"].append(f"Failed to stop container {container_name}")
+                        shutdown_results["remaining_issues"].append(
+                            f"Failed to stop container {container_name}"
+                        )
                         if verbose:
                             print(f"   ❌ Failed to force kill {container_name}")
 
         except subprocess.TimeoutExpired:
-            shutdown_results["remaining_issues"].append(f"Container {container_name} operations timed out")
+            shutdown_results["remaining_issues"].append(
+                f"Container {container_name} operations timed out"
+            )
             if verbose:
                 print(f"   ⏱️  Operations for {container_name} timed out")
         except Exception as e:
-            shutdown_results["remaining_issues"].append(f"Container {container_name} error: {str(e)}")
+            shutdown_results["remaining_issues"].append(
+                f"Container {container_name} error: {str(e)}"
+            )
             if verbose:
                 print(f"   ❌ Error with {container_name}: {e}")
 
@@ -2533,23 +2815,27 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
             print("   🔍 Searching for ClickHouse server processes...")
 
         import psutil
+
         clickhouse_processes = []
 
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        for proc in psutil.process_iter(["pid", "name", "cmdline"]):
             try:
-                if not proc.info['cmdline']:
+                if not proc.info["cmdline"]:
                     continue
 
-                cmdline = ' '.join(proc.info['cmdline']).lower()
+                cmdline = " ".join(proc.info["cmdline"]).lower()
 
                 # Look for ClickHouse server processes
-                if any(pattern in cmdline for pattern in [
-                    'clickhouse-server',
-                    '/usr/bin/clickhouse-server',
-                    'clickhouse/clickhouse-server',
-                    '--daemon'  # ClickHouse daemon flag
-                ]):
-                    clickhouse_processes.append(proc.info['pid'])
+                if any(
+                    pattern in cmdline
+                    for pattern in [
+                        "clickhouse-server",
+                        "/usr/bin/clickhouse-server",
+                        "clickhouse/clickhouse-server",
+                        "--daemon",  # ClickHouse daemon flag
+                    ]
+                ):
+                    clickhouse_processes.append(proc.info["pid"])
                     if verbose:
                         print(f"   🔍 Found ClickHouse process PID {proc.info['pid']}")
 
@@ -2568,7 +2854,9 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                         if verbose:
                             print(f"   ✅ Terminated ClickHouse process PID {pid}")
                     else:
-                        shutdown_results["remaining_issues"].append(f"Failed to terminate process PID {pid}")
+                        shutdown_results["remaining_issues"].append(
+                            f"Failed to terminate process PID {pid}"
+                        )
                         if verbose:
                             print(f"   ❌ Failed to terminate PID {pid}")
 
@@ -2576,7 +2864,9 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
                 continue  # Process already gone
 
     except Exception as e:
-        shutdown_results["remaining_issues"].append(f"Process termination error: {str(e)}")
+        shutdown_results["remaining_issues"].append(
+            f"Process termination error: {str(e)}"
+        )
         if verbose:
             print(f"   ❌ Process termination phase error: {e}")
 
@@ -2589,12 +2879,15 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
 
         # Check if ClickHouse port is still bound
         import socket
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(1)
-                result = sock.connect_ex(('127.0.0.1', 8123))
+                result = sock.connect_ex(("127.0.0.1", 8123))
                 if result == 0:
-                    shutdown_results["remaining_issues"].append("ClickHouse HTTP port 8123 still responding")
+                    shutdown_results["remaining_issues"].append(
+                        "ClickHouse HTTP port 8123 still responding"
+                    )
                     shutdown_results["success"] = False
                     if verbose:
                         print("   ⚠️  ClickHouse HTTP port 8123 still responding")
@@ -2606,14 +2899,20 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
             try:
                 result = subprocess.run(
                     ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
-                    capture_output=True, text=True, timeout=3
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
                 )
 
                 if result.returncode == 0 and result.stdout.strip().lower() == "true":
-                    shutdown_results["remaining_issues"].append(f"Container {container_name} still running")
+                    shutdown_results["remaining_issues"].append(
+                        f"Container {container_name} still running"
+                    )
                     shutdown_results["success"] = False
                     if verbose:
-                        print(f"   ⚠️  Container {container_name} still running after shutdown attempts")
+                        print(
+                            f"   ⚠️  Container {container_name} still running after shutdown attempts"
+                        )
 
             except:
                 pass  # Container doesn't exist or Docker error
@@ -2629,12 +2928,13 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
         if shutdown_results["success"]:
             print("   🎯 ClickHouse containers shutdown successfully!")
         else:
-            print(f"   ⚠️  ClickHouse shutdown completed with {len(shutdown_results['remaining_issues'])} remaining issues")
+            print(
+                f"   ⚠️  ClickHouse shutdown completed with {len(shutdown_results['remaining_issues'])} remaining issues"
+            )
             for issue in shutdown_results["remaining_issues"]:
                 print(f"      - {issue}")
 
     return shutdown_results
-
 
 
 # REMOVED: Conflicting dashboard-mgr command group - use 'run' and 'stop' commands instead
@@ -2649,40 +2949,50 @@ def _shutdown_clickhouse_containers_robust(verbose: bool = False):
 @click.option("--dashboard-port", "-p", type=int, default=8110, help="Dashboard port")
 @click.option("--no-browser", is_flag=True, help="Don't open browser automatically")
 @click.option("--status-only", is_flag=True, help="Show service status and exit")
-@click.option("--json", "status_json", is_flag=True, help="Output status-only data as JSON")
-@click.option("--config-file", type=click.Path(exists=True), help="Custom configuration file")
-@click.option("--dev-mode", is_flag=True, help="Enable development mode with debug logging")
+@click.option(
+    "--json", "status_json", is_flag=True, help="Output status-only data as JSON"
+)
+@click.option(
+    "--config-file", type=click.Path(exists=True), help="Custom configuration file"
+)
+@click.option(
+    "--dev-mode", is_flag=True, help="Enable development mode with debug logging"
+)
 @click.pass_context
-def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, dev_mode):
+def run(
+    ctx, dashboard_port, no_browser, status_only, status_json, config_file, dev_mode
+):
     """
     🚀 SINGLE ENTRY POINT - Start all Context Cleaner services with orchestration.
-    
+
     This is the recommended way to start Context Cleaner. It provides:
-    
+
     ✅ Complete service orchestration and dependency management
-    ✅ Health monitoring and automatic service recovery  
+    ✅ Health monitoring and automatic service recovery
     ✅ Integrated dashboard with all analytics and insights
     ✅ Process registry tracking and cleanup
     ✅ Real-time telemetry and performance monitoring
-    
+
     STARTUP SEQUENCE:
-    1. 🐳 Docker services (ClickHouse + OpenTelemetry)  
+    1. 🐳 Docker services (ClickHouse + OpenTelemetry)
     2. 🔗 JSONL processing and data bridge services
     3. 📊 Comprehensive health dashboard
     4. 🔍 Process registry and monitoring
-    
+
     QUICK START:
       context-cleaner run                    # Start everything
       context-cleaner run --status-only      # Check service status
       context-cleaner debug service-health   # Troubleshoot issues
       context-cleaner stop                   # Stop all services
-    
+
     For troubleshooting, use 'context-cleaner debug --help' commands.
     """
-    
+
     config = ctx.obj["config"]
     verbose = ctx.obj["verbose"] or dev_mode
-    supervisor_enabled = config.feature_flags.get("enable_supervisor_orchestration", True)
+    supervisor_enabled = config.feature_flags.get(
+        "enable_supervisor_orchestration", True
+    )
 
     if supervisor_enabled and _SUPERVISOR_IMPORT_ERROR is not None:
         click.echo(
@@ -2700,16 +3010,20 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
     if config_file:
         config = ApplicationConfig.from_file(Path(config_file))
         ctx.obj["config"] = config
-    
+
     # Enable development mode
     if dev_mode:
         ctx.obj["verbose"] = True
         verbose = True
         click.echo("🔧 Development mode enabled - verbose logging active")
-    
+
     # Import service orchestrator
     try:
-        from context_cleaner.services import ServiceOrchestrator, _ORCHESTRATOR_IMPORT_ERROR
+        from context_cleaner.services import (
+            ServiceOrchestrator,
+            _ORCHESTRATOR_IMPORT_ERROR,
+        )
+
         if ServiceOrchestrator is None:
             msg = _ORCHESTRATOR_IMPORT_ERROR or "Service orchestrator module missing"
             click.echo(f"❌ Service orchestrator not available: {msg}", err=True)
@@ -2726,7 +3040,7 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
     click.echo("🔍 DEBUG: Creating ServiceOrchestrator instance...")
     orchestrator = ServiceOrchestrator(config=config, verbose=verbose)
     click.echo("✅ DEBUG: ServiceOrchestrator instance created successfully")
-    
+
     # Handle status-only mode
     click.echo("🔍 DEBUG: Checking status-only mode...")
     if status_only:
@@ -2740,10 +3054,15 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
             supervisor_endpoint = default_supervisor_endpoint()
             try:
                 from context_cleaner.ipc.client import SupervisorClient
-                from context_cleaner.ipc.protocol import SupervisorRequest, RequestAction
+                from context_cleaner.ipc.protocol import (
+                    SupervisorRequest,
+                    RequestAction,
+                )
 
                 with SupervisorClient(endpoint=supervisor_endpoint) as client:
-                    response = client.send(SupervisorRequest(action=RequestAction.STATUS))
+                    response = client.send(
+                        SupervisorRequest(action=RequestAction.STATUS)
+                    )
                     if response.status == "ok":
                         supervisor_snapshot = response.result
                         watchdog_info = supervisor_snapshot.get("watchdog")
@@ -2757,7 +3076,9 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
                 "orchestrator": supervisor_orchestrator.get("orchestrator", {}),
                 "services": supervisor_orchestrator.get("services", {}),
                 "services_summary": supervisor_orchestrator.get("services_summary", {}),
-                "watchdog": watchdog_info or supervisor_snapshot.get("watchdog", {}) or {},
+                "watchdog": watchdog_info
+                or supervisor_snapshot.get("watchdog", {})
+                or {},
                 "supervisor": supervisor_snapshot.get("supervisor"),
                 "registry": supervisor_snapshot.get("registry"),
             }
@@ -2783,7 +3104,9 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
         orch_status = payload.get("orchestrator", {}) or {}
         orch_running = bool(orch_status.get("running"))
         running_icon = "🟢" if orch_running else "🔴"
-        click.echo(f"{running_icon} Orchestrator: {'Running' if orch_running else 'Stopped'}")
+        click.echo(
+            f"{running_icon} Orchestrator: {'Running' if orch_running else 'Stopped'}"
+        )
 
         if payload.get("watchdog"):
             click.echo("\n👀 Watchdog:")
@@ -2792,7 +3115,9 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
             enabled = watchdog_view.get("enabled", True)
             status_icon = "🟢" if running else "🔴"
             state = "Active" if running else "Stopped"
-            click.echo(f"   {status_icon} {state} (enabled: {'yes' if enabled else 'no'})")
+            click.echo(
+                f"   {status_icon} {state} (enabled: {'yes' if enabled else 'no'})"
+            )
 
             last_hb = watchdog_view.get("last_heartbeat_at") or "unknown"
             click.echo(f"      Last heartbeat: {last_hb}")
@@ -2800,7 +3125,9 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
             last_restart = watchdog_view.get("last_restart_at")
             reason = watchdog_view.get("last_restart_reason")
             if last_restart or reason:
-                click.echo(f"      Last restart: {last_restart or 'never'} (reason: {reason or 'n/a'})")
+                click.echo(
+                    f"      Last restart: {last_restart or 'never'} (reason: {reason or 'n/a'})"
+                )
 
             attempts = watchdog_view.get("restart_attempts", 0)
             click.echo(f"      Restart attempts: {attempts}")
@@ -2821,31 +3148,37 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
         for service_name, service_info in services_view.items():
             status_icon = {
                 "running": "🟢",
-                "starting": "🟡", 
+                "starting": "🟡",
                 "stopping": "🟡",
                 "stopped": "🔴",
                 "failed": "❌",
-                "unknown": "⚪"
+                "unknown": "⚪",
             }.get(service_info["status"], "⚪")
-            
+
             service_status = service_info.get("status", "unknown")
             is_healthy = bool(service_info.get("health_status"))
-            health_icon = "💚" if is_healthy else "💔" if service_status == "running" else "⚪"
-            required_text = " (required)" if service_info.get("required", False) else " (optional)"
-            
-            click.echo(f"   {status_icon} {health_icon} {service_info.get('name', service_name)}{required_text}")
+            health_icon = (
+                "💚" if is_healthy else "💔" if service_status == "running" else "⚪"
+            )
+            required_text = (
+                " (required)" if service_info.get("required", False) else " (optional)"
+            )
+
+            click.echo(
+                f"   {status_icon} {health_icon} {service_info.get('name', service_name)}{required_text}"
+            )
             click.echo(f"      Status: {service_status.title()}")
-            
+
             restart_count = service_info.get("restart_count", 0)
             if restart_count > 0:
                 click.echo(f"      Restarts: {restart_count}")
-            
+
             last_error = service_info.get("last_error")
             if last_error:
                 click.echo(f"      Last error: {last_error}")
-        
+
         return
-    
+
     click.echo("🔍 DEBUG: Service configuration completed")
 
     supervisor_config = SupervisorConfig(
@@ -2907,11 +3240,15 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
                 try:
                     loop.run_forever()
                 finally:
-                    pending_tasks = [task for task in asyncio.all_tasks(loop) if not task.done()]
+                    pending_tasks = [
+                        task for task in asyncio.all_tasks(loop) if not task.done()
+                    ]
                     for task in pending_tasks:
                         task.cancel()
                     if pending_tasks:
-                        loop.run_until_complete(asyncio.gather(*pending_tasks, return_exceptions=True))
+                        loop.run_until_complete(
+                            asyncio.gather(*pending_tasks, return_exceptions=True)
+                        )
                     loop.run_until_complete(loop.shutdown_asyncgens())
                     asyncio.set_event_loop(None)
 
@@ -3003,22 +3340,29 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
         else:
             supervisor_state["instance"] = None
             if verbose:
-                click.echo("⚠️  Supervisor unavailable; using fallback event loop handling")
+                click.echo(
+                    "⚠️  Supervisor unavailable; using fallback event loop handling"
+                )
     else:
         if verbose:
-            click.echo("⚠️ Supervisor orchestration feature disabled; running without IPC supervisor")
-    
+            click.echo(
+                "⚠️ Supervisor orchestration feature disabled; running without IPC supervisor"
+            )
+
     try:
         # Start all services - handle event loop properly with enhanced debugging
         click.echo("🔍 DEBUG: Defining start_services() async function...")
+
         async def start_services():
-            click.echo("🔍 DEBUG: Inside start_services(), calling orchestrator.start_all_services()...")
+            click.echo(
+                "🔍 DEBUG: Inside start_services(), calling orchestrator.start_all_services()..."
+            )
             try:
                 return await orchestrator.start_all_services(dashboard_port)
             except Exception as e:
                 click.echo(f"❌ DEBUG: Exception in start_all_services(): {str(e)}")
                 raise
-        
+
         if supervisor_loop is not None:
             click.echo("🔍 DEBUG: Starting services via supervisor event loop...")
         else:
@@ -3030,19 +3374,22 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
             raise
 
         click.echo(f"🔍 DEBUG: Service startup result: {success}")
-        
+
         if not success:
             click.echo("❌ Failed to start all required services", err=True)
             sys.exit(1)
-        
+
         # Start the dashboard (this is the main blocking operation)
         try:
-            from context_cleaner.dashboard.comprehensive_health_dashboard import ComprehensiveHealthDashboard
+            from context_cleaner.dashboard.comprehensive_health_dashboard import (
+                ComprehensiveHealthDashboard,
+            )
 
             dashboard = ComprehensiveHealthDashboard(config=config)
-            
+
             # Open browser if requested
             if not no_browser:
+
                 def open_browser():
                     time.sleep(2)
                     try:
@@ -3050,9 +3397,9 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
                         webbrowser.open(url)
                     except Exception:
                         pass
-                
+
                 threading.Thread(target=open_browser, daemon=True).start()
-            
+
             dashboard_url = f"http://{config.dashboard.host}:{dashboard_port}"
             orchestrator.register_external_service(
                 "dashboard",
@@ -3069,23 +3416,28 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
                 dashboard_state.url = dashboard_url
             click.echo(f"🚀 Context Cleaner running at: {dashboard_url}")
             click.echo("📊 All services started successfully!")
-            
+
             # Show running services
             for service_name, service_state in orchestrator.service_states.items():
                 service = orchestrator.services[service_name]
                 if service_state.status.value == "running":
                     click.echo(f"   ✅ {service.description}")
-            
+
             click.echo("\nPress Ctrl+C to stop all services")
-            
+
             # Start dashboard (blocking)
-            dashboard.start_server(host=config.dashboard.host, port=dashboard_port, debug=False, open_browser=False)
-        
+            dashboard.start_server(
+                host=config.dashboard.host,
+                port=dashboard_port,
+                debug=False,
+                open_browser=False,
+            )
+
         except Exception as e:
             click.echo(f"❌ Failed to start dashboard: {e}", err=True)
             _shutdown_orchestrator()
             sys.exit(1)
-    
+
     except KeyboardInterrupt:
         if verbose:
             click.echo("\n👋 Received shutdown signal")
@@ -3121,7 +3473,6 @@ def run(ctx, dashboard_port, no_browser, status_only, status_json, config_file, 
             if current_supervisor is not None:
                 current_supervisor.register_watchdog(None)
         _stop_supervisor()
-
 
 
 if __name__ == "__main__":

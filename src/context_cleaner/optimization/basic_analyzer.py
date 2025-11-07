@@ -148,6 +148,7 @@ class SafeContextAnalyzer:
         """Get accurate token count using ccusage approach."""
         try:
             from ..analysis.enhanced_token_counter import get_accurate_token_count
+
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0

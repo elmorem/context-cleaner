@@ -4,7 +4,9 @@ from fastapi import HTTPException
 from context_cleaner.api.models import create_error_response
 
 
-def create_max_retries_exceeded_error(attempts: int, strategies_tried: list) -> HTTPException:
+def create_max_retries_exceeded_error(
+    attempts: int, strategies_tried: list
+) -> HTTPException:
     """Create standardized error for when all recovery strategies have been exhausted."""
     return create_error_response(
         message=f"Recovery failed after {attempts} attempts with strategies: {strategies_tried}",
@@ -13,8 +15,8 @@ def create_max_retries_exceeded_error(attempts: int, strategies_tried: list) -> 
         details={
             "attempts": attempts,
             "strategies_tried": strategies_tried,
-            "recovery_type": "error_recovery"
-        }
+            "recovery_type": "error_recovery",
+        },
     )
 
 
@@ -24,10 +26,7 @@ def create_no_viable_strategy_error(error_type: str) -> HTTPException:
         message=f"No recovery strategy available for error type: {error_type}",
         error_code="NO_VIABLE_STRATEGY",
         status_code=422,
-        details={
-            "error_type": error_type,
-            "recovery_type": "error_recovery"
-        }
+        details={"error_type": error_type, "recovery_type": "error_recovery"},
     )
 
 
@@ -40,14 +39,15 @@ def create_strategy_execution_error(strategy_name: str, reason: str) -> HTTPExce
         details={
             "strategy_name": strategy_name,
             "reason": reason,
-            "recovery_type": "error_recovery"
-        }
+            "recovery_type": "error_recovery",
+        },
     )
 
 
 # Legacy compatibility - deprecated but kept for backwards compatibility
 class RecoveryError(Exception):
     """Base exception for recovery system errors. DEPRECATED: Use create_*_error functions instead."""
+
     pass
 
 
@@ -57,7 +57,9 @@ class MaxRetriesExceeded(RecoveryError):
     def __init__(self, attempts: int, strategies_tried: list):
         self.attempts = attempts
         self.strategies_tried = strategies_tried
-        super().__init__(f"Recovery failed after {attempts} attempts with strategies: {strategies_tried}")
+        super().__init__(
+            f"Recovery failed after {attempts} attempts with strategies: {strategies_tried}"
+        )
 
 
 class NoViableStrategyError(RecoveryError):

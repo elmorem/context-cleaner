@@ -1,6 +1,6 @@
 # Context Cleaner Analytics Guide
 
-Complete guide to Context Cleaner's analytics and effectiveness tracking features introduced in v0.2.0.
+Complete guide to Context Cleaner's analytics and effectiveness tracking features.
 
 ## 📊 **Overview**
 
@@ -522,6 +522,6 @@ ggplot(metrics, aes(x = strategy_type, y = productivity_improvement)) +
 
 ---
 
-**Context Cleaner Analytics Guide** - Comprehensive analytics and effectiveness tracking for v0.2.0
+**Context Cleaner Analytics Guide** - Comprehensive analytics and effectiveness tracking for v0.3.0
 
 *Ready to dive deeper? Check out the [CLI Reference](cli-reference.md) or [Configuration Guide](configuration.md).*

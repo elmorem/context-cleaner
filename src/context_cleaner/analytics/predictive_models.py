@@ -481,7 +481,7 @@ class PredictiveModelEngine:
                 raise create_error_response(
                     "Insufficient productivity data",
                     "INSUFFICIENT_PRODUCTIVITY_DATA",
-                    400
+                    400,
                 )
 
             # Sort by timestamp
@@ -562,7 +562,7 @@ class PredictiveModelEngine:
             raise create_error_response(
                 f"Productivity trend forecasting failed: {str(e)}",
                 "TREND_FORECASTING_ERROR",
-                500
+                500,
             )
 
     def predict_optimal_timing(
@@ -594,7 +594,7 @@ class PredictiveModelEngine:
                 raise create_error_response(
                     "Insufficient recent data for timing analysis",
                     "INSUFFICIENT_TIMING_DATA",
-                    400
+                    400,
                 )
 
             # Analyze productivity by hour of day
@@ -633,7 +633,7 @@ class PredictiveModelEngine:
             raise create_error_response(
                 f"Optimal timing prediction failed: {str(e)}",
                 "TIMING_PREDICTION_ERROR",
-                500
+                500,
             )
 
     def evaluate_model_performance(

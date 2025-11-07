@@ -9,9 +9,9 @@ from .search_engine import (
 )
 
 __all__ = [
-    'AdvancedSearchEngine',
-    'SearchResults',
-    'SearchResult', 
-    'SearchStrategy',
-    'WorkflowPattern',
+    "AdvancedSearchEngine",
+    "SearchResults",
+    "SearchResult",
+    "SearchStrategy",
+    "WorkflowPattern",
 ]

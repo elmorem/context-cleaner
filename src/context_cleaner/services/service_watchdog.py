@@ -173,12 +173,16 @@ class ServiceWatchdog:
             return False
 
         if not entry.is_process_alive():
-            LOGGER.warning("Watchdog detected supervisor process PID %s not alive", entry.pid)
+            LOGGER.warning(
+                "Watchdog detected supervisor process PID %s not alive", entry.pid
+            )
             return False
 
         heartbeat_info = self._extract_heartbeat(entry)
         if heartbeat_info is None:
-            LOGGER.warning("Watchdog missing heartbeat metadata for supervisor PID %s", entry.pid)
+            LOGGER.warning(
+                "Watchdog missing heartbeat metadata for supervisor PID %s", entry.pid
+            )
             return False
 
         heartbeat_at, timeout_seconds = heartbeat_info
@@ -187,7 +191,10 @@ class ServiceWatchdog:
         self._last_heartbeat_at = heartbeat_at
 
         if heartbeat_at is None:
-            LOGGER.warning("Watchdog could not parse heartbeat timestamp for supervisor PID %s", entry.pid)
+            LOGGER.warning(
+                "Watchdog could not parse heartbeat timestamp for supervisor PID %s",
+                entry.pid,
+            )
             return False
 
         delta = (now - heartbeat_at).total_seconds()
@@ -209,15 +216,21 @@ class ServiceWatchdog:
         except Exception:  # pragma: no cover - defensive
             return entries[0]
 
-    def _extract_heartbeat(self, entry: ProcessEntry) -> Optional[tuple[Optional[datetime], int]]:
+    def _extract_heartbeat(
+        self, entry: ProcessEntry
+    ) -> Optional[tuple[Optional[datetime], int]]:
         environment_raw = entry.environment_vars or "{}"
         try:
             environment = json.loads(environment_raw)
         except json.JSONDecodeError:
-            LOGGER.debug("Failed to decode supervisor environment vars: %s", environment_raw)
+            LOGGER.debug(
+                "Failed to decode supervisor environment vars: %s", environment_raw
+            )
             environment = {}
 
-        heartbeat_value = environment.get("HEARTBEAT_AT") or environment.get("UPDATED_AT")
+        heartbeat_value = environment.get("HEARTBEAT_AT") or environment.get(
+            "UPDATED_AT"
+        )
         timeout = environment.get("HEARTBEAT_TIMEOUT")
 
         timeout_seconds = max(self._config.poll_interval_seconds * 3, 5)
@@ -266,7 +279,11 @@ class ServiceWatchdog:
             self._restart_attempts += 1
             self._last_restart_at = now
             self._last_restart_reason = reason
-            LOGGER.warning("Watchdog initiating supervisor restart (attempt %s, reason=%s)", self._restart_attempts, reason)
+            LOGGER.warning(
+                "Watchdog initiating supervisor restart (attempt %s, reason=%s)",
+                self._restart_attempts,
+                reason,
+            )
             restart_record = {
                 "attempt": self._restart_attempts,
                 "reason": reason,

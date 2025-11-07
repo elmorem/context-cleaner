@@ -22,16 +22,18 @@ logger = logging.getLogger(__name__)
 
 class InvalidationStrategy(Enum):
     """Cache invalidation strategies for different data types"""
-    IMMEDIATE = "immediate"           # Invalidate immediately on data change
-    TIME_BASED = "time_based"        # Invalidate after TTL expires
-    DEPENDENCY_BASED = "dependency"   # Invalidate based on data dependencies
-    WRITE_THROUGH = "write_through"   # Update cache on write operations
-    LAZY_EXPIRY = "lazy_expiry"      # Extend TTL on access
+
+    IMMEDIATE = "immediate"  # Invalidate immediately on data change
+    TIME_BASED = "time_based"  # Invalidate after TTL expires
+    DEPENDENCY_BASED = "dependency"  # Invalidate based on data dependencies
+    WRITE_THROUGH = "write_through"  # Update cache on write operations
+    LAZY_EXPIRY = "lazy_expiry"  # Extend TTL on access
 
 
 @dataclass
 class CachePolicy:
     """Cache policy configuration for different endpoint types"""
+
     ttl_seconds: int = 300
     strategy: InvalidationStrategy = InvalidationStrategy.TIME_BASED
     max_size_mb: Optional[float] = None
@@ -48,7 +50,7 @@ class CacheKeyGenerator:
         endpoint: str,
         params: Dict[str, Any] = None,
         user_context: Dict[str, Any] = None,
-        version: str = "v1"
+        version: str = "v1",
     ) -> str:
         """Generate consistent cache key with hierarchical namespace"""
 
@@ -57,13 +59,15 @@ class CacheKeyGenerator:
 
         # Add parameters hash if present
         if params:
-            param_str = json.dumps(params, sort_keys=True, separators=(',', ':'))
+            param_str = json.dumps(params, sort_keys=True, separators=(",", ":"))
             param_hash = hashlib.sha256(param_str.encode()).hexdigest()[:12]
             components.append(f"params:{param_hash}")
 
         # Add user context hash if present
         if user_context:
-            context_str = json.dumps(user_context, sort_keys=True, separators=(',', ':'))
+            context_str = json.dumps(
+                user_context, sort_keys=True, separators=(",", ":")
+            )
             context_hash = hashlib.sha256(context_str.encode()).hexdigest()[:8]
             components.append(f"ctx:{context_hash}")
 
@@ -126,7 +130,9 @@ class DependencyTracker:
                 if not self._reverse_deps[cache_key]:
                     del self._reverse_deps[cache_key]
 
-        logger.info(f"Invalidated {invalidated_count} cache entries for dependency: {dependency_key}")
+        logger.info(
+            f"Invalidated {invalidated_count} cache entries for dependency: {dependency_key}"
+        )
         return invalidated_count
 
     async def remove_cache_dependencies(self, cache_key: str):
@@ -150,44 +156,44 @@ class AdvancedCacheManager:
 
         # Policy configurations for different endpoint types
         self.policies: Dict[str, CachePolicy] = {
-            'dashboard_overview': CachePolicy(
+            "dashboard_overview": CachePolicy(
                 ttl_seconds=30,
                 strategy=InvalidationStrategy.DEPENDENCY_BASED,
-                dependency_keys=['metrics', 'health', 'widgets'],
-                refresh_ahead_factor=0.9
+                dependency_keys=["metrics", "health", "widgets"],
+                refresh_ahead_factor=0.9,
             ),
-            'widget_data': CachePolicy(
+            "widget_data": CachePolicy(
                 ttl_seconds=60,
                 strategy=InvalidationStrategy.WRITE_THROUGH,
-                dependency_keys=['sessions', 'telemetry'],
-                refresh_ahead_factor=0.8
+                dependency_keys=["sessions", "telemetry"],
+                refresh_ahead_factor=0.8,
             ),
-            'cost_analysis': CachePolicy(
+            "cost_analysis": CachePolicy(
                 ttl_seconds=300,
                 strategy=InvalidationStrategy.TIME_BASED,
-                dependency_keys=['billing', 'usage'],
-                refresh_ahead_factor=0.7
+                dependency_keys=["billing", "usage"],
+                refresh_ahead_factor=0.7,
             ),
-            'system_health': CachePolicy(
+            "system_health": CachePolicy(
                 ttl_seconds=15,
                 strategy=InvalidationStrategy.IMMEDIATE,
-                refresh_ahead_factor=0.95
+                refresh_ahead_factor=0.95,
             ),
-            'session_list': CachePolicy(
+            "session_list": CachePolicy(
                 ttl_seconds=120,
                 strategy=InvalidationStrategy.LAZY_EXPIRY,
-                dependency_keys=['sessions'],
-                refresh_ahead_factor=0.6
-            )
+                dependency_keys=["sessions"],
+                refresh_ahead_factor=0.6,
+            ),
         }
 
         # Performance tracking
         self.stats = {
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'invalidations': 0,
-            'refresh_ahead_hits': 0,
-            'total_response_time_saved_ms': 0
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "invalidations": 0,
+            "refresh_ahead_hits": 0,
+            "total_response_time_saved_ms": 0,
         }
 
     async def get_with_policy(
@@ -196,7 +202,7 @@ class AdvancedCacheManager:
         data_fetcher: Callable,
         params: Dict[str, Any] = None,
         user_context: Dict[str, Any] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> Dict[str, Any]:
         """Get cached data with intelligent policy application"""
 
@@ -208,15 +214,17 @@ class AdvancedCacheManager:
 
         # Try cache first unless forcing refresh
         if not force_refresh:
-            cached_data = await self._get_with_refresh_ahead(cache_key, policy, data_fetcher)
+            cached_data = await self._get_with_refresh_ahead(
+                cache_key, policy, data_fetcher
+            )
             if cached_data is not None:
-                self.stats['cache_hits'] += 1
+                self.stats["cache_hits"] += 1
                 saved_time = (datetime.now() - start_time).total_seconds() * 1000
-                self.stats['total_response_time_saved_ms'] += saved_time
+                self.stats["total_response_time_saved_ms"] += saved_time
                 return cached_data
 
         # Cache miss - fetch fresh data
-        self.stats['cache_misses'] += 1
+        self.stats["cache_misses"] += 1
         logger.debug(f"Cache miss for endpoint: {endpoint}")
 
         try:
@@ -241,10 +249,7 @@ class AdvancedCacheManager:
             raise
 
     async def _get_with_refresh_ahead(
-        self,
-        cache_key: str,
-        policy: CachePolicy,
-        data_fetcher: Callable
+        self, cache_key: str, policy: CachePolicy, data_fetcher: Callable
     ) -> Optional[Dict[str, Any]]:
         """Get cached data with refresh-ahead strategy"""
 
@@ -253,24 +258,25 @@ class AdvancedCacheManager:
             return None
 
         # Check if refresh-ahead is needed
-        if isinstance(cached_entry, dict) and 'cached_at' in cached_entry:
-            cached_at = datetime.fromisoformat(cached_entry['cached_at'])
+        if isinstance(cached_entry, dict) and "cached_at" in cached_entry:
+            cached_at = datetime.fromisoformat(cached_entry["cached_at"])
             age_seconds = (datetime.now() - cached_at).total_seconds()
             refresh_threshold = policy.ttl_seconds * policy.refresh_ahead_factor
 
             if age_seconds >= refresh_threshold:
                 # Trigger background refresh
-                self.stats['refresh_ahead_hits'] += 1
-                asyncio.create_task(self._background_refresh(cache_key, data_fetcher, policy))
+                self.stats["refresh_ahead_hits"] += 1
+                asyncio.create_task(
+                    self._background_refresh(cache_key, data_fetcher, policy)
+                )
                 logger.debug(f"Background refresh triggered for key: {cache_key}")
 
-        return cached_entry.get('data') if isinstance(cached_entry, dict) else cached_entry
+        return (
+            cached_entry.get("data") if isinstance(cached_entry, dict) else cached_entry
+        )
 
     async def _background_refresh(
-        self,
-        cache_key: str,
-        data_fetcher: Callable,
-        policy: CachePolicy
+        self, cache_key: str, data_fetcher: Callable, policy: CachePolicy
     ):
         """Background refresh of cache data"""
         try:
@@ -279,27 +285,25 @@ class AdvancedCacheManager:
             else:
                 fresh_data = data_fetcher()
 
-            await self._store_with_policy(cache_key, fresh_data, policy, "background_refresh")
+            await self._store_with_policy(
+                cache_key, fresh_data, policy, "background_refresh"
+            )
             logger.debug(f"Background refresh completed for key: {cache_key}")
 
         except Exception as e:
             logger.warning(f"Background refresh failed for {cache_key}: {e}")
 
     async def _store_with_policy(
-        self,
-        cache_key: str,
-        data: Any,
-        policy: CachePolicy,
-        endpoint: str
+        self, cache_key: str, data: Any, policy: CachePolicy, endpoint: str
     ):
         """Store data in cache according to policy"""
 
         # Prepare cache entry with metadata
         cache_entry = {
-            'data': data,
-            'cached_at': datetime.now().isoformat(),
-            'policy': policy.strategy.value,
-            'endpoint': endpoint
+            "data": data,
+            "cached_at": datetime.now().isoformat(),
+            "policy": policy.strategy.value,
+            "endpoint": endpoint,
         }
 
         # Store in cache
@@ -308,22 +312,30 @@ class AdvancedCacheManager:
         # Set up dependencies if configured
         if policy.dependency_keys:
             for dep_key in policy.dependency_keys:
-                dependency_key = CacheKeyGenerator.generate_dependency_key(dep_key, "global")
+                dependency_key = CacheKeyGenerator.generate_dependency_key(
+                    dep_key, "global"
+                )
                 await self.dependency_tracker.add_dependency(cache_key, dependency_key)
 
-    async def invalidate_by_dependency(self, resource_type: str, resource_id: str = "global") -> int:
+    async def invalidate_by_dependency(
+        self, resource_type: str, resource_id: str = "global"
+    ) -> int:
         """Invalidate cache entries by dependency"""
-        dependency_key = CacheKeyGenerator.generate_dependency_key(resource_type, resource_id)
+        dependency_key = CacheKeyGenerator.generate_dependency_key(
+            resource_type, resource_id
+        )
         count = await self.dependency_tracker.invalidate_dependents(dependency_key)
-        self.stats['invalidations'] += count
+        self.stats["invalidations"] += count
         return count
 
-    async def invalidate_endpoint(self, endpoint: str, wildcard_params: List[str] = None) -> int:
+    async def invalidate_endpoint(
+        self, endpoint: str, wildcard_params: List[str] = None
+    ) -> int:
         """Invalidate all cache entries for an endpoint"""
         pattern = CacheKeyGenerator.generate_pattern(endpoint, wildcard_params)
         success = await self.cache.invalidate(pattern)
         if success:
-            self.stats['invalidations'] += 1
+            self.stats["invalidations"] += 1
             logger.info(f"Invalidated cache pattern: {pattern}")
         return 1 if success else 0
 
@@ -332,12 +344,14 @@ class AdvancedCacheManager:
         results = {}
 
         for config in warm_configs:
-            endpoint = config.get('endpoint')
-            data_fetcher = config.get('data_fetcher')
-            params = config.get('params', {})
+            endpoint = config.get("endpoint")
+            data_fetcher = config.get("data_fetcher")
+            params = config.get("params", {})
 
             try:
-                await self.get_with_policy(endpoint, data_fetcher, params, force_refresh=True)
+                await self.get_with_policy(
+                    endpoint, data_fetcher, params, force_refresh=True
+                )
                 results[endpoint] = True
                 logger.debug(f"Cache warmed for endpoint: {endpoint}")
             except Exception as e:
@@ -345,7 +359,9 @@ class AdvancedCacheManager:
                 results[endpoint] = False
 
         successful = sum(1 for success in results.values() if success)
-        logger.info(f"Cache warming completed: {successful}/{len(warm_configs)} successful")
+        logger.info(
+            f"Cache warming completed: {successful}/{len(warm_configs)} successful"
+        )
         return results
 
     async def get_performance_stats(self) -> Dict[str, Any]:
@@ -355,29 +371,33 @@ class AdvancedCacheManager:
         except:
             base_stats = {}
 
-        total_requests = self.stats['cache_hits'] + self.stats['cache_misses']
+        total_requests = self.stats["cache_hits"] + self.stats["cache_misses"]
         hit_rate = 0.0
         if total_requests > 0:
-            hit_rate = (self.stats['cache_hits'] / total_requests) * 100
+            hit_rate = (self.stats["cache_hits"] / total_requests) * 100
 
         return {
-            'advanced_cache_manager': {
-                'cache_hits': self.stats['cache_hits'],
-                'cache_misses': self.stats['cache_misses'],
-                'hit_rate_percent': round(hit_rate, 2),
-                'invalidations': self.stats['invalidations'],
-                'refresh_ahead_hits': self.stats['refresh_ahead_hits'],
-                'total_response_time_saved_ms': self.stats['total_response_time_saved_ms'],
-                'average_time_saved_per_hit_ms': round(
-                    self.stats['total_response_time_saved_ms'] / max(self.stats['cache_hits'], 1), 2
-                )
+            "advanced_cache_manager": {
+                "cache_hits": self.stats["cache_hits"],
+                "cache_misses": self.stats["cache_misses"],
+                "hit_rate_percent": round(hit_rate, 2),
+                "invalidations": self.stats["invalidations"],
+                "refresh_ahead_hits": self.stats["refresh_ahead_hits"],
+                "total_response_time_saved_ms": self.stats[
+                    "total_response_time_saved_ms"
+                ],
+                "average_time_saved_per_hit_ms": round(
+                    self.stats["total_response_time_saved_ms"]
+                    / max(self.stats["cache_hits"], 1),
+                    2,
+                ),
             },
-            'base_cache_stats': base_stats,
-            'policies_configured': len(self.policies),
-            'dependency_tracking': {
-                'dependencies_tracked': len(self.dependency_tracker._dependencies),
-                'reverse_dependencies': len(self.dependency_tracker._reverse_deps)
-            }
+            "base_cache_stats": base_stats,
+            "policies_configured": len(self.policies),
+            "dependency_tracking": {
+                "dependencies_tracked": len(self.dependency_tracker._dependencies),
+                "reverse_dependencies": len(self.dependency_tracker._reverse_deps),
+            },
         }
 
     def register_policy(self, endpoint: str, policy: CachePolicy):
@@ -403,19 +423,19 @@ class AdvancedCacheManager:
             await self.cache.invalidate(test_key)
 
             return {
-                'cache_manager_healthy': get_success,
-                'policies_loaded': len(self.policies),
-                'dependency_tracker_active': True,
-                'stats': self.stats,
-                'timestamp': datetime.now().isoformat()
+                "cache_manager_healthy": get_success,
+                "policies_loaded": len(self.policies),
+                "dependency_tracker_active": True,
+                "stats": self.stats,
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
             logger.error(f"Cache manager health check failed: {e}")
             return {
-                'cache_manager_healthy': False,
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
+                "cache_manager_healthy": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
             }
 
 
@@ -424,14 +444,17 @@ def cached_endpoint(
     endpoint: str,
     ttl_seconds: int = 300,
     strategy: InvalidationStrategy = InvalidationStrategy.TIME_BASED,
-    dependency_keys: List[str] = None
+    dependency_keys: List[str] = None,
 ):
     """Decorator to add caching to FastAPI endpoints"""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # This would need to be integrated with the FastAPI dependency injection
             # For now, it's a placeholder for the pattern
             return await func(*args, **kwargs)
+
         return wrapper
+
     return decorator

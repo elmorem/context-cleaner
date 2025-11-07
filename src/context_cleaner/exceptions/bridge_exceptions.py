@@ -17,7 +17,12 @@ class BridgeError(Exception):
     failures including error categorization and detailed context.
     """
 
-    def __init__(self, message: str, error_code: Optional[str] = None, context: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        message: str,
+        error_code: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.error_code = error_code or self.__class__.__name__
@@ -66,7 +71,9 @@ class BridgeConnectionError(BridgeError):
             "underlying_error": str(underlying_error) if underlying_error else None,
         }
 
-        super().__init__(message=message, error_code="BRIDGE_CONNECTION_FAILED", context=context)
+        super().__init__(
+            message=message, error_code="BRIDGE_CONNECTION_FAILED", context=context
+        )
 
         self.host = host
         self.port = port
@@ -97,7 +104,9 @@ class BridgeValidationError(BridgeError):
             "session_id": session_id,
         }
 
-        super().__init__(message=message, error_code="BRIDGE_VALIDATION_FAILED", context=context)
+        super().__init__(
+            message=message, error_code="BRIDGE_VALIDATION_FAILED", context=context
+        )
 
         self.validation_failures = validation_failures or []
         self.invalid_fields = invalid_fields or {}
@@ -135,7 +144,9 @@ class BridgeStorageError(BridgeError):
             "underlying_error": str(underlying_error) if underlying_error else None,
         }
 
-        super().__init__(message=message, error_code="BRIDGE_STORAGE_FAILED", context=context)
+        super().__init__(
+            message=message, error_code="BRIDGE_STORAGE_FAILED", context=context
+        )
 
         self.operation_type = operation_type
         self.affected_records = affected_records
@@ -194,7 +205,9 @@ class BridgeCircuitBreakerError(BridgeError):
             "recovery_time_seconds": recovery_time_seconds,
         }
 
-        super().__init__(message=message, error_code="BRIDGE_CIRCUIT_OPEN", context=context)
+        super().__init__(
+            message=message, error_code="BRIDGE_CIRCUIT_OPEN", context=context
+        )
 
         self.failure_count = failure_count
         self.failure_threshold = failure_threshold
@@ -224,7 +237,9 @@ class BridgeDataIntegrityError(BridgeError):
             "variance_percentage": variance_percentage,
         }
 
-        super().__init__(message=message, error_code="BRIDGE_DATA_INTEGRITY", context=context)
+        super().__init__(
+            message=message, error_code="BRIDGE_DATA_INTEGRITY", context=context
+        )
 
         self.expected_tokens = expected_tokens
         self.actual_tokens = actual_tokens

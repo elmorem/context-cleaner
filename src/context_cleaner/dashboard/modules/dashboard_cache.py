@@ -30,7 +30,12 @@ class DashboardCache:
     Implements delegation pattern for different cache types
     """
 
-    def __init__(self, cache_dashboard=None, telemetry_widgets=None, multi_level_cache: Optional[CacheService] = None):
+    def __init__(
+        self,
+        cache_dashboard=None,
+        telemetry_widgets=None,
+        multi_level_cache: Optional[CacheService] = None,
+    ):
         self.cache_dashboard = cache_dashboard
         self.telemetry_widgets = telemetry_widgets
 
@@ -42,10 +47,10 @@ class DashboardCache:
 
         # Cache configuration for different data types
         self.cache_config = {
-            'session_analytics': {'ttl': 30},
-            'widget_data': {'ttl': 60},
-            'dashboard_metrics': {'ttl': 120},
-            'performance_data': {'ttl': 300}
+            "session_analytics": {"ttl": 30},
+            "widget_data": {"ttl": 60},
+            "dashboard_metrics": {"ttl": 120},
+            "performance_data": {"ttl": 300},
         }
 
         # Initialize legacy attributes for backward compatibility
@@ -60,7 +65,9 @@ class DashboardCache:
         try:
             cached_data = await self.multi_level_cache.get("session_analytics")
             if cached_data:
-                logger.debug(f"Returning cached session analytics ({len(cached_data)} sessions)")
+                logger.debug(
+                    f"Returning cached session analytics ({len(cached_data)} sessions)"
+                )
             return cached_data
         except Exception as e:
             logger.warning(f"Error retrieving session analytics from cache: {e}")
@@ -69,9 +76,11 @@ class DashboardCache:
     async def set_session_analytics_cache(self, data: List[Dict[str, Any]]) -> None:
         """Cache session analytics data using MultiLevelCache"""
         try:
-            ttl = self.cache_config['session_analytics']['ttl']
+            ttl = self.cache_config["session_analytics"]["ttl"]
             await self.multi_level_cache.set("session_analytics", data, ttl=ttl)
-            logger.debug(f"Cached {len(data)} session analytics entries with {ttl}s TTL")
+            logger.debug(
+                f"Cached {len(data)} session analytics entries with {ttl}s TTL"
+            )
         except Exception as e:
             logger.warning(f"Error caching session analytics: {e}")
 
@@ -181,7 +190,7 @@ class DashboardCache:
 
         # Check TTL if configured
         if key in self.cache_timestamps and key in self.cache_config:
-            ttl = self.cache_config[key].get('ttl', 300)  # Default 5 minutes
+            ttl = self.cache_config[key].get("ttl", 300)  # Default 5 minutes
             cache_time = self.cache_timestamps[key]
             now = datetime.now()
 
@@ -207,7 +216,7 @@ class DashboardCache:
             # Fallback to legacy cache
             self.cache_store[key] = value
             self.cache_timestamps[key] = datetime.now()
-            self.cache_config[key] = {'ttl': ttl}
+            self.cache_config[key] = {"ttl": ttl}
             logger.debug(f"Fallback: Legacy cache entry '{key}' set with TTL {ttl}s")
 
     async def invalidate(self, pattern: str = None) -> None:
@@ -220,9 +229,13 @@ class DashboardCache:
 
             # Use MultiLevelCache pattern invalidation
             await self.multi_level_cache.invalidate(pattern)
-            logger.debug(f"Invalidated cache entries matching pattern '{pattern}' via MultiLevelCache")
+            logger.debug(
+                f"Invalidated cache entries matching pattern '{pattern}' via MultiLevelCache"
+            )
         except Exception as e:
-            logger.warning(f"MultiLevelCache invalidation failed for pattern '{pattern}': {e}")
+            logger.warning(
+                f"MultiLevelCache invalidation failed for pattern '{pattern}': {e}"
+            )
 
         # Fallback: Legacy pattern-based invalidation
         keys_to_remove = []
@@ -239,7 +252,9 @@ class DashboardCache:
             if key in self.cache_config:
                 del self.cache_config[key]
 
-        logger.debug(f"Fallback: Invalidated {len(keys_to_remove)} legacy cache entries matching pattern '{pattern}'")
+        logger.debug(
+            f"Fallback: Invalidated {len(keys_to_remove)} legacy cache entries matching pattern '{pattern}'"
+        )
 
     async def clear_all(self) -> None:
         """Clear all cache entries using MultiLevelCache"""
@@ -273,7 +288,7 @@ class DashboardCache:
         # Count expired entries in legacy cache
         for key, cache_time in self.cache_timestamps.items():
             if key in self.cache_config:
-                ttl = self.cache_config[key].get('ttl', 300)
+                ttl = self.cache_config[key].get("ttl", 300)
                 if (now - cache_time).total_seconds() > ttl:
                     expired_count += 1
 
@@ -284,11 +299,17 @@ class DashboardCache:
             cached_analytics = await self.multi_level_cache.get("session_analytics")
             if cached_analytics:
                 session_analytics_cached = True
-                session_analytics_size = len(cached_analytics) if isinstance(cached_analytics, list) else 1
+                session_analytics_size = (
+                    len(cached_analytics) if isinstance(cached_analytics, list) else 1
+                )
         except Exception:
             # Fallback to legacy check
             session_analytics_cached = self._session_analytics_cache is not None
-            session_analytics_size = len(self._session_analytics_cache) if self._session_analytics_cache else 0
+            session_analytics_size = (
+                len(self._session_analytics_cache)
+                if self._session_analytics_cache
+                else 0
+            )
 
         return {
             "multilevel_cache": multilevel_stats,
@@ -300,7 +321,8 @@ class DashboardCache:
             "session_analytics_cache_size": session_analytics_size,
             "session_analytics_cache_age_seconds": (
                 (now - self._session_analytics_cache_time).total_seconds()
-                if self._session_analytics_cache_time else None
+                if self._session_analytics_cache_time
+                else None
             ),
             "cache_dashboard_available": self.cache_dashboard is not None,
             "telemetry_widgets_available": self.telemetry_widgets is not None,
@@ -363,7 +385,9 @@ class CacheCoordinator:
         if not multilevel_healthy:
             recommendations.append("MultiLevelCache experiencing issues - check logs")
         if legacy_expired > 0:
-            recommendations.append(f"Consider clearing {legacy_expired} expired legacy cache entries")
+            recommendations.append(
+                f"Consider clearing {legacy_expired} expired legacy cache entries"
+            )
         if not recommendations:
             recommendations.append("Cache operating normally")
 
@@ -373,16 +397,19 @@ class CacheCoordinator:
             "overall_health": "healthy" if overall_healthy else "degraded",
             "multilevel_cache_healthy": multilevel_healthy,
             "legacy_cache_healthy": legacy_expired == 0,
-            "recommendations": recommendations
+            "recommendations": recommendations,
         }
 
 
 class ModuleStatus:
     """Track module extraction status"""
+
     EXTRACTION_STATUS = "extracted"
     ORIGINAL_LINES = 200  # Cache-related methods scattered throughout
     TARGET_LINES = 200
     REDUCTION_TARGET = "Unified caching strategy, eliminate redundant implementations"
 
 
-logger.info(f"dashboard_cache module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}")
+logger.info(
+    f"dashboard_cache module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}"
+)

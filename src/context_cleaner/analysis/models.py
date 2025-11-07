@@ -34,7 +34,7 @@ class MessageType(Enum):
 
 class FileType(Enum):
     """Types of JSONL files we can encounter."""
-    
+
     CONVERSATION = "conversation"
     SUMMARY = "summary"
     UNKNOWN = "unknown"
@@ -42,7 +42,7 @@ class FileType(Enum):
 
 class SummaryType(Enum):
     """Types of project summary metadata."""
-    
+
     SUMMARY = "summary"
     PROJECT_STATUS = "project_status"
     COMPLETION = "completion"
@@ -60,12 +60,12 @@ class TokenMetrics:
     ephemeral_5m_input_tokens: int = 0
     ephemeral_1h_input_tokens: int = 0
     total_tokens: int = 0
-    
+
     # Additional comprehensive token tracking fields (matching ccusage)
     cost_usd: float = 0.0
     service_tier: Optional[str] = None
     model_name: Optional[str] = None
-    
+
     # Alternative field names for compatibility
     cache_creation_tokens: int = 0
     cache_read_tokens: int = 0
@@ -74,49 +74,57 @@ class TokenMetrics:
         """Calculate total tokens using ccusage methodology with validation."""
         # Validate token counts are non-negative
         self._validate_token_counts()
-        
+
         if self.total_tokens == 0:
             # Use ccusage's reliable calculation method
-            cache_creation = self.cache_creation_input_tokens or self.cache_creation_tokens
+            cache_creation = (
+                self.cache_creation_input_tokens or self.cache_creation_tokens
+            )
             cache_read = self.cache_read_input_tokens or self.cache_read_tokens
             self.total_tokens = (
-                self.input_tokens + 
-                self.output_tokens + 
-                cache_creation + 
-                cache_read
+                self.input_tokens + self.output_tokens + cache_creation + cache_read
             )
 
     def _validate_token_counts(self):
         """Validate that all token counts are non-negative integers."""
         token_fields = [
-            'input_tokens', 'output_tokens', 'cache_creation_input_tokens',
-            'cache_read_input_tokens', 'ephemeral_5m_input_tokens', 
-            'ephemeral_1h_input_tokens', 'cache_creation_tokens', 'cache_read_tokens'
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+            "ephemeral_5m_input_tokens",
+            "ephemeral_1h_input_tokens",
+            "cache_creation_tokens",
+            "cache_read_tokens",
         ]
-        
+
         for field in token_fields:
             value = getattr(self, field)
             if value < 0:
                 # Reset negative values to 0 and log warning
                 setattr(self, field, 0)
                 import logging
+
                 logger = logging.getLogger(__name__)
-                logger.warning(f"Invalid negative token count in {field}: {value}, reset to 0")
-        
+                logger.warning(
+                    f"Invalid negative token count in {field}: {value}, reset to 0"
+                )
+
         # Validate cost_usd is non-negative
         if self.cost_usd < 0:
             self.cost_usd = 0.0
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Invalid negative cost: {self.cost_usd}, reset to 0.0")
 
     def is_valid(self) -> bool:
         """Check if token metrics contain valid data."""
         return (
-            self.input_tokens >= 0 and
-            self.output_tokens >= 0 and 
-            self.total_tokens >= 0 and
-            self.cost_usd >= 0.0
+            self.input_tokens >= 0
+            and self.output_tokens >= 0
+            and self.total_tokens >= 0
+            and self.cost_usd >= 0.0
         )
 
     @property
@@ -218,7 +226,7 @@ class SessionMessage:
         """Get accurate token count from token metrics (no fallback estimation)."""
         if self.token_metrics:
             return self.token_metrics.total_tokens
-        
+
         # Return 0 if no actual token metrics available (ccusage approach)
         # This prevents inaccurate estimation fallbacks
         return 0
@@ -380,7 +388,7 @@ Cache Analysis Summary:
 @dataclass
 class ProjectSummary:
     """Project summary metadata from Claude Code projects."""
-    
+
     uuid: str
     leaf_uuid: str
     summary_type: SummaryType
@@ -390,43 +398,69 @@ class ProjectSummary:
     project_path: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     completion_status: Optional[str] = None
-    
+
     @property
     def is_completed(self) -> bool:
         """Check if project appears to be completed with enhanced detection."""
         completed_keywords = [
-            "completed", "finished", "done", "fixed", "implemented", 
-            "resolved", "delivered", "shipped", "closed", "merged",
-            "deployed", "released", "solved", "accomplished", "achieved",
-            "finalized", "wrapped up", "complete", "success", "successful"
+            "completed",
+            "finished",
+            "done",
+            "fixed",
+            "implemented",
+            "resolved",
+            "delivered",
+            "shipped",
+            "closed",
+            "merged",
+            "deployed",
+            "released",
+            "solved",
+            "accomplished",
+            "achieved",
+            "finalized",
+            "wrapped up",
+            "complete",
+            "success",
+            "successful",
         ]
-        
+
         # Also check for negative indicators that suggest incomplete work
-        incomplete_keywords = ["todo", "pending", "in progress", "working on", "needs", "wip", "draft"]
-        
+        incomplete_keywords = [
+            "todo",
+            "pending",
+            "in progress",
+            "working on",
+            "needs",
+            "wip",
+            "draft",
+        ]
+
         desc_lower = self.description.lower()
-        
+
         # Check for completion indicators
         has_completion = any(keyword in desc_lower for keyword in completed_keywords)
-        
-        # Check for incomplete indicators  
+
+        # Check for incomplete indicators
         has_incomplete = any(keyword in desc_lower for keyword in incomplete_keywords)
-        
+
         # Prefer explicit completion over incomplete indicators
         return has_completion and not has_incomplete
-    
+
     @property
     def project_category(self) -> str:
         """Categorize project based on description."""
         desc_lower = self.description.lower()
-        
+
         if any(word in desc_lower for word in ["bug", "fix", "error", "issue"]):
             return "Bug Fix"
         elif any(word in desc_lower for word in ["feature", "implement", "add", "new"]):
             return "Feature Development"
         elif any(word in desc_lower for word in ["refactor", "optimize", "improve"]):
             return "Enhancement"
-        elif any(word in desc_lower for word in ["telemetry", "analytics", "monitoring"]):
+        elif any(
+            word in desc_lower for word in ["telemetry", "analytics", "monitoring"]
+        ):
             return "Analytics"
         elif any(word in desc_lower for word in ["auth", "login", "security"]):
             return "Security"
@@ -437,19 +471,19 @@ class ProjectSummary:
 @dataclass
 class FileMetadata:
     """Metadata about a JSONL file and its content type."""
-    
+
     file_path: str
     file_type: FileType
     first_line_content: Dict[str, Any]
     line_count: int
     file_size_bytes: int
     last_modified: datetime
-    
+
     @property
     def is_conversation_file(self) -> bool:
         """Check if this is a conversation file."""
         return self.file_type == FileType.CONVERSATION
-    
+
     @property
     def is_summary_file(self) -> bool:
         """Check if this is a summary metadata file."""

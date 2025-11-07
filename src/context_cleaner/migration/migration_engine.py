@@ -78,7 +78,12 @@ class MigrationResult:
     @property
     def success(self) -> bool:
         """Check if migration was successful overall."""
-        return len(self.errors) == 0 and self.files_failed == 0 and self.failed_bridges == 0 and self.validation_passed
+        return (
+            len(self.errors) == 0
+            and self.files_failed == 0
+            and self.failed_bridges == 0
+            and self.validation_passed
+        )
 
     @property
     def completion_percentage(self) -> float:
@@ -244,7 +249,9 @@ class MigrationEngine:
             # Calculate final performance metrics
             self._calculate_final_metrics()
 
-            logger.info(f"Historical migration complete: {self.current_migration.success}")
+            logger.info(
+                f"Historical migration complete: {self.current_migration.success}"
+            )
 
             return self.current_migration
 
@@ -316,7 +323,9 @@ class MigrationEngine:
 
             self._calculate_final_metrics()
 
-            logger.info(f"Incremental migration complete: {self.current_migration.success}")
+            logger.info(
+                f"Incremental migration complete: {self.current_migration.success}"
+            )
             return self.current_migration
 
         except Exception as e:
@@ -326,10 +335,14 @@ class MigrationEngine:
             return self.current_migration
 
     async def _phase_discovery(
-        self, source_directories: Optional[List[str]], filter_criteria: Optional[Dict[str, Any]]
+        self,
+        source_directories: Optional[List[str]],
+        filter_criteria: Optional[Dict[str, Any]],
     ):
         """Phase 1: Discover and catalog JSONL files."""
-        self.progress_tracker.update_phase("discovery", "Scanning directories for JSONL files")
+        self.progress_tracker.update_phase(
+            "discovery", "Scanning directories for JSONL files"
+        )
 
         # Perform file discovery
         discovery_result = await self.discovery_service.discover_files(
@@ -343,13 +356,17 @@ class MigrationEngine:
             return
 
         # Update migration metrics
-        self.current_migration.total_files_discovered = discovery_result.total_files_found
+        self.current_migration.total_files_discovered = (
+            discovery_result.total_files_found
+        )
 
         # Filter out corrupt files
         healthy_files = discovery_result.healthy_files
         if len(healthy_files) < discovery_result.total_files_found:
             corrupt_count = discovery_result.total_files_found - len(healthy_files)
-            self.current_migration.add_warning(f"Skipping {corrupt_count} corrupt files")
+            self.current_migration.add_warning(
+                f"Skipping {corrupt_count} corrupt files"
+            )
 
         # Start progress tracking
         estimated_records = discovery_result.estimated_total_lines
@@ -373,7 +390,9 @@ class MigrationEngine:
 
     async def _phase_data_processing(self, dry_run: bool = False):
         """Phase 2: Extract and migrate data from JSONL files."""
-        self.progress_tracker.update_phase("processing", f"Processing {len(self._discovered_files)} files")
+        self.progress_tracker.update_phase(
+            "processing", f"Processing {len(self._discovered_files)} files"
+        )
 
         if not hasattr(self, "_discovered_files") or not self._discovered_files:
             self.current_migration.add_error("No files discovered for processing")
@@ -383,7 +402,10 @@ class MigrationEngine:
         file_batches = self._create_file_batches(self._discovered_files)
 
         for batch_idx, file_batch in enumerate(file_batches):
-            logger.info(f"Processing file batch {batch_idx + 1}/{len(file_batches)} " f"({len(file_batch)} files)")
+            logger.info(
+                f"Processing file batch {batch_idx + 1}/{len(file_batches)} "
+                f"({len(file_batch)} files)"
+            )
 
             # Process batch with concurrency control
             batch_results = await self._process_file_batch(file_batch, dry_run)
@@ -434,14 +456,19 @@ class MigrationEngine:
             self.current_migration.final_checkpoint_id = final_checkpoint.checkpoint_id
 
         # Calculate bridge success metrics
-        self.current_migration.successful_bridges = sum(1 for br in self.current_migration.bridge_results if br.success)
+        self.current_migration.successful_bridges = sum(
+            1 for br in self.current_migration.bridge_results if br.success
+        )
         self.current_migration.failed_bridges = (
-            len(self.current_migration.bridge_results) - self.current_migration.successful_bridges
+            len(self.current_migration.bridge_results)
+            - self.current_migration.successful_bridges
         )
 
         logger.info("Migration finalization complete")
 
-    def _create_file_batches(self, files: List[JSONLFileInfo]) -> List[List[JSONLFileInfo]]:
+    def _create_file_batches(
+        self, files: List[JSONLFileInfo]
+    ) -> List[List[JSONLFileInfo]]:
         """Create batches of files for processing with memory considerations."""
         batches = []
         current_batch = []
@@ -475,7 +502,9 @@ class MigrationEngine:
 
         return batches
 
-    async def _process_file_batch(self, file_batch: List[JSONLFileInfo], dry_run: bool) -> List[ExtractionResult]:
+    async def _process_file_batch(
+        self, file_batch: List[JSONLFileInfo], dry_run: bool
+    ) -> List[ExtractionResult]:
         """Process a batch of files concurrently."""
 
         # Extract data from files
@@ -489,7 +518,11 @@ class MigrationEngine:
             for extraction_result in extraction_results:
                 try:
                     # Convert to bridge format and store
-                    bridge_sessions = await self.extraction_engine.convert_to_bridge_format(extraction_result)
+                    bridge_sessions = (
+                        await self.extraction_engine.convert_to_bridge_format(
+                            extraction_result
+                        )
+                    )
 
                     # Store in batches via bridge service
                     bridge_results = await self.bridge_service.bulk_store_sessions(
@@ -507,7 +540,9 @@ class MigrationEngine:
 
         return extraction_results
 
-    async def _handle_batch_results(self, extraction_results: List[ExtractionResult], dry_run: bool):
+    async def _handle_batch_results(
+        self, extraction_results: List[ExtractionResult], dry_run: bool
+    ):
         """Handle results from batch processing."""
 
         for extraction_result in extraction_results:
@@ -519,25 +554,34 @@ class MigrationEngine:
                 self.failed_files.add(file_path)
 
                 for error in extraction_result.errors:
-                    self.current_migration.add_error(f"File {Path(file_path).name}: {error}")
+                    self.current_migration.add_error(
+                        f"File {Path(file_path).name}: {error}"
+                    )
             else:
                 # File processing succeeded
                 self.current_migration.files_succeeded += 1
                 self.processed_files.add(file_path)
 
                 # Update metrics
-                self.current_migration.total_sessions_created += extraction_result.total_sessions_found
-                self.current_migration.total_records_inserted += extraction_result.total_lines_processed
+                self.current_migration.total_sessions_created += (
+                    extraction_result.total_sessions_found
+                )
+                self.current_migration.total_records_inserted += (
+                    extraction_result.total_lines_processed
+                )
 
                 # Calculate tokens migrated
                 tokens_in_file = sum(
-                    session.calculated_total_tokens for session in extraction_result.sessions_extracted.values()
+                    session.calculated_total_tokens
+                    for session in extraction_result.sessions_extracted.values()
                 )
                 self.current_migration.total_tokens_migrated += tokens_in_file
 
                 # Add warnings
                 for warning in extraction_result.warnings:
-                    self.current_migration.add_warning(f"File {Path(file_path).name}: {warning}")
+                    self.current_migration.add_warning(
+                        f"File {Path(file_path).name}: {warning}"
+                    )
 
             # Update progress tracker
             self.progress_tracker.update_file_progress(
@@ -558,7 +602,9 @@ class MigrationEngine:
             self.current_migration.files_succeeded + self.current_migration.files_failed
         )
 
-    async def _create_progress_checkpoint(self, reason: str) -> Optional[MigrationCheckpoint]:
+    async def _create_progress_checkpoint(
+        self, reason: str
+    ) -> Optional[MigrationCheckpoint]:
         """Create a migration checkpoint."""
         try:
             checkpoint = await self.progress_tracker.create_checkpoint(
@@ -632,7 +678,10 @@ class MigrationEngine:
 
     async def get_migration_status(self, migration_id: str) -> Optional[Dict[str, Any]]:
         """Get status of a migration operation."""
-        if self.current_migration and self.current_migration.migration_id == migration_id:
+        if (
+            self.current_migration
+            and self.current_migration.migration_id == migration_id
+        ):
             return {
                 "migration_result": self.current_migration.to_dict(),
                 "current_progress": (
@@ -644,14 +693,18 @@ class MigrationEngine:
 
         return None
 
-    async def list_available_checkpoints(self, migration_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def list_available_checkpoints(
+        self, migration_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """List available checkpoints for resuming."""
         checkpoints = await self.progress_tracker.list_checkpoints(migration_id)
         return [checkpoint.to_dict() for checkpoint in checkpoints]
 
     async def cleanup_old_data(self, max_age_days: int = 30):
         """Clean up old migration data and checkpoints."""
-        cleaned_checkpoints = await self.progress_tracker.cleanup_old_checkpoints(max_age_days)
+        cleaned_checkpoints = await self.progress_tracker.cleanup_old_checkpoints(
+            max_age_days
+        )
 
         logger.info(f"Cleanup complete: {cleaned_checkpoints} checkpoints removed")
         return {"checkpoints_cleaned": cleaned_checkpoints}

@@ -23,11 +23,15 @@ def __getattr__(name: str):
 
         return _ContextCleanerConfig
     if name == "ProductivityAnalyzer":
-        from .analytics.productivity_analyzer import ProductivityAnalyzer as _ProductivityAnalyzer
+        from .analytics.productivity_analyzer import (
+            ProductivityAnalyzer as _ProductivityAnalyzer,
+        )
 
         return _ProductivityAnalyzer
     if name == "ProductivityDashboard":
-        from .dashboard.web_server import ProductivityDashboard as _ProductivityDashboard
+        from .dashboard.web_server import (
+            ProductivityDashboard as _ProductivityDashboard,
+        )
 
         return _ProductivityDashboard
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

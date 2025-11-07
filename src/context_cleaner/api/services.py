@@ -13,8 +13,12 @@ import asyncio
 from decimal import Decimal
 
 from .models import (
-    DashboardMetrics, WidgetData, SystemHealth,
-    EventType, WebSocketMessage, DashboardOverviewResponse
+    DashboardMetrics,
+    WidgetData,
+    SystemHealth,
+    EventType,
+    WebSocketMessage,
+    DashboardOverviewResponse,
 )
 from .repositories import TelemetryRepository
 from .cache import CacheService
@@ -22,13 +26,16 @@ from .websocket import EventBus
 
 logger = logging.getLogger(__name__)
 
+
 class DashboardService:
     """Core dashboard service with business logic and caching"""
 
-    def __init__(self,
-                 telemetry_repo: TelemetryRepository,
-                 cache_service: CacheService,
-                 event_bus: EventBus):
+    def __init__(
+        self,
+        telemetry_repo: TelemetryRepository,
+        cache_service: CacheService,
+        event_bus: EventBus,
+    ):
         self.telemetry_repo = telemetry_repo
         self.cache = cache_service
         self.event_bus = event_bus
@@ -74,7 +81,7 @@ class DashboardService:
                     metrics=metrics,
                     widgets=essential_widgets,
                     system_health=system_health,
-                    last_updated=datetime.now()
+                    last_updated=datetime.now(),
                 )
 
                 # Cache the response
@@ -89,10 +96,13 @@ class DashboardService:
             logger.error(f"Error getting dashboard overview: {e}")
             return self._get_fallback_overview()
 
-    async def get_widget_data(self, widget_type: str,
-                             session_id: Optional[str] = None,
-                             time_range_days: int = 7,
-                             force_refresh: bool = False) -> WidgetData:
+    async def get_widget_data(
+        self,
+        widget_type: str,
+        session_id: Optional[str] = None,
+        time_range_days: int = 7,
+        force_refresh: bool = False,
+    ) -> WidgetData:
         """Get specific widget data with caching"""
 
         cache_key = f"widget:{widget_type}:{session_id or 'global'}:{time_range_days}"
@@ -117,12 +127,12 @@ class DashboardService:
             await self.event_bus.emit(
                 EventType.WIDGET_DATA_UPDATED.value,
                 {
-                    'widget_type': widget_type,
-                    'widget_id': widget_data.widget_id,
-                    'status': widget_data.status,
-                    'data': widget_data.data,
-                    'timestamp': widget_data.last_updated.isoformat()
-                }
+                    "widget_type": widget_type,
+                    "widget_id": widget_data.widget_id,
+                    "status": widget_data.status,
+                    "data": widget_data.data,
+                    "timestamp": widget_data.last_updated.isoformat(),
+                },
             )
 
             return widget_data
@@ -131,9 +141,12 @@ class DashboardService:
             logger.error(f"Error getting widget data for {widget_type}: {e}")
             return self._get_fallback_widget(widget_type)
 
-    async def get_multiple_widgets(self, widget_types: List[str],
-                                  session_id: Optional[str] = None,
-                                  time_range_days: int = 7) -> Dict[str, WidgetData]:
+    async def get_multiple_widgets(
+        self,
+        widget_types: List[str],
+        session_id: Optional[str] = None,
+        time_range_days: int = 7,
+    ) -> Dict[str, WidgetData]:
         """Get multiple widgets efficiently with parallel fetching"""
 
         logger.info(f"Fetching {len(widget_types)} widgets in parallel")
@@ -168,7 +181,7 @@ class DashboardService:
             # Emit cache invalidation event
             await self.event_bus.emit(
                 "cache.invalidated",
-                {'pattern': pattern, 'timestamp': datetime.now().isoformat()}
+                {"pattern": pattern, "timestamp": datetime.now().isoformat()},
             )
             return True
 
@@ -186,7 +199,9 @@ class DashboardService:
                 return SystemHealth(**cached)
 
             health = await self.telemetry_repo.get_system_health()
-            await self.cache.set(cache_key, health.to_dict(), ttl=15)  # Short TTL for health
+            await self.cache.set(
+                cache_key, health.to_dict(), ttl=15
+            )  # Short TTL for health
 
             # Emit health status change if significant
             await self._maybe_emit_health_change(health)
@@ -214,12 +229,12 @@ class DashboardService:
             avg_daily = total_cost / max(len(daily_costs), 1)
 
             analysis = {
-                'total_cost': total_cost,
-                'average_daily_cost': avg_daily,
-                'daily_trends': cost_trends,
-                'cost_velocity': self._calculate_cost_velocity(daily_costs),
-                'projected_monthly': avg_daily * 30,
-                'analysis_date': datetime.now().isoformat()
+                "total_cost": total_cost,
+                "average_daily_cost": avg_daily,
+                "daily_trends": cost_trends,
+                "cost_velocity": self._calculate_cost_velocity(daily_costs),
+                "projected_monthly": avg_daily * 30,
+                "analysis_date": datetime.now().isoformat(),
             }
 
             await self.cache.set(cache_key, analysis, ttl=300)  # 5 min cache
@@ -227,12 +242,12 @@ class DashboardService:
 
         except Exception as e:
             logger.error(f"Error getting cost analysis: {e}")
-            return {'error': str(e), 'total_cost': 0.0}
+            return {"error": str(e), "total_cost": 0.0}
 
     # Private helper methods
     async def _get_essential_widgets(self) -> List[WidgetData]:
         """Get essential widgets for dashboard overview"""
-        essential_types = ['error_monitor', 'cost_tracker', 'model_efficiency']
+        essential_types = ["error_monitor", "cost_tracker", "model_efficiency"]
         widgets_data = await self.get_multiple_widgets(essential_types)
         return list(widgets_data.values())
 
@@ -243,19 +258,21 @@ class DashboardService:
             return
 
         # Check for significant changes
-        token_change = abs(current_metrics.total_tokens - self._last_metrics.total_tokens)
+        token_change = abs(
+            current_metrics.total_tokens - self._last_metrics.total_tokens
+        )
         cost_change = float(abs(current_metrics.cost - self._last_metrics.cost))
 
         if token_change > 1000 or cost_change > 1.0:  # Thresholds for "significant"
             await self.event_bus.emit(
                 EventType.DASHBOARD_METRICS_UPDATED.value,
                 {
-                    'total_tokens': current_metrics.total_tokens,
-                    'total_sessions': current_metrics.total_sessions,
-                    'success_rate': current_metrics.success_rate,
-                    'cost_change': cost_change,
-                    'timestamp': current_metrics.timestamp.isoformat()
-                }
+                    "total_tokens": current_metrics.total_tokens,
+                    "total_sessions": current_metrics.total_sessions,
+                    "success_rate": current_metrics.success_rate,
+                    "cost_change": cost_change,
+                    "timestamp": current_metrics.timestamp.isoformat(),
+                },
             )
 
         self._last_metrics = current_metrics
@@ -269,21 +286,21 @@ class DashboardService:
             await self.event_bus.emit(
                 EventType.HEALTH_STATUS_CHANGED.value,
                 {
-                    'healthy': health.overall_healthy,
-                    'database_status': health.database_status,
-                    'connection_status': health.connection_status,
-                    'timestamp': health.timestamp.isoformat()
-                }
+                    "healthy": health.overall_healthy,
+                    "database_status": health.database_status,
+                    "connection_status": health.connection_status,
+                    "timestamp": health.timestamp.isoformat(),
+                },
             )
             await self.cache.set(cache_key, health.overall_healthy, ttl=3600)
 
     def _get_widget_cache_ttl(self, widget_type: str) -> int:
         """Get appropriate cache TTL for widget type"""
         ttl_map = {
-            'error_monitor': 30,      # Errors need quick updates
-            'cost_tracker': 300,      # Cost can be cached longer
-            'model_efficiency': 600,  # Efficiency metrics are stable
-            'timeout_risk': 60,       # Performance needs regular updates
+            "error_monitor": 30,  # Errors need quick updates
+            "cost_tracker": 300,  # Cost can be cached longer
+            "model_efficiency": 600,  # Efficiency metrics are stable
+            "timeout_risk": 60,  # Performance needs regular updates
         }
         return ttl_map.get(widget_type, 120)  # Default 2 minutes
 
@@ -309,20 +326,20 @@ class DashboardService:
             total_sessions=0,
             success_rate=100.0,
             active_agents=0,
-            cost=Decimal('0.00'),
-            timestamp=datetime.now()
+            cost=Decimal("0.00"),
+            timestamp=datetime.now(),
         )
 
     def _get_fallback_health(self) -> SystemHealth:
         """Fallback health when data unavailable"""
         return SystemHealth(
             overall_healthy=False,
-            database_status='unknown',
-            connection_status='disconnected',
+            database_status="unknown",
+            connection_status="disconnected",
             response_time_ms=0.0,
             uptime_seconds=0.0,
             error_rate=0.0,
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
 
     def _get_fallback_widget(self, widget_type: str) -> WidgetData:
@@ -330,11 +347,11 @@ class DashboardService:
         return WidgetData(
             widget_id=f"{widget_type}_fallback",
             widget_type=widget_type,
-            title=widget_type.replace('_', ' ').title(),
+            title=widget_type.replace("_", " ").title(),
             status="error",
             data={"error": "Data temporarily unavailable"},
             last_updated=datetime.now(),
-            metadata={"fallback": True}
+            metadata={"fallback": True},
         )
 
     def _get_fallback_overview(self) -> DashboardOverviewResponse:
@@ -343,13 +360,16 @@ class DashboardService:
             metrics=self._get_fallback_metrics(),
             widgets=[],
             system_health=self._get_fallback_health(),
-            last_updated=datetime.now()
+            last_updated=datetime.now(),
         )
+
 
 class TelemetryService:
     """Service for telemetry-specific operations"""
 
-    def __init__(self, telemetry_repo: TelemetryRepository, cache_service: CacheService):
+    def __init__(
+        self, telemetry_repo: TelemetryRepository, cache_service: CacheService
+    ):
         self.telemetry_repo = telemetry_repo
         self.cache = cache_service
 
@@ -377,11 +397,11 @@ class TelemetryService:
         # This would need to be implemented in the repository
         # For now, return a placeholder
         metrics = {
-            'session_id': session_id,
-            'status': 'active',
-            'start_time': datetime.now().isoformat(),
-            'request_count': 0,
-            'cost': 0.0
+            "session_id": session_id,
+            "status": "active",
+            "start_time": datetime.now().isoformat(),
+            "request_count": 0,
+            "cost": 0.0,
         }
 
         await self.cache.set(cache_key, metrics, ttl=120)

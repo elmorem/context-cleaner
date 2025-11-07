@@ -93,9 +93,10 @@ Context Cleaner is an advanced productivity tracking and context optimization to
    pip install context-cleaner
    ```
 
-2. **Set up Claude Code Integration**:
+2. **Set up telemetry** (optional):
    ```bash
-   context-cleaner install --claude-integration
+   context-cleaner telemetry init
+   source ~/.context_cleaner/telemetry/telemetry-env.sh
    ```
 
 3. **Start tracking**:
@@ -117,8 +118,9 @@ Context Cleaner is an advanced productivity tracking and context optimization to
 
 ## 📝 Documentation Notes
 
-- **Last Updated**: v0.1.0 - August 29, 2025
-- **Python Support**: 3.8+ (tested on 3.8, 3.9, 3.10, 3.11, 3.12)
+- **Current Version**: v0.3.0
+- **Last Updated**: January 2025
+- **Python Support**: 3.9+ (tested on 3.9, 3.10, 3.11, 3.12)
 - **Platform Support**: Windows, macOS, Linux
 - **License**: MIT License - see [LICENSE](../LICENSE) file
 

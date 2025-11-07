@@ -185,6 +185,7 @@ class ManipulationValidator:
         """Get accurate token count using ccusage approach."""
         try:
             from ..analysis.enhanced_token_counter import get_accurate_token_count
+
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
@@ -465,7 +466,8 @@ class ManipulationValidator:
             # Calculate operation impact
             # ccusage approach: Use accurate token counting
             total_context_tokens = sum(
-                self._get_accurate_token_count(str(value)) for value in context_data.values()
+                self._get_accurate_token_count(str(value))
+                for value in context_data.values()
             )
 
             if total_context_tokens > 0:
@@ -595,7 +597,9 @@ class ManipulationValidator:
 
             # Validate total impact
             # ccusage approach: Use accurate token counting
-            total_context_tokens = sum(self._get_accurate_token_count(str(v)) for v in context_data.values())
+            total_context_tokens = sum(
+                self._get_accurate_token_count(str(v)) for v in context_data.values()
+            )
             if total_context_tokens > 0:
                 total_reduction_ratio = (
                     plan.estimated_total_reduction / total_context_tokens
@@ -734,8 +738,14 @@ class ManipulationValidator:
 
             # Calculate token counts
             # ccusage approach: Use accurate token counting
-            original_tokens = sum(self._get_accurate_token_count(str(v)) for v in original_context.values())
-            modified_tokens = sum(self._get_accurate_token_count(str(v)) for v in modified_context.values())
+            original_tokens = sum(
+                self._get_accurate_token_count(str(v))
+                for v in original_context.values()
+            )
+            modified_tokens = sum(
+                self._get_accurate_token_count(str(v))
+                for v in modified_context.values()
+            )
 
             # Expected token reduction from operations
             expected_reduction = sum(

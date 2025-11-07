@@ -183,7 +183,7 @@ class ContextCleanerConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return asdict(self)
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value using dot notation (dict-like interface for backwards compatibility)."""
         try:
@@ -191,13 +191,13 @@ class ContextCleanerConfig:
             config_dict = self.to_dict()
             keys = key.split(".")
             current = config_dict
-            
+
             for k in keys:
                 if isinstance(current, dict) and k in current:
                     current = current[k]
                 else:
                     return default
-                    
+
             return current
         except (KeyError, AttributeError, TypeError):
             return default

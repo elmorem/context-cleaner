@@ -46,12 +46,14 @@ class RealtimeEventSerializer:
     def serialize_datetime(obj):
         """Recursively serialize datetime objects to ISO strings"""
         if isinstance(obj, dict):
-            return {k: RealtimeEventSerializer.serialize_datetime(v) for k, v in obj.items()}
+            return {
+                k: RealtimeEventSerializer.serialize_datetime(v) for k, v in obj.items()
+            }
         elif isinstance(obj, list):
             return [RealtimeEventSerializer.serialize_datetime(item) for item in obj]
         elif isinstance(obj, datetime):
             return obj.isoformat()
-        elif hasattr(obj, 'value'):  # Handle enums
+        elif hasattr(obj, "value"):  # Handle enums
             return obj.value
         return obj
 
@@ -73,7 +75,9 @@ class DashboardRealtime:
     Critical: Preserves existing WebSocket event structure exactly
     """
 
-    def __init__(self, event_bus: EventBus = None, dashboard_instance=None, socketio=None):
+    def __init__(
+        self, event_bus: EventBus = None, dashboard_instance=None, socketio=None
+    ):
         self.event_bus = event_bus
         self.dashboard = dashboard_instance
         self.socketio = socketio
@@ -111,11 +115,17 @@ class DashboardRealtime:
                 asyncio.set_event_loop(None)
                 loop.close()
 
-        if eventlet is not None and getattr(eventlet, "tpool", None) and hasattr(eventlet.tpool, "execute"):
+        if (
+            eventlet is not None
+            and getattr(eventlet, "tpool", None)
+            and hasattr(eventlet.tpool, "execute")
+        ):
             logger.debug("Running coroutine via eventlet.tpool")
             return eventlet.tpool.execute(runner)
         elif eventlet is not None and not getattr(eventlet, "tpool", None):
-            logger.warning("Eventlet detected without tpool support; falling back to native threading")
+            logger.warning(
+                "Eventlet detected without tpool support; falling back to native threading"
+            )
 
         result_holder: Dict[str, Any] = {}
         error_holder: Dict[str, BaseException] = {}
@@ -145,7 +155,9 @@ class DashboardRealtime:
 
         # Register EventBus handlers instead of SocketIO decorators
         # The EventBus will handle WebSocket communication internally
-        logger.info("✅ EventBus handlers configured for FastAPI WebSocket real-time updates")
+        logger.info(
+            "✅ EventBus handlers configured for FastAPI WebSocket real-time updates"
+        )
 
     def _handle_connect_legacy(self):
         def handle_connect():
@@ -155,7 +167,9 @@ class DashboardRealtime:
 
             try:
                 # Send initial comprehensive health data
-                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                if self.dashboard and hasattr(
+                    self.dashboard, "generate_comprehensive_health_report"
+                ):
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     report = loop.run_until_complete(
@@ -186,7 +200,9 @@ class DashboardRealtime:
             WebSocket-first: Immediate response via WebSocket
             """
             try:
-                if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                if self.dashboard and hasattr(
+                    self.dashboard, "generate_comprehensive_health_report"
+                ):
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     report = loop.run_until_complete(
@@ -216,7 +232,9 @@ class DashboardRealtime:
                 logger.error(f"Performance update request failed: {e}")
                 emit("error", {"message": str(e)})
 
-        logger.info("✅ SocketIO events configured for WebSocket-first real-time updates")
+        logger.info(
+            "✅ SocketIO events configured for WebSocket-first real-time updates"
+        )
 
     def start_background_broadcasting(self) -> None:
         """
@@ -231,7 +249,7 @@ class DashboardRealtime:
         self._update_thread = threading.Thread(
             target=self._real_time_update_loop,
             name="RealtimeDashboardUpdates",
-            daemon=True
+            daemon=True,
         )
         self._update_thread.start()
         logger.info("🚀 Background WebSocket broadcasting started")
@@ -249,7 +267,7 @@ class DashboardRealtime:
         """Setup SocketIO event handlers for real-time dashboard communication."""
         # Use constructor-provided socketio first, then fall back to dashboard.socketio
         socketio = self.socketio
-        if not socketio and self.dashboard and hasattr(self.dashboard, 'socketio'):
+        if not socketio and self.dashboard and hasattr(self.dashboard, "socketio"):
             socketio = self.dashboard.socketio
 
         if not socketio:
@@ -264,16 +282,22 @@ class DashboardRealtime:
 
             def _broadcast_initial_health():
                 try:
-                    if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                    if self.dashboard and hasattr(
+                        self.dashboard, "generate_comprehensive_health_report"
+                    ):
                         report = self._run_coroutine_blocking(
                             self.dashboard.generate_comprehensive_health_report()
                         )
                         safe_report = self.serializer.serialize_health_report(report)
                         socketio.emit("health_update", safe_report)
                     else:
-                        socketio.emit("health_update", {"status": "dashboard_unavailable"})
+                        socketio.emit(
+                            "health_update", {"status": "dashboard_unavailable"}
+                        )
                 except Exception as exc:
-                    logger.error("Initial health data broadcast failed: %s", exc, exc_info=True)
+                    logger.error(
+                        "Initial health data broadcast failed: %s", exc, exc_info=True
+                    )
                     socketio.emit("error", {"message": str(exc)})
 
             socketio.start_background_task(_broadcast_initial_health)
@@ -294,14 +318,18 @@ class DashboardRealtime:
 
             def _broadcast_health_update():
                 try:
-                    if self.dashboard and hasattr(self.dashboard, 'generate_comprehensive_health_report'):
+                    if self.dashboard and hasattr(
+                        self.dashboard, "generate_comprehensive_health_report"
+                    ):
                         report = self._run_coroutine_blocking(
                             self.dashboard.generate_comprehensive_health_report()
                         )
                         safe_report = self.serializer.serialize_health_report(report)
                         socketio.emit("health_update", safe_report)
                     else:
-                        socketio.emit("health_update", {"status": "dashboard_unavailable"})
+                        socketio.emit(
+                            "health_update", {"status": "dashboard_unavailable"}
+                        )
                 except Exception as exc:
                     logger.error("Health update request failed: %s", exc, exc_info=True)
 
@@ -330,22 +358,28 @@ class DashboardRealtime:
                     "timestamp": datetime.now().isoformat(),
                     "overall_health_score": report.overall_health_score,
                     "focus_score": report.focus_metrics.focus_score,
-                    "redundancy_score": 1.0 - report.redundancy_analysis.duplicate_content_percentage,
+                    "redundancy_score": 1.0
+                    - report.redundancy_analysis.duplicate_content_percentage,
                     "recency_score": report.recency_indicators.fresh_context_percentage,
-                    "size_score": 1.0 - report.size_optimization.optimization_potential_percentage,
+                    "size_score": 1.0
+                    - report.size_optimization.optimization_potential_percentage,
                 }
 
                 self._performance_history.append(health_data)
 
                 # Trim history to max size
                 if len(self._performance_history) > self._max_history_points:
-                    self._performance_history = self._performance_history[-self._max_history_points:]
+                    self._performance_history = self._performance_history[
+                        -self._max_history_points :
+                    ]
 
                 # EventBus: Broadcast to all connected clients
                 safe_report = self.serializer.serialize_health_report(report)
                 asyncio.create_task(self.event_bus.emit("health_update", safe_report))
 
-                logger.debug(f"📡 Health update broadcasted to {len(self.active_connections)} WebSocket clients")
+                logger.debug(
+                    f"📡 Health update broadcasted to {len(self.active_connections)} WebSocket clients"
+                )
 
                 # Update every 30 seconds
                 self._stop_event.wait(timeout=30.0)
@@ -376,7 +410,8 @@ class DashboardRealtime:
                         "alerts_enabled": self._alerts_enabled,
                         "history_points": len(self._performance_history),
                         "websocket_connections": len(self.active_connections),
-                        "background_broadcasting": self._update_thread is not None and self._update_thread.is_alive(),
+                        "background_broadcasting": self._update_thread is not None
+                        and self._update_thread.is_alive(),
                     },
                 }
             else:
@@ -401,7 +436,7 @@ class DashboardRealtime:
             return {
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
-                "system": {"websocket_connections": len(self.active_connections)}
+                "system": {"websocket_connections": len(self.active_connections)},
             }
 
     def get_realtime_events_fallback(self) -> List[Dict[str, Any]]:
@@ -414,60 +449,73 @@ class DashboardRealtime:
         try:
             # Add performance metrics event
             metrics = self.get_current_performance_metrics()
-            events.append({
-                "type": "performance_update",
-                "timestamp": datetime.now().isoformat(),
-                "data": metrics
-            })
+            events.append(
+                {
+                    "type": "performance_update",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": metrics,
+                }
+            )
 
             # Add dashboard metrics if available
-            if self.dashboard and hasattr(self.dashboard, '_get_basic_dashboard_metrics'):
+            if self.dashboard and hasattr(
+                self.dashboard, "_get_basic_dashboard_metrics"
+            ):
                 try:
                     basic_metrics = self.dashboard._get_basic_dashboard_metrics()
-                    events.append({
-                        "type": "dashboard_metrics",
-                        "timestamp": datetime.now().isoformat(),
-                        "data": basic_metrics
-                    })
+                    events.append(
+                        {
+                            "type": "dashboard_metrics",
+                            "timestamp": datetime.now().isoformat(),
+                            "data": basic_metrics,
+                        }
+                    )
                 except Exception:
                     pass
 
             # Add health status event
-            events.append({
-                "type": "health_status",
-                "timestamp": datetime.now().isoformat(),
-                "data": {
-                    "status": "healthy",
-                    "websocket_available": self.event_bus is not None,
-                    "background_broadcasting": self._update_thread is not None and self._update_thread.is_alive(),
-                    "connection_count": len(self.active_connections)
+            events.append(
+                {
+                    "type": "health_status",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": {
+                        "status": "healthy",
+                        "websocket_available": self.event_bus is not None,
+                        "background_broadcasting": self._update_thread is not None
+                        and self._update_thread.is_alive(),
+                        "connection_count": len(self.active_connections),
+                    },
                 }
-            })
+            )
 
             # Add context window usage if available
-            if self.dashboard and hasattr(self.dashboard, 'context_analyzer'):
+            if self.dashboard and hasattr(self.dashboard, "context_analyzer"):
                 try:
                     if self.dashboard.context_analyzer:
                         context_usage = {
                             "tokens_used": 15000,  # Mock data
                             "tokens_available": 200000,
-                            "usage_percentage": 7.5
+                            "usage_percentage": 7.5,
                         }
-                        events.append({
-                            "type": "context_usage",
-                            "timestamp": datetime.now().isoformat(),
-                            "data": context_usage
-                        })
+                        events.append(
+                            {
+                                "type": "context_usage",
+                                "timestamp": datetime.now().isoformat(),
+                                "data": context_usage,
+                            }
+                        )
                 except Exception:
                     pass
 
         except Exception as e:
             logger.error(f"Realtime events fallback generation failed: {e}")
-            events.append({
-                "type": "error",
-                "timestamp": datetime.now().isoformat(),
-                "data": {"message": str(e)}
-            })
+            events.append(
+                {
+                    "type": "error",
+                    "timestamp": datetime.now().isoformat(),
+                    "data": {"message": str(e)},
+                }
+            )
 
         return events
 
@@ -477,14 +525,16 @@ class DashboardRealtime:
         WebSocket-first: Immediate broadcast to connected clients
         """
         if not self.event_bus:
-            logger.warning(f"Cannot broadcast {widget_type} update - WebSocket unavailable")
+            logger.warning(
+                f"Cannot broadcast {widget_type} update - WebSocket unavailable"
+            )
             return
 
         try:
             update_payload = {
                 "widget_type": widget_type,
                 "timestamp": datetime.now().isoformat(),
-                "data": self.serializer.serialize_datetime(data)
+                "data": self.serializer.serialize_datetime(data),
             }
 
             asyncio.create_task(self.event_bus.emit("widget_update", update_payload))
@@ -514,9 +564,10 @@ class DashboardRealtime:
         return {
             "websocket_available": self.event_bus is not None,
             "active_connections": len(self.active_connections),
-            "background_broadcasting": self._update_thread is not None and self._update_thread.is_alive(),
+            "background_broadcasting": self._update_thread is not None
+            and self._update_thread.is_alive(),
             "performance_history_size": len(self._performance_history),
-            "alerts_enabled": self._alerts_enabled
+            "alerts_enabled": self._alerts_enabled,
         }
 
 
@@ -549,21 +600,26 @@ class RealtimeCoordinator:
         stats = self.realtime.get_connection_stats()
 
         return {
-            "recommended_transport": "websocket" if stats["websocket_available"] else "polling",
+            "recommended_transport": (
+                "websocket" if stats["websocket_available"] else "polling"
+            ),
             "websocket_available": stats["websocket_available"],
             "fallback_endpoint": "/api/realtime/events",
             "websocket_endpoint": "/socket.io/",
             "polling_interval_ms": 5000 if not stats["websocket_available"] else None,
-            "stats": stats
+            "stats": stats,
         }
 
 
 class ModuleStatus:
     """Track module extraction status"""
+
     EXTRACTION_STATUS = "extracted"
     ORIGINAL_LINES = 400  # WebSocket, threading, and real-time logic
     TARGET_LINES = 400
     REDUCTION_TARGET = "WebSocket-first architecture with HTTP fallbacks"
 
 
-logger.info(f"dashboard_realtime module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}")
+logger.info(
+    f"dashboard_realtime module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}"
+)

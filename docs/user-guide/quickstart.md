@@ -1,11 +1,11 @@
 # Quick Start Guide
 
-Get up and running with Context Cleaner v0.2.0 in less than 5 minutes! This guide covers installation, initial setup, and your first analytics session.
+Get up and running with Context Cleaner v0.3.0 in less than 5 minutes! This guide covers installation, initial setup, and your first analytics session.
 
 ## 🚀 Installation
 
 ### Prerequisites
-- **Python 3.8 or higher** (Python 3.9+ recommended)
+- **Python 3.9 or higher** (tested on 3.9, 3.10, 3.11, 3.12)
 - **Claude Code** (for optimal integration features)
 - **10MB+ disk space** for analytics data storage
 
@@ -21,7 +21,7 @@ pip install -e .
 
 # Verify installation
 context-cleaner --version
-# Output: Context Cleaner 0.2.0
+# Output: Context Cleaner 0.3.0
 ```
 
 ### System Requirements Check

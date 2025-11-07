@@ -77,7 +77,9 @@ class UnixSocketTransport(Transport):
                 while len(payload) < size:
                     chunk = sock.recv(min(BUFFER_SIZE, size - len(payload)))
                     if not chunk:
-                        raise TransportError("Supervisor connection closed during stream")
+                        raise TransportError(
+                            "Supervisor connection closed during stream"
+                        )
                     payload.extend(chunk)
             except OSError as exc:  # pragma: no cover - environment specific
                 raise TransportError(f"Failed to receive stream chunk: {exc}") from exc

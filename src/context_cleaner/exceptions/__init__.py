@@ -7,15 +7,15 @@ from .bridge_exceptions import (
     BridgeStorageError,
     BridgeTimeoutError,
     BridgeCircuitBreakerError,
-    BridgeDataIntegrityError
+    BridgeDataIntegrityError,
 )
 
 __all__ = [
     "BridgeError",
-    "BridgeConnectionError", 
+    "BridgeConnectionError",
     "BridgeValidationError",
     "BridgeStorageError",
     "BridgeTimeoutError",
     "BridgeCircuitBreakerError",
-    "BridgeDataIntegrityError"
+    "BridgeDataIntegrityError",
 ]

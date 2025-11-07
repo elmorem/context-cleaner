@@ -15,6 +15,7 @@ import weakref
 
 logger = logging.getLogger(__name__)
 
+
 class CacheService(ABC):
     """Abstract cache service interface"""
 
@@ -38,10 +39,13 @@ class CacheService(ABC):
         """Clear all cache entries"""
         pass
 
+
 class MultiLevelCache(CacheService):
     """Multi-level cache implementation with memory and Redis layers"""
 
-    def __init__(self, redis_url: str = "redis://localhost:6379", max_memory_items: int = 1000):
+    def __init__(
+        self, redis_url: str = "redis://localhost:6379", max_memory_items: int = 1000
+    ):
         self.max_memory_items = max_memory_items
         self.memory_cache: Dict[str, Dict[str, Any]] = {}
         self.redis_client = None
@@ -60,19 +64,22 @@ class MultiLevelCache(CacheService):
                 if self.redis_client is None:
                     try:
                         import redis.asyncio as redis
+
                         self.redis_client = redis.from_url(
                             self.redis_url,
                             decode_responses=True,
                             retry_on_timeout=True,
                             socket_connect_timeout=5,
-                            socket_timeout=5
+                            socket_timeout=5,
                         )
                         # Test connection
                         await self.redis_client.ping()
                         self._redis_available = True
                         logger.info("Redis connection established successfully")
                     except Exception as e:
-                        logger.warning(f"Redis not available, using memory-only cache: {e}")
+                        logger.warning(
+                            f"Redis not available, using memory-only cache: {e}"
+                        )
                         self.redis_client = None
                         self._redis_available = False
 
@@ -85,7 +92,7 @@ class MultiLevelCache(CacheService):
                 if not self._is_expired(entry):
                     self._update_access_order(key)
                     logger.debug(f"Cache hit (memory): {key}")
-                    return entry['value']
+                    return entry["value"]
                 else:
                     # Remove expired entry
                     del self.memory_cache[key]
@@ -100,7 +107,9 @@ class MultiLevelCache(CacheService):
                     if cached_data:
                         data = json.loads(cached_data)
                         # Populate L1 cache
-                        await self._set_memory_cache(key, data, 300)  # Default TTL for L1
+                        await self._set_memory_cache(
+                            key, data, 300
+                        )  # Default TTL for L1
                         logger.debug(f"Cache hit (redis): {key}")
                         return data
                 except Exception as e:
@@ -166,9 +175,13 @@ class MultiLevelCache(CacheService):
                         await self.redis_client.delete(*keys)
                         invalidated_count += len(keys)
                 except Exception as e:
-                    logger.warning(f"Redis invalidation error for pattern {pattern}: {e}")
+                    logger.warning(
+                        f"Redis invalidation error for pattern {pattern}: {e}"
+                    )
 
-            logger.info(f"Cache invalidated {invalidated_count} keys for pattern: {pattern}")
+            logger.info(
+                f"Cache invalidated {invalidated_count} keys for pattern: {pattern}"
+            )
             return True
 
         except Exception as e:
@@ -205,15 +218,15 @@ class MultiLevelCache(CacheService):
 
             if self._redis_available and self.redis_client:
                 try:
-                    redis_info = await self.redis_client.info('memory')
+                    redis_info = await self.redis_client.info("memory")
                 except Exception as e:
                     logger.warning(f"Could not get Redis stats: {e}")
 
             return {
-                'memory_cache_size': memory_size,
-                'redis_available': self._redis_available,
-                'redis_info': redis_info,
-                'max_memory_items': self.max_memory_items
+                "memory_cache_size": memory_size,
+                "redis_available": self._redis_available,
+                "redis_info": redis_info,
+                "max_memory_items": self.max_memory_items,
             }
 
         except Exception as e:
@@ -228,8 +241,8 @@ class MultiLevelCache(CacheService):
             await self._evict_lru_items()
 
         self.memory_cache[key] = {
-            'value': value,
-            'expires_at': datetime.now() + timedelta(seconds=ttl)
+            "value": value,
+            "expires_at": datetime.now() + timedelta(seconds=ttl),
         }
         self._update_access_order(key)
 
@@ -252,16 +265,16 @@ class MultiLevelCache(CacheService):
 
     def _is_expired(self, entry: Dict[str, Any]) -> bool:
         """Check if cache entry is expired"""
-        return datetime.now() > entry['expires_at']
+        return datetime.now() > entry["expires_at"]
 
     def _matches_pattern(self, key: str, pattern: str) -> bool:
         """Simple pattern matching for cache invalidation"""
-        if pattern.endswith('*'):
+        if pattern.endswith("*"):
             return key.startswith(pattern[:-1])
-        elif pattern.startswith('*'):
+        elif pattern.startswith("*"):
             return key.endswith(pattern[1:])
-        elif '*' in pattern:
-            parts = pattern.split('*')
+        elif "*" in pattern:
+            parts = pattern.split("*")
             return key.startswith(parts[0]) and key.endswith(parts[-1])
         else:
             return key == pattern
@@ -270,12 +283,13 @@ class MultiLevelCache(CacheService):
         """Custom JSON serializer for cache values"""
         if isinstance(obj, datetime):
             return obj.isoformat()
-        elif hasattr(obj, 'dict'):  # Pydantic models
+        elif hasattr(obj, "dict"):  # Pydantic models
             return obj.dict()
-        elif hasattr(obj, '__dict__'):  # Other objects
+        elif hasattr(obj, "__dict__"):  # Other objects
             return obj.__dict__
         else:
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
 
 class InMemoryCache(CacheService):
     """Simple in-memory cache for development/testing"""
@@ -290,7 +304,7 @@ class InMemoryCache(CacheService):
             entry = self.cache[key]
             if not self._is_expired(entry):
                 self._update_access_order(key)
-                return entry['value']
+                return entry["value"]
             else:
                 del self.cache[key]
                 if key in self._access_order:
@@ -304,8 +318,8 @@ class InMemoryCache(CacheService):
                 self._evict_lru()
 
             self.cache[key] = {
-                'value': value,
-                'expires_at': datetime.now() + timedelta(seconds=ttl)
+                "value": value,
+                "expires_at": datetime.now() + timedelta(seconds=ttl),
             }
             self._update_access_order(key)
             return True
@@ -316,8 +330,7 @@ class InMemoryCache(CacheService):
     async def invalidate(self, pattern: str) -> bool:
         try:
             keys_to_remove = [
-                key for key in self.cache.keys()
-                if self._matches_pattern(key, pattern)
+                key for key in self.cache.keys() if self._matches_pattern(key, pattern)
             ]
 
             for key in keys_to_remove:
@@ -348,15 +361,15 @@ class InMemoryCache(CacheService):
         self._access_order.append(key)
 
     def _is_expired(self, entry: Dict[str, Any]) -> bool:
-        return datetime.now() > entry['expires_at']
+        return datetime.now() > entry["expires_at"]
 
     def _matches_pattern(self, key: str, pattern: str) -> bool:
-        if pattern.endswith('*'):
+        if pattern.endswith("*"):
             return key.startswith(pattern[:-1])
-        elif pattern.startswith('*'):
+        elif pattern.startswith("*"):
             return key.endswith(pattern[1:])
-        elif '*' in pattern:
-            parts = pattern.split('*')
+        elif "*" in pattern:
+            parts = pattern.split("*")
             return key.startswith(parts[0]) and key.endswith(parts[-1])
         else:
             return key == pattern

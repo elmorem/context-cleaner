@@ -22,12 +22,17 @@ class WindowsPipeTransport(Transport):
     def close(self) -> None:  # pragma: no cover - platform specific
         return None
 
-    def send_request(self, message: SupervisorRequest) -> None:  # pragma: no cover - platform specific
+    def send_request(
+        self, message: SupervisorRequest
+    ) -> None:  # pragma: no cover - platform specific
         raise TransportError("Windows named pipe transport not implemented yet")
 
-    def receive_response(self) -> SupervisorResponse:  # pragma: no cover - platform specific
+    def receive_response(
+        self,
+    ) -> SupervisorResponse:  # pragma: no cover - platform specific
         raise TransportError("Windows named pipe transport not implemented yet")
 
-    def receive_stream(self) -> Iterable[StreamChunk]:  # pragma: no cover - platform specific
+    def receive_stream(
+        self,
+    ) -> Iterable[StreamChunk]:  # pragma: no cover - platform specific
         raise TransportError("Windows named pipe transport not implemented yet")
-

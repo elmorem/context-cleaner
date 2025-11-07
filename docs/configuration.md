@@ -1,6 +1,6 @@
 # Context Cleaner Configuration Reference
 
-Complete configuration reference for Context Cleaner v0.2.0, including all settings, environment variables, and customization options.
+Complete configuration reference for Context Cleaner v0.3.0, including all settings, environment variables, and customization options.
 
 ## 📋 **Configuration Overview**
 
@@ -627,6 +627,6 @@ log_level: "ERROR"              # Minimal logging
 
 ---
 
-**Context Cleaner Configuration Reference** - Complete configuration guide for v0.2.0
+**Context Cleaner Configuration Reference** - Complete configuration guide for v0.3.0
 
 *Need help with configuration? Check the [Troubleshooting Guide](troubleshooting.md) or [CLI Reference](cli-reference.md).*

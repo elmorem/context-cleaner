@@ -38,4 +38,3 @@ class Transport(abc.ABC):
         """Iterate over streaming chunks. Optional override."""
 
         raise NotImplementedError
-

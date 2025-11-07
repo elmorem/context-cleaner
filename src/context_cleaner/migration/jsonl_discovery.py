@@ -95,13 +95,21 @@ class FileDiscoveryResult:
     # Discovery results
     total_files_found: int = 0
     total_size_bytes: int = 0
-    files_by_priority: Dict[int, List[JSONLFileInfo]] = field(default_factory=lambda: defaultdict(list))
-    files_by_group: Dict[str, List[JSONLFileInfo]] = field(default_factory=lambda: defaultdict(list))
+    files_by_priority: Dict[int, List[JSONLFileInfo]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    files_by_group: Dict[str, List[JSONLFileInfo]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
 
     # File categorization
-    recent_files: List[JSONLFileInfo] = field(default_factory=list)  # Modified within 7 days
+    recent_files: List[JSONLFileInfo] = field(
+        default_factory=list
+    )  # Modified within 7 days
     large_files: List[JSONLFileInfo] = field(default_factory=list)  # > 100MB
-    corrupt_files: List[JSONLFileInfo] = field(default_factory=list)  # Failed integrity check
+    corrupt_files: List[JSONLFileInfo] = field(
+        default_factory=list
+    )  # Failed integrity check
 
     # Estimates
     estimated_total_lines: int = 0
@@ -181,7 +189,9 @@ class JSONLDiscoveryService:
         enable_integrity_check: bool = True,
         enable_content_analysis: bool = True,
     ):
-        self.default_search_paths = default_search_paths or [str(Path.home() / ".claude" / "projects")]
+        self.default_search_paths = default_search_paths or [
+            str(Path.home() / ".claude" / "projects")
+        ]
         self.file_patterns = file_patterns or ["*.jsonl"]
         self.max_file_age_days = max_file_age_days
         self.enable_integrity_check = enable_integrity_check
@@ -263,13 +273,17 @@ class JSONLDiscoveryService:
             await self._categorize_files(all_files, result)
 
             # Generate processing manifest with optimal ordering
-            result.processing_manifest = await self._generate_processing_order(all_files, sort_by)
+            result.processing_manifest = await self._generate_processing_order(
+                all_files, sort_by
+            )
 
             # Calculate final statistics
             result.total_files_found = len(all_files)
             result.total_size_bytes = sum(f.size_bytes for f in all_files)
             result.estimated_total_lines = sum(f.estimated_lines for f in all_files)
-            result.estimated_total_sessions = sum(f.estimated_sessions for f in all_files)
+            result.estimated_total_sessions = sum(
+                f.estimated_sessions for f in all_files
+            )
             result.estimated_total_tokens = sum(f.estimated_tokens for f in all_files)
 
             result.end_time = datetime.now()
@@ -288,7 +302,9 @@ class JSONLDiscoveryService:
             logger.error(f"JSONL discovery failed: {e}")
             return result
 
-    async def _scan_directory(self, directory_path: str, result: FileDiscoveryResult) -> List[JSONLFileInfo]:
+    async def _scan_directory(
+        self, directory_path: str, result: FileDiscoveryResult
+    ) -> List[JSONLFileInfo]:
         """Scan a single directory for JSONL files."""
         files = []
 
@@ -318,7 +334,9 @@ class JSONLDiscoveryService:
                             files.append(file_info)
 
                         except Exception as e:
-                            result.add_error(f"Error processing file {file_path}: {str(e)}")
+                            result.add_error(
+                                f"Error processing file {file_path}: {str(e)}"
+                            )
 
         except Exception as e:
             result.add_error(f"Error scanning directory {directory_path}: {str(e)}")
@@ -337,7 +355,9 @@ class JSONLDiscoveryService:
             modified_at=datetime.fromtimestamp(stat.st_mtime),
         )
 
-    async def _apply_filters(self, files: List[JSONLFileInfo], filter_criteria: Dict[str, Any]) -> List[JSONLFileInfo]:
+    async def _apply_filters(
+        self, files: List[JSONLFileInfo], filter_criteria: Dict[str, Any]
+    ) -> List[JSONLFileInfo]:
         """Apply filtering criteria to file list."""
         filtered_files = files
 
@@ -361,11 +381,17 @@ class JSONLDiscoveryService:
             patterns = filter_criteria["filename_patterns"]
             if isinstance(patterns, str):
                 patterns = [patterns]
-            filtered_files = [f for f in filtered_files if any(pattern in f.filename.lower() for pattern in patterns)]
+            filtered_files = [
+                f
+                for f in filtered_files
+                if any(pattern in f.filename.lower() for pattern in patterns)
+            ]
 
         return filtered_files
 
-    async def _analyze_file_content(self, files: List[JSONLFileInfo], result: FileDiscoveryResult):
+    async def _analyze_file_content(
+        self, files: List[JSONLFileInfo], result: FileDiscoveryResult
+    ):
         """Analyze file content to estimate lines, sessions, and tokens."""
         logger.info(f"Analyzing content for {len(files)} files...")
 
@@ -399,7 +425,7 @@ class JSONLDiscoveryService:
                             if actual_tokens > 0:
                                 total_actual_tokens += actual_tokens
                                 entries_with_token_data += 1
-                            
+
                             # Extract content length as fallback
                             content = self._extract_content(entry)
                             total_content_length += len(content)
@@ -415,34 +441,60 @@ class JSONLDiscoveryService:
                     avg_line_size = (
                         file_info.size_bytes / max(lines_sampled, 1)
                         if lines_sampled < 100
-                        else file_info.size_bytes / (file_info.size_bytes / (total_content_length / lines_sampled))
+                        else file_info.size_bytes
+                        / (
+                            file_info.size_bytes
+                            / (total_content_length / lines_sampled)
+                        )
                     )
-                    file_info.estimated_lines = max(1, int(file_info.size_bytes / max(avg_line_size, 1)))
+                    file_info.estimated_lines = max(
+                        1, int(file_info.size_bytes / max(avg_line_size, 1))
+                    )
 
                     # Estimate sessions (with extrapolation)
                     session_density = len(sessions_found) / lines_sampled
-                    file_info.estimated_sessions = max(1, int(file_info.estimated_lines * session_density))
+                    file_info.estimated_sessions = max(
+                        1, int(file_info.estimated_lines * session_density)
+                    )
 
                     # Use actual token data if available (ccusage approach), otherwise estimate
                     if entries_with_token_data > 0:
                         # Use actual token data from JSONL entries (most accurate)
-                        avg_tokens_per_entry = total_actual_tokens / entries_with_token_data
+                        avg_tokens_per_entry = (
+                            total_actual_tokens / entries_with_token_data
+                        )
                         entries_per_file = file_info.estimated_lines
-                        file_info.estimated_tokens = max(1, int(avg_tokens_per_entry * entries_per_file))
-                        logger.debug(f"Used actual token data: {entries_with_token_data}/{lines_sampled} entries had token data")
+                        file_info.estimated_tokens = max(
+                            1, int(avg_tokens_per_entry * entries_per_file)
+                        )
+                        logger.debug(
+                            f"Used actual token data: {entries_with_token_data}/{lines_sampled} entries had token data"
+                        )
                     else:
                         # Fallback to enhanced analysis or rough estimate only when no actual data is available
-                        logger.warning(f"No actual token data found in {file_info.filename}, skipping token estimation")
-                        file_info.estimated_tokens = 0  # Following ccusage approach - no crude estimation
+                        logger.warning(
+                            f"No actual token data found in {file_info.filename}, skipping token estimation"
+                        )
+                        file_info.estimated_tokens = (
+                            0  # Following ccusage approach - no crude estimation
+                        )
 
             except Exception as e:
-                result.add_warning(f"Content analysis failed for {file_info.filename}: {str(e)}")
+                result.add_warning(
+                    f"Content analysis failed for {file_info.filename}: {str(e)}"
+                )
                 # Set default estimates
-                file_info.estimated_lines = max(1, file_info.size_bytes // 500)  # Rough estimate
+                file_info.estimated_lines = max(
+                    1, file_info.size_bytes // 500
+                )  # Rough estimate
                 file_info.estimated_sessions = max(1, file_info.estimated_lines // 100)
-                file_info.estimated_tokens = max(1, file_info.estimated_lines * 50)  # Very rough estimate
+                file_info.estimated_tokens = max(
+                    1, file_info.estimated_lines * 50
+                )  # Very rough estimate
 
-    async def _check_file_integrity(self, files: List[JSONLFileInfo], result: FileDiscoveryResult):
+    async def _check_file_integrity(
+        self, files: List[JSONLFileInfo], result: FileDiscoveryResult
+    ):
         """Check file integrity and detect corruption."""
         logger.info(f"Checking integrity for {len(files)} files...")
 
@@ -453,7 +505,9 @@ class JSONLDiscoveryService:
 
                 # Basic corruption detection
                 try:
-                    async with aiofiles.open(file_info.path, "r", encoding="utf-8") as file:
+                    async with aiofiles.open(
+                        file_info.path, "r", encoding="utf-8"
+                    ) as file:
                         lines_checked = 0
 
                         async for line in file:
@@ -467,12 +521,16 @@ class JSONLDiscoveryService:
                                     lines_checked += 1
                                 except json.JSONDecodeError:
                                     file_info.is_corrupt = True
-                                    file_info.corruption_reason = f"Invalid JSON at line {lines_checked + 1}"
+                                    file_info.corruption_reason = (
+                                        f"Invalid JSON at line {lines_checked + 1}"
+                                    )
                                     break
 
                         if lines_checked == 0:
                             file_info.is_corrupt = True
-                            file_info.corruption_reason = "File appears empty or unreadable"
+                            file_info.corruption_reason = (
+                                "File appears empty or unreadable"
+                            )
 
                 except UnicodeDecodeError:
                     file_info.is_corrupt = True
@@ -481,7 +539,9 @@ class JSONLDiscoveryService:
             except Exception as e:
                 file_info.is_corrupt = True
                 file_info.corruption_reason = f"Integrity check failed: {str(e)}"
-                result.add_warning(f"Integrity check failed for {file_info.filename}: {str(e)}")
+                result.add_warning(
+                    f"Integrity check failed for {file_info.filename}: {str(e)}"
+                )
 
     async def _calculate_file_hash(self, file_path: str) -> str:
         """Calculate SHA-256 hash of file."""
@@ -494,7 +554,9 @@ class JSONLDiscoveryService:
 
         return hasher.hexdigest()
 
-    async def _categorize_files(self, files: List[JSONLFileInfo], result: FileDiscoveryResult):
+    async def _categorize_files(
+        self, files: List[JSONLFileInfo], result: FileDiscoveryResult
+    ):
         """Categorize files by priority and processing groups."""
         for file_info in files:
             # Assign priority based on patterns
@@ -546,11 +608,15 @@ class JSONLDiscoveryService:
 
         return "default"
 
-    async def _generate_processing_order(self, files: List[JSONLFileInfo], sort_by: str) -> List[JSONLFileInfo]:
+    async def _generate_processing_order(
+        self, files: List[JSONLFileInfo], sort_by: str
+    ) -> List[JSONLFileInfo]:
         """Generate optimal processing order for files."""
         if sort_by == "priority_asc":
             # Sort by priority first, then by modified date (newest first)
-            return sorted(files, key=lambda f: (f.processing_priority, -f.modified_at.timestamp()))
+            return sorted(
+                files, key=lambda f: (f.processing_priority, -f.modified_at.timestamp())
+            )
 
         elif sort_by == "size_desc":
             # Sort by size (largest first) - good for parallel processing
@@ -595,54 +661,58 @@ class JSONLDiscoveryService:
     def _extract_actual_tokens(self, entry: Dict) -> int:
         """
         Extract actual token usage from JSONL entry using ccusage approach.
-        
+
         Returns:
             int: Actual token count from usage data, or 0 if not available
         """
         try:
             # ccusage approach: Extract actual token data from usage statistics
             # Check for input tokens in usage data
-            if 'usage' in entry and isinstance(entry['usage'], dict):
-                usage = entry['usage']
-                
+            if "usage" in entry and isinstance(entry["usage"], dict):
+                usage = entry["usage"]
+
                 # Look for input_tokens (most accurate)
-                if 'input_tokens' in usage and usage['input_tokens'] is not None:
-                    return int(usage['input_tokens'])
-                
+                if "input_tokens" in usage and usage["input_tokens"] is not None:
+                    return int(usage["input_tokens"])
+
                 # Fallback: Look for total_tokens if available
-                if 'total_tokens' in usage and usage['total_tokens'] is not None:
-                    return int(usage['total_tokens'])
-            
+                if "total_tokens" in usage and usage["total_tokens"] is not None:
+                    return int(usage["total_tokens"])
+
             # Check for token data in different structures
-            if 'input_tokens' in entry and entry['input_tokens'] is not None:
-                return int(entry['input_tokens'])
-            
-            if 'total_tokens' in entry and entry['total_tokens'] is not None:
-                return int(entry['total_tokens'])
-            
+            if "input_tokens" in entry and entry["input_tokens"] is not None:
+                return int(entry["input_tokens"])
+
+            if "total_tokens" in entry and entry["total_tokens"] is not None:
+                return int(entry["total_tokens"])
+
             # Check for token data in message structure
-            if 'messages' in entry and isinstance(entry['messages'], list):
+            if "messages" in entry and isinstance(entry["messages"], list):
                 total_tokens = 0
-                for message in entry['messages']:
-                    if isinstance(message, dict) and 'tokens' in message:
-                        if message['tokens'] is not None:
-                            total_tokens += int(message['tokens'])
+                for message in entry["messages"]:
+                    if isinstance(message, dict) and "tokens" in message:
+                        if message["tokens"] is not None:
+                            total_tokens += int(message["tokens"])
                 if total_tokens > 0:
                     return total_tokens
-            
+
             # ccusage approach: Return 0 when no actual token data is available
             # (no crude estimation fallbacks)
             return 0
-            
+
         except (ValueError, TypeError, KeyError) as e:
             logger.debug(f"Error extracting actual tokens: {e}")
             return 0
 
-    async def save_manifest(self, result: FileDiscoveryResult, output_path: str) -> bool:
+    async def save_manifest(
+        self, result: FileDiscoveryResult, output_path: str
+    ) -> bool:
         """Save discovery result as JSON manifest file."""
         try:
             async with aiofiles.open(output_path, "w", encoding="utf-8") as file:
-                await file.write(json.dumps(result.to_dict(), indent=2, ensure_ascii=False))
+                await file.write(
+                    json.dumps(result.to_dict(), indent=2, ensure_ascii=False)
+                )
 
             logger.info(f"Discovery manifest saved to: {output_path}")
             return True

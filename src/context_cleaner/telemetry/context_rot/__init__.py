@@ -8,43 +8,46 @@ from .widget import ContextRotWidget, ContextRotMeterData
 # Phase 2: ML Enhancement Exports
 try:
     from .ml_analysis import (
-        MLFrustrationDetector, 
-        SentimentPipeline, 
+        MLFrustrationDetector,
+        SentimentPipeline,
         ConversationFlowAnalyzer,
         FrustrationAnalysis,
-        SentimentScore
+        SentimentScore,
     )
     from .adaptive_thresholds import (
         AdaptiveThresholdManager,
-        UserBaselineTracker, 
+        UserBaselineTracker,
         ThresholdOptimizer,
         ThresholdConfig,
-        UserBaseline
+        UserBaseline,
     )
+
     ML_COMPONENTS_AVAILABLE = True
 except ImportError:
     ML_COMPONENTS_AVAILABLE = False
 
 __all__ = [
-    'ContextRotAnalyzer',
-    'SecureContextRotAnalyzer', 
-    'PrivacyConfig',
-    'ProductionReadyContextRotMonitor',
-    'ContextRotWidget',
-    'ContextRotMeterData'
+    "ContextRotAnalyzer",
+    "SecureContextRotAnalyzer",
+    "PrivacyConfig",
+    "ProductionReadyContextRotMonitor",
+    "ContextRotWidget",
+    "ContextRotMeterData",
 ]
 
 # Add ML components to exports if available
 if ML_COMPONENTS_AVAILABLE:
-    __all__.extend([
-        'MLFrustrationDetector',
-        'SentimentPipeline',
-        'ConversationFlowAnalyzer', 
-        'FrustrationAnalysis',
-        'SentimentScore',
-        'AdaptiveThresholdManager',
-        'UserBaselineTracker',
-        'ThresholdOptimizer',
-        'ThresholdConfig',
-        'UserBaseline'
-    ])
+    __all__.extend(
+        [
+            "MLFrustrationDetector",
+            "SentimentPipeline",
+            "ConversationFlowAnalyzer",
+            "FrustrationAnalysis",
+            "SentimentScore",
+            "AdaptiveThresholdManager",
+            "UserBaselineTracker",
+            "ThresholdOptimizer",
+            "ThresholdConfig",
+            "UserBaseline",
+        ]
+    )

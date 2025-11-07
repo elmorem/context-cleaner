@@ -45,7 +45,7 @@ config = ContextCleanerConfig(
 | `tracking.session_timeout` | `int` | `1800` | Session timeout in seconds |
 | `privacy.data_retention_days` | `int` | `90` | Data retention period |
 | `performance.max_memory_mb` | `int` | `50` | Maximum memory usage |
-| `dashboard.port` | `int` | `8546` | Dashboard server port |
+| `dashboard.port` | `int` | `8110` | Dashboard server port |
 | `dashboard.theme` | `str` | `dark` | Dashboard theme |
 
 ### `SessionTracker`
@@ -375,7 +375,7 @@ Context Cleaner can be configured using environment variables:
 | `CONTEXT_CLEANER_DATA_DIR` | Data directory path | `~/.context_cleaner` |
 | `CONTEXT_CLEANER_DEBUG` | Enable debug logging | `False` |
 | `CONTEXT_CLEANER_TRACKING_ENABLED` | Enable tracking | `True` |
-| `CONTEXT_CLEANER_DASHBOARD_PORT` | Dashboard port | `8546` |
+| `CONTEXT_CLEANER_DASHBOARD_PORT` | Dashboard port | `8110` |
 | `CONTEXT_CLEANER_RETENTION_DAYS` | Data retention period | `90` |
 
 ---

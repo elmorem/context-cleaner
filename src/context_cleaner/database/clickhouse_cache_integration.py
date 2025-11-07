@@ -25,7 +25,9 @@ class ClickHouseCacheIntegration:
     with optimized TTL management and cache invalidation.
     """
 
-    def __init__(self, clickhouse_client: ClickHouseClient, cache_service: CacheService):
+    def __init__(
+        self, clickhouse_client: ClickHouseClient, cache_service: CacheService
+    ):
         """Initialize cache integration with ClickHouse client and cache service."""
         self.clickhouse_client = clickhouse_client
         self.cache_service = cache_service
@@ -36,39 +38,40 @@ class ClickHouseCacheIntegration:
         # Cache TTL strategies for different query types
         self.cache_strategies = {
             # Dashboard queries - frequent access, short TTL for real-time feel
-            'dashboard_overview': 60,       # 1 minute
-            'widget_data': 30,              # 30 seconds
-            'health_metrics': 15,           # 15 seconds
-
+            "dashboard_overview": 60,  # 1 minute
+            "widget_data": 30,  # 30 seconds
+            "health_metrics": 15,  # 15 seconds
             # Analytics queries - moderate frequency, longer TTL
-            'cost_trends': 300,             # 5 minutes
-            'usage_stats': 180,             # 3 minutes
-            'model_statistics': 240,        # 4 minutes
-            'token_analysis': 600,          # 10 minutes
-
+            "cost_trends": 300,  # 5 minutes
+            "usage_stats": 180,  # 3 minutes
+            "model_statistics": 240,  # 4 minutes
+            "token_analysis": 600,  # 10 minutes
             # Heavy aggregation queries - low frequency, long TTL
-            'aggregated_metrics': 900,      # 15 minutes
-            'historical_analysis': 1800,    # 30 minutes
-            'bulk_statistics': 3600,        # 1 hour
-
+            "aggregated_metrics": 900,  # 15 minutes
+            "historical_analysis": 1800,  # 30 minutes
+            "bulk_statistics": 3600,  # 1 hour
             # System queries - very long TTL
-            'schema_info': 7200,            # 2 hours
-            'table_metadata': 3600,         # 1 hour
+            "schema_info": 7200,  # 2 hours
+            "table_metadata": 3600,  # 1 hour
         }
 
         # Performance monitoring
         self.performance_stats = {
-            'queries_cached': 0,
-            'cache_hits': 0,
-            'cache_misses': 0,
-            'cache_invalidations': 0,
-            'total_cache_time_saved_ms': 0
+            "queries_cached": 0,
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "cache_invalidations": 0,
+            "total_cache_time_saved_ms": 0,
         }
 
         logger.info("ClickHouse cache integration initialized successfully")
 
-    def generate_cache_key(self, query: str, params: Optional[Dict[str, Any]] = None,
-                         query_type: str = 'general') -> str:
+    def generate_cache_key(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]] = None,
+        query_type: str = "general",
+    ) -> str:
         """
         Generate intelligent cache key based on query, parameters, and type.
 
@@ -81,14 +84,14 @@ class ClickHouseCacheIntegration:
             Cache key string
         """
         # Normalize query for consistent caching
-        normalized_query = ' '.join(query.strip().split())
+        normalized_query = " ".join(query.strip().split())
 
         # Create hash components
         query_hash = hashlib.sha256(normalized_query.encode()).hexdigest()[:16]
 
-        params_hash = ''
+        params_hash = ""
         if params:
-            params_str = json.dumps(params, sort_keys=True, separators=(',', ':'))
+            params_str = json.dumps(params, sort_keys=True, separators=(",", ":"))
             params_hash = hashlib.sha256(params_str.encode()).hexdigest()[:8]
 
         # Generate cache key with namespace
@@ -98,9 +101,13 @@ class ClickHouseCacheIntegration:
 
         return cache_key
 
-    async def execute_cached_query(self, query: str, params: Optional[Dict[str, Any]] = None,
-                                 query_type: str = 'general',
-                                 force_refresh: bool = False) -> List[Dict[str, Any]]:
+    async def execute_cached_query(
+        self,
+        query: str,
+        params: Optional[Dict[str, Any]] = None,
+        query_type: str = "general",
+        force_refresh: bool = False,
+    ) -> List[Dict[str, Any]]:
         """
         Execute query with intelligent caching.
 
@@ -126,17 +133,21 @@ class ClickHouseCacheIntegration:
             try:
                 cached_result = await self.cache_service.get(cache_key)
                 if cached_result is not None:
-                    self.performance_stats['cache_hits'] += 1
-                    cache_time_saved = (datetime.now() - start_time).total_seconds() * 1000
-                    self.performance_stats['total_cache_time_saved_ms'] += cache_time_saved
+                    self.performance_stats["cache_hits"] += 1
+                    cache_time_saved = (
+                        datetime.now() - start_time
+                    ).total_seconds() * 1000
+                    self.performance_stats[
+                        "total_cache_time_saved_ms"
+                    ] += cache_time_saved
 
                     logger.debug(f"Cache hit for {query_type}: {cache_key}")
                     return cached_result
                 else:
-                    self.performance_stats['cache_misses'] += 1
+                    self.performance_stats["cache_misses"] += 1
             except Exception as e:
                 logger.warning(f"Cache retrieval error for {cache_key}: {e}")
-                self.performance_stats['cache_misses'] += 1
+                self.performance_stats["cache_misses"] += 1
 
         # Execute query with ClickHouse client
         try:
@@ -148,7 +159,7 @@ class ClickHouseCacheIntegration:
             if results:  # Only cache non-empty results
                 try:
                     await self.cache_service.set(cache_key, results, cache_ttl)
-                    self.performance_stats['queries_cached'] += 1
+                    self.performance_stats["queries_cached"] += 1
                     logger.debug(f"Cached {query_type} query result: {cache_key}")
                 except Exception as e:
                     logger.warning(f"Cache storage error for {cache_key}: {e}")
@@ -173,7 +184,7 @@ class ClickHouseCacheIntegration:
         try:
             success = await self.cache_service.invalidate(f"clickhouse:{pattern}")
             if success:
-                self.performance_stats['cache_invalidations'] += 1
+                self.performance_stats["cache_invalidations"] += 1
                 logger.info(f"Invalidated cache pattern: {pattern}")
             return success
         except Exception as e:
@@ -192,7 +203,9 @@ class ClickHouseCacheIntegration:
         """
         return await self.invalidate_cache_pattern(f"{query_type}:*")
 
-    async def warm_dashboard_cache(self, dashboard_queries: Dict[str, str]) -> Dict[str, bool]:
+    async def warm_dashboard_cache(
+        self, dashboard_queries: Dict[str, str]
+    ) -> Dict[str, bool]:
         """
         Pre-warm cache with common dashboard queries.
 
@@ -206,14 +219,18 @@ class ClickHouseCacheIntegration:
 
         for query_type, query in dashboard_queries.items():
             try:
-                await self.execute_cached_query(query, query_type=query_type, force_refresh=True)
+                await self.execute_cached_query(
+                    query, query_type=query_type, force_refresh=True
+                )
                 results[query_type] = True
                 logger.debug(f"Cache warmed for {query_type}")
             except Exception as e:
                 logger.error(f"Cache warming failed for {query_type}: {e}")
                 results[query_type] = False
 
-        logger.info(f"Cache warming completed: {sum(results.values())}/{len(results)} successful")
+        logger.info(
+            f"Cache warming completed: {sum(results.values())}/{len(results)} successful"
+        )
         return results
 
     async def get_cache_performance_stats(self) -> Dict[str, Any]:
@@ -226,63 +243,79 @@ class ClickHouseCacheIntegration:
             clickhouse_stats = await self.clickhouse_client.get_performance_stats()
 
             # Calculate cache efficiency metrics
-            total_queries = self.performance_stats['cache_hits'] + self.performance_stats['cache_misses']
+            total_queries = (
+                self.performance_stats["cache_hits"]
+                + self.performance_stats["cache_misses"]
+            )
             cache_hit_rate = 0.0
             if total_queries > 0:
-                cache_hit_rate = (self.performance_stats['cache_hits'] / total_queries) * 100
+                cache_hit_rate = (
+                    self.performance_stats["cache_hits"] / total_queries
+                ) * 100
 
             return {
-                'cache_integration': {
-                    'queries_cached': self.performance_stats['queries_cached'],
-                    'cache_hits': self.performance_stats['cache_hits'],
-                    'cache_misses': self.performance_stats['cache_misses'],
-                    'cache_hit_rate_percent': round(cache_hit_rate, 2),
-                    'cache_invalidations': self.performance_stats['cache_invalidations'],
-                    'total_cache_time_saved_ms': self.performance_stats['total_cache_time_saved_ms'],
-                    'average_time_saved_per_hit_ms': round(
-                        self.performance_stats['total_cache_time_saved_ms'] /
-                        max(self.performance_stats['cache_hits'], 1), 2
-                    )
+                "cache_integration": {
+                    "queries_cached": self.performance_stats["queries_cached"],
+                    "cache_hits": self.performance_stats["cache_hits"],
+                    "cache_misses": self.performance_stats["cache_misses"],
+                    "cache_hit_rate_percent": round(cache_hit_rate, 2),
+                    "cache_invalidations": self.performance_stats[
+                        "cache_invalidations"
+                    ],
+                    "total_cache_time_saved_ms": self.performance_stats[
+                        "total_cache_time_saved_ms"
+                    ],
+                    "average_time_saved_per_hit_ms": round(
+                        self.performance_stats["total_cache_time_saved_ms"]
+                        / max(self.performance_stats["cache_hits"], 1),
+                        2,
+                    ),
                 },
-                'cache_service_stats': cache_stats,
-                'clickhouse_stats': clickhouse_stats,
-                'cache_strategies': self.cache_strategies
+                "cache_service_stats": cache_stats,
+                "clickhouse_stats": clickhouse_stats,
+                "cache_strategies": self.cache_strategies,
             }
 
         except Exception as e:
             logger.error(f"Error getting cache performance stats: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}
 
-    def optimize_for_workload(self, workload_type: str = 'dashboard'):
+    def optimize_for_workload(self, workload_type: str = "dashboard"):
         """
         Optimize cache strategies for specific workload patterns.
 
         Args:
             workload_type: Type of workload ('dashboard', 'analytics', 'bulk')
         """
-        if workload_type == 'dashboard':
+        if workload_type == "dashboard":
             # Optimize for real-time dashboard responsiveness
-            self.cache_strategies.update({
-                'dashboard_overview': 30,   # Even shorter for real-time feel
-                'widget_data': 15,          # Very short for responsive widgets
-                'health_metrics': 10,       # Almost real-time health data
-            })
+            self.cache_strategies.update(
+                {
+                    "dashboard_overview": 30,  # Even shorter for real-time feel
+                    "widget_data": 15,  # Very short for responsive widgets
+                    "health_metrics": 10,  # Almost real-time health data
+                }
+            )
 
-        elif workload_type == 'analytics':
+        elif workload_type == "analytics":
             # Optimize for analytical workloads with longer TTLs
-            self.cache_strategies.update({
-                'token_analysis': 1200,     # 20 minutes
-                'cost_trends': 600,         # 10 minutes
-                'usage_stats': 900,         # 15 minutes
-            })
+            self.cache_strategies.update(
+                {
+                    "token_analysis": 1200,  # 20 minutes
+                    "cost_trends": 600,  # 10 minutes
+                    "usage_stats": 900,  # 15 minutes
+                }
+            )
 
-        elif workload_type == 'bulk':
+        elif workload_type == "bulk":
             # Optimize for bulk processing with very long TTLs
-            self.cache_strategies.update({
-                'bulk_statistics': 7200,    # 2 hours
-                'historical_analysis': 3600, # 1 hour
-                'aggregated_metrics': 1800, # 30 minutes
-            })
+            self.cache_strategies.update(
+                {
+                    "bulk_statistics": 7200,  # 2 hours
+                    "historical_analysis": 3600,  # 1 hour
+                    "aggregated_metrics": 1800,  # 30 minutes
+                }
+            )
 
         # Apply optimizations to ClickHouse client
         self.clickhouse_client.optimize_for_dashboard_queries()
@@ -296,11 +329,11 @@ class ClickHouseCacheIntegration:
             if success:
                 # Reset performance stats
                 self.performance_stats = {
-                    'queries_cached': 0,
-                    'cache_hits': 0,
-                    'cache_misses': 0,
-                    'cache_invalidations': 0,
-                    'total_cache_time_saved_ms': 0
+                    "queries_cached": 0,
+                    "cache_hits": 0,
+                    "cache_misses": 0,
+                    "cache_invalidations": 0,
+                    "total_cache_time_saved_ms": 0,
                 }
                 logger.info("All ClickHouse cache cleared")
             return success
@@ -319,33 +352,41 @@ class ClickHouseCacheIntegration:
             set_success = await self.cache_service.set(test_key, test_data, 60)
 
             # Test cache get
-            retrieved_data = await self.cache_service.get(test_key) if set_success else None
+            retrieved_data = (
+                await self.cache_service.get(test_key) if set_success else None
+            )
             get_success = retrieved_data is not None
 
             # Test cache invalidation
-            invalidate_success = await self.cache_service.invalidate(test_key) if get_success else False
+            invalidate_success = (
+                await self.cache_service.invalidate(test_key) if get_success else False
+            )
 
             # Test ClickHouse connectivity
-            clickhouse_health = await self.clickhouse_client.comprehensive_health_check()
+            clickhouse_health = (
+                await self.clickhouse_client.comprehensive_health_check()
+            )
 
             return {
-                'cache_integration_healthy': set_success and get_success and invalidate_success,
-                'cache_operations': {
-                    'set_success': set_success,
-                    'get_success': get_success,
-                    'invalidate_success': invalidate_success
+                "cache_integration_healthy": set_success
+                and get_success
+                and invalidate_success,
+                "cache_operations": {
+                    "set_success": set_success,
+                    "get_success": get_success,
+                    "invalidate_success": invalidate_success,
                 },
-                'clickhouse_health': clickhouse_health,
-                'performance_stats': self.performance_stats,
-                'timestamp': datetime.now().isoformat()
+                "clickhouse_health": clickhouse_health,
+                "performance_stats": self.performance_stats,
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return {
-                'cache_integration_healthy': False,
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
+                "cache_integration_healthy": False,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat(),
             }
 
 
@@ -356,7 +397,7 @@ async def create_clickhouse_cache_integration(
     clickhouse_database: str = "otel",
     redis_url: str = "redis://localhost:6379",
     max_connections: int = 10,
-    enable_query_caching: bool = True
+    enable_query_caching: bool = True,
 ) -> ClickHouseCacheIntegration:
     """
     Factory function to create a fully configured ClickHouse cache integration.
@@ -382,7 +423,7 @@ async def create_clickhouse_cache_integration(
             port=clickhouse_port,
             database=clickhouse_database,
             max_connections=max_connections,
-            enable_query_caching=enable_query_caching
+            enable_query_caching=enable_query_caching,
         )
 
         # Initialize ClickHouse client
@@ -392,7 +433,7 @@ async def create_clickhouse_cache_integration(
         integration = ClickHouseCacheIntegration(clickhouse_client, cache_service)
 
         # Optimize for dashboard workload by default
-        integration.optimize_for_workload('dashboard')
+        integration.optimize_for_workload("dashboard")
 
         logger.info("ClickHouse cache integration created successfully")
         return integration

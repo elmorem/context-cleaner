@@ -1,13 +1,15 @@
 """Advanced queries for complete content analysis."""
+
 from typing import List, Dict, Any, Optional
 from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
 
+
 class FullContentQueries:
     """Advanced queries for complete content analysis."""
-    
+
     def __init__(self, clickhouse_client: ClickHouseClient):
         self.clickhouse = clickhouse_client
-    
+
     async def get_complete_conversation(self, session_id: str) -> List[Dict[str, Any]]:
         """Get COMPLETE conversation content for a session."""
         query = """
@@ -27,10 +29,12 @@ class FullContentQueries:
         WHERE session_id = {session_id:String}
         ORDER BY timestamp ASC
         """
-        
-        return await self.clickhouse.execute_query(query, {'session_id': session_id})
-    
-    async def search_conversation_content(self, search_term: str, limit: int = 50) -> List[Dict[str, Any]]:
+
+        return await self.clickhouse.execute_query(query, {"session_id": session_id})
+
+    async def search_conversation_content(
+        self, search_term: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
         """Search through ACTUAL message content across all conversations."""
         query = """
         SELECT 
@@ -52,12 +56,11 @@ class FullContentQueries:
         ORDER BY timestamp DESC
         LIMIT {limit:UInt32}
         """
-        
-        return await self.clickhouse.execute_query(query, {
-            'search_term': search_term,
-            'limit': limit
-        })
-    
+
+        return await self.clickhouse.execute_query(
+            query, {"search_term": search_term, "limit": limit}
+        )
+
     async def get_complete_file_history(self, file_path: str) -> List[Dict[str, Any]]:
         """Get COMPLETE file content history with full contents."""
         query = """
@@ -77,10 +80,12 @@ class FullContentQueries:
         WHERE file_path = {file_path:String}
         ORDER BY timestamp DESC
         """
-        
-        return await self.clickhouse.execute_query(query, {'file_path': file_path})
-    
-    async def search_file_content(self, search_term: str, language: Optional[str] = None) -> List[Dict[str, Any]]:
+
+        return await self.clickhouse.execute_query(query, {"file_path": file_path})
+
+    async def search_file_content(
+        self, search_term: str, language: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Search through ACTUAL file contents."""
         query = """
         SELECT 
@@ -102,18 +107,18 @@ class FullContentQueries:
         ORDER BY timestamp DESC
         LIMIT 100
         """
-        
+
         language_filter = ""
-        params = {'search_term': search_term}
-        
+        params = {"search_term": search_term}
+
         if language:
             language_filter = "AND programming_language = {language:String}"
-            params['language'] = language
-        
+            params["language"] = language
+
         formatted_query = query.format(language_filter=language_filter)
-        
+
         return await self.clickhouse.execute_query(formatted_query, params)
-    
+
     async def analyze_code_patterns(self, language: str) -> Dict[str, Any]:
         """Analyze patterns in ACTUAL code content."""
         query = """
@@ -156,11 +161,13 @@ class FullContentQueries:
             
         FROM function_matches
         """
-        
-        results = await self.clickhouse.execute_query(query, {'language': language})
+
+        results = await self.clickhouse.execute_query(query, {"language": language})
         return results[0] if results else {}
-    
-    async def get_tool_execution_analysis(self, tool_name: Optional[str] = None) -> Dict[str, Any]:
+
+    async def get_tool_execution_analysis(
+        self, tool_name: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Analyze COMPLETE tool execution results."""
         query = """
         SELECT 
@@ -181,22 +188,22 @@ class FullContentQueries:
         GROUP BY tool_name
         ORDER BY execution_count DESC
         """
-        
+
         tool_filter = ""
         params = {}
-        
+
         if tool_name:
             tool_filter = "WHERE tool_name = {tool_name:String}"
-            params['tool_name'] = tool_name
-        
+            params["tool_name"] = tool_name
+
         formatted_query = query.format(tool_filter=tool_filter)
-        
+
         return await self.clickhouse.execute_query(formatted_query, params)
-    
+
     async def get_content_statistics(self) -> Dict[str, Any]:
         """Get comprehensive content statistics."""
         stats = {}
-        
+
         # Message content statistics
         message_stats_query = """
         SELECT 
@@ -215,10 +222,10 @@ class FullContentQueries:
         FROM otel.claude_message_content
         WHERE timestamp >= now() - INTERVAL 30 DAY
         """
-        
+
         message_stats = await self.clickhouse.execute_query(message_stats_query)
-        stats['messages'] = message_stats[0] if message_stats else {}
-        
+        stats["messages"] = message_stats[0] if message_stats else {}
+
         # File content statistics
         file_stats_query = """
         SELECT 
@@ -236,10 +243,10 @@ class FullContentQueries:
         FROM otel.claude_file_content
         WHERE timestamp >= now() - INTERVAL 30 DAY
         """
-        
+
         file_stats = await self.clickhouse.execute_query(file_stats_query)
-        stats['files'] = file_stats[0] if file_stats else {}
-        
+        stats["files"] = file_stats[0] if file_stats else {}
+
         # Tool execution statistics
         tool_stats_query = """
         SELECT 
@@ -255,12 +262,12 @@ class FullContentQueries:
         FROM otel.claude_tool_results
         WHERE timestamp >= now() - INTERVAL 30 DAY
         """
-        
+
         tool_stats = await self.clickhouse.execute_query(tool_stats_query)
-        stats['tools'] = tool_stats[0] if tool_stats else {}
-        
+        stats["tools"] = tool_stats[0] if tool_stats else {}
+
         return stats
-    
+
     async def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent conversation sessions with basic metadata."""
         query = f"""
@@ -282,5 +289,5 @@ class FullContentQueries:
         ORDER BY session_start DESC
         LIMIT {limit}
         """
-        
+
         return await self.clickhouse.execute_query(query)

@@ -61,7 +61,7 @@ class SessionCacheParser:
 
             # Detect file type before parsing
             file_metadata = self.summary_parser.detect_file_type(file_path)
-            
+
             # Skip summary files gracefully without warnings
             if file_metadata.file_type == FileType.SUMMARY:
                 logger.debug(f"Skipping summary file (not a conversation): {file_path}")
@@ -236,7 +236,7 @@ class SessionCacheParser:
     def _parse_token_metrics(self, usage_data: Dict[str, Any]) -> TokenMetrics:
         """Parse comprehensive token usage metrics matching ccusage approach with validation."""
         cache_creation = usage_data.get("cache_creation", {})
-        
+
         def safe_int(value, default=0):
             """Safely convert value to int, handling malformed data."""
             try:
@@ -244,7 +244,7 @@ class SessionCacheParser:
             except (ValueError, TypeError):
                 logger.warning(f"Invalid token count value: {value}, using {default}")
                 return default
-        
+
         def safe_float(value, default=0.0):
             """Safely convert value to float, handling malformed data."""
             try:
@@ -256,14 +256,28 @@ class SessionCacheParser:
         return TokenMetrics(
             input_tokens=safe_int(usage_data.get("input_tokens")),
             output_tokens=safe_int(usage_data.get("output_tokens")),
-            cache_creation_input_tokens=safe_int(usage_data.get("cache_creation_input_tokens")),
+            cache_creation_input_tokens=safe_int(
+                usage_data.get("cache_creation_input_tokens")
+            ),
             cache_read_input_tokens=safe_int(usage_data.get("cache_read_input_tokens")),
-            ephemeral_5m_input_tokens=safe_int(cache_creation.get("ephemeral_5m_input_tokens")),
-            ephemeral_1h_input_tokens=safe_int(cache_creation.get("ephemeral_1h_input_tokens")),
+            ephemeral_5m_input_tokens=safe_int(
+                cache_creation.get("ephemeral_5m_input_tokens")
+            ),
+            ephemeral_1h_input_tokens=safe_int(
+                cache_creation.get("ephemeral_1h_input_tokens")
+            ),
             # Extract comprehensive ccusage-style fields with validation
             cost_usd=safe_float(usage_data.get("cost_usd")),
-            service_tier=usage_data.get("service_tier") if isinstance(usage_data.get("service_tier"), str) else None,
-            model_name=usage_data.get("model") if isinstance(usage_data.get("model"), str) else None,
+            service_tier=(
+                usage_data.get("service_tier")
+                if isinstance(usage_data.get("service_tier"), str)
+                else None
+            ),
+            model_name=(
+                usage_data.get("model")
+                if isinstance(usage_data.get("model"), str)
+                else None
+            ),
             # Handle alternative field names for backward compatibility
             cache_creation_tokens=safe_int(usage_data.get("cache_creation_tokens")),
             cache_read_tokens=safe_int(usage_data.get("cache_read_tokens")),
@@ -436,6 +450,7 @@ class SessionCacheParser:
 # ---------------------------------------------------------------------------
 # Legacy compatibility
 # ---------------------------------------------------------------------------
+
 
 class SessionParser(SessionCacheParser):
     """Backward-compatible alias for historical imports."""

@@ -27,7 +27,9 @@ from typing import Dict, Any, Optional, List
 import concurrent.futures
 
 from context_cleaner.api.models import (
-    create_no_data_error, create_unsupported_error, create_error_response
+    create_no_data_error,
+    create_unsupported_error,
+    create_error_response,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,14 +37,24 @@ logger = logging.getLogger(__name__)
 # Import telemetry components with graceful fallback
 try:
     from context_cleaner.telemetry.clients.clickhouse_client import ClickHouseClient
-    from context_cleaner.telemetry.cost_optimization.engine import CostOptimizationEngine
+    from context_cleaner.telemetry.cost_optimization.engine import (
+        CostOptimizationEngine,
+    )
     from context_cleaner.telemetry.error_recovery.manager import ErrorRecoveryManager
-    from context_cleaner.telemetry.dashboard.widgets import TelemetryWidgetManager, TelemetryWidgetType
+    from context_cleaner.telemetry.dashboard.widgets import (
+        TelemetryWidgetManager,
+        TelemetryWidgetType,
+    )
     from context_cleaner.telemetry.cost_optimization.models import BudgetConfig
-    from context_cleaner.telemetry.orchestration.task_orchestrator import TaskOrchestrator
+    from context_cleaner.telemetry.orchestration.task_orchestrator import (
+        TaskOrchestrator,
+    )
     from context_cleaner.telemetry.orchestration.workflow_learner import WorkflowLearner
     from context_cleaner.telemetry.orchestration.agent_selector import AgentSelector
-    from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import JsonlProcessorService
+    from context_cleaner.telemetry.jsonl_enhancement.jsonl_processor_service import (
+        JsonlProcessorService,
+    )
+
     TELEMETRY_DASHBOARD_AVAILABLE = True
 except ImportError as e:
     logger.info(f"Telemetry dashboard not available: {e}")
@@ -50,17 +62,33 @@ except ImportError as e:
 
     # Create stub classes when telemetry dashboard is not available
     class ClickHouseClient:
-        def __init__(self): pass
-        async def get_total_aggregated_stats(self): return {}
-        async def get_recent_errors(self, hours=24): return []
-        async def execute_query(self, query): return []
+        def __init__(self):
+            pass
+
+        async def get_total_aggregated_stats(self):
+            return {}
+
+        async def get_recent_errors(self, hours=24):
+            return []
+
+        async def execute_query(self, query):
+            return []
 
     class TelemetryWidgetManager:
-        def __init__(self, *args, **kwargs): pass
-        async def get_all_widget_data(self): return {}
-        async def get_widget_data(self, widget_type, **kwargs): return None
-        def get_data_freshness_report(self): return {}
-        def get_widget_health_summary(self): return {}
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def get_all_widget_data(self):
+            return {}
+
+        async def get_widget_data(self, widget_type, **kwargs):
+            return None
+
+        def get_data_freshness_report(self):
+            return {}
+
+        def get_widget_health_summary(self):
+            return {}
 
     class TelemetryWidgetType:
         COST_TRACKER = "cost_tracker"
@@ -101,16 +129,20 @@ class TelemetryInitializer:
                 daily_budget=10.0,
                 session_budget=2.0,
                 warning_threshold=0.8,
-                critical_threshold=0.95
+                critical_threshold=0.95,
             )
-            self.cost_engine = CostOptimizationEngine(self.telemetry_client, budget_config)
+            self.cost_engine = CostOptimizationEngine(
+                self.telemetry_client, budget_config
+            )
             self.recovery_manager = ErrorRecoveryManager(self.telemetry_client)
 
             # Initialize orchestration services
             try:
                 self.task_orchestrator = TaskOrchestrator(self.telemetry_client)
                 self.workflow_learner = WorkflowLearner(self.telemetry_client)
-                self.agent_selector = AgentSelector(self.telemetry_client, self.workflow_learner)
+                self.agent_selector = AgentSelector(
+                    self.telemetry_client, self.workflow_learner
+                )
                 logger.info("✅ Orchestration services initialized")
             except Exception as e:
                 logger.warning(f"Orchestration initialization failed: {e}")
@@ -120,9 +152,9 @@ class TelemetryInitializer:
                 self.telemetry_client,
                 cost_engine=self.cost_engine,
                 recovery_manager=self.recovery_manager,
-                task_orchestrator=getattr(self, 'task_orchestrator', None),
-                workflow_learner=getattr(self, 'workflow_learner', None),
-                agent_selector=getattr(self, 'agent_selector', None)
+                task_orchestrator=getattr(self, "task_orchestrator", None),
+                workflow_learner=getattr(self, "workflow_learner", None),
+                agent_selector=getattr(self, "agent_selector", None),
             )
 
             # Initialize JSONL processor for enhanced analytics
@@ -154,7 +186,7 @@ class TelemetryInitializer:
                 "workflow_learner": self.workflow_learner is not None,
                 "agent_selector": self.agent_selector is not None,
                 "jsonl_processor": self.jsonl_processor is not None,
-            }
+            },
         }
 
 
@@ -165,14 +197,18 @@ class TelemetryWidgetCoordinator:
     Implements WebSocket-first architecture with HTTP fallbacks
     """
 
-    def __init__(self, telemetry_initializer: TelemetryInitializer, realtime_manager=None):
+    def __init__(
+        self, telemetry_initializer: TelemetryInitializer, realtime_manager=None
+    ):
         self.telemetry = telemetry_initializer
         self.realtime_manager = realtime_manager
 
     async def get_all_widget_data(self) -> Dict[str, Any]:
         """Get all telemetry widget data with proper serialization"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
+            raise create_error_response(
+                "Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503
+            )
 
         try:
             widgets = await self.telemetry.telemetry_widgets.get_all_widget_data()
@@ -181,17 +217,19 @@ class TelemetryWidgetCoordinator:
             widgets_dict = {}
             for widget_type, widget_data in widgets.items():
                 widgets_dict[widget_type] = {
-                    'widget_type': widget_data.widget_type.value,
-                    'title': widget_data.title,
-                    'status': widget_data.status,
-                    'data': widget_data.data,
-                    'last_updated': widget_data.last_updated.isoformat(),
-                    'alerts': widget_data.alerts
+                    "widget_type": widget_data.widget_type.value,
+                    "title": widget_data.title,
+                    "status": widget_data.status,
+                    "data": widget_data.data,
+                    "last_updated": widget_data.last_updated.isoformat(),
+                    "alerts": widget_data.alerts,
                 }
 
             # WebSocket-first: Broadcast widget updates
             if self.realtime_manager:
-                self.realtime_manager.broadcast_widget_update("telemetry_widgets", widgets_dict)
+                self.realtime_manager.broadcast_widget_update(
+                    "telemetry_widgets", widgets_dict
+                )
 
             return widgets_dict
 
@@ -199,21 +237,25 @@ class TelemetryWidgetCoordinator:
             logger.error(f"Telemetry widgets failed: {e}")
             raise create_error_response(str(e), "TELEMETRY_ERROR")
 
-    async def get_widget_data_thread_safe(self, widget_type: str, **kwargs) -> Dict[str, Any]:
+    async def get_widget_data_thread_safe(
+        self, widget_type: str, **kwargs
+    ) -> Dict[str, Any]:
         """Get specific widget data with thread-safe execution"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
+            raise create_error_response(
+                "Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503
+            )
 
         widget_map = {
-            'error-monitor': 'ERROR_MONITOR',
-            'cost-tracker': 'COST_TRACKER',
-            'timeout-risk': 'TIMEOUT_RISK',
-            'tool-optimizer': 'TOOL_OPTIMIZER',
-            'model-efficiency': 'MODEL_EFFICIENCY',
-            'context-rot-meter': 'CONTEXT_ROT_METER',
-            'conversation-timeline': 'CONVERSATION_TIMELINE',
-            'code-pattern-analysis': 'CODE_PATTERN_ANALYSIS',
-            'content-search-widget': 'CONTENT_SEARCH_WIDGET'
+            "error-monitor": "ERROR_MONITOR",
+            "cost-tracker": "COST_TRACKER",
+            "timeout-risk": "TIMEOUT_RISK",
+            "tool-optimizer": "TOOL_OPTIMIZER",
+            "model-efficiency": "MODEL_EFFICIENCY",
+            "context-rot-meter": "CONTEXT_ROT_METER",
+            "conversation-timeline": "CONVERSATION_TIMELINE",
+            "code-pattern-analysis": "CODE_PATTERN_ANALYSIS",
+            "content-search-widget": "CONTENT_SEARCH_WIDGET",
         }
 
         if widget_type not in widget_map:
@@ -224,30 +266,36 @@ class TelemetryWidgetCoordinator:
 
             # Use thread-safe async execution
             try:
-                data = await self.telemetry.telemetry_widgets.get_widget_data(widget_enum, **kwargs)
+                data = await self.telemetry.telemetry_widgets.get_widget_data(
+                    widget_enum, **kwargs
+                )
             except RuntimeError:
                 # If we're in an async context, use thread executor
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         lambda: asyncio.run(
-                            self.telemetry.telemetry_widgets.get_widget_data(widget_enum, **kwargs)
+                            self.telemetry.telemetry_widgets.get_widget_data(
+                                widget_enum, **kwargs
+                            )
                         )
                     )
                     data = future.result(timeout=30)
 
             if data:
                 result = {
-                    'widget_type': data.widget_type.value,
-                    'title': data.title,
-                    'status': data.status,
-                    'data': data.data,
-                    'alerts': data.alerts,
-                    'last_updated': data.last_updated.isoformat()
+                    "widget_type": data.widget_type.value,
+                    "title": data.title,
+                    "status": data.status,
+                    "data": data.data,
+                    "alerts": data.alerts,
+                    "last_updated": data.last_updated.isoformat(),
                 }
 
                 # WebSocket-first: Broadcast specific widget updates
                 if self.realtime_manager:
-                    self.realtime_manager.broadcast_widget_update(f"telemetry_{widget_type}", result)
+                    self.realtime_manager.broadcast_widget_update(
+                        f"telemetry_{widget_type}", result
+                    )
 
                 return result
             else:
@@ -266,8 +314,8 @@ class TelemetryWidgetCoordinator:
                 "widgets_available": self.telemetry.telemetry_widgets is not None,
                 "debug_info": {
                     "clickhouse_available": TELEMETRY_DASHBOARD_AVAILABLE,
-                    "service_mode": "fallback"
-                }
+                    "service_mode": "fallback",
+                },
             }
 
         try:
@@ -288,7 +336,7 @@ class TelemetryWidgetCoordinator:
             return {
                 "error": "Telemetry not available",
                 "all_widgets_status": "offline",
-                "reason": "no_telemetry"
+                "reason": "no_telemetry",
             }
 
         try:
@@ -296,8 +344,12 @@ class TelemetryWidgetCoordinator:
 
             result = {
                 "widget_health": summary,
-                "overall_status": "mixed" if any("Error" in status for status in summary.values()) else "healthy",
-                "timestamp": datetime.now().isoformat()
+                "overall_status": (
+                    "mixed"
+                    if any("Error" in status for status in summary.values())
+                    else "healthy"
+                ),
+                "timestamp": datetime.now().isoformat(),
             }
 
             # WebSocket-first: Broadcast health updates
@@ -323,18 +375,22 @@ class TelemetryErrorTracker:
     async def get_cost_burnrate_data(self) -> Dict[str, Any]:
         """Get real-time cost burn rate data"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
+            raise create_error_response(
+                "Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503
+            )
 
         try:
-            cost_widget = await self.telemetry.telemetry_widgets.get_widget_data(TelemetryWidgetType.COST_TRACKER)
+            cost_widget = await self.telemetry.telemetry_widgets.get_widget_data(
+                TelemetryWidgetType.COST_TRACKER
+            )
 
             return {
-                'current_cost': cost_widget.data.get('current_session_cost', 0),
-                'burn_rate': cost_widget.data.get('burn_rate_per_hour', 0),
-                'budget_remaining': cost_widget.data.get('budget_remaining', 0),
-                'projection': cost_widget.data.get('cost_projection', 0),
-                'status': cost_widget.status,
-                'alerts': cost_widget.alerts
+                "current_cost": cost_widget.data.get("current_session_cost", 0),
+                "burn_rate": cost_widget.data.get("burn_rate_per_hour", 0),
+                "budget_remaining": cost_widget.data.get("budget_remaining", 0),
+                "projection": cost_widget.data.get("cost_projection", 0),
+                "status": cost_widget.status,
+                "alerts": cost_widget.alerts,
             }
         except Exception as e:
             logger.error(f"Cost burn rate failed: {e}")
@@ -343,18 +399,22 @@ class TelemetryErrorTracker:
     async def get_error_monitor_data(self) -> Dict[str, Any]:
         """Get error monitoring data"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_widgets:
-            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
+            raise create_error_response(
+                "Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503
+            )
 
         try:
-            error_widget = await self.telemetry.telemetry_widgets.get_widget_data(TelemetryWidgetType.ERROR_MONITOR)
+            error_widget = await self.telemetry.telemetry_widgets.get_widget_data(
+                TelemetryWidgetType.ERROR_MONITOR
+            )
 
             return {
-                'error_rate': error_widget.data.get('current_error_rate', 0),
-                'trend': error_widget.data.get('error_trend', 'stable'),
-                'recent_errors': error_widget.data.get('recent_errors', []),
-                'recovery_rate': error_widget.data.get('recovery_success_rate', 0),
-                'status': error_widget.status,
-                'alerts': error_widget.alerts
+                "error_rate": error_widget.data.get("current_error_rate", 0),
+                "trend": error_widget.data.get("error_trend", "stable"),
+                "recent_errors": error_widget.data.get("recent_errors", []),
+                "recovery_rate": error_widget.data.get("recovery_success_rate", 0),
+                "status": error_widget.status,
+                "alerts": error_widget.alerts,
             }
         except Exception as e:
             logger.error(f"Error monitor failed: {e}")
@@ -363,11 +423,15 @@ class TelemetryErrorTracker:
     async def get_detailed_error_analysis(self, hours: int = 24) -> Dict[str, Any]:
         """Get detailed error information for analysis with categorization"""
         if not self.telemetry.telemetry_enabled or not self.telemetry.telemetry_client:
-            raise create_error_response("Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503)
+            raise create_error_response(
+                "Telemetry service not available", "TELEMETRY_UNAVAILABLE", 503
+            )
 
         try:
             # Get detailed error events
-            recent_errors = await self.telemetry.telemetry_client.get_recent_errors(hours=hours)
+            recent_errors = await self.telemetry.telemetry_client.get_recent_errors(
+                hours=hours
+            )
 
             # Get error type breakdown
             error_breakdown_query = f"""
@@ -386,7 +450,9 @@ class TelemetryErrorTracker:
             LIMIT 20
             """
 
-            error_breakdown = await self.telemetry.telemetry_client.execute_query(error_breakdown_query)
+            error_breakdown = await self.telemetry.telemetry_client.execute_query(
+                error_breakdown_query
+            )
 
             # Process error types for categorization
             categorized_errors = self._categorize_errors(error_breakdown)
@@ -396,7 +462,7 @@ class TelemetryErrorTracker:
                 "error_breakdown": error_breakdown,
                 "categorized_errors": categorized_errors,
                 "analysis_period_hours": hours,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -408,19 +474,19 @@ class TelemetryErrorTracker:
         categorized_errors = {}
 
         for error in error_breakdown:
-            error_type = error['error_type'] or 'Unknown'
+            error_type = error["error_type"] or "Unknown"
 
             # Categorize error types
-            if '429' in error_type or 'rate_limit' in error_type.lower():
-                category = 'Rate Limiting'
-            elif '400' in error_type or 'invalid_request' in error_type.lower():
-                category = 'Invalid Request'
-            elif 'abort' in error_type.lower() or 'timeout' in error_type.lower():
-                category = 'Connection Issues'
-            elif '500' in error_type or 'internal_server' in error_type.lower():
-                category = 'Server Errors'
+            if "429" in error_type or "rate_limit" in error_type.lower():
+                category = "Rate Limiting"
+            elif "400" in error_type or "invalid_request" in error_type.lower():
+                category = "Invalid Request"
+            elif "abort" in error_type.lower() or "timeout" in error_type.lower():
+                category = "Connection Issues"
+            elif "500" in error_type or "internal_server" in error_type.lower():
+                category = "Server Errors"
             else:
-                category = 'Other'
+                category = "Other"
 
             if category not in categorized_errors:
                 categorized_errors[category] = []
@@ -428,30 +494,33 @@ class TelemetryErrorTracker:
             # Extract meaningful error message
             if '"message":"' in error_type:
                 try:
-                    parsed = json.loads(error_type.split(' ', 1)[1])
-                    message = parsed.get('error', {}).get('message', error_type)
+                    parsed = json.loads(error_type.split(" ", 1)[1])
+                    message = parsed.get("error", {}).get("message", error_type)
                 except:
                     message = error_type
             else:
                 message = error_type
 
             error_entry = {
-                'message': message,
-                'status_code': error['status_code'],
-                'count': int(error['count']),
-                'avg_duration_ms': float(error['avg_duration'] or 0),
-                'first_occurrence': error['first_occurrence'],
-                'last_occurrence': error['last_occurrence']
+                "message": message,
+                "status_code": error["status_code"],
+                "count": int(error["count"]),
+                "avg_duration_ms": float(error["avg_duration"] or 0),
+                "first_occurrence": error["first_occurrence"],
+                "last_occurrence": error["last_occurrence"],
             }
 
             # Add special handling for "prompt too long" errors
-            if 'prompt is too long' in error_type.lower():
+            if "prompt is too long" in error_type.lower():
                 import re
-                token_match = re.search(r'(\d+) tokens > (\d+) maximum', error_type)
+
+                token_match = re.search(r"(\d+) tokens > (\d+) maximum", error_type)
                 if token_match:
-                    error_entry['actual_tokens'] = int(token_match.group(1))
-                    error_entry['max_tokens'] = int(token_match.group(2))
-                    error_entry['token_excess'] = int(token_match.group(1)) - int(token_match.group(2))
+                    error_entry["actual_tokens"] = int(token_match.group(1))
+                    error_entry["max_tokens"] = int(token_match.group(2))
+                    error_entry["token_excess"] = int(token_match.group(1)) - int(
+                        token_match.group(2)
+                    )
 
             categorized_errors[category].append(error_entry)
 
@@ -472,7 +541,9 @@ class TelemetryFallbackProcessor:
         """Get dashboard metrics from local JSONL files when telemetry is unavailable"""
         try:
             # Import enhanced token counter and session parser for local analysis
-            from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+            from context_cleaner.analysis.enhanced_token_counter import (
+                get_accurate_token_count,
+            )
             from context_cleaner.analysis.session_parser import SessionParser
 
             # Find JSONL files in common directories
@@ -480,7 +551,7 @@ class TelemetryFallbackProcessor:
                 Path.home() / ".claude",
                 Path.home() / ".claude" / "contexts",
                 Path(os.getcwd()),
-                Path(os.getcwd()) / "contexts"
+                Path(os.getcwd()) / "contexts",
             ]
 
             total_tokens = 0
@@ -498,7 +569,9 @@ class TelemetryFallbackProcessor:
                 # Look for JSONL files recursively
                 jsonl_files = list(jsonl_dir.rglob("*.jsonl"))
 
-                for jsonl_file in jsonl_files[:10]:  # Limit to prevent performance issues
+                for jsonl_file in jsonl_files[
+                    :10
+                ]:  # Limit to prevent performance issues
                     try:
                         # Parse session data
                         session_data = session_parser.parse_session_file(jsonl_file)
@@ -506,16 +579,22 @@ class TelemetryFallbackProcessor:
                             total_sessions += 1
 
                             # Estimate token count
-                            file_content = jsonl_file.read_text(encoding='utf-8', errors='ignore')
-                            tokens = get_accurate_token_count(file_content[:10000])  # Sample first 10k chars
+                            file_content = jsonl_file.read_text(
+                                encoding="utf-8", errors="ignore"
+                            )
+                            tokens = get_accurate_token_count(
+                                file_content[:10000]
+                            )  # Sample first 10k chars
                             total_tokens += tokens
 
                             # Estimate cost (rough approximation)
-                            estimated_cost = tokens * 0.00001  # $0.01 per 1000 tokens approximation
+                            estimated_cost = (
+                                tokens * 0.00001
+                            )  # $0.01 per 1000 tokens approximation
                             total_cost += estimated_cost
 
                             # Check for errors in session
-                            if 'error' not in file_content.lower():
+                            if "error" not in file_content.lower():
                                 successful_sessions += 1
                             else:
                                 error_count += 1
@@ -524,7 +603,11 @@ class TelemetryFallbackProcessor:
                         logger.debug(f"Failed to parse {jsonl_file}: {e}")
                         continue
 
-            success_rate = (successful_sessions / total_sessions * 100) if total_sessions > 0 else 0
+            success_rate = (
+                (successful_sessions / total_sessions * 100)
+                if total_sessions > 0
+                else 0
+            )
 
             return {
                 "total_tokens": total_tokens,
@@ -535,7 +618,7 @@ class TelemetryFallbackProcessor:
                 "active_agents": 1,  # Local processing
                 "telemetry_status": "using-local-data",
                 "data_source": "local_jsonl",
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -554,21 +637,27 @@ class TelemetryFallbackProcessor:
             "telemetry_status": "unavailable",
             "data_source": "fallback",
             "last_updated": datetime.now().isoformat(),
-            "note": "Fallback metrics - actual telemetry unavailable"
+            "note": "Fallback metrics - actual telemetry unavailable",
         }
 
-    async def fetch_telemetry_stats_with_timeout(self, telemetry_client, timeout_seconds: int = 10) -> Dict[str, Any]:
+    async def fetch_telemetry_stats_with_timeout(
+        self, telemetry_client, timeout_seconds: int = 10
+    ) -> Dict[str, Any]:
         """Fetch telemetry stats with timeout fallback"""
         try:
             # Use timeout for telemetry operations
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 loop = asyncio.new_event_loop()
-                future = executor.submit(self._fetch_telemetry_stats, telemetry_client, loop)
+                future = executor.submit(
+                    self._fetch_telemetry_stats, telemetry_client, loop
+                )
 
                 try:
                     return future.result(timeout=timeout_seconds)
                 except concurrent.futures.TimeoutError:
-                    logger.warning(f"Telemetry fetch timed out after {timeout_seconds}s")
+                    logger.warning(
+                        f"Telemetry fetch timed out after {timeout_seconds}s"
+                    )
                     return self.get_local_jsonl_stats()
 
         except Exception as e:
@@ -578,9 +667,7 @@ class TelemetryFallbackProcessor:
     def _fetch_telemetry_stats(self, telemetry_client, loop) -> Dict[str, Any]:
         """Helper method to fetch telemetry stats in separate thread"""
         asyncio.set_event_loop(loop)
-        return loop.run_until_complete(
-            telemetry_client.get_total_aggregated_stats()
-        )
+        return loop.run_until_complete(telemetry_client.get_total_aggregated_stats())
 
 
 class DashboardTelemetry:
@@ -596,7 +683,9 @@ class DashboardTelemetry:
 
         # Initialize telemetry components
         self.initializer = TelemetryInitializer()
-        self.widget_coordinator = TelemetryWidgetCoordinator(self.initializer, realtime_manager)
+        self.widget_coordinator = TelemetryWidgetCoordinator(
+            self.initializer, realtime_manager
+        )
         self.error_tracker = TelemetryErrorTracker(self.initializer)
         self.fallback_processor = TelemetryFallbackProcessor()
 
@@ -606,12 +695,14 @@ class DashboardTelemetry:
     def get_initialization_status(self) -> Dict[str, Any]:
         """Get comprehensive telemetry initialization status"""
         status = self.initializer.get_initialization_status()
-        status.update({
-            "overall_telemetry_enabled": self.telemetry_enabled,
-            "widget_coordinator_ready": self.widget_coordinator is not None,
-            "error_tracker_ready": self.error_tracker is not None,
-            "fallback_processor_ready": self.fallback_processor is not None,
-        })
+        status.update(
+            {
+                "overall_telemetry_enabled": self.telemetry_enabled,
+                "widget_coordinator_ready": self.widget_coordinator is not None,
+                "error_tracker_ready": self.error_tracker is not None,
+                "fallback_processor_ready": self.fallback_processor is not None,
+            }
+        )
         return status
 
     async def get_all_widgets(self) -> Dict[str, Any]:
@@ -620,7 +711,9 @@ class DashboardTelemetry:
 
     async def get_widget_data(self, widget_type: str, **kwargs) -> Dict[str, Any]:
         """Get specific widget data with thread-safe execution"""
-        return await self.widget_coordinator.get_widget_data_thread_safe(widget_type, **kwargs)
+        return await self.widget_coordinator.get_widget_data_thread_safe(
+            widget_type, **kwargs
+        )
 
     async def get_cost_data(self) -> Dict[str, Any]:
         """Get cost monitoring data"""
@@ -648,7 +741,9 @@ class DashboardTelemetry:
             return self.dashboard_cache.clear_widget_cache()
         return False
 
-    async def get_dashboard_metrics_with_fallback(self, timeout_seconds: int = 10) -> Dict[str, Any]:
+    async def get_dashboard_metrics_with_fallback(
+        self, timeout_seconds: int = 10
+    ) -> Dict[str, Any]:
         """Get dashboard metrics with intelligent fallback to local data"""
         if not self.telemetry_enabled:
             return self.fallback_processor.get_local_jsonl_stats()
@@ -690,7 +785,7 @@ class TelemetryCoordinator:
                 "/api/telemetry/tool-analytics",
                 "/api/telemetry/model-analytics",
                 "/api/telemetry/model-detailed/<model_name>",
-                "/api/telemetry-widget/<widget_type>"
+                "/api/telemetry-widget/<widget_type>",
             ],
             "widget_types": [
                 "error-monitor",
@@ -701,7 +796,7 @@ class TelemetryCoordinator:
                 "context-rot-meter",
                 "conversation-timeline",
                 "code-pattern-analysis",
-                "content-search-widget"
+                "content-search-widget",
             ],
             "features": [
                 "Real-time error monitoring",
@@ -710,17 +805,24 @@ class TelemetryCoordinator:
                 "ClickHouse integration",
                 "Local JSONL fallback",
                 "WebSocket broadcasting",
-                "Thread-safe execution"
-            ]
+                "Thread-safe execution",
+            ],
         }
 
 
 class ModuleStatus:
     """Track module extraction status"""
+
     EXTRACTION_STATUS = "extracted"
-    ORIGINAL_LINES = 500  # Telemetry initialization, widgets, error tracking, fallback systems
+    ORIGINAL_LINES = (
+        500  # Telemetry initialization, widgets, error tracking, fallback systems
+    )
     TARGET_LINES = 500
-    REDUCTION_TARGET = "WebSocket-first telemetry with comprehensive monitoring and fallback"
+    REDUCTION_TARGET = (
+        "WebSocket-first telemetry with comprehensive monitoring and fallback"
+    )
 
 
-logger.info(f"dashboard_telemetry module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}")
+logger.info(
+    f"dashboard_telemetry module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}"
+)

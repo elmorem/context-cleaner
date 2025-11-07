@@ -128,10 +128,14 @@ def ensure_eventlet_monkey_patch(*, patch_threads: bool | None = None) -> None:
                             return threading.get_ident()
 
                     gevent_thread.get_ident = _safe_gevent_get_ident  # type: ignore[attr-defined]
-                    logger.debug("Patched gevent.thread.get_ident for Eventlet compatibility")
+                    logger.debug(
+                        "Patched gevent.thread.get_ident for Eventlet compatibility"
+                    )
                 else:
                     gevent_thread.get_ident = threading.get_ident  # type: ignore[attr-defined]
-                    logger.debug("Set gevent.thread.get_ident fallback to threading.get_ident")
+                    logger.debug(
+                        "Set gevent.thread.get_ident fallback to threading.get_ident"
+                    )
             except ImportError:
                 pass
 

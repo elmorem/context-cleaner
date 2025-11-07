@@ -52,45 +52,45 @@ class ProjectSummaryParser:
                     first_line_content={},
                     line_count=0,
                     file_size_bytes=0,
-                    last_modified=datetime.now()
+                    last_modified=datetime.now(),
                 )
 
             # Get file stats
             file_stat = file_path.stat()
             file_size_bytes = file_stat.st_size
             last_modified = datetime.fromtimestamp(file_stat.st_mtime)
-            
+
             # Read first line to determine file type
             first_line_content = {}
             line_count = 0
-            
+
             with open(file_path, "r", encoding="utf-8") as f:
                 for line_num, line in enumerate(f, 1):
                     line = line.strip()
                     if not line:
                         continue
-                    
+
                     line_count = line_num
-                    
+
                     # Parse first non-empty line
                     if line_num == 1 or not first_line_content:
                         try:
                             first_line_content = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-            
+
             # Determine file type based on first line content
             file_type = self._classify_file_type(first_line_content)
-            
+
             return FileMetadata(
                 file_path=str(file_path),
                 file_type=file_type,
                 first_line_content=first_line_content,
                 line_count=line_count,
                 file_size_bytes=file_size_bytes,
-                last_modified=last_modified
+                last_modified=last_modified,
             )
-            
+
         except Exception as e:
             logger.error(f"Error detecting file type for {file_path}: {e}")
             return FileMetadata(
@@ -99,7 +99,7 @@ class ProjectSummaryParser:
                 first_line_content={},
                 line_count=0,
                 file_size_bytes=0,
-                last_modified=datetime.now()
+                last_modified=datetime.now(),
             )
 
     def _classify_file_type(self, first_line: Dict[str, Any]) -> FileType:
@@ -114,17 +114,19 @@ class ProjectSummaryParser:
         """
         if not first_line:
             return FileType.UNKNOWN
-            
+
         # Check for summary file indicators
         if first_line.get("type") == "summary":
             return FileType.SUMMARY
-            
+
         # Check for conversation file indicators
-        if (first_line.get("uuid") and 
-            first_line.get("timestamp") and 
-            ("message" in first_line or "type" in first_line)):
+        if (
+            first_line.get("uuid")
+            and first_line.get("timestamp")
+            and ("message" in first_line or "type" in first_line)
+        ):
             return FileType.CONVERSATION
-            
+
         return FileType.UNKNOWN
 
     def parse_summary_file(self, file_path: Path) -> List[ProjectSummary]:
@@ -189,7 +191,9 @@ class ProjectSummaryParser:
                         if data.get("type") == "summary":
                             yield data
                         else:
-                            logger.debug(f"Skipping non-summary line {line_num} in {file_path}")
+                            logger.debug(
+                                f"Skipping non-summary line {line_num} in {file_path}"
+                            )
 
                     except json.JSONDecodeError as e:
                         logger.warning(
@@ -206,7 +210,9 @@ class ProjectSummaryParser:
             logger.error(f"Error reading summary file {file_path}: {e}")
             return
 
-    def _parse_summary_data(self, data: Dict[str, Any], file_path: Path) -> Optional[ProjectSummary]:
+    def _parse_summary_data(
+        self, data: Dict[str, Any], file_path: Path
+    ) -> Optional[ProjectSummary]:
         """
         Parse a single summary from JSON data.
 
@@ -222,17 +228,17 @@ class ProjectSummaryParser:
             uuid = data.get("uuid", f"summary_{file_path.stem}")
             leaf_uuid = data.get("leafUuid", "")
             summary_text = data.get("summary", "")
-            
+
             if not summary_text:
                 logger.warning(f"Summary missing text content in {file_path}")
                 return None
 
             # Determine summary type
             summary_type = SummaryType.SUMMARY  # Default type
-            
+
             # Extract project path if available
             project_path = str(file_path.parent) if file_path else None
-            
+
             # Generate timestamp (use file modification time if not available)
             timestamp = datetime.now()
             if file_path and file_path.exists():
@@ -242,7 +248,9 @@ class ProjectSummaryParser:
             tags = self._extract_tags(summary_text)
 
             # Determine completion status
-            completion_status = "completed" if self._is_completed(summary_text) else "in_progress"
+            completion_status = (
+                "completed" if self._is_completed(summary_text) else "in_progress"
+            )
 
             return ProjectSummary(
                 uuid=uuid,
@@ -253,7 +261,7 @@ class ProjectSummaryParser:
                 timestamp=timestamp,
                 project_path=project_path,
                 tags=tags,
-                completion_status=completion_status
+                completion_status=completion_status,
             )
 
         except Exception as e:
@@ -264,20 +272,31 @@ class ProjectSummaryParser:
         """Extract relevant tags from summary text."""
         tags = []
         text_lower = summary_text.lower()
-        
+
         # Technology tags
         tech_keywords = {
-            "python": "python", "javascript": "javascript", "typescript": "typescript",
-            "react": "react", "django": "django", "flask": "flask", "fastapi": "fastapi",
-            "node": "nodejs", "docker": "docker", "kubernetes": "kubernetes",
-            "postgres": "postgresql", "mysql": "mysql", "redis": "redis",
-            "aws": "aws", "azure": "azure", "gcp": "gcp"
+            "python": "python",
+            "javascript": "javascript",
+            "typescript": "typescript",
+            "react": "react",
+            "django": "django",
+            "flask": "flask",
+            "fastapi": "fastapi",
+            "node": "nodejs",
+            "docker": "docker",
+            "kubernetes": "kubernetes",
+            "postgres": "postgresql",
+            "mysql": "mysql",
+            "redis": "redis",
+            "aws": "aws",
+            "azure": "azure",
+            "gcp": "gcp",
         }
-        
+
         for keyword, tag in tech_keywords.items():
             if keyword in text_lower:
                 tags.append(tag)
-        
+
         # Feature type tags
         if any(word in text_lower for word in ["auth", "login", "security"]):
             tags.append("authentication")
@@ -289,14 +308,21 @@ class ProjectSummaryParser:
             tags.append("database")
         if any(word in text_lower for word in ["test", "testing", "spec"]):
             tags.append("testing")
-            
+
         return list(set(tags))  # Remove duplicates
 
     def _is_completed(self, summary_text: str) -> bool:
         """Check if project appears to be completed based on summary text."""
         completed_indicators = [
-            "completed", "finished", "done", "fixed", "implemented",
-            "deployed", "released", "resolved", "solved"
+            "completed",
+            "finished",
+            "done",
+            "fixed",
+            "implemented",
+            "deployed",
+            "released",
+            "resolved",
+            "solved",
         ]
         text_lower = summary_text.lower()
         return any(indicator in text_lower for indicator in completed_indicators)

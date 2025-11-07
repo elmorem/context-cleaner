@@ -15,11 +15,18 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import croniter
 import json
-from .task_processing import Task, TaskResult, TaskStatus, TaskPriority, AdvancedTaskProcessor
+from .task_processing import (
+    Task,
+    TaskResult,
+    TaskStatus,
+    TaskPriority,
+    AdvancedTaskProcessor,
+)
 
 
 class ScheduleType(Enum):
     """Types of task scheduling"""
+
     IMMEDIATE = "immediate"
     DELAYED = "delayed"
     PERIODIC = "periodic"
@@ -30,6 +37,7 @@ class ScheduleType(Enum):
 
 class RetryStrategy(Enum):
     """Retry strategy types"""
+
     EXPONENTIAL_BACKOFF = "exponential_backoff"
     LINEAR_BACKOFF = "linear_backoff"
     FIXED_DELAY = "fixed_delay"
@@ -39,6 +47,7 @@ class RetryStrategy(Enum):
 
 class TaskLifecycleState(Enum):
     """Extended task lifecycle states"""
+
     SCHEDULED = "scheduled"
     WAITING_DEPENDENCIES = "waiting_dependencies"
     READY = "ready"
@@ -55,6 +64,7 @@ class TaskLifecycleState(Enum):
 @dataclass
 class RetryConfig:
     """Configuration for retry behavior"""
+
     strategy: RetryStrategy
     max_attempts: int = 3
     base_delay: float = 1.0
@@ -68,6 +78,7 @@ class RetryConfig:
 @dataclass
 class ScheduleConfig:
     """Configuration for task scheduling"""
+
     schedule_type: ScheduleType
     execute_at: Optional[datetime] = None
     delay_seconds: Optional[float] = None
@@ -83,6 +94,7 @@ class ScheduleConfig:
 @dataclass
 class ScheduledTask:
     """Extended task with scheduling and retry information"""
+
     base_task: Task
     schedule_config: ScheduleConfig
     retry_config: RetryConfig
@@ -110,7 +122,9 @@ class ScheduledTask:
             return False
         return self.base_task.priority.value < other.base_task.priority.value
 
-    def update_state(self, new_state: TaskLifecycleState, error: Optional[Exception] = None):
+    def update_state(
+        self, new_state: TaskLifecycleState, error: Optional[Exception] = None
+    ):
         """Update task state and metadata"""
         self.state = new_state
         self.updated_at = datetime.utcnow()
@@ -124,11 +138,17 @@ class ScheduledTask:
         if self.state not in [TaskLifecycleState.READY, TaskLifecycleState.RETRYING]:
             return False
 
-        if self.schedule_config.expire_at and datetime.utcnow() > self.schedule_config.expire_at:
+        if (
+            self.schedule_config.expire_at
+            and datetime.utcnow() > self.schedule_config.expire_at
+        ):
             self.update_state(TaskLifecycleState.EXPIRED)
             return False
 
-        if self.schedule_config.max_executions and self.execution_count >= self.schedule_config.max_executions:
+        if (
+            self.schedule_config.max_executions
+            and self.execution_count >= self.schedule_config.max_executions
+        ):
             return False
 
         if self.next_execution and datetime.utcnow() < self.next_execution:
@@ -143,7 +163,10 @@ class ScheduledTask:
 
         # Check if error type is in retry list
         error_type = type(error)
-        return any(issubclass(error_type, exc_type) for exc_type in self.retry_config.retry_on_exceptions)
+        return any(
+            issubclass(error_type, exc_type)
+            for exc_type in self.retry_config.retry_on_exceptions
+        )
 
     def calculate_next_execution(self) -> Optional[datetime]:
         """Calculate when this task should next be executed"""
@@ -159,7 +182,9 @@ class ScheduledTask:
         elif self.schedule_config.schedule_type == ScheduleType.PERIODIC:
             if self.schedule_config.interval_seconds:
                 if self.last_execution:
-                    return self.last_execution + timedelta(seconds=self.schedule_config.interval_seconds)
+                    return self.last_execution + timedelta(
+                        seconds=self.schedule_config.interval_seconds
+                    )
                 else:
                     return now
 
@@ -169,7 +194,10 @@ class ScheduledTask:
                 return cron.get_next(datetime)
 
         elif self.schedule_config.schedule_type == ScheduleType.CONDITIONAL:
-            if self.schedule_config.condition_func and self.schedule_config.condition_func():
+            if (
+                self.schedule_config.condition_func
+                and self.schedule_config.condition_func()
+            ):
                 return now
 
         return None
@@ -179,7 +207,9 @@ class ScheduledTask:
         attempt = self.failure_count
 
         if self.retry_config.strategy == RetryStrategy.EXPONENTIAL_BACKOFF:
-            delay = self.retry_config.base_delay * (self.retry_config.backoff_multiplier ** (attempt - 1))
+            delay = self.retry_config.base_delay * (
+                self.retry_config.backoff_multiplier ** (attempt - 1)
+            )
 
         elif self.retry_config.strategy == RetryStrategy.LINEAR_BACKOFF:
             delay = self.retry_config.base_delay * attempt
@@ -188,6 +218,7 @@ class ScheduledTask:
             delay = self.retry_config.base_delay
 
         elif self.retry_config.strategy == RetryStrategy.FIBONACCI:
+
             def fibonacci(n):
                 if n <= 1:
                     return n
@@ -195,6 +226,7 @@ class ScheduledTask:
                 for _ in range(2, n + 1):
                     a, b = b, a + b
                 return b
+
             delay = self.retry_config.base_delay * fibonacci(attempt)
 
         elif self.retry_config.strategy == RetryStrategy.CUSTOM:
@@ -209,6 +241,7 @@ class ScheduledTask:
         # Apply jitter to prevent thundering herd
         if self.retry_config.jitter:
             import random
+
             jitter_factor = 0.1  # 10% jitter
             jitter = random.uniform(-jitter_factor, jitter_factor) * delay
             delay = delay + jitter
@@ -267,6 +300,7 @@ class DependencyResolver:
 
     def detect_cycles(self) -> List[List[str]]:
         """Detect circular dependencies in the graph"""
+
         def dfs(node, path, visited, rec_stack):
             visited.add(node)
             rec_stack.add(node)
@@ -298,9 +332,9 @@ class DependencyResolver:
 class AdvancedTaskScheduler:
     """Advanced task scheduler with sophisticated scheduling and retry mechanisms"""
 
-    def __init__(self,
-                 task_processor: AdvancedTaskProcessor,
-                 max_concurrent_scheduled: int = 100):
+    def __init__(
+        self, task_processor: AdvancedTaskProcessor, max_concurrent_scheduled: int = 100
+    ):
         self.task_processor = task_processor
         self.max_concurrent_scheduled = max_concurrent_scheduled
 
@@ -319,14 +353,14 @@ class AdvancedTaskScheduler:
 
         # Statistics
         self.stats = {
-            'tasks_scheduled': 0,
-            'tasks_executed': 0,
-            'tasks_completed': 0,
-            'tasks_failed': 0,
-            'tasks_retried': 0,
-            'tasks_expired': 0,
-            'average_execution_time': 0.0,
-            'average_retry_count': 0.0
+            "tasks_scheduled": 0,
+            "tasks_executed": 0,
+            "tasks_completed": 0,
+            "tasks_failed": 0,
+            "tasks_retried": 0,
+            "tasks_expired": 0,
+            "average_execution_time": 0.0,
+            "average_retry_count": 0.0,
         }
 
         self.logger = logging.getLogger(__name__)
@@ -340,7 +374,9 @@ class AdvancedTaskScheduler:
 
         # Start scheduler loop
         self.scheduler_task = asyncio.create_task(self._scheduler_loop())
-        self.dependency_checker_task = asyncio.create_task(self._dependency_checker_loop())
+        self.dependency_checker_task = asyncio.create_task(
+            self._dependency_checker_loop()
+        )
 
         self.logger.info("Advanced task scheduler started")
 
@@ -368,16 +404,18 @@ class AdvancedTaskScheduler:
 
         self.logger.info("Advanced task scheduler stopped")
 
-    async def schedule_task(self,
-                          name: str,
-                          func: Callable,
-                          schedule_config: ScheduleConfig,
-                          retry_config: Optional[RetryConfig] = None,
-                          args: Tuple = (),
-                          kwargs: Optional[Dict[str, Any]] = None,
-                          priority: TaskPriority = TaskPriority.NORMAL,
-                          timeout: Optional[float] = None,
-                          tags: Optional[Set[str]] = None) -> str:
+    async def schedule_task(
+        self,
+        name: str,
+        func: Callable,
+        schedule_config: ScheduleConfig,
+        retry_config: Optional[RetryConfig] = None,
+        args: Tuple = (),
+        kwargs: Optional[Dict[str, Any]] = None,
+        priority: TaskPriority = TaskPriority.NORMAL,
+        timeout: Optional[float] = None,
+        tags: Optional[Set[str]] = None,
+    ) -> str:
         """Schedule a task with advanced scheduling and retry configuration"""
 
         task_id = str(uuid.uuid4())
@@ -393,7 +431,7 @@ class AdvancedTaskScheduler:
             args=args,
             kwargs=kwargs,
             timeout=timeout,
-            tags=tags
+            tags=tags,
         )
 
         # Default retry config
@@ -401,14 +439,14 @@ class AdvancedTaskScheduler:
             retry_config = RetryConfig(
                 strategy=RetryStrategy.EXPONENTIAL_BACKOFF,
                 max_attempts=3,
-                base_delay=1.0
+                base_delay=1.0,
             )
 
         # Create scheduled task
         scheduled_task = ScheduledTask(
             base_task=base_task,
             schedule_config=schedule_config,
-            retry_config=retry_config
+            retry_config=retry_config,
         )
 
         # Calculate initial execution time
@@ -427,9 +465,11 @@ class AdvancedTaskScheduler:
             heapq.heappush(self.schedule_queue, scheduled_task)
 
         self.scheduled_tasks[task_id] = scheduled_task
-        self.stats['tasks_scheduled'] += 1
+        self.stats["tasks_scheduled"] += 1
 
-        self.logger.info(f"Scheduled task {task_id} ({name}) with {schedule_config.schedule_type.value} schedule")
+        self.logger.info(
+            f"Scheduled task {task_id} ({name}) with {schedule_config.schedule_type.value} schedule"
+        )
 
         return task_id
 
@@ -441,7 +481,10 @@ class AdvancedTaskScheduler:
                 executed_tasks = []
 
                 # Process ready tasks
-                while self.schedule_queue and len(executed_tasks) < self.max_concurrent_scheduled:
+                while (
+                    self.schedule_queue
+                    and len(executed_tasks) < self.max_concurrent_scheduled
+                ):
                     # Peek at next task
                     if not self.schedule_queue:
                         break
@@ -449,7 +492,10 @@ class AdvancedTaskScheduler:
                     next_task = self.schedule_queue[0]
 
                     # Check if it's time to execute
-                    if next_task.next_execution and next_task.next_execution > current_time:
+                    if (
+                        next_task.next_execution
+                        and next_task.next_execution > current_time
+                    ):
                         break
 
                     # Remove from queue
@@ -458,7 +504,7 @@ class AdvancedTaskScheduler:
                     # Verify task can still execute
                     if not scheduled_task.can_execute():
                         if scheduled_task.state == TaskLifecycleState.EXPIRED:
-                            self.stats['tasks_expired'] += 1
+                            self.stats["tasks_expired"] += 1
                         continue
 
                     # Execute task
@@ -489,7 +535,9 @@ class AdvancedTaskScheduler:
                         heapq.heappush(self.schedule_queue, scheduled_task)
                         del self.waiting_dependencies[task_id]
 
-                        self.logger.info(f"Task {task_id} dependencies satisfied, moved to ready queue")
+                        self.logger.info(
+                            f"Task {task_id} dependencies satisfied, moved to ready queue"
+                        )
 
                 await asyncio.sleep(1.0)  # Check dependencies every second
 
@@ -506,9 +554,9 @@ class AdvancedTaskScheduler:
 
             # Record execution start
             execution_record = {
-                'attempt': scheduled_task.execution_count,
-                'started_at': scheduled_task.last_execution.isoformat(),
-                'retry_count': scheduled_task.failure_count
+                "attempt": scheduled_task.execution_count,
+                "started_at": scheduled_task.last_execution.isoformat(),
+                "retry_count": scheduled_task.failure_count,
             }
 
             # Submit to task processor
@@ -519,19 +567,30 @@ class AdvancedTaskScheduler:
                 kwargs=scheduled_task.base_task.kwargs,
                 priority=scheduled_task.base_task.priority,
                 timeout=scheduled_task.base_task.timeout,
-                tags=scheduled_task.base_task.tags
+                tags=scheduled_task.base_task.tags,
             )
 
             # Monitor execution
-            asyncio.create_task(self._monitor_task_execution(scheduled_task, processor_task_id, execution_record))
+            asyncio.create_task(
+                self._monitor_task_execution(
+                    scheduled_task, processor_task_id, execution_record
+                )
+            )
 
-            self.stats['tasks_executed'] += 1
+            self.stats["tasks_executed"] += 1
 
         except Exception as e:
-            self.logger.error(f"Error executing scheduled task {scheduled_task.base_task.id}: {e}")
+            self.logger.error(
+                f"Error executing scheduled task {scheduled_task.base_task.id}: {e}"
+            )
             await self._handle_task_failure(scheduled_task, e)
 
-    async def _monitor_task_execution(self, scheduled_task: ScheduledTask, processor_task_id: str, execution_record: Dict[str, Any]):
+    async def _monitor_task_execution(
+        self,
+        scheduled_task: ScheduledTask,
+        processor_task_id: str,
+        execution_record: Dict[str, Any],
+    ):
         """Monitor task execution and handle completion/failure"""
         try:
             # Wait for task completion
@@ -542,23 +601,34 @@ class AdvancedTaskScheduler:
                     await asyncio.sleep(0.1)
 
             # Record execution end
-            execution_record['completed_at'] = datetime.utcnow().isoformat()
-            execution_record['execution_time'] = result.execution_time
-            execution_record['memory_used'] = result.memory_used
-            execution_record['status'] = result.status.value
+            execution_record["completed_at"] = datetime.utcnow().isoformat()
+            execution_record["execution_time"] = result.execution_time
+            execution_record["memory_used"] = result.memory_used
+            execution_record["status"] = result.status.value
 
             if result.status == TaskStatus.COMPLETED:
-                await self._handle_task_success(scheduled_task, result, execution_record)
+                await self._handle_task_success(
+                    scheduled_task, result, execution_record
+                )
             else:
-                execution_record['error'] = str(result.error) if result.error else "Unknown error"
-                await self._handle_task_failure(scheduled_task, result.error, execution_record)
+                execution_record["error"] = (
+                    str(result.error) if result.error else "Unknown error"
+                )
+                await self._handle_task_failure(
+                    scheduled_task, result.error, execution_record
+                )
 
         except Exception as e:
-            execution_record['error'] = str(e)
-            execution_record['completed_at'] = datetime.utcnow().isoformat()
+            execution_record["error"] = str(e)
+            execution_record["completed_at"] = datetime.utcnow().isoformat()
             await self._handle_task_failure(scheduled_task, e, execution_record)
 
-    async def _handle_task_success(self, scheduled_task: ScheduledTask, result: TaskResult, execution_record: Dict[str, Any]):
+    async def _handle_task_success(
+        self,
+        scheduled_task: ScheduledTask,
+        result: TaskResult,
+        execution_record: Dict[str, Any],
+    ):
         """Handle successful task execution"""
         scheduled_task.update_state(TaskLifecycleState.COMPLETED)
         scheduled_task.execution_history.append(execution_record)
@@ -566,19 +636,26 @@ class AdvancedTaskScheduler:
         # Mark as completed for dependency resolution
         self.dependency_resolver.mark_completed(scheduled_task.base_task.id)
 
-        self.stats['tasks_completed'] += 1
+        self.stats["tasks_completed"] += 1
 
         # Update average execution time
-        total_completed = self.stats['tasks_completed']
-        current_avg = self.stats['average_execution_time']
-        self.stats['average_execution_time'] = (current_avg * (total_completed - 1) + result.execution_time) / total_completed
+        total_completed = self.stats["tasks_completed"]
+        current_avg = self.stats["average_execution_time"]
+        self.stats["average_execution_time"] = (
+            current_avg * (total_completed - 1) + result.execution_time
+        ) / total_completed
 
         # Schedule next execution for periodic tasks
         await self._schedule_next_execution(scheduled_task)
 
         self.logger.info(f"Task {scheduled_task.base_task.id} completed successfully")
 
-    async def _handle_task_failure(self, scheduled_task: ScheduledTask, error: Exception, execution_record: Optional[Dict[str, Any]] = None):
+    async def _handle_task_failure(
+        self,
+        scheduled_task: ScheduledTask,
+        error: Exception,
+        execution_record: Optional[Dict[str, Any]] = None,
+    ):
         """Handle task execution failure"""
         scheduled_task.update_state(TaskLifecycleState.FAILED, error)
 
@@ -591,36 +668,50 @@ class AdvancedTaskScheduler:
         else:
             # Mark as permanently failed
             self.dependency_resolver.mark_failed(scheduled_task.base_task.id)
-            self.stats['tasks_failed'] += 1
+            self.stats["tasks_failed"] += 1
 
-            self.logger.error(f"Task {scheduled_task.base_task.id} failed permanently: {error}")
+            self.logger.error(
+                f"Task {scheduled_task.base_task.id} failed permanently: {error}"
+            )
 
     async def _schedule_retry(self, scheduled_task: ScheduledTask):
         """Schedule a task for retry"""
         retry_delay = scheduled_task.calculate_retry_delay()
-        scheduled_task.next_execution = datetime.utcnow() + timedelta(seconds=retry_delay)
+        scheduled_task.next_execution = datetime.utcnow() + timedelta(
+            seconds=retry_delay
+        )
         scheduled_task.update_state(TaskLifecycleState.RETRYING)
 
         # Re-add to schedule queue
         heapq.heappush(self.schedule_queue, scheduled_task)
 
-        self.stats['tasks_retried'] += 1
+        self.stats["tasks_retried"] += 1
 
         # Update average retry count
-        total_retried = self.stats['tasks_retried']
-        current_avg = self.stats['average_retry_count']
-        self.stats['average_retry_count'] = (current_avg * (total_retried - 1) + scheduled_task.failure_count) / total_retried
+        total_retried = self.stats["tasks_retried"]
+        current_avg = self.stats["average_retry_count"]
+        self.stats["average_retry_count"] = (
+            current_avg * (total_retried - 1) + scheduled_task.failure_count
+        ) / total_retried
 
-        self.logger.info(f"Task {scheduled_task.base_task.id} scheduled for retry in {retry_delay:.2f} seconds")
+        self.logger.info(
+            f"Task {scheduled_task.base_task.id} scheduled for retry in {retry_delay:.2f} seconds"
+        )
 
     async def _schedule_next_execution(self, scheduled_task: ScheduledTask):
         """Schedule next execution for recurring tasks"""
-        if scheduled_task.schedule_config.schedule_type in [ScheduleType.PERIODIC, ScheduleType.CRON]:
+        if scheduled_task.schedule_config.schedule_type in [
+            ScheduleType.PERIODIC,
+            ScheduleType.CRON,
+        ]:
             # Calculate next execution
             next_exec = scheduled_task.calculate_next_execution()
 
-            if next_exec and (not scheduled_task.schedule_config.max_executions or
-                            scheduled_task.execution_count < scheduled_task.schedule_config.max_executions):
+            if next_exec and (
+                not scheduled_task.schedule_config.max_executions
+                or scheduled_task.execution_count
+                < scheduled_task.schedule_config.max_executions
+            ):
 
                 # Reset state for next execution
                 scheduled_task.next_execution = next_exec
@@ -629,7 +720,9 @@ class AdvancedTaskScheduler:
                 # Re-add to schedule queue
                 heapq.heappush(self.schedule_queue, scheduled_task)
 
-                self.logger.info(f"Task {scheduled_task.base_task.id} scheduled for next execution at {next_exec}")
+                self.logger.info(
+                    f"Task {scheduled_task.base_task.id} scheduled for next execution at {next_exec}"
+                )
 
     def cancel_task(self, task_id: str) -> bool:
         """Cancel a scheduled task"""
@@ -652,7 +745,10 @@ class AdvancedTaskScheduler:
         """Pause a scheduled task"""
         if task_id in self.scheduled_tasks:
             scheduled_task = self.scheduled_tasks[task_id]
-            if scheduled_task.state in [TaskLifecycleState.READY, TaskLifecycleState.RETRYING]:
+            if scheduled_task.state in [
+                TaskLifecycleState.READY,
+                TaskLifecycleState.RETRYING,
+            ]:
                 scheduled_task.update_state(TaskLifecycleState.PAUSED)
                 self.logger.info(f"Task {task_id} paused")
                 return True
@@ -676,30 +772,42 @@ class AdvancedTaskScheduler:
         if task_id in self.scheduled_tasks:
             scheduled_task = self.scheduled_tasks[task_id]
             return {
-                'task_id': task_id,
-                'name': scheduled_task.base_task.name,
-                'state': scheduled_task.state.value,
-                'execution_count': scheduled_task.execution_count,
-                'failure_count': scheduled_task.failure_count,
-                'last_execution': scheduled_task.last_execution.isoformat() if scheduled_task.last_execution else None,
-                'next_execution': scheduled_task.next_execution.isoformat() if scheduled_task.next_execution else None,
-                'last_error': str(scheduled_task.last_error) if scheduled_task.last_error else None,
-                'created_at': scheduled_task.created_at.isoformat(),
-                'updated_at': scheduled_task.updated_at.isoformat(),
-                'schedule_type': scheduled_task.schedule_config.schedule_type.value,
-                'execution_history': scheduled_task.execution_history
+                "task_id": task_id,
+                "name": scheduled_task.base_task.name,
+                "state": scheduled_task.state.value,
+                "execution_count": scheduled_task.execution_count,
+                "failure_count": scheduled_task.failure_count,
+                "last_execution": (
+                    scheduled_task.last_execution.isoformat()
+                    if scheduled_task.last_execution
+                    else None
+                ),
+                "next_execution": (
+                    scheduled_task.next_execution.isoformat()
+                    if scheduled_task.next_execution
+                    else None
+                ),
+                "last_error": (
+                    str(scheduled_task.last_error)
+                    if scheduled_task.last_error
+                    else None
+                ),
+                "created_at": scheduled_task.created_at.isoformat(),
+                "updated_at": scheduled_task.updated_at.isoformat(),
+                "schedule_type": scheduled_task.schedule_config.schedule_type.value,
+                "execution_history": scheduled_task.execution_history,
             }
         return None
 
     def get_scheduler_status(self) -> Dict[str, Any]:
         """Get comprehensive scheduler status"""
         return {
-            'running': self.running,
-            'scheduled_tasks': len(self.scheduled_tasks),
-            'ready_tasks': len(self.schedule_queue),
-            'waiting_dependencies': len(self.waiting_dependencies),
-            'statistics': self.stats.copy(),
-            'dependency_cycles': self.dependency_resolver.detect_cycles()
+            "running": self.running,
+            "scheduled_tasks": len(self.scheduled_tasks),
+            "ready_tasks": len(self.schedule_queue),
+            "waiting_dependencies": len(self.waiting_dependencies),
+            "statistics": self.stats.copy(),
+            "dependency_cycles": self.dependency_resolver.detect_cycles(),
         }
 
     def get_tasks_by_state(self, state: TaskLifecycleState) -> List[Dict[str, Any]]:
@@ -718,8 +826,15 @@ class AdvancedTaskScheduler:
         tasks_to_remove = []
 
         for task_id, scheduled_task in self.scheduled_tasks.items():
-            if (scheduled_task.state in [TaskLifecycleState.COMPLETED, TaskLifecycleState.FAILED, TaskLifecycleState.CANCELLED] and
-                scheduled_task.updated_at < cutoff_time):
+            if (
+                scheduled_task.state
+                in [
+                    TaskLifecycleState.COMPLETED,
+                    TaskLifecycleState.FAILED,
+                    TaskLifecycleState.CANCELLED,
+                ]
+                and scheduled_task.updated_at < cutoff_time
+            ):
                 tasks_to_remove.append(task_id)
 
         for task_id in tasks_to_remove:

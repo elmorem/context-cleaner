@@ -11,11 +11,11 @@ from .session_analysis import (
 )
 
 __all__ = [
-    'SessionAnalyticsEngine',
-    'SessionComparison',
-    'TrendAnalysis', 
-    'SessionInsights',
-    'ProductivityTrend',
-    'TrendDirection',
-    'MetricType',
+    "SessionAnalyticsEngine",
+    "SessionComparison",
+    "TrendAnalysis",
+    "SessionInsights",
+    "ProductivityTrend",
+    "TrendDirection",
+    "MetricType",
 ]

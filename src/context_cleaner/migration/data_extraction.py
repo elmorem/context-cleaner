@@ -21,7 +21,9 @@ from collections import defaultdict
 import aiofiles
 
 from ..models.token_bridge_models import SessionTokenMetrics
-from ..analysis.enhanced_token_counter import SessionTokenMetrics as AnalysisSessionMetrics
+from ..analysis.enhanced_token_counter import (
+    SessionTokenMetrics as AnalysisSessionMetrics,
+)
 from .jsonl_discovery import JSONLFileInfo
 
 logger = logging.getLogger(__name__)
@@ -143,12 +145,29 @@ class DataExtractionEngine:
             "claude_md": ["claude.md", "claude code", "claudemd"],
             "custom_agents": ["agent:", "custom agent", "specialized agent"],
             "mcp_tools": ["mcp__", "mcp_", "model context protocol"],
-            "system_prompts": ["system-reminder", "instructions", "guidelines", "you are"],
-            "system_tools": ["bash", "read", "write", "edit", "grep", "glob", "task", "tool"],
+            "system_prompts": [
+                "system-reminder",
+                "instructions",
+                "guidelines",
+                "you are",
+            ],
+            "system_tools": [
+                "bash",
+                "read",
+                "write",
+                "edit",
+                "grep",
+                "glob",
+                "task",
+                "tool",
+            ],
         }
 
     async def extract_from_file(
-        self, file_info: JSONLFileInfo, max_lines: Optional[int] = None, skip_corrupted: bool = True
+        self,
+        file_info: JSONLFileInfo,
+        max_lines: Optional[int] = None,
+        skip_corrupted: bool = True,
     ) -> ExtractionResult:
         """
         Extract SessionTokenMetrics from a single JSONL file.
@@ -172,7 +191,9 @@ class DataExtractionEngine:
         )
 
         if file_info.is_corrupt and not skip_corrupted:
-            result.add_error(f"File is marked as corrupt: {file_info.corruption_reason}")
+            result.add_error(
+                f"File is marked as corrupt: {file_info.corruption_reason}"
+            )
             result.end_time = datetime.now()
             return result
 
@@ -183,13 +204,17 @@ class DataExtractionEngine:
             lines_processed = 0
 
             # Stream file processing to handle large files
-            async for chunk in self._stream_file_chunks(file_info.path, self.chunk_size):
+            async for chunk in self._stream_file_chunks(
+                file_info.path, self.chunk_size
+            ):
                 chunk_sessions = await self._process_chunk(chunk, result)
 
                 # Merge chunk sessions with main sessions
                 for session_id, session_metrics in chunk_sessions.items():
                     if session_id in sessions:
-                        sessions[session_id] = await self._merge_sessions(sessions[session_id], session_metrics)
+                        sessions[session_id] = await self._merge_sessions(
+                            sessions[session_id], session_metrics
+                        )
                     else:
                         sessions[session_id] = session_metrics
 
@@ -197,7 +222,9 @@ class DataExtractionEngine:
 
                 # Check memory usage and process in smaller chunks if needed
                 if self._estimate_memory_usage(sessions) > self.max_memory_mb:
-                    logger.warning(f"Memory limit approached, processed {lines_processed} lines")
+                    logger.warning(
+                        f"Memory limit approached, processed {lines_processed} lines"
+                    )
                     break
 
                 # Check line limit
@@ -218,7 +245,9 @@ class DataExtractionEngine:
             if duration > 0:
                 result.processing_rate_lines_per_second = lines_processed / duration
 
-            logger.info(f"Extraction complete: {len(sessions)} sessions from {lines_processed} lines")
+            logger.info(
+                f"Extraction complete: {len(sessions)} sessions from {lines_processed} lines"
+            )
 
             return result
 
@@ -229,7 +258,10 @@ class DataExtractionEngine:
             return result
 
     async def extract_from_multiple_files(
-        self, files: List[JSONLFileInfo], max_concurrent: int = 3, progress_callback: Optional[callable] = None
+        self,
+        files: List[JSONLFileInfo],
+        max_concurrent: int = 3,
+        progress_callback: Optional[callable] = None,
     ) -> List[ExtractionResult]:
         """
         Extract data from multiple files concurrently.
@@ -261,7 +293,9 @@ class DataExtractionEngine:
 
         return results
 
-    async def _stream_file_chunks(self, file_path: str, chunk_size: int) -> AsyncGenerator[List[str], None]:
+    async def _stream_file_chunks(
+        self, file_path: str, chunk_size: int
+    ) -> AsyncGenerator[List[str], None]:
         """Stream file in chunks to manage memory usage."""
         try:
             async with aiofiles.open(file_path, "r", encoding="utf-8") as file:
@@ -282,7 +316,9 @@ class DataExtractionEngine:
             logger.error(f"Error streaming file {file_path}: {e}")
             raise
 
-    async def _process_chunk(self, lines: List[str], result: ExtractionResult) -> Dict[str, SessionTokenMetrics]:
+    async def _process_chunk(
+        self, lines: List[str], result: ExtractionResult
+    ) -> Dict[str, SessionTokenMetrics]:
         """Process a chunk of lines and extract session metrics."""
         sessions: Dict[str, SessionTokenMetrics] = {}
 
@@ -365,7 +401,10 @@ class DataExtractionEngine:
         return None
 
     async def _process_entry(
-        self, entry: Dict[str, Any], session_metrics: SessionTokenMetrics, result: ExtractionResult
+        self,
+        entry: Dict[str, Any],
+        session_metrics: SessionTokenMetrics,
+        result: ExtractionResult,
     ):
         """Process a single JSONL entry and update session metrics."""
         try:
@@ -374,8 +413,12 @@ class DataExtractionEngine:
             if usage:
                 session_metrics.reported_input_tokens += usage.get("input_tokens", 0)
                 session_metrics.reported_output_tokens += usage.get("output_tokens", 0)
-                session_metrics.reported_cache_creation_tokens += usage.get("cache_creation_input_tokens", 0)
-                session_metrics.reported_cache_read_tokens += usage.get("cache_read_input_tokens", 0)
+                session_metrics.reported_cache_creation_tokens += usage.get(
+                    "cache_creation_input_tokens", 0
+                )
+                session_metrics.reported_cache_read_tokens += usage.get(
+                    "cache_read_input_tokens", 0
+                )
 
             # Extract content for analysis
             content = self._extract_content(entry)
@@ -390,20 +433,25 @@ class DataExtractionEngine:
                 if usage:
                     # Use actual reported tokens when available (following ccusage accuracy)
                     actual_tokens = (
-                        usage.get("input_tokens", 0) +
-                        usage.get("output_tokens", 0) + 
-                        usage.get("cache_creation_input_tokens", 0) +
-                        usage.get("cache_read_input_tokens", 0)
+                        usage.get("input_tokens", 0)
+                        + usage.get("output_tokens", 0)
+                        + usage.get("cache_creation_input_tokens", 0)
+                        + usage.get("cache_read_input_tokens", 0)
                     )
                     if actual_tokens > 0:
                         session_metrics.calculated_total_tokens += actual_tokens
-                        logger.debug(f"Used {actual_tokens} actual tokens from JSONL usage data")
+                        logger.debug(
+                            f"Used {actual_tokens} actual tokens from JSONL usage data"
+                        )
                     # Skip content without actual usage data to maintain accuracy (ccusage method)
 
             # Extract timestamps
             timestamp = self._extract_timestamp(entry)
             if timestamp:
-                if not session_metrics.start_time or timestamp < session_metrics.start_time:
+                if (
+                    not session_metrics.start_time
+                    or timestamp < session_metrics.start_time
+                ):
                     session_metrics.start_time = timestamp
                 if not session_metrics.end_time or timestamp > session_metrics.end_time:
                     session_metrics.end_time = timestamp
@@ -413,7 +461,9 @@ class DataExtractionEngine:
             session_metrics.calculate_undercount_percentage()
 
         except Exception as e:
-            result.add_warning(f"Error processing entry for session {session_metrics.session_id}: {str(e)}")
+            result.add_warning(
+                f"Error processing entry for session {session_metrics.session_id}: {str(e)}"
+            )
 
     def _extract_usage_stats(self, entry: Dict[str, Any]) -> Optional[Dict[str, int]]:
         """Extract usage statistics from entry (multiple schema support)."""
@@ -501,7 +551,9 @@ class DataExtractionEngine:
 
         return "user_messages"  # Default category
 
-    async def _merge_sessions(self, existing: SessionTokenMetrics, new: SessionTokenMetrics) -> SessionTokenMetrics:
+    async def _merge_sessions(
+        self, existing: SessionTokenMetrics, new: SessionTokenMetrics
+    ) -> SessionTokenMetrics:
         """Merge two SessionTokenMetrics for the same session."""
         # Aggregate token counts
         existing.reported_input_tokens += new.reported_input_tokens
@@ -538,12 +590,16 @@ class DataExtractionEngine:
 
         # Add content size estimate
         for session in sessions.values():
-            content_size = sum(sessions[session.session_id].content_categories.values()) * 0.1  # KB
+            content_size = (
+                sum(sessions[session.session_id].content_categories.values()) * 0.1
+            )  # KB
             base_memory += content_size
 
         return base_memory / 1024  # Convert to MB
 
-    async def _validate_extracted_sessions(self, sessions: Dict[str, SessionTokenMetrics], result: ExtractionResult):
+    async def _validate_extracted_sessions(
+        self, sessions: Dict[str, SessionTokenMetrics], result: ExtractionResult
+    ):
         """Validate extracted session metrics."""
         for session_id, metrics in sessions.items():
             validation_errors = metrics.validate()
@@ -553,7 +609,9 @@ class DataExtractionEngine:
                 for error in validation_errors:
                     result.add_warning(f"Session {session_id} validation: {error}")
 
-    async def convert_to_bridge_format(self, extraction_result: ExtractionResult) -> List[SessionTokenMetrics]:
+    async def convert_to_bridge_format(
+        self, extraction_result: ExtractionResult
+    ) -> List[SessionTokenMetrics]:
         """
         Convert extraction result to bridge-compatible SessionTokenMetrics.
 

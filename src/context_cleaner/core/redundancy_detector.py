@@ -327,10 +327,11 @@ class RedundancyDetector:
 
             total_items = sum(len(items) for items in categories.values())
             total_content = json.dumps(context_data, default=str)
-            
+
             # ccusage approach: Use accurate token counting
             try:
                 from ..analysis.enhanced_token_counter import get_accurate_token_count
+
                 total_tokens = get_accurate_token_count(total_content)
             except ImportError:
                 # ccusage approach: Return 0 when accurate counting is not available

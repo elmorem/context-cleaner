@@ -320,7 +320,12 @@ class ClickHouseSchema:
                 name="enhanced_token_summaries",
                 create_sql=cls.ENHANCED_TOKEN_SUMMARIES_TABLE.format(database=database),
                 indexes=cls.INDEXES["enhanced_token_summaries"],
-                views=["session_token_summary", "token_trends", "content_category_analysis", "analysis_performance"],
+                views=[
+                    "session_token_summary",
+                    "token_trends",
+                    "content_category_analysis",
+                    "analysis_performance",
+                ],
                 description="Primary table storing session-level token summaries from Enhanced Token Analysis",
             ),
             "enhanced_token_details": TableSchema(
@@ -332,7 +337,9 @@ class ClickHouseSchema:
             ),
             "enhanced_analysis_metadata": TableSchema(
                 name="enhanced_analysis_metadata",
-                create_sql=cls.ENHANCED_ANALYSIS_METADATA_TABLE.format(database=database),
+                create_sql=cls.ENHANCED_ANALYSIS_METADATA_TABLE.format(
+                    database=database
+                ),
                 indexes=cls.INDEXES["enhanced_analysis_metadata"],
                 views=[],
                 description="Metadata table tracking analysis execution and system performance",
@@ -340,7 +347,9 @@ class ClickHouseSchema:
         }
 
     @classmethod
-    def get_create_table_sql(cls, table_name: str, database: str = DATABASE_NAME) -> str:
+    def get_create_table_sql(
+        cls, table_name: str, database: str = DATABASE_NAME
+    ) -> str:
         """
         Get CREATE TABLE SQL for specific table.
 
@@ -356,7 +365,9 @@ class ClickHouseSchema:
         """
         schemas = cls.get_table_schemas(database)
         if table_name not in schemas:
-            raise ValueError(f"Unknown table: {table_name}. Available tables: {list(schemas.keys())}")
+            raise ValueError(
+                f"Unknown table: {table_name}. Available tables: {list(schemas.keys())}"
+            )
 
         return schemas[table_name].create_sql
 
@@ -393,7 +404,9 @@ class ClickHouseSchema:
             ValueError: If view_name is not recognized
         """
         if view_name not in cls.VIEWS:
-            raise ValueError(f"Unknown view: {view_name}. Available views: {list(cls.VIEWS.keys())}")
+            raise ValueError(
+                f"Unknown view: {view_name}. Available views: {list(cls.VIEWS.keys())}"
+            )
 
         return cls.VIEWS[view_name].format(database=database)
 
@@ -427,7 +440,11 @@ class ClickHouseSchema:
         sql_statements.append(f"CREATE DATABASE IF NOT EXISTS {database};")
 
         # 2. Create tables in dependency order
-        table_order = ["enhanced_token_summaries", "enhanced_token_details", "enhanced_analysis_metadata"]
+        table_order = [
+            "enhanced_token_summaries",
+            "enhanced_token_details",
+            "enhanced_analysis_metadata",
+        ]
         for table_name in table_order:
             sql_statements.append(cls.get_create_table_sql(table_name, database))
 
@@ -496,7 +513,9 @@ class ClickHouseSchema:
         """
 
     @classmethod
-    def get_data_consistency_check_sql(cls, database: str = DATABASE_NAME) -> Dict[str, str]:
+    def get_data_consistency_check_sql(
+        cls, database: str = DATABASE_NAME
+    ) -> Dict[str, str]:
         """
         Get SQL queries for data consistency validation.
 
@@ -547,7 +566,9 @@ class ClickHouseSchema:
         }
 
     @classmethod
-    def get_performance_monitoring_sql(cls, database: str = DATABASE_NAME) -> Dict[str, str]:
+    def get_performance_monitoring_sql(
+        cls, database: str = DATABASE_NAME
+    ) -> Dict[str, str]:
         """
         Get SQL queries for performance monitoring.
 

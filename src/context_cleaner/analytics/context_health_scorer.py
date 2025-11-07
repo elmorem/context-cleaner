@@ -238,22 +238,27 @@ class ContextHealthScorer:
         try:
             # Try to get actual token count from enhanced analysis first
             estimated_tokens = self._get_enhanced_token_count(context_data)
-            
+
             if estimated_tokens == 0:
                 # Fallback: check if context_data has token metrics directly
-                if 'token_metrics' in context_data:
-                    token_metrics = context_data['token_metrics']
-                    if isinstance(token_metrics, dict) and 'total_tokens' in token_metrics:
-                        estimated_tokens = token_metrics['total_tokens']
-                elif 'total_tokens' in context_data:
-                    estimated_tokens = context_data.get('total_tokens', 0)
-                elif 'estimated_tokens' in context_data:
-                    estimated_tokens = context_data.get('estimated_tokens', 0)
-            
+                if "token_metrics" in context_data:
+                    token_metrics = context_data["token_metrics"]
+                    if (
+                        isinstance(token_metrics, dict)
+                        and "total_tokens" in token_metrics
+                    ):
+                        estimated_tokens = token_metrics["total_tokens"]
+                elif "total_tokens" in context_data:
+                    estimated_tokens = context_data.get("total_tokens", 0)
+                elif "estimated_tokens" in context_data:
+                    estimated_tokens = context_data.get("estimated_tokens", 0)
+
             # If no actual token data available, return neutral score
             # Following ccusage approach: no crude estimation fallbacks
             if estimated_tokens == 0:
-                logger.info("No token metrics available for context scoring, returning neutral score")
+                logger.info(
+                    "No token metrics available for context scoring, returning neutral score"
+                )
                 return 70  # Neutral score when token data unavailable
 
             # Size-based scoring with diminishing returns (using actual tokens)
@@ -283,31 +288,39 @@ class ContextHealthScorer:
         """Attempt to get accurate token count using enhanced token analysis."""
         try:
             # Check if this is a session file path
-            if isinstance(context_data, dict) and 'session_file' in context_data:
-                session_file = context_data['session_file']
+            if isinstance(context_data, dict) and "session_file" in context_data:
+                session_file = context_data["session_file"]
                 if session_file and isinstance(session_file, str):
                     try:
-                        from context_cleaner.analysis.context_window_analyzer import ContextWindowAnalyzer
+                        from context_cleaner.analysis.context_window_analyzer import (
+                            ContextWindowAnalyzer,
+                        )
+
                         analyzer = ContextWindowAnalyzer(self.config)
                         analysis = analyzer._analyze_session_context(session_file)
-                        if analysis and 'estimated_tokens' in analysis:
-                            return analysis['estimated_tokens']
+                        if analysis and "estimated_tokens" in analysis:
+                            return analysis["estimated_tokens"]
                     except Exception as e:
-                        logger.debug(f"Enhanced token analysis failed for {session_file}: {e}")
-            
+                        logger.debug(
+                            f"Enhanced token analysis failed for {session_file}: {e}"
+                        )
+
             # Try to get token count from enhanced token analysis service
             try:
-                from context_cleaner.analysis.dashboard_integration import get_enhanced_token_analysis_sync
+                from context_cleaner.analysis.dashboard_integration import (
+                    get_enhanced_token_analysis_sync,
+                )
+
                 enhanced_result = get_enhanced_token_analysis_sync()
-                if enhanced_result and enhanced_result.get('total_tokens', 0) > 0:
+                if enhanced_result and enhanced_result.get("total_tokens", 0) > 0:
                     # This gives us global token count, but we need specific context data
                     # This is a fallback only if context_data doesn't have specific metrics
                     pass
             except Exception as e:
                 logger.debug(f"Global enhanced token analysis failed: {e}")
-            
+
             return 0  # No enhanced token count available
-            
+
         except Exception as e:
             logger.error(f"Enhanced token count extraction failed: {e}")
             return 0
@@ -315,7 +328,10 @@ class ContextHealthScorer:
     def _get_accurate_token_count(self, content_str: str) -> int:
         """Get accurate token count using ccusage approach."""
         try:
-            from context_cleaner.analysis.enhanced_token_counter import get_accurate_token_count
+            from context_cleaner.analysis.enhanced_token_counter import (
+                get_accurate_token_count,
+            )
+
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
@@ -817,7 +833,7 @@ class ContextHealthScorer:
             raise create_error_response(
                 "Unable to extract scoring factors",
                 "SCORING_FACTORS_EXTRACTION_ERROR",
-                500
+                500,
             )
 
     def _record_scoring_event(

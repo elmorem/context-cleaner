@@ -15,7 +15,10 @@ from typing import Dict, List, Optional, Any, Callable
 from contextlib import asynccontextmanager
 
 from ..telemetry.clients.clickhouse_client import ClickHouseClient
-from ..analysis.enhanced_token_counter import EnhancedTokenCounterService, SessionTokenMetrics as AnalysisSessionMetrics
+from ..analysis.enhanced_token_counter import (
+    EnhancedTokenCounterService,
+    SessionTokenMetrics as AnalysisSessionMetrics,
+)
 from ..models.token_bridge_models import (
     BridgeResult,
     SessionTokenMetrics,
@@ -107,13 +110,16 @@ class TokenAnalysisBridge:
     ):
         self.config = config or BridgeConfiguration()
         self.clickhouse_client = clickhouse_client or ClickHouseClient(
-            host=self.config.clickhouse_host, port=self.config.clickhouse_port, database=self.config.clickhouse_database
+            host=self.config.clickhouse_host,
+            port=self.config.clickhouse_port,
+            database=self.config.clickhouse_database,
         )
         self.enhanced_counter = enhanced_counter or EnhancedTokenCounterService()
 
         # Circuit breaker for database operations
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=self.config.failure_threshold, recovery_timeout=self.config.recovery_timeout_seconds
+            failure_threshold=self.config.failure_threshold,
+            recovery_timeout=self.config.recovery_timeout_seconds,
         )
 
         # Performance tracking
@@ -123,7 +129,10 @@ class TokenAnalysisBridge:
         logger.info("Token Analysis Bridge initialized")
 
     async def store_session_metrics(
-        self, session_metrics: SessionTokenMetrics, force_update: bool = False, correlation_id: Optional[str] = None
+        self,
+        session_metrics: SessionTokenMetrics,
+        force_update: bool = False,
+        correlation_id: Optional[str] = None,
     ) -> BridgeResult:
         """
         Store enhanced session token metrics in ClickHouse database.
@@ -154,7 +163,9 @@ class TokenAnalysisBridge:
         try:
             # Validate input data
             if self.config.enable_validation:
-                validation_errors = await self._validate_session_metrics(session_metrics)
+                validation_errors = await self._validate_session_metrics(
+                    session_metrics
+                )
                 if validation_errors:
                     raise BridgeValidationError(
                         message="Session metrics validation failed",
@@ -166,7 +177,9 @@ class TokenAnalysisBridge:
             if not force_update:
                 existing = await self._get_existing_session(session_metrics.session_id)
                 if existing:
-                    result.add_warning(f"Session {session_metrics.session_id} already exists, skipping")
+                    result.add_warning(
+                        f"Session {session_metrics.session_id} already exists, skipping"
+                    )
                     return result
 
             # Prepare session for storage
@@ -191,7 +204,12 @@ class TokenAnalysisBridge:
 
             return result
 
-        except (BridgeValidationError, BridgeStorageError, BridgeConnectionError, BridgeCircuitBreakerError):
+        except (
+            BridgeValidationError,
+            BridgeStorageError,
+            BridgeConnectionError,
+            BridgeCircuitBreakerError,
+        ):
             result.success = False
             result.processing_time_seconds = time.time() - start_time
             await self._record_operation_failure(result)
@@ -232,7 +250,9 @@ class TokenAnalysisBridge:
             LIMIT 1
             """
 
-            results = await self.clickhouse_client.execute_query(query, params={"session_id": session_id})
+            results = await self.clickhouse_client.execute_query(
+                query, params={"session_id": session_id}
+            )
 
             if not results:
                 return None
@@ -242,7 +262,10 @@ class TokenAnalysisBridge:
 
         except Exception as e:
             logger.error(f"Error retrieving session metrics for {session_id}: {e}")
-            raise BridgeConnectionError(message=f"Failed to retrieve session metrics: {str(e)}", underlying_error=e)
+            raise BridgeConnectionError(
+                message=f"Failed to retrieve session metrics: {str(e)}",
+                underlying_error=e,
+            )
 
     async def bulk_store_sessions(
         self,
@@ -286,7 +309,9 @@ class TokenAnalysisBridge:
         """
         start_time = time.time()
 
-        health = BridgeHealthStatus(status=HealthStatus.HEALTHY, message="Service is healthy")
+        health = BridgeHealthStatus(
+            status=HealthStatus.HEALTHY, message="Service is healthy"
+        )
 
         try:
             # Test database connectivity
@@ -304,8 +329,12 @@ class TokenAnalysisBridge:
             # Check recent operation success rate
             recent_operations = await self._get_recent_operations()
             if recent_operations:
-                successful_ops = sum(1 for op in recent_operations if op.get("success", False))
-                health.recent_success_rate = (successful_ops / len(recent_operations)) * 100
+                successful_ops = sum(
+                    1 for op in recent_operations if op.get("success", False)
+                )
+                health.recent_success_rate = (
+                    successful_ops / len(recent_operations)
+                ) * 100
                 health.recent_operations_count = len(recent_operations)
 
                 if health.recent_success_rate < 90:
@@ -314,8 +343,12 @@ class TokenAnalysisBridge:
 
             # Get performance metrics
             if recent_operations:
-                processing_times = [op.get("processing_time", 0) for op in recent_operations]
-                health.average_processing_time_ms = (sum(processing_times) / len(processing_times)) * 1000
+                processing_times = [
+                    op.get("processing_time", 0) for op in recent_operations
+                ]
+                health.average_processing_time_ms = (
+                    sum(processing_times) / len(processing_times)
+                ) * 1000
 
             # Get storage statistics
             stats = await self._get_storage_statistics()
@@ -331,7 +364,9 @@ class TokenAnalysisBridge:
 
         return health
 
-    async def _validate_session_metrics(self, metrics: SessionTokenMetrics) -> List[str]:
+    async def _validate_session_metrics(
+        self, metrics: SessionTokenMetrics
+    ) -> List[str]:
         """Validate session metrics before storage."""
         errors = metrics.validate()
 
@@ -346,10 +381,10 @@ class TokenAnalysisBridge:
     async def _get_existing_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Check if session already exists in database."""
         try:
-            query = (
-                "SELECT session_id FROM otel.enhanced_token_summaries WHERE session_id = {session_id:String} LIMIT 1"
+            query = "SELECT session_id FROM otel.enhanced_token_summaries WHERE session_id = {session_id:String} LIMIT 1"
+            results = await self.clickhouse_client.execute_query(
+                query, params={"session_id": session_id}
             )
-            results = await self.clickhouse_client.execute_query(query, params={"session_id": session_id})
             return results[0] if results else None
         except Exception:
             return None
@@ -358,7 +393,9 @@ class TokenAnalysisBridge:
         """Store single session record in ClickHouse."""
         record = session_metrics.to_clickhouse_record()
 
-        success = await self.clickhouse_client.bulk_insert("enhanced_token_summaries", [record])
+        success = await self.clickhouse_client.bulk_insert(
+            "enhanced_token_summaries", [record]
+        )
 
         if not success:
             raise BridgeStorageError(
@@ -367,7 +404,9 @@ class TokenAnalysisBridge:
                 table_name="enhanced_token_summaries",
             )
 
-    async def _store_session_batch(self, sessions: List[SessionTokenMetrics]) -> BridgeResult:
+    async def _store_session_batch(
+        self, sessions: List[SessionTokenMetrics]
+    ) -> BridgeResult:
         """Store a batch of session metrics."""
         start_time = time.time()
         correlation_id = str(uuid.uuid4())
@@ -387,7 +426,9 @@ class TokenAnalysisBridge:
                 if self.config.enable_validation:
                     errors = await self._validate_session_metrics(session)
                     if errors:
-                        result.add_error(f"Session {session.session_id}: {'; '.join(errors)}")
+                        result.add_error(
+                            f"Session {session.session_id}: {'; '.join(errors)}"
+                        )
                         continue
 
                 session.bridge_stored_at = datetime.now()
@@ -399,7 +440,9 @@ class TokenAnalysisBridge:
                 total_tokens += session.calculated_total_tokens
 
             if records:
-                success = await self.clickhouse_client.bulk_insert("enhanced_token_summaries", records)
+                success = await self.clickhouse_client.bulk_insert(
+                    "enhanced_token_summaries", records
+                )
 
                 if success:
                     result.records_stored = len(records)
@@ -423,11 +466,21 @@ class TokenAnalysisBridge:
 
         metrics = SessionTokenMetrics(
             session_id=record["session_id"],
-            start_time=datetime.fromisoformat(record["start_time"]) if record.get("start_time") else None,
-            end_time=datetime.fromisoformat(record["end_time"]) if record.get("end_time") else None,
+            start_time=(
+                datetime.fromisoformat(record["start_time"])
+                if record.get("start_time")
+                else None
+            ),
+            end_time=(
+                datetime.fromisoformat(record["end_time"])
+                if record.get("end_time")
+                else None
+            ),
             reported_input_tokens=record.get("reported_input_tokens", 0),
             reported_output_tokens=record.get("reported_output_tokens", 0),
-            reported_cache_creation_tokens=record.get("reported_cache_creation_tokens", 0),
+            reported_cache_creation_tokens=record.get(
+                "reported_cache_creation_tokens", 0
+            ),
             reported_cache_read_tokens=record.get("reported_cache_read_tokens", 0),
             calculated_input_tokens=record.get("calculated_input_tokens", 0),
             calculated_total_tokens=record.get("calculated_total_tokens", 0),
@@ -447,7 +500,9 @@ class TokenAnalysisBridge:
         # Include bridge metadata if requested
         if include_metadata:
             metrics.bridge_stored_at = (
-                datetime.fromisoformat(record["created_at"]) if record.get("created_at") else None
+                datetime.fromisoformat(record["created_at"])
+                if record.get("created_at")
+                else None
             )
             metrics.bridge_correlation_id = record.get("bridge_correlation_id")
 
@@ -468,8 +523,12 @@ class TokenAnalysisBridge:
             )
 
             # Keep only recent history
-            cutoff = datetime.now() - timedelta(minutes=self.config.performance_window_minutes)
-            self.operation_history = [op for op in self.operation_history if op["timestamp"] > cutoff]
+            cutoff = datetime.now() - timedelta(
+                minutes=self.config.performance_window_minutes
+            )
+            self.operation_history = [
+                op for op in self.operation_history if op["timestamp"] > cutoff
+            ]
 
     async def _record_operation_failure(self, result: BridgeResult):
         """Record failed operation for performance tracking."""

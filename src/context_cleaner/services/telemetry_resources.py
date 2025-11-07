@@ -17,13 +17,17 @@ TELEMETRY_RESOURCE_FILES: Iterable[str] = (
 DEFAULT_DATA_DIR = Path.home() / ".context_cleaner" / "data"
 
 
-def stage_telemetry_resources(config: Optional[object] = None, verbose: bool = False) -> Path:
+def stage_telemetry_resources(
+    config: Optional[object] = None, verbose: bool = False
+) -> Path:
     """Copy packaged telemetry assets to a writable directory and return the path."""
 
     data_directory = Path(
         getattr(config, "data_directory", DEFAULT_DATA_DIR)
     ).expanduser()
-    base_directory = data_directory.parent if data_directory.name == "data" else data_directory
+    base_directory = (
+        data_directory.parent if data_directory.name == "data" else data_directory
+    )
     destination = base_directory / "telemetry"
     destination.mkdir(parents=True, exist_ok=True)
 
@@ -31,7 +35,9 @@ def stage_telemetry_resources(config: Optional[object] = None, verbose: bool = F
         resource_root = importlib_resources.files(TELEMETRY_PACKAGE)
     except (ModuleNotFoundError, AttributeError) as exc:  # pragma: no cover - defensive
         if verbose:
-            print(f"⚠️  Telemetry resources unavailable ({exc}); docker services may fail to start")
+            print(
+                f"⚠️  Telemetry resources unavailable ({exc}); docker services may fail to start"
+            )
         return destination
 
     for filename in TELEMETRY_RESOURCE_FILES:

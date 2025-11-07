@@ -28,9 +28,11 @@ from ..analysis import (
 )
 from ..analytics.advanced_patterns import AdvancedPatternRecognizer
 
+
 def _get_health_scorer_classes():
     """Lazy import to avoid circular dependency."""
     from ..analytics.context_health_scorer import ContextHealthScorer, HealthScore
+
     return ContextHealthScorer, HealthScore
 
 

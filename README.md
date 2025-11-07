@@ -6,11 +6,13 @@
 
 **Advanced productivity tracking and context optimization for AI-assisted development**
 
+> **Current Version:** 0.3.0 | **Python:** 3.9+ | **Status:** Production/Stable
+
 Context Cleaner is a comprehensive productivity tracking tool designed specifically for developers using AI coding assistants like Claude Code. It provides intelligent context health monitoring, performance analytics, and optimization recommendations to maximize development productivity.
 
 ## 🎯 **Key Features**
 
-### **📊 Effectiveness Tracking & Analytics** ⭐ NEW in v0.2.0
+### **📊 Effectiveness Tracking & Analytics**
 - **Before/after metrics** with quantifiable productivity improvements
 - **User satisfaction tracking** with 1-5 rating system and feedback collection
 - **Strategy effectiveness analysis** across Conservative/Balanced/Aggressive/Focus modes
@@ -39,7 +41,7 @@ Context Cleaner is a comprehensive productivity tracking tool designed specifica
 - **Transparent operation** with open-source codebase
 
 ### **🔧 Developer-Friendly CLI**
-- **Comprehensive command set** with 15+ commands for all productivity needs
+- **Comprehensive command set** with 20+ commands for all productivity needs
 - **Multiple output formats** (JSON, text) for integration and automation
 - **Session management** with start/end tracking and detailed analytics
 - **System health monitoring** with diagnostics and issue resolution
@@ -96,7 +98,7 @@ The unified dashboard provides **everything in one place**:
 - **🔍 Analytics**: Context health and performance trends with detailed legends
 - **⚡ Performance**: Real-time system resources, database, and cache metrics
 
-**Dashboard URL**: `http://localhost:8081`
+**Dashboard URL**: `http://localhost:8110` (default port)
 
 ### **Command Line Tools** (Optional)
 ```bash
@@ -107,7 +109,7 @@ context-cleaner effectiveness --days 7     # Optimization stats
 context-cleaner stop                       # Graceful shutdown
 ```
 
-## 📊 **New Analytics Features** ⭐
+## 📊 **Analytics Features**
 
 ### **Effectiveness Tracking**
 ```bash
@@ -380,16 +382,48 @@ pytest tests/cli/test_pr20_analytics_integration.py -v
 pytest tests/cli/test_pr20_analytics_integration.py::TestSecurityAndPerformanceFixes -v
 ```
 
-## 📄 **What's New in v0.2.0**
+## 📄 **What's New in v0.3.0**
+
+### **🚀 Service Orchestration & Management**
+- **Single-entry orchestration**: `context-cleaner run` command as unified entry point
+- **Supervisor architecture**: Long-running IPC supervisor with process registry
+- **Enhanced shutdown**: Streaming progress updates and targeted service control
+- **Watchdog monitoring**: Automatic service health checks and restart capabilities
+- **Process registry**: Comprehensive service tracking and state management
+
+### **🔧 New CLI Commands**
+- `analytics` - Advanced analytics and predictive intelligence
+- `bridge` - Token analysis bridge service management
+- `debug` - Process registry and service health debugging
+- `jsonl` - JSONL content processing and analysis
+- `migration` - Enhanced token analysis migration tools
+- `token-analysis` - Anthropic token analysis integration
+- `update-data` - Widget data staleness diagnostics
+
+### **📦 Packaging & Distribution**
+- Telemetry resources packaged with ClickHouse schema
+- Gunicorn included in runtime dependencies
+- Windows PowerShell environment variable support
+- Improved dashboard asset packaging and verification
+
+### **🛠️ Infrastructure Improvements**
+- ClickHouse schema fixes with optional-table handling
+- Stale PID file cleanup for stable dashboard startup
+- Developer utilities sanitized for path derivation
+- Enhanced integration verification for distributions
+
+---
+
+## 📄 **Previous Release: v0.2.0**
 
 ### **🔥 Major Features**
 - **Effectiveness Tracking System**: Quantifiable before/after productivity metrics
 - **User Satisfaction Monitoring**: Rating system with feedback collection
-- **Strategy Analysis**: Performance comparison across optimization modes  
+- **Strategy Analysis**: Performance comparison across optimization modes
 - **ROI Demonstration**: Time-saved calculations and productivity improvements
 - **Enhanced CLI**: 3 new commands (`health-check`, `export-analytics`, `effectiveness`)
 
-### **🛡️ Security Improvements**  
+### **🛡️ Security Improvements**
 - **PII Sanitization**: Automatic sensitive data removal before storage
 - **Atomic File Operations**: Race-condition prevention with exclusive locking
 - **Secure Storage**: Enhanced file permissions and data integrity protection
@@ -400,12 +434,6 @@ pytest tests/cli/test_pr20_analytics_integration.py::TestSecurityAndPerformanceF
 - **LRU Caching**: Optimized frequent data access patterns
 - **Optimized I/O**: Index-based filtering and reduced file operations
 - **Memory Management**: Efficient resource usage and cleanup
-
-### **🧪 Production Readiness**
-- **Enhanced Error Handling**: Consistent exception management without sys.exit()
-- **Comprehensive Testing**: 29 tests including security and performance validation
-- **Resource Management**: Proper cleanup and context manager usage
-- **Documentation**: Complete overhaul with accurate examples and guides
 
 ## 🤝 **Support**
 
@@ -422,7 +450,7 @@ pytest tests/cli/test_pr20_analytics_integration.py::TestSecurityAndPerformanceF
 
 ## 🎯 **Roadmap**
 
-### **Version 0.3.0** (Next Release)
+### **Version 0.4.0** (Next Release)
 - **Machine Learning Analytics**: AI-powered productivity insights and forecasting
 - **Team Collaboration**: Aggregated (anonymized) team productivity metrics
 - **IDE Integration**: Direct integration with popular development environments
@@ -436,6 +464,6 @@ pytest tests/cli/test_pr20_analytics_integration.py::TestSecurityAndPerformanceF
 
 ---
 
-**Context Cleaner v0.2.0** - Transforming AI-assisted development through intelligent productivity tracking, effectiveness measurement, and optimization.
+**Context Cleaner v0.3.0** - Transforming AI-assisted development through intelligent productivity tracking, effectiveness measurement, and optimization.
 
 *Built with ❤️ for developers who want to understand and improve their coding productivity.*

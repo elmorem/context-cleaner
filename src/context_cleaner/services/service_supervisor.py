@@ -81,7 +81,9 @@ class SupervisorConfig:
 class ServiceSupervisor:
     """Skeleton implementation of the IPC supervisor."""
 
-    def __init__(self, orchestrator: ServiceOrchestrator, config: SupervisorConfig) -> None:
+    def __init__(
+        self, orchestrator: ServiceOrchestrator, config: SupervisorConfig
+    ) -> None:
         self._orchestrator = orchestrator
         self._config = config
         self._stack = AsyncExitStack()
@@ -112,7 +114,9 @@ class ServiceSupervisor:
         self._audit_logger = AuditLogger(audit_path)
         await self._stack.enter_async_context(self._audit_logger)
 
-        self._supervisor_registered = await asyncio.to_thread(self._register_supervisor_process)
+        self._supervisor_registered = await asyncio.to_thread(
+            self._register_supervisor_process
+        )
         if not self._supervisor_registered:
             LOGGER.warning("Failed to register supervisor process in registry")
         self._heartbeat_task = asyncio.create_task(self._emit_heartbeat_loop())
@@ -131,7 +135,9 @@ class ServiceSupervisor:
         socket_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._socket_path = socket_path
-        server = await asyncio.start_unix_server(self._handle_connection, path=str(socket_path))
+        server = await asyncio.start_unix_server(
+            self._handle_connection, path=str(socket_path)
+        )
         self._server = server
         self._server_task = asyncio.create_task(server.serve_forever())
         self._stack.push_async_callback(self._shutdown_server)
@@ -191,7 +197,9 @@ class ServiceSupervisor:
                 if self._supervisor_registered:
                     await asyncio.to_thread(self._update_registry_status, "running")
                 status_payload = await self._build_status_payload(exclude_token=token)
-                return SupervisorResponse(request_id=request.request_id, status="ok", result=status_payload)
+                return SupervisorResponse(
+                    request_id=request.request_id, status="ok", result=status_payload
+                )
             if request.action is RequestAction.SHUTDOWN:
                 shutdown_kwargs, error = self._resolve_shutdown_options(request)
                 if error:
@@ -204,7 +212,9 @@ class ServiceSupervisor:
                 active_filters = {k: v for k, v in shutdown_kwargs.items() if v}
                 payload = {
                     "message": "shutdown-started",
-                    "services": await asyncio.to_thread(self._orchestrator.get_service_status),
+                    "services": await asyncio.to_thread(
+                        self._orchestrator.get_service_status
+                    ),
                 }
                 if active_filters:
                     payload["filters"] = active_filters
@@ -221,7 +231,9 @@ class ServiceSupervisor:
         finally:
             await self._release_connection(token)
 
-    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def _handle_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         peername = writer.get_extra_info("peername")
         LOGGER.debug("Accepted supervisor connection from %s", peername)
         try:
@@ -259,7 +271,9 @@ class ServiceSupervisor:
             with suppress(Exception):
                 await writer.wait_closed()
 
-    async def _send_response(self, writer: asyncio.StreamWriter, response: SupervisorResponse) -> None:
+    async def _send_response(
+        self, writer: asyncio.StreamWriter, response: SupervisorResponse
+    ) -> None:
         payload = response.to_json().encode("utf-8")
         frame = len(payload).to_bytes(4, "big") + payload
         writer.write(frame)
@@ -288,7 +302,9 @@ class ServiceSupervisor:
             )
         return None
 
-    def _error_response(self, request: SupervisorRequest, *, code: ErrorCode, message: str) -> SupervisorResponse:
+    def _error_response(
+        self, request: SupervisorRequest, *, code: ErrorCode, message: str
+    ) -> SupervisorResponse:
         return SupervisorResponse(
             request_id=request.request_id,
             status="error",
@@ -405,14 +421,24 @@ class ServiceSupervisor:
         if not self._registry:
             return
         if not self._registry.unregister_process(os.getpid()):
-            LOGGER.debug("Registry unregister for supervisor pid %s failed", os.getpid())
+            LOGGER.debug(
+                "Registry unregister for supervisor pid %s failed", os.getpid()
+            )
         self._last_registry_environment = None
 
-    async def _build_status_payload(self, *, exclude_token: Optional[object] = None) -> Dict[str, Any]:
-        orchestrator_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+    async def _build_status_payload(
+        self, *, exclude_token: Optional[object] = None
+    ) -> Dict[str, Any]:
+        orchestrator_status = await asyncio.to_thread(
+            self._orchestrator.get_service_status
+        )
         await asyncio.to_thread(
             self._update_registry_metadata,
-            orchestrator_status.get("services_summary") if isinstance(orchestrator_status, dict) else None,
+            (
+                orchestrator_status.get("services_summary")
+                if isinstance(orchestrator_status, dict)
+                else None
+            ),
         )
         registry_snapshot = await asyncio.to_thread(self._collect_registry_snapshot)
         now = dt.datetime.now(dt.timezone.utc)
@@ -422,12 +448,22 @@ class ServiceSupervisor:
         active_connections = len(self._connections)
         if exclude_token is not None and exclude_token in self._connections:
             active_connections = max(active_connections - 1, 0)
-        services_summary = orchestrator_status.get("services_summary", {}) if isinstance(orchestrator_status, dict) else {}
-        by_status = services_summary.get("by_status", {}) if isinstance(services_summary, dict) else {}
+        services_summary = (
+            orchestrator_status.get("services_summary", {})
+            if isinstance(orchestrator_status, dict)
+            else {}
+        )
+        by_status = (
+            services_summary.get("by_status", {})
+            if isinstance(services_summary, dict)
+            else {}
+        )
         supervisor_info = {
             "pid": os.getpid(),
             "endpoint": self._config.endpoint,
-            "start_time": self._start_time.strftime(ISO8601) if self._start_time else None,
+            "start_time": (
+                self._start_time.strftime(ISO8601) if self._start_time else None
+            ),
             "uptime_seconds": uptime,
             "active_connections": active_connections,
             "max_connections": self._config.max_connections,
@@ -436,14 +472,19 @@ class ServiceSupervisor:
             "audit_log": str(self._audit_logger.path) if self._audit_logger else None,
             "state": "running" if self._running else "stopped",
             "services_total": services_summary.get("total", 0),
-            "services_running": by_status.get("running", 0) + by_status.get("attached", 0),
+            "services_running": by_status.get("running", 0)
+            + by_status.get("attached", 0),
             "services_by_status": by_status,
             "services_transitioning": services_summary.get("transitioning", {}),
             "required_failed": services_summary.get("required_failed", []),
             "optional_failed": services_summary.get("optional_failed", []),
             "heartbeat_interval": self._config.heartbeat_interval_seconds,
             "heartbeat_timeout": self._config.heartbeat_timeout_seconds,
-            "last_heartbeat_at": self._last_heartbeat_at.strftime(ISO8601) if self._last_heartbeat_at else None,
+            "last_heartbeat_at": (
+                self._last_heartbeat_at.strftime(ISO8601)
+                if self._last_heartbeat_at
+                else None
+            ),
         }
         watchdog_info: Dict[str, Any] = {}
         if self._watchdog is not None:
@@ -452,10 +493,18 @@ class ServiceSupervisor:
             watchdog_info = {
                 "enabled": not self._watchdog.disabled,
                 "running": self._watchdog.is_running,
-                "last_heartbeat_at": self._watchdog.last_heartbeat_at.strftime(ISO8601) if self._watchdog.last_heartbeat_at else None,
+                "last_heartbeat_at": (
+                    self._watchdog.last_heartbeat_at.strftime(ISO8601)
+                    if self._watchdog.last_heartbeat_at
+                    else None
+                ),
                 "last_restart_reason": self._watchdog.last_restart_reason,
                 "last_restart_success": self._watchdog.last_restart_success,
-                "last_restart_at": self._watchdog.last_restart_at.isoformat() if self._watchdog.last_restart_at else None,
+                "last_restart_at": (
+                    self._watchdog.last_restart_at.isoformat()
+                    if self._watchdog.last_restart_at
+                    else None
+                ),
                 "restart_attempts": self._watchdog.restart_attempts,
                 "restart_history": history[-max_history:],
             }
@@ -476,7 +525,9 @@ class ServiceSupervisor:
             return {"supervisor": []}
 
         return {
-            "supervisor": [self._serialize_registry_entry(entry) for entry in supervisor_entries],
+            "supervisor": [
+                self._serialize_registry_entry(entry) for entry in supervisor_entries
+            ],
         }
 
     def _serialize_registry_entry(self, entry: ProcessEntry) -> Dict[str, Any]:
@@ -498,7 +549,9 @@ class ServiceSupervisor:
             "container_state",
             "metadata",
         )
-        result = {key: data.get(key) for key in keys if data.get(key) not in (None, "", [])}
+        result = {
+            key: data.get(key) for key in keys if data.get(key) not in (None, "", [])
+        }
         for key in ("resource_limits", "health_check_config", "environment_vars"):
             value = data.get(key)
             if not value:
@@ -535,8 +588,12 @@ class ServiceSupervisor:
         initial_chunk = {
             "stage": "initiated",
             "summary": before_status.get("services_summary"),
-            "running_services": before_status.get("orchestrator", {}).get("services_running"),
-            "required_failed": before_status.get("orchestrator", {}).get("required_failed"),
+            "running_services": before_status.get("orchestrator", {}).get(
+                "services_running"
+            ),
+            "required_failed": before_status.get("orchestrator", {}).get(
+                "required_failed"
+            ),
         }
         if active_filters:
             initial_chunk["filters"] = active_filters
@@ -547,7 +604,9 @@ class ServiceSupervisor:
             final=False,
         )
 
-        shutdown_task = asyncio.create_task(self._orchestrator.shutdown_all(**shutdown_kwargs))
+        shutdown_task = asyncio.create_task(
+            self._orchestrator.shutdown_all(**shutdown_kwargs)
+        )
         progress_emitted = False
         last_snapshot = before_status
         shutdown_summary: Dict[str, Any] | None = None
@@ -555,18 +614,28 @@ class ServiceSupervisor:
         try:
             while not shutdown_task.done():
                 await asyncio.sleep(0.2)
-                progress_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+                progress_status = await asyncio.to_thread(
+                    self._orchestrator.get_service_status
+                )
                 last_snapshot = progress_status
-                await self._record_stream_audit(request, progress_status, stage="progress")
+                await self._record_stream_audit(
+                    request, progress_status, stage="progress"
+                )
                 await self._send_stream_chunk(
                     writer,
                     request,
                     {
                         "stage": "progress",
                         "summary": progress_status.get("services_summary"),
-                        "running_services": progress_status.get("orchestrator", {}).get("services_running"),
-                        "transitioning": progress_status.get("orchestrator", {}).get("transitioning"),
-                        "required_failed": progress_status.get("orchestrator", {}).get("required_failed"),
+                        "running_services": progress_status.get("orchestrator", {}).get(
+                            "services_running"
+                        ),
+                        "transitioning": progress_status.get("orchestrator", {}).get(
+                            "transitioning"
+                        ),
+                        "required_failed": progress_status.get("orchestrator", {}).get(
+                            "required_failed"
+                        ),
                     },
                     final=False,
                 )
@@ -578,14 +647,22 @@ class ServiceSupervisor:
             success = False
             LOGGER.exception("Supervisor shutdown stream failed: %s", exc)
         finally:
-            result_status = await asyncio.to_thread(self._orchestrator.get_service_status)
+            result_status = await asyncio.to_thread(
+                self._orchestrator.get_service_status
+            )
             final_chunk = {
                 "stage": "completed",
                 "success": success,
                 "summary": result_status.get("services_summary"),
-                "running_services": result_status.get("orchestrator", {}).get("services_running"),
-                "required_failed": result_status.get("orchestrator", {}).get("required_failed"),
-                "transitioning": result_status.get("orchestrator", {}).get("transitioning"),
+                "running_services": result_status.get("orchestrator", {}).get(
+                    "services_running"
+                ),
+                "required_failed": result_status.get("orchestrator", {}).get(
+                    "required_failed"
+                ),
+                "transitioning": result_status.get("orchestrator", {}).get(
+                    "transitioning"
+                ),
                 "last_summary": last_snapshot.get("services_summary"),
                 "progress_emitted": progress_emitted,
                 "shutdown_summary": shutdown_summary,
@@ -598,7 +675,9 @@ class ServiceSupervisor:
                 final_chunk,
                 final=True,
             )
-            await self._record_stream_audit(request, result_status, stage="completed", success=success)
+            await self._record_stream_audit(
+                request, result_status, stage="completed", success=success
+            )
 
         status = "ok" if success else "error"
         payload = {
@@ -614,8 +693,12 @@ class ServiceSupervisor:
             result=payload,
         )
         if self._supervisor_registered:
-            await asyncio.to_thread(self._update_registry_status, "running" if success else "error")
-        await self._record_audit("shutdown-stream-complete", request=request, response=response)
+            await asyncio.to_thread(
+                self._update_registry_status, "running" if success else "error"
+            )
+        await self._record_audit(
+            "shutdown-stream-complete", request=request, response=response
+        )
         return response
 
     async def _send_stream_chunk(
@@ -654,8 +737,12 @@ class ServiceSupervisor:
         stage: str,
         success: Optional[bool] = None,
     ) -> None:
-        summary = snapshot.get("services_summary", {}) if isinstance(snapshot, dict) else {}
-        orchestrator = snapshot.get("orchestrator", {}) if isinstance(snapshot, dict) else {}
+        summary = (
+            snapshot.get("services_summary", {}) if isinstance(snapshot, dict) else {}
+        )
+        orchestrator = (
+            snapshot.get("orchestrator", {}) if isinstance(snapshot, dict) else {}
+        )
         entry = {
             "event": "shutdown-stream-state",
             "timestamp": dt.datetime.now(dt.timezone.utc).strftime(ISO8601),
@@ -686,7 +773,9 @@ class ServiceSupervisor:
         if updated:
             self._last_registry_environment = environment
         else:
-            LOGGER.debug("Registry metadata update for supervisor pid %s failed", os.getpid())
+            LOGGER.debug(
+                "Registry metadata update for supervisor pid %s failed", os.getpid()
+            )
 
     async def _emit_heartbeat_loop(self) -> None:
         interval = max(1, self._config.heartbeat_interval_seconds)
@@ -694,7 +783,9 @@ class ServiceSupervisor:
             try:
                 await asyncio.sleep(interval)
                 await asyncio.to_thread(self._publish_heartbeat)
-            except asyncio.CancelledError:  # pragma: no cover - cooperative cancellation
+            except (
+                asyncio.CancelledError
+            ):  # pragma: no cover - cooperative cancellation
                 break
             except Exception as exc:  # pragma: no cover - defensive logging
                 LOGGER.debug("Heartbeat update failed: %s", exc)
@@ -755,15 +846,21 @@ class ServiceSupervisor:
             "processes_only": processes_only,
         }
 
-        services_option = request.filters.get("services") or request.options.get("services")
+        services_option = request.filters.get("services") or request.options.get(
+            "services"
+        )
         services_list: Optional[list[str]] = None
         if services_option is not None:
             if isinstance(services_option, str):
                 if services_option:
                     # Support comma-delimited strings from CLI callers
-                    services_list = [s.strip() for s in services_option.split(",") if s.strip()]
+                    services_list = [
+                        s.strip() for s in services_option.split(",") if s.strip()
+                    ]
             elif isinstance(services_option, (list, tuple, set)):
-                services_list = [str(item).strip() for item in services_option if str(item).strip()]
+                services_list = [
+                    str(item).strip() for item in services_option if str(item).strip()
+                ]
             else:
                 return {}, self._error_response(
                     request,

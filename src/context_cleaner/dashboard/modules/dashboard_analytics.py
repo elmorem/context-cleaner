@@ -25,8 +25,11 @@ import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
 from context_cleaner.api.models import (
-    create_no_data_error, create_unsupported_error, create_error_response,
-    AnalyticsChartResponse, AnalyticsSummaryResponse
+    create_no_data_error,
+    create_unsupported_error,
+    create_error_response,
+    AnalyticsChartResponse,
+    AnalyticsSummaryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,7 +144,9 @@ class SessionAnalyticsProcessor:
         if self.dashboard_cache:
             cached_data = self.dashboard_cache.get_session_analytics_cache()
             if cached_data is not None:
-                logger.debug(f"Returning cached session analytics ({len(cached_data)} sessions)")
+                logger.debug(
+                    f"Returning cached session analytics ({len(cached_data)} sessions)"
+                )
                 return cached_data
 
         logger.info(f"Retrieving recent sessions for analytics dashboard ({days} days)")
@@ -534,10 +539,9 @@ class DashboardAnalytics:
 
         # WebSocket-first: Broadcast updates if real-time manager available
         if self.realtime_manager:
-            self.realtime_manager.broadcast_widget_update("analytics_chart", {
-                "chart_type": chart_type,
-                "chart_data": result
-            })
+            self.realtime_manager.broadcast_widget_update(
+                "analytics_chart", {"chart_type": chart_type, "chart_data": result}
+            )
 
         return result
 
@@ -547,10 +551,9 @@ class DashboardAnalytics:
 
         # WebSocket-first: Broadcast timeline updates
         if self.realtime_manager:
-            self.realtime_manager.broadcast_widget_update("session_timeline", {
-                "days": days,
-                "timeline_data": result
-            })
+            self.realtime_manager.broadcast_widget_update(
+                "session_timeline", {"days": days, "timeline_data": result}
+            )
 
         return result
 
@@ -568,8 +571,12 @@ class DashboardAnalytics:
 
             # Calculate summary statistics
             total_sessions = len(sessions)
-            avg_duration = sum(s.get("duration_minutes", 0) for s in sessions) / total_sessions
-            avg_productivity = sum(s.get("productivity_score", 0) for s in sessions) / total_sessions
+            avg_duration = (
+                sum(s.get("duration_minutes", 0) for s in sessions) / total_sessions
+            )
+            avg_productivity = (
+                sum(s.get("productivity_score", 0) for s in sessions) / total_sessions
+            )
             total_focus_time = sum(s.get("focus_time_minutes", 0) for s in sessions)
 
             summary = {
@@ -579,13 +586,17 @@ class DashboardAnalytics:
                 "avg_productivity_score": round(avg_productivity, 2),
                 "total_focus_time_hours": round(total_focus_time / 60, 2),
                 "sessions_per_day": round(total_sessions / days, 2),
-                "peak_productivity_score": max(s.get("productivity_score", 0) for s in sessions),
+                "peak_productivity_score": max(
+                    s.get("productivity_score", 0) for s in sessions
+                ),
                 "total_context_size": sum(s.get("context_size", 0) for s in sessions),
             }
 
             # WebSocket-first: Broadcast summary updates
             if self.realtime_manager:
-                self.realtime_manager.broadcast_widget_update("analytics_summary", summary)
+                self.realtime_manager.broadcast_widget_update(
+                    "analytics_summary", summary
+                )
 
             return summary
 
@@ -614,31 +625,34 @@ class AnalyticsCoordinator:
                 "/api/analytics/recent-sessions/<int:days>",
                 "/api/analytics/chart/<chart_type>",
                 "/api/analytics/timeline/<int:days>",
-                "/api/session-timeline"
+                "/api/session-timeline",
             ],
             "chart_types": [
                 "health_trends",
                 "productivity_overview",
                 "productivity_trend",
                 "session_distribution",
-                "daily_productivity_pattern"
+                "daily_productivity_pattern",
             ],
             "features": [
                 "Real-time session analytics",
                 "Plotly chart generation",
                 "Cache-optimized processing",
                 "WebSocket broadcasting",
-                "Timeline visualization"
-            ]
+                "Timeline visualization",
+            ],
         }
 
 
 class ModuleStatus:
     """Track module extraction status"""
+
     EXTRACTION_STATUS = "extracted"
     ORIGINAL_LINES = 450  # Analytics, chart generation, and session processing
     TARGET_LINES = 450
     REDUCTION_TARGET = "WebSocket-first analytics with sophisticated Plotly charts"
 
 
-logger.info(f"dashboard_analytics module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}")
+logger.info(
+    f"dashboard_analytics module extracted - Status: {ModuleStatus.EXTRACTION_STATUS}"
+)

@@ -121,7 +121,9 @@ class MigrationProgress:
     @property
     def is_complete(self) -> bool:
         """Check if migration is complete."""
-        return (self.files_completed + self.files_failed + self.files_skipped) >= self.files_total
+        return (
+            self.files_completed + self.files_failed + self.files_skipped
+        ) >= self.files_total
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -130,7 +132,9 @@ class MigrationProgress:
             "start_time": self.start_time.isoformat(),
             "last_update_time": self.last_update_time.isoformat(),
             "estimated_completion_time": (
-                self.estimated_completion_time.isoformat() if self.estimated_completion_time else None
+                self.estimated_completion_time.isoformat()
+                if self.estimated_completion_time
+                else None
             ),
             "elapsed_time_seconds": self.elapsed_time_seconds,
             "files_progress_percentage": self.files_progress_percentage,
@@ -195,7 +199,9 @@ class ProgressTracker:
         performance_window_size: int = 100,  # Number of samples for moving average
         enable_system_monitoring: bool = True,
     ):
-        self.checkpoint_dir = Path(checkpoint_dir or Path.home() / ".claude" / "migration_checkpoints")
+        self.checkpoint_dir = Path(
+            checkpoint_dir or Path.home() / ".claude" / "migration_checkpoints"
+        )
         self.checkpoint_interval_seconds = checkpoint_interval_seconds
         self.performance_window_size = performance_window_size
         self.enable_system_monitoring = enable_system_monitoring
@@ -446,7 +452,9 @@ class ProgressTracker:
         logger.info(f"Created checkpoint: {checkpoint_id}")
         return checkpoint
 
-    async def load_checkpoint(self, checkpoint_id: str) -> Optional[MigrationCheckpoint]:
+    async def load_checkpoint(
+        self, checkpoint_id: str
+    ) -> Optional[MigrationCheckpoint]:
         """Load a migration checkpoint."""
         checkpoint_file = self.checkpoint_dir / f"{checkpoint_id}.json"
 
@@ -501,7 +509,9 @@ class ProgressTracker:
                     - self.current_progress.files_skipped,
                 )
 
-            logger.info(f"Resumed migration from checkpoint: {checkpoint.checkpoint_id}")
+            logger.info(
+                f"Resumed migration from checkpoint: {checkpoint.checkpoint_id}"
+            )
             self._notify_callbacks()
             return True
 
@@ -509,14 +519,18 @@ class ProgressTracker:
             logger.error(f"Failed to resume from checkpoint: {e}")
             return False
 
-    async def list_checkpoints(self, migration_id: Optional[str] = None) -> List[MigrationCheckpoint]:
+    async def list_checkpoints(
+        self, migration_id: Optional[str] = None
+    ) -> List[MigrationCheckpoint]:
         """List available checkpoints."""
         checkpoints = []
 
         try:
             for checkpoint_file in self.checkpoint_dir.glob("checkpoint_*.json"):
                 try:
-                    async with aiofiles.open(checkpoint_file, "r", encoding="utf-8") as file:
+                    async with aiofiles.open(
+                        checkpoint_file, "r", encoding="utf-8"
+                    ) as file:
                         data = json.loads(await file.read())
 
                     checkpoint = MigrationCheckpoint.from_dict(data)
@@ -550,7 +564,9 @@ class ProgressTracker:
 
         if elapsed > 0:
             current_rate = records_delta / elapsed
-            self.current_progress.current_processing_rate_records_per_second = current_rate
+            self.current_progress.current_processing_rate_records_per_second = (
+                current_rate
+            )
             self.performance_history["records_per_second"].append(current_rate)
 
             # Calculate moving average
@@ -558,7 +574,9 @@ class ProgressTracker:
                 avg_rate = sum(self.performance_history["records_per_second"]) / len(
                     self.performance_history["records_per_second"]
                 )
-                self.current_progress.average_processing_rate_records_per_second = avg_rate
+                self.current_progress.average_processing_rate_records_per_second = (
+                    avg_rate
+                )
 
     def _update_token_rates(self, tokens_delta: int):
         """Update token processing rate metrics."""
@@ -570,7 +588,9 @@ class ProgressTracker:
 
         if elapsed > 0:
             current_rate = tokens_delta / elapsed
-            self.current_progress.current_processing_rate_tokens_per_second = current_rate
+            self.current_progress.current_processing_rate_tokens_per_second = (
+                current_rate
+            )
             self.performance_history["tokens_per_second"].append(current_rate)
 
             # Calculate moving average
@@ -578,7 +598,9 @@ class ProgressTracker:
                 avg_rate = sum(self.performance_history["tokens_per_second"]) / len(
                     self.performance_history["tokens_per_second"]
                 )
-                self.current_progress.average_processing_rate_tokens_per_second = avg_rate
+                self.current_progress.average_processing_rate_tokens_per_second = (
+                    avg_rate
+                )
 
     def _update_eta(self):
         """Update estimated time to completion."""
@@ -591,13 +613,24 @@ class ProgressTracker:
             and self.current_progress.average_processing_rate_records_per_second > 0
         ):
 
-            remaining_records = self.current_progress.records_total - self.current_progress.records_processed
-            eta_seconds = remaining_records / self.current_progress.average_processing_rate_records_per_second
+            remaining_records = (
+                self.current_progress.records_total
+                - self.current_progress.records_processed
+            )
+            eta_seconds = (
+                remaining_records
+                / self.current_progress.average_processing_rate_records_per_second
+            )
 
-        elif self.current_progress.files_remaining > 0 and self.current_progress.files_completed > 0:
+        elif (
+            self.current_progress.files_remaining > 0
+            and self.current_progress.files_completed > 0
+        ):
 
             elapsed = self.current_progress.elapsed_time_seconds
-            files_per_second = self.current_progress.files_completed / elapsed if elapsed > 0 else 0
+            files_per_second = (
+                self.current_progress.files_completed / elapsed if elapsed > 0 else 0
+            )
 
             if files_per_second > 0:
                 eta_seconds = self.current_progress.files_remaining / files_per_second
@@ -607,7 +640,9 @@ class ProgressTracker:
             eta_seconds = None
 
         if eta_seconds is not None:
-            self.current_progress.estimated_completion_time = datetime.now() + timedelta(seconds=eta_seconds)
+            self.current_progress.estimated_completion_time = (
+                datetime.now() + timedelta(seconds=eta_seconds)
+            )
         else:
             self.current_progress.estimated_completion_time = None
 
@@ -626,7 +661,9 @@ class ProgressTracker:
             return
 
         now = datetime.now()
-        if (now - self.last_checkpoint_time).seconds >= self.checkpoint_interval_seconds:
+        if (
+            now - self.last_checkpoint_time
+        ).seconds >= self.checkpoint_interval_seconds:
             asyncio.create_task(self._create_auto_checkpoint())
 
     async def _create_auto_checkpoint(self):
@@ -642,7 +679,9 @@ class ProgressTracker:
         checkpoint_file = self.checkpoint_dir / f"{checkpoint.checkpoint_id}.json"
 
         async with aiofiles.open(checkpoint_file, "w", encoding="utf-8") as file:
-            await file.write(json.dumps(checkpoint.to_dict(), indent=2, ensure_ascii=False))
+            await file.write(
+                json.dumps(checkpoint.to_dict(), indent=2, ensure_ascii=False)
+            )
 
     def enable_auto_checkpoint(self, enabled: bool = True):
         """Enable or disable automatic checkpointing."""
@@ -665,7 +704,9 @@ class ProgressTracker:
                         cleaned_count += 1
 
                 except Exception as e:
-                    logger.warning(f"Failed to cleanup checkpoint {checkpoint_file}: {e}")
+                    logger.warning(
+                        f"Failed to cleanup checkpoint {checkpoint_file}: {e}"
+                    )
 
         except Exception as e:
             logger.error(f"Checkpoint cleanup failed: {e}")

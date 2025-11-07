@@ -700,6 +700,6 @@ For more troubleshooting help, see the [Troubleshooting Guide](../TROUBLESHOOTIN
 
 ---
 
-**Context Cleaner CLI Reference** - Complete command documentation for v0.2.0
+**Context Cleaner CLI Reference** - Complete command documentation for v0.3.0
 
 *Need more help? Check out the [User Guide](quickstart.md) or [Configuration Reference](configuration.md).*

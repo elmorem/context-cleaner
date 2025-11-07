@@ -66,7 +66,11 @@ class MigrationRecord:
             "direction": self.direction.value,
             "status": self.status.value,
             "started_at": self.started_at.strftime("%Y-%m-%d %H:%M:%S"),
-            "completed_at": self.completed_at.strftime("%Y-%m-%d %H:%M:%S") if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.strftime("%Y-%m-%d %H:%M:%S")
+                if self.completed_at
+                else None
+            ),
             "error_message": self.error_message or "",
             "checksum": self.checksum,
             "batch_size": self.batch_size,
@@ -78,7 +82,9 @@ class MigrationRecord:
 class Migration(ABC):
     """Base class for database migrations."""
 
-    def __init__(self, migration_id: str, version: str, name: str, description: str = ""):
+    def __init__(
+        self, migration_id: str, version: str, name: str, description: str = ""
+    ):
         self.migration_id = migration_id
         self.version = version
         self.name = name
@@ -86,7 +92,9 @@ class Migration(ABC):
         self.checksum = self._calculate_checksum()
 
     @abstractmethod
-    async def forward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def forward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """
         Execute forward migration.
 
@@ -100,7 +108,9 @@ class Migration(ABC):
         pass
 
     @abstractmethod
-    async def backward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def backward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """
         Execute backward migration (rollback).
 
@@ -144,14 +154,26 @@ class InitialSchemaMigration(Migration):
         )
         self.schema = ClickHouseSchema()
 
-    async def forward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def forward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """Create initial schema."""
-        result = {"success": True, "tables_created": [], "indexes_created": [], "views_created": [], "errors": []}
+        result = {
+            "success": True,
+            "tables_created": [],
+            "indexes_created": [],
+            "views_created": [],
+            "errors": [],
+        }
 
         try:
             # Create tables
             schemas = self.schema.get_table_schemas(client.database)
-            table_order = ["enhanced_token_summaries", "enhanced_token_details", "enhanced_analysis_metadata"]
+            table_order = [
+                "enhanced_token_summaries",
+                "enhanced_token_details",
+                "enhanced_analysis_metadata",
+            ]
 
             for table_name in table_order:
                 try:
@@ -196,9 +218,16 @@ class InitialSchemaMigration(Migration):
 
         return result
 
-    async def backward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def backward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """Drop initial schema."""
-        result = {"success": True, "tables_dropped": [], "views_dropped": [], "errors": []}
+        result = {
+            "success": True,
+            "tables_dropped": [],
+            "views_dropped": [],
+            "errors": [],
+        }
 
         try:
             # Drop views first
@@ -211,7 +240,11 @@ class InitialSchemaMigration(Migration):
                     result["errors"].append(f"Failed to drop view {view_name}: {e}")
 
             # Drop tables in reverse order
-            table_order = ["enhanced_analysis_metadata", "enhanced_token_details", "enhanced_token_summaries"]
+            table_order = [
+                "enhanced_analysis_metadata",
+                "enhanced_token_details",
+                "enhanced_token_summaries",
+            ]
             for table_name in table_order:
                 try:
                     drop_sql = f"DROP TABLE IF EXISTS {client.database}.{table_name}"
@@ -250,7 +283,9 @@ class InitialSchemaMigration(Migration):
 
             if conflicts:
                 validation["conflicts"] = conflicts
-                validation["warnings"].append(f"Existing tables will be affected: {', '.join(conflicts)}")
+                validation["warnings"].append(
+                    f"Existing tables will be affected: {', '.join(conflicts)}"
+                )
 
             # Check database permissions
             try:
@@ -279,7 +314,9 @@ class PerformanceOptimizationMigration(Migration):
             description="Add additional indexes and optimize table settings for 2.7B token dataset",
         )
 
-    async def forward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def forward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """Apply performance optimizations."""
         result = {"success": True, "optimizations_applied": [], "errors": []}
 
@@ -294,7 +331,9 @@ class PerformanceOptimizationMigration(Migration):
             for index_sql in skip_indexes:
                 try:
                     await client.execute_query(index_sql)
-                    result["optimizations_applied"].append(index_sql.split("ADD INDEX")[1].split("TYPE")[0].strip())
+                    result["optimizations_applied"].append(
+                        index_sql.split("ADD INDEX")[1].split("TYPE")[0].strip()
+                    )
                 except Exception as e:
                     result["errors"].append(f"Failed to add skip index: {e}")
 
@@ -307,7 +346,9 @@ class PerformanceOptimizationMigration(Migration):
             for setting_sql in settings_updates:
                 try:
                     await client.execute_query(setting_sql)
-                    result["optimizations_applied"].append("table_settings_optimization")
+                    result["optimizations_applied"].append(
+                        "table_settings_optimization"
+                    )
                 except Exception as e:
                     result["errors"].append(f"Failed to update table settings: {e}")
 
@@ -320,7 +361,9 @@ class PerformanceOptimizationMigration(Migration):
 
         return result
 
-    async def backward(self, client: ClickHouseClient, batch_size: int = 1000) -> Dict[str, Any]:
+    async def backward(
+        self, client: ClickHouseClient, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """Remove performance optimizations."""
         result = {"success": True, "optimizations_removed": [], "errors": []}
 
@@ -335,7 +378,9 @@ class PerformanceOptimizationMigration(Migration):
             for drop_sql in drop_indexes:
                 try:
                     await client.execute_query(drop_sql)
-                    result["optimizations_removed"].append(drop_sql.split("DROP INDEX")[1].strip())
+                    result["optimizations_removed"].append(
+                        drop_sql.split("DROP INDEX")[1].strip()
+                    )
                 except Exception as e:
                     result["errors"].append(f"Failed to drop skip index: {e}")
 
@@ -347,7 +392,12 @@ class PerformanceOptimizationMigration(Migration):
 
     async def validate(self, client: ClickHouseClient) -> Dict[str, Any]:
         """Validate performance optimization migration."""
-        validation = {"can_execute": True, "warnings": [], "table_sizes_acceptable": True, "indexes_ready": True}
+        validation = {
+            "can_execute": True,
+            "warnings": [],
+            "table_sizes_acceptable": True,
+            "indexes_ready": True,
+        }
 
         try:
             # Check table exists
@@ -356,7 +406,9 @@ class PerformanceOptimizationMigration(Migration):
 
             if len(tables_result) < 3:
                 validation["can_execute"] = False
-                validation["warnings"].append("Required tables not found - run initial migration first")
+                validation["warnings"].append(
+                    "Required tables not found - run initial migration first"
+                )
 
             # Check current table sizes for optimization feasibility
             size_query = f"""
@@ -421,7 +473,9 @@ class MigrationManager:
         if migration.migration_id not in self.migration_order:
             self.migration_order.append(migration.migration_id)
 
-        logger.info(f"Registered migration: {migration.migration_id} ({migration.name})")
+        logger.info(
+            f"Registered migration: {migration.migration_id} ({migration.name})"
+        )
 
     async def initialize_migration_tracking(self):
         """Initialize migration tracking table."""
@@ -465,9 +519,13 @@ class MigrationManager:
                     name=row["name"],
                     direction=MigrationDirection(row["direction"]),
                     status=MigrationStatus(row["status"]),
-                    started_at=datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")),
+                    started_at=datetime.fromisoformat(
+                        row["started_at"].replace("Z", "+00:00")
+                    ),
                     completed_at=(
-                        datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00"))
+                        datetime.fromisoformat(
+                            row["completed_at"].replace("Z", "+00:00")
+                        )
                         if row["completed_at"]
                         else None
                     ),
@@ -498,7 +556,9 @@ class MigrationManager:
 
         return pending
 
-    async def migrate_up(self, target_migration: Optional[str] = None, batch_size: int = 1000) -> Dict[str, Any]:
+    async def migrate_up(
+        self, target_migration: Optional[str] = None, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """
         Execute forward migrations.
 
@@ -525,9 +585,14 @@ class MigrationManager:
             pending_migrations = await self.get_pending_migrations()
 
             for idx, migration in enumerate(pending_migrations):
-                at_target = target_migration is not None and migration.migration_id == target_migration
+                at_target = (
+                    target_migration is not None
+                    and migration.migration_id == target_migration
+                )
 
-                logger.info(f"Applying migration: {migration.migration_id} ({migration.name})")
+                logger.info(
+                    f"Applying migration: {migration.migration_id} ({migration.name})"
+                )
 
                 # Validate migration
                 validation = await migration.validate(self.client)
@@ -554,11 +619,15 @@ class MigrationManager:
                         continue
 
                 # Execute migration
-                migration_result = await self._execute_migration(migration, MigrationDirection.FORWARD, batch_size)
+                migration_result = await self._execute_migration(
+                    migration, MigrationDirection.FORWARD, batch_size
+                )
 
                 if migration_result["success"]:
                     result["migrations_applied"].append(migration.migration_id)
-                    logger.info(f"Successfully applied migration: {migration.migration_id}")
+                    logger.info(
+                        f"Successfully applied migration: {migration.migration_id}"
+                    )
                     if at_target:
                         break
                 else:
@@ -572,7 +641,9 @@ class MigrationManager:
             if result["migrations_failed"]:
                 result["success"] = False
 
-            result["total_execution_time"] = (datetime.now() - start_time).total_seconds()
+            result["total_execution_time"] = (
+                datetime.now() - start_time
+            ).total_seconds()
 
         except Exception as e:
             result["success"] = False
@@ -581,7 +652,9 @@ class MigrationManager:
 
         return result
 
-    async def migrate_down(self, target_migration: str, batch_size: int = 1000) -> Dict[str, Any]:
+    async def migrate_down(
+        self, target_migration: str, batch_size: int = 1000
+    ) -> Dict[str, Any]:
         """
         Execute backward migrations (rollback).
 
@@ -617,21 +690,29 @@ class MigrationManager:
 
             if not target_found:
                 result["success"] = False
-                result["errors"].append(f"Target migration {target_migration} not found in applied migrations")
+                result["errors"].append(
+                    f"Target migration {target_migration} not found in applied migrations"
+                )
                 return result
 
             # Execute rollbacks
             for migration_id in rollback_migrations:
                 if migration_id not in self.migrations:
-                    result["errors"].append(f"Migration {migration_id} not registered - cannot rollback")
+                    result["errors"].append(
+                        f"Migration {migration_id} not registered - cannot rollback"
+                    )
                     result["migrations_failed"].append(migration_id)
                     continue
 
                 migration = self.migrations[migration_id]
-                logger.info(f"Rolling back migration: {migration_id} ({migration.name})")
+                logger.info(
+                    f"Rolling back migration: {migration_id} ({migration.name})"
+                )
 
                 # Execute rollback
-                migration_result = await self._execute_migration(migration, MigrationDirection.BACKWARD, batch_size)
+                migration_result = await self._execute_migration(
+                    migration, MigrationDirection.BACKWARD, batch_size
+                )
 
                 if migration_result["success"]:
                     result["migrations_rolled_back"].append(migration_id)
@@ -644,7 +725,9 @@ class MigrationManager:
             if result["migrations_failed"]:
                 result["success"] = False
 
-            result["total_execution_time"] = (datetime.now() - start_time).total_seconds()
+            result["total_execution_time"] = (
+                datetime.now() - start_time
+            ).total_seconds()
 
         except Exception as e:
             result["success"] = False
@@ -742,7 +825,12 @@ class MigrationManager:
             ]
 
             status["pending_migrations"] = [
-                {"id": m.migration_id, "name": m.name, "version": m.version, "description": m.description}
+                {
+                    "id": m.migration_id,
+                    "name": m.name,
+                    "version": m.version,
+                    "description": m.description,
+                }
                 for m in pending
             ]
 

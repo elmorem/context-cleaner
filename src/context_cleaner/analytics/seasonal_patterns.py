@@ -557,7 +557,7 @@ class SeasonalPatternDetector:
                 raise create_error_response(
                     "No seasonal patterns detected for productivity",
                     "NO_SEASONAL_PATTERNS",
-                    404
+                    404,
                 )
 
             productivity_analysis = analyses[0]
@@ -617,7 +617,7 @@ class SeasonalPatternDetector:
             raise create_error_response(
                 f"Productivity seasonality analysis failed: {str(e)}",
                 "SEASONALITY_ANALYSIS_ERROR",
-                500
+                500,
             )
 
     def forecast_seasonal_values(
@@ -638,7 +638,7 @@ class SeasonalPatternDetector:
                 raise create_error_response(
                     "No pattern values available for forecasting",
                     "NO_PATTERN_VALUES",
-                    400
+                    400,
                 )
 
             # Generate forecast based on seasonal pattern
@@ -677,9 +677,7 @@ class SeasonalPatternDetector:
         except Exception as e:
             logger.error(f"Seasonal forecasting failed: {e}")
             raise create_error_response(
-                f"Seasonal forecasting failed: {str(e)}",
-                "FORECASTING_ERROR",
-                500
+                f"Seasonal forecasting failed: {str(e)}", "FORECASTING_ERROR", 500
             )
 
     # Private analysis methods

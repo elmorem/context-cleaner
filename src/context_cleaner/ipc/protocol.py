@@ -65,7 +65,9 @@ class SupervisorRequest:
     action: RequestAction
     protocol_version: ProtocolVersion = ProtocolVersion.V1_0
     request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: dt.datetime = field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
+    timestamp: dt.datetime = field(
+        default_factory=lambda: dt.datetime.now(dt.timezone.utc)
+    )
     options: Dict[str, Any] = field(default_factory=dict)
     filters: Dict[str, Any] = field(default_factory=dict)
     streaming: bool = False
@@ -142,7 +144,9 @@ class SupervisorRequest:
 
         return cls(
             action=action,
-            protocol_version=ProtocolVersion(data.get("protocol_version", ProtocolVersion.V1_0.value)),
+            protocol_version=ProtocolVersion(
+                data.get("protocol_version", ProtocolVersion.V1_0.value)
+            ),
             request_id=data.get("request_id", str(uuid.uuid4())),
             timestamp=timestamp,
             options=data.get("options", {}),
@@ -178,7 +182,9 @@ class StreamChunk:
     @classmethod
     def from_json(cls, payload: str) -> "StreamChunk":
         data = json.loads(payload)
-        server_timestamp = dt.datetime.strptime(data["server_timestamp"], ISO8601).replace(tzinfo=dt.timezone.utc)
+        server_timestamp = dt.datetime.strptime(
+            data["server_timestamp"], ISO8601
+        ).replace(tzinfo=dt.timezone.utc)
         raw_payload = base64.b64decode(data.get("payload", ""))
         return cls(
             request_id=data["request_id"],
@@ -195,7 +201,9 @@ class SupervisorResponse:
     request_id: str
     status: str
     protocol_version: ProtocolVersion = ProtocolVersion.V1_0
-    server_timestamp: dt.datetime = field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
+    server_timestamp: dt.datetime = field(
+        default_factory=lambda: dt.datetime.now(dt.timezone.utc)
+    )
     progress: Optional[float] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[Dict[str, Any]] = None
@@ -222,11 +230,15 @@ class SupervisorResponse:
     @classmethod
     def from_json(cls, payload: str) -> "SupervisorResponse":
         data = json.loads(payload)
-        server_timestamp = dt.datetime.strptime(data["server_timestamp"], ISO8601).replace(tzinfo=dt.timezone.utc)
+        server_timestamp = dt.datetime.strptime(
+            data["server_timestamp"], ISO8601
+        ).replace(tzinfo=dt.timezone.utc)
         progress = data.get("progress")
         result = data.get("result")
         error = data.get("error")
-        protocol_version = ProtocolVersion(data.get("protocol_version", ProtocolVersion.V1_0.value))
+        protocol_version = ProtocolVersion(
+            data.get("protocol_version", ProtocolVersion.V1_0.value)
+        )
         return cls(
             request_id=data["request_id"],
             status=data["status"],

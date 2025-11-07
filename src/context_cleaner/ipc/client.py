@@ -42,7 +42,9 @@ class SupervisorClient:
     ) -> None:
         self.endpoint = endpoint or default_supervisor_endpoint()
         self._transport = transport or self._build_transport()
-        self._auth_token = auth_token or os.environ.get("CONTEXT_CLEANER_SUPERVISOR_TOKEN")
+        self._auth_token = auth_token or os.environ.get(
+            "CONTEXT_CLEANER_SUPERVISOR_TOKEN"
+        )
 
     def _build_transport(self) -> Transport:
         if os.name == "nt":

@@ -15,15 +15,16 @@ from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
+
 class EventBus:
     """Event bus for internal event handling and WebSocket broadcasting"""
 
     def __init__(self):
         self.subscribers: Dict[str, List[Callable]] = {}
-        self.websocket_manager: Optional['ConnectionManager'] = None
+        self.websocket_manager: Optional["ConnectionManager"] = None
         self._lock = asyncio.Lock()
 
-    def set_websocket_manager(self, manager: 'ConnectionManager'):
+    def set_websocket_manager(self, manager: "ConnectionManager"):
         """Set the WebSocket manager for broadcasting"""
         self.websocket_manager = manager
 
@@ -62,7 +63,7 @@ class EventBus:
                 message = {
                     "type": event_type,
                     "data": data,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 await self.websocket_manager.broadcast_to_topic(event_type, message)
 
@@ -72,15 +73,16 @@ class EventBus:
             message = {
                 "type": event_type,
                 "data": data,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             await self.websocket_manager.send_to_client(client_id, message)
+
 
 class ConnectionManager:
     """WebSocket connection manager with subscription handling"""
 
     def __init__(self):
-        self.active_connections: Dict[str, 'WebSocket'] = {}
+        self.active_connections: Dict[str, "WebSocket"] = {}
         self.client_subscriptions: Dict[str, Set[str]] = {}
         self.topic_subscribers: Dict[str, Set[str]] = {}
         self._lock = asyncio.Lock()
@@ -105,10 +107,10 @@ class ConnectionManager:
                         "dashboard.metrics.updated",
                         "widget.data.updated",
                         "system.health.changed",
-                        "cost.threshold.exceeded"
-                    ]
+                        "cost.threshold.exceeded",
+                    ],
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             await self._send_message(websocket, welcome_msg)
 
@@ -167,7 +169,9 @@ class ConnectionManager:
         if topic not in self.topic_subscribers:
             return
 
-        subscribers = list(self.topic_subscribers[topic])  # Copy to avoid modification during iteration
+        subscribers = list(
+            self.topic_subscribers[topic]
+        )  # Copy to avoid modification during iteration
         disconnected_clients = []
 
         for client_id in subscribers:
@@ -203,12 +207,15 @@ class ConnectionManager:
         async with self._lock:
             return {
                 "active_connections": len(self.active_connections),
-                "total_subscriptions": sum(len(subs) for subs in self.client_subscriptions.values()),
+                "total_subscriptions": sum(
+                    len(subs) for subs in self.client_subscriptions.values()
+                ),
                 "topics_with_subscribers": len(self.topic_subscribers),
                 "clients": list(self.active_connections.keys()),
                 "topic_subscriber_counts": {
-                    topic: len(subscribers) for topic, subscribers in self.topic_subscribers.items()
-                }
+                    topic: len(subscribers)
+                    for topic, subscribers in self.topic_subscribers.items()
+                },
             }
 
     async def handle_client_message(self, client_id: str, message: str) -> bool:
@@ -225,7 +232,7 @@ class ConnectionManager:
                     ack_msg = {
                         "type": "subscription.ack",
                         "data": {"topic": topic, "subscribed": True},
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
                     await self.send_to_client(client_id, ack_msg)
                     return True
@@ -238,7 +245,7 @@ class ConnectionManager:
                     ack_msg = {
                         "type": "unsubscription.ack",
                         "data": {"topic": topic, "subscribed": False},
-                        "timestamp": datetime.now().isoformat()
+                        "timestamp": datetime.now().isoformat(),
                     }
                     await self.send_to_client(client_id, ack_msg)
                     return True
@@ -248,13 +255,15 @@ class ConnectionManager:
                 pong_msg = {
                     "type": "pong",
                     "data": {"timestamp": datetime.now().isoformat()},
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 await self.send_to_client(client_id, pong_msg)
                 return True
 
             else:
-                logger.warning(f"Unknown message type from client {client_id}: {message_type}")
+                logger.warning(
+                    f"Unknown message type from client {client_id}: {message_type}"
+                )
                 return False
 
         except json.JSONDecodeError:
@@ -277,12 +286,13 @@ class ConnectionManager:
         """Custom JSON serializer for WebSocket messages"""
         if isinstance(obj, datetime):
             return obj.isoformat()
-        elif hasattr(obj, 'dict'):  # Pydantic models
+        elif hasattr(obj, "dict"):  # Pydantic models
             return obj.dict()
-        elif hasattr(obj, '__dict__'):  # Other objects
+        elif hasattr(obj, "__dict__"):  # Other objects
             return obj.__dict__
         else:
             raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
 
 class HeartbeatManager:
     """Manages WebSocket connection heartbeats"""
@@ -332,9 +342,11 @@ class HeartbeatManager:
                 "type": "heartbeat",
                 "data": {
                     "server_time": datetime.now().isoformat(),
-                    "active_connections": stats["active_connections"]
+                    "active_connections": stats["active_connections"],
                 },
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             # Broadcast heartbeat as system message
-            await self.connection_manager.broadcast_to_topic("system.heartbeat", heartbeat_msg)
+            await self.connection_manager.broadcast_to_topic(
+                "system.heartbeat", heartbeat_msg
+            )

@@ -4,9 +4,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class APIResponseFormatter:
     """Standardized API response formatting for consistent frontend consumption."""
-    
+
     @staticmethod
     def success(data: Any, message: str = None) -> Dict[str, Any]:
         """Format successful API response."""
@@ -15,11 +16,13 @@ class APIResponseFormatter:
             "data": data,
             "message": message,
             "timestamp": datetime.now().isoformat(),
-            "error": None
+            "error": None,
         }
-    
+
     @staticmethod
-    def error(message: str, error_code: str = None, data: Any = None, status_code: int = 500) -> Dict[str, Any]:
+    def error(
+        message: str, error_code: str = None, data: Any = None, status_code: int = 500
+    ) -> Dict[str, Any]:
         """Format error API response."""
         return {
             "status": "error",
@@ -27,9 +30,9 @@ class APIResponseFormatter:
             "message": message,
             "error_code": error_code,
             "timestamp": datetime.now().isoformat(),
-            "error": message
+            "error": message,
         }
-    
+
     @staticmethod
     def degraded(data: Any, message: str, warning_code: str = None) -> Dict[str, Any]:
         """Format degraded service response with partial data."""
@@ -39,9 +42,9 @@ class APIResponseFormatter:
             "message": message,
             "warning_code": warning_code,
             "timestamp": datetime.now().isoformat(),
-            "error": None
+            "error": None,
         }
-    
+
     @staticmethod
     def loading(message: str = "Loading...", progress: float = None) -> Dict[str, Any]:
         """Format loading state response."""
@@ -51,7 +54,7 @@ class APIResponseFormatter:
             "message": message,
             "progress": progress,
             "timestamp": datetime.now().isoformat(),
-            "error": None
+            "error": None,
         }
 
     @staticmethod
@@ -61,18 +64,17 @@ class APIResponseFormatter:
             try:
                 # Basic schema validation
                 if isinstance(expected_schema, dict) and isinstance(data, dict):
-                    for required_field in expected_schema.get('required', []):
+                    for required_field in expected_schema.get("required", []):
                         if required_field not in data:
                             return APIResponseFormatter.error(
                                 f"Missing required field: {required_field}",
-                                error_code="INVALID_SCHEMA"
+                                error_code="INVALID_SCHEMA",
                             )
                 return APIResponseFormatter.success(data)
             except Exception as e:
                 logger.error(f"Schema validation error: {e}")
                 return APIResponseFormatter.error(
-                    "Data validation failed",
-                    error_code="VALIDATION_ERROR"
+                    "Data validation failed", error_code="VALIDATION_ERROR"
                 )
         else:
             return APIResponseFormatter.success(data)

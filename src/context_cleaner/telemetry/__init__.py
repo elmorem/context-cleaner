@@ -6,7 +6,7 @@ telemetry data from Claude Code sessions to optimize performance, cost, and reli
 
 Key features:
 - Error recovery and resilience patterns
-- Cost optimization and budget management  
+- Cost optimization and budget management
 - Workflow pattern recognition and automation
 - Real-time analytics and insights
 """
@@ -21,7 +21,7 @@ __version__ = "1.1.0"
 
 __all__ = [
     "ClickHouseClient",
-    "ErrorRecoveryManager", 
+    "ErrorRecoveryManager",
     "CostOptimizationEngine",
     "JsonlProcessorService",
     "FullContentQueries",

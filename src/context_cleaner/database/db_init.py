@@ -108,20 +108,29 @@ class DatabaseInitializer:
             Initialization result with status and details
         """
         start_time = datetime.now()
-        result = InitializationResult(status=InitializationStatus.FAILED, message="Initialization not started")
+        result = InitializationResult(
+            status=InitializationStatus.FAILED, message="Initialization not started"
+        )
 
         try:
-            logger.info(f"Starting database initialization (force={force}, dry_run={self.dry_run})")
+            logger.info(
+                f"Starting database initialization (force={force}, dry_run={self.dry_run})"
+            )
 
             # Step 1: Verify connection
             self._last_connection_failure_reason = None
             self._last_connection_failure_detail = None
             connection_ok = await self._verify_connection()
-            if not connection_ok and self._last_connection_failure_reason == "version_query_empty":
+            if (
+                not connection_ok
+                and self._last_connection_failure_reason == "version_query_empty"
+            ):
                 # Attempt lightweight probe before failing hard
                 connection_ok = await self._basic_connection_probe()
                 if connection_ok:
-                    logger.warning("Version check failed but basic probe succeeded; continuing initialization")
+                    logger.warning(
+                        "Version check failed but basic probe succeeded; continuing initialization"
+                    )
 
             if not connection_ok:
                 reason = self._last_connection_failure_reason
@@ -130,7 +139,9 @@ class DatabaseInitializer:
                 if reason == "exception":
                     result.status = InitializationStatus.FAILED
                     error_message = detail or "Unknown connection error"
-                    result.message = f"Initialization failed with exception: {error_message}"
+                    result.message = (
+                        f"Initialization failed with exception: {error_message}"
+                    )
                     result.errors.append(error_message)
                 else:
                     result.status = InitializationStatus.CONNECTION_FAILED
@@ -144,7 +155,9 @@ class DatabaseInitializer:
 
             if schema_conflicts and not force:
                 result.status = InitializationStatus.VALIDATION_FAILED
-                result.message = f"Schema conflicts detected: {', '.join(schema_conflicts)}"
+                result.message = (
+                    f"Schema conflicts detected: {', '.join(schema_conflicts)}"
+                )
                 result.warnings.extend(schema_conflicts)
                 return result
 
@@ -178,12 +191,20 @@ class DatabaseInitializer:
 
             # Determine final status
             if result.errors:
-                if result.tables_created or result.indexes_created or result.views_created:
+                if (
+                    result.tables_created
+                    or result.indexes_created
+                    or result.views_created
+                ):
                     result.status = InitializationStatus.PARTIAL_SUCCESS
-                    result.message = f"Partial success: {len(result.errors)} errors occurred"
+                    result.message = (
+                        f"Partial success: {len(result.errors)} errors occurred"
+                    )
                 else:
                     result.status = InitializationStatus.FAILED
-                    result.message = f"Initialization failed: {len(result.errors)} errors"
+                    result.message = (
+                        f"Initialization failed: {len(result.errors)} errors"
+                    )
             else:
                 result.status = InitializationStatus.SUCCESS
                 result.message = "Database initialization completed successfully"
@@ -191,7 +212,10 @@ class DatabaseInitializer:
             execution_time = (datetime.now() - start_time).total_seconds()
             result.execution_time_seconds = execution_time
 
-            logger.info(f"Database initialization completed: {result.status.value} " f"in {execution_time:.2f}s")
+            logger.info(
+                f"Database initialization completed: {result.status.value} "
+                f"in {execution_time:.2f}s"
+            )
 
             return result
 
@@ -212,7 +236,9 @@ class DatabaseInitializer:
             if not health_check:
                 logger.error("Health check failed during connection verification")
                 self._last_connection_failure_reason = "health_check_failed"
-                self._last_connection_failure_detail = "Health check failed during connection verification"
+                self._last_connection_failure_detail = (
+                    "Health check failed during connection verification"
+                )
                 return False
 
             if require_version:
@@ -221,13 +247,17 @@ class DatabaseInitializer:
                 if not result:
                     logger.error("Version query failed during connection verification")
                     self._last_connection_failure_reason = "version_query_empty"
-                    self._last_connection_failure_detail = "Version query returned no results"
+                    self._last_connection_failure_detail = (
+                        "Version query returned no results"
+                    )
                     return False
 
                 version = result[0].get("version()", "unknown")
                 logger.info(f"Successfully connected to ClickHouse version: {version}")
             else:
-                logger.info("Successfully completed lightweight connection verification")
+                logger.info(
+                    "Successfully completed lightweight connection verification"
+                )
             self._last_connection_failure_reason = None
             self._last_connection_failure_detail = None
             return True
@@ -265,7 +295,9 @@ class DatabaseInitializer:
             logger.warning(f"Could not retrieve existing tables: {e}")
             return []
 
-    def _check_schema_conflicts(self, existing_tables: List[str], force: bool) -> List[str]:
+    def _check_schema_conflicts(
+        self, existing_tables: List[str], force: bool
+    ) -> List[str]:
         """Check for schema conflicts with existing tables."""
         conflicts = []
         expected_tables = set(self.schema.get_table_schemas().keys())
@@ -292,7 +324,11 @@ class DatabaseInitializer:
         schemas = self.schema.get_table_schemas(self.database_name)
 
         # Create tables in dependency order
-        table_order = ["enhanced_token_summaries", "enhanced_token_details", "enhanced_analysis_metadata"]
+        table_order = [
+            "enhanced_token_summaries",
+            "enhanced_token_details",
+            "enhanced_analysis_metadata",
+        ]
 
         for table_name in table_order:
             try:
@@ -304,7 +340,9 @@ class DatabaseInitializer:
 
                 # Drop table if force is enabled
                 if force and not self.dry_run:
-                    drop_query = f"DROP TABLE IF EXISTS {self.database_name}.{table_name}"
+                    drop_query = (
+                        f"DROP TABLE IF EXISTS {self.database_name}.{table_name}"
+                    )
                     await self.client.execute_query(drop_query)
                     logger.info(f"Dropped existing table: {table_name}")
 
@@ -313,7 +351,9 @@ class DatabaseInitializer:
                     await self.client.execute_query(schema.create_sql)
 
                 result["created"].append(table_name)
-                logger.info(f"{'[DRY RUN] ' if self.dry_run else ''}Created table: {table_name}")
+                logger.info(
+                    f"{'[DRY RUN] ' if self.dry_run else ''}Created table: {table_name}"
+                )
 
             except Exception as e:
                 error_msg = f"Failed to create table {table_name}: {e}"
@@ -339,7 +379,8 @@ class DatabaseInitializer:
                     result["created"].append(index_name)
 
                 logger.info(
-                    f"{'[DRY RUN] ' if self.dry_run else ''}" f"Created {len(index_sqls)} indexes for {table_name}"
+                    f"{'[DRY RUN] ' if self.dry_run else ''}"
+                    f"Created {len(index_sqls)} indexes for {table_name}"
                 )
 
             except Exception as e:
@@ -361,7 +402,9 @@ class DatabaseInitializer:
                     await self.client.execute_query(view_sql)
 
                 result["created"].append(view_name)
-                logger.info(f"{'[DRY RUN] ' if self.dry_run else ''}Created view: {view_name}")
+                logger.info(
+                    f"{'[DRY RUN] ' if self.dry_run else ''}Created view: {view_name}"
+                )
 
             except Exception as e:
                 error_msg = f"Failed to create view {view_name}: {e}"
@@ -391,18 +434,24 @@ class DatabaseInitializer:
 
             if missing_tables:
                 result["valid"] = False
-                result["warnings"].extend([f"Missing table: {table}" for table in missing_tables])
+                result["warnings"].extend(
+                    [f"Missing table: {table}" for table in missing_tables]
+                )
 
             # Run consistency checks
             if not self.dry_run:
-                consistency_checks = self.schema.get_data_consistency_check_sql(self.database_name)
+                consistency_checks = self.schema.get_data_consistency_check_sql(
+                    self.database_name
+                )
                 for check_name, check_sql in consistency_checks.items():
                     try:
                         # Run consistency check (will be empty for new database)
                         await self.client.execute_query(check_sql)
                         logger.debug(f"Consistency check '{check_name}' passed")
                     except Exception as e:
-                        result["warnings"].append(f"Consistency check '{check_name}' failed: {e}")
+                        result["warnings"].append(
+                            f"Consistency check '{check_name}' failed: {e}"
+                        )
 
         except Exception as e:
             result["valid"] = False
@@ -431,7 +480,9 @@ class DatabaseInitializer:
             # Check connection
             if not await self._verify_connection(require_version=False):
                 validation_result["compatible"] = False
-                validation_result["compatibility_issues"].append("Cannot connect to database")
+                validation_result["compatibility_issues"].append(
+                    "Cannot connect to database"
+                )
                 return validation_result
 
             # Get existing tables
@@ -456,12 +507,16 @@ class DatabaseInitializer:
                     validation_result["schema_version"] = version_result[0]["version"]
                 else:
                     validation_result["schema_version"] = "not_tracked"
-                    validation_result["recommendations"].append("Schema version is not being tracked")
+                    validation_result["recommendations"].append(
+                        "Schema version is not being tracked"
+                    )
             except Exception:
                 validation_result["schema_version"] = "unknown"
 
             # Performance monitoring checks
-            perf_queries = self.schema.get_performance_monitoring_sql(self.database_name)
+            perf_queries = self.schema.get_performance_monitoring_sql(
+                self.database_name
+            )
             for check_name, check_sql in perf_queries.items():
                 try:
                     await self.client.execute_query(check_sql)
@@ -472,7 +527,9 @@ class DatabaseInitializer:
 
         except Exception as e:
             validation_result["compatible"] = False
-            validation_result["compatibility_issues"].append(f"Schema validation failed: {e}")
+            validation_result["compatibility_issues"].append(
+                f"Schema validation failed: {e}"
+            )
 
         return validation_result
 
@@ -525,7 +582,9 @@ class DatabaseInitializer:
 
         return configs.get(environment, configs["development"])
 
-    async def create_client_from_environment(self, environment: str) -> ClickHouseClient:
+    async def create_client_from_environment(
+        self, environment: str
+    ) -> ClickHouseClient:
         """
         Create ClickHouse client configured for specific environment.
 

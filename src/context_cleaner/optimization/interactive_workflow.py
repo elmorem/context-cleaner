@@ -134,6 +134,7 @@ class InteractiveWorkflowManager:
         """Get accurate token count using ccusage approach."""
         try:
             from ..analysis.enhanced_token_counter import get_accurate_token_count
+
             return get_accurate_token_count(content_str)
         except ImportError:
             return 0
@@ -365,7 +366,9 @@ class InteractiveWorkflowManager:
         )
 
         # Count deferred operations as rejected so reporting reflects user choices
-        deferred_operations = len(session.manipulation_plan.operations) - len(selected_ops)
+        deferred_operations = len(session.manipulation_plan.operations) - len(
+            selected_ops
+        )
         if deferred_operations > 0:
             result.operations_rejected += deferred_operations
 
@@ -626,7 +629,9 @@ class InteractiveWorkflowManager:
                                 operation_type="remove",
                                 target_keys=[key],
                                 operation_data={"removal_reason": "completed_item"},
-                                estimated_token_impact=-self._get_accurate_token_count(value),
+                                estimated_token_impact=-self._get_accurate_token_count(
+                                    value
+                                ),
                                 confidence_score=0.9,
                                 reasoning=f"Remove completed item: {key}",
                                 requires_confirmation=True,

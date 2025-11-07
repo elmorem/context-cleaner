@@ -32,7 +32,9 @@ def setup_logging(verbose: bool = False):
     """Setup logging for CLI commands."""
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
 
 
@@ -47,8 +49,15 @@ def migration(ctx, verbose):
 
 
 @migration.command()
-@click.option("--path", "-p", multiple=True, help="Search paths for JSONL files (can specify multiple)")
-@click.option("--pattern", default="*.jsonl", help="File pattern to match (default: *.jsonl)")
+@click.option(
+    "--path",
+    "-p",
+    multiple=True,
+    help="Search paths for JSONL files (can specify multiple)",
+)
+@click.option(
+    "--pattern", default="*.jsonl", help="File pattern to match (default: *.jsonl)"
+)
 @click.option("--output", "-o", help="Output manifest file path")
 @click.option("--max-files", type=int, help="Maximum number of files to discover")
 @click.option("--max-age-days", type=int, help="Maximum file age in days")
@@ -60,8 +69,12 @@ def migration(ctx, verbose):
     default="priority_asc",
     help="Sort order for processing",
 )
-@click.option("--check-integrity", is_flag=True, help="Check file integrity during discovery")
-@click.option("--analyze-content", is_flag=True, help="Analyze file content for estimates")
+@click.option(
+    "--check-integrity", is_flag=True, help="Check file integrity during discovery"
+)
+@click.option(
+    "--analyze-content", is_flag=True, help="Analyze file content for estimates"
+)
 @click.pass_context
 def discover_jsonl(
     ctx,
@@ -143,7 +156,9 @@ def discover_jsonl(
             # Save manifest if requested
             if output:
                 output_path = Path(output).expanduser().resolve()
-                success = await discovery_service.save_manifest(result, str(output_path))
+                success = await discovery_service.save_manifest(
+                    result, str(output_path)
+                )
                 if success:
                     click.echo(f"\n💾 Manifest saved to: {output_path}")
                 else:
@@ -176,17 +191,42 @@ def discover_jsonl(
 
 @migration.command()
 @click.option("--manifest", "-m", help="Discovery manifest file to use")
-@click.option("--path", "-p", multiple=True, help="Search paths if no manifest provided")
-@click.option("--batch-size", "-b", default=1000, type=int, help="Batch size for processing")
-@click.option("--max-concurrent", "-c", default=3, type=int, help="Maximum concurrent file processing")
-@click.option("--max-memory-mb", default=1500, type=int, help="Maximum memory usage in MB")
-@click.option("--checkpoint-interval", default=10, type=int, help="Files between checkpoints")
-@click.option("--dry-run", is_flag=True, help="Validate without actually migrating data")
+@click.option(
+    "--path", "-p", multiple=True, help="Search paths if no manifest provided"
+)
+@click.option(
+    "--batch-size", "-b", default=1000, type=int, help="Batch size for processing"
+)
+@click.option(
+    "--max-concurrent",
+    "-c",
+    default=3,
+    type=int,
+    help="Maximum concurrent file processing",
+)
+@click.option(
+    "--max-memory-mb", default=1500, type=int, help="Maximum memory usage in MB"
+)
+@click.option(
+    "--checkpoint-interval", default=10, type=int, help="Files between checkpoints"
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Validate without actually migrating data"
+)
 @click.option("--resume-from", help="Checkpoint ID to resume from")
 @click.option("--force", is_flag=True, help="Force migration even if validation fails")
 @click.pass_context
 def migrate_historical(
-    ctx, manifest, path, batch_size, max_concurrent, max_memory_mb, checkpoint_interval, dry_run, resume_from, force
+    ctx,
+    manifest,
+    path,
+    batch_size,
+    max_concurrent,
+    max_memory_mb,
+    checkpoint_interval,
+    dry_run,
+    resume_from,
+    force,
 ):
     """Migrate historical JSONL data to ClickHouse database."""
 
@@ -253,7 +293,9 @@ def migrate_historical(
                 click.echo("❌ Migration completed with errors")
 
             click.echo(f"\n📊 Migration Summary:")
-            click.echo(f"   📁 Files processed: {result.total_files_processed}/{result.total_files_discovered}")
+            click.echo(
+                f"   📁 Files processed: {result.total_files_processed}/{result.total_files_discovered}"
+            )
             click.echo(f"   ✅ Files succeeded: {result.files_succeeded}")
             click.echo(f"   ❌ Files failed: {result.files_failed}")
             click.echo(f"   ⏭️  Files skipped: {result.files_skipped}")
@@ -263,8 +305,12 @@ def migrate_historical(
 
             click.echo(f"\n⚡ Performance Metrics:")
             click.echo(f"   ⏱️  Duration: {result.processing_duration_seconds:.1f}s")
-            click.echo(f"   📄 Files/min: {result.average_processing_rate_files_per_minute:.1f}")
-            click.echo(f"   🎯 Tokens/sec: {result.average_processing_rate_tokens_per_second:.0f}")
+            click.echo(
+                f"   📄 Files/min: {result.average_processing_rate_files_per_minute:.1f}"
+            )
+            click.echo(
+                f"   🎯 Tokens/sec: {result.average_processing_rate_tokens_per_second:.0f}"
+            )
             click.echo(f"   💾 Peak memory: {result.peak_memory_usage_mb:.1f}MB")
 
             if result.checkpoints_created:
@@ -303,13 +349,28 @@ def migrate_historical(
 
 @migration.command()
 @click.option("--migration-id", "-m", help="Specific migration ID to check")
-@click.option("--show-progress", is_flag=True, help="Show detailed progress information")
+@click.option(
+    "--show-progress", is_flag=True, help="Show detailed progress information"
+)
 @click.option("--show-errors", is_flag=True, help="Show recent errors and warnings")
 @click.option("--show-performance", is_flag=True, help="Show performance metrics")
 @click.option("--watch", "-w", is_flag=True, help="Watch progress in real-time")
-@click.option("--refresh-interval", default=5, type=int, help="Refresh interval for watch mode (seconds)")
+@click.option(
+    "--refresh-interval",
+    default=5,
+    type=int,
+    help="Refresh interval for watch mode (seconds)",
+)
 @click.pass_context
-def migration_status(ctx, migration_id, show_progress, show_errors, show_performance, watch, refresh_interval):
+def migration_status(
+    ctx,
+    migration_id,
+    show_progress,
+    show_errors,
+    show_performance,
+    watch,
+    refresh_interval,
+):
     """Show migration status and progress."""
 
     async def show_status():
@@ -330,13 +391,19 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
 
                 click.echo(f"📊 Migration Status: {migration_id}")
                 click.echo(f"   Type: {migration_result['migration_type']}")
-                click.echo(f"   Status: {'✅ Success' if migration_result['success'] else '❌ Failed'}")
-                click.echo(f"   Progress: {migration_result['completion_percentage']:.1f}%")
+                click.echo(
+                    f"   Status: {'✅ Success' if migration_result['success'] else '❌ Failed'}"
+                )
+                click.echo(
+                    f"   Progress: {migration_result['completion_percentage']:.1f}%"
+                )
 
                 if current_progress and show_progress:
                     click.echo(f"\n🔄 Current Progress:")
                     click.echo(f"   Phase: {current_progress['current_phase']}")
-                    click.echo(f"   Files: {current_progress['files_completed']}/{current_progress['files_total']}")
+                    click.echo(
+                        f"   Files: {current_progress['files_completed']}/{current_progress['files_total']}"
+                    )
                     click.echo(
                         f"   Records: {current_progress['records_processed']:,}/{current_progress['records_total']:,}"
                     )
@@ -352,7 +419,9 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
                     click.echo(f"🔄 Active Migration: {current_progress.migration_id}")
                     click.echo(f"   Type: {current_progress.migration_type}")
                     click.echo(f"   Phase: {current_progress.current_phase}")
-                    click.echo(f"   Overall Progress: {current_progress.overall_progress_percentage:.1f}%")
+                    click.echo(
+                        f"   Overall Progress: {current_progress.overall_progress_percentage:.1f}%"
+                    )
 
                     if show_progress:
                         click.echo(f"\n📊 Detailed Progress:")
@@ -371,11 +440,19 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
 
                     if show_performance:
                         click.echo(f"\n⚡ Performance:")
-                        click.echo(f"   Records/sec: {current_progress.current_processing_rate_records_per_second:.0f}")
-                        click.echo(f"   Tokens/sec: {current_progress.current_processing_rate_tokens_per_second:.0f}")
-                        click.echo(f"   Elapsed: {current_progress.elapsed_time_seconds:.0f}s")
+                        click.echo(
+                            f"   Records/sec: {current_progress.current_processing_rate_records_per_second:.0f}"
+                        )
+                        click.echo(
+                            f"   Tokens/sec: {current_progress.current_processing_rate_tokens_per_second:.0f}"
+                        )
+                        click.echo(
+                            f"   Elapsed: {current_progress.elapsed_time_seconds:.0f}s"
+                        )
                         if current_progress.eta_seconds:
-                            click.echo(f"   ETA: {current_progress.eta_seconds/60:.1f}m")
+                            click.echo(
+                                f"   ETA: {current_progress.eta_seconds/60:.1f}m"
+                            )
 
                     if show_errors:
                         click.echo(f"\n🚨 Issues:")
@@ -391,7 +468,10 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
                 if checkpoints:
                     click.echo(f"\n🔄 Available Checkpoints ({len(checkpoints)}):")
                     for checkpoint in checkpoints[:3]:
-                        click.echo(f"   • {checkpoint['checkpoint_id']} " f"({checkpoint['timestamp']})")
+                        click.echo(
+                            f"   • {checkpoint['checkpoint_id']} "
+                            f"({checkpoint['timestamp']})"
+                        )
 
             return 0
 
@@ -412,10 +492,14 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
             try:
                 while True:
                     click.clear()
-                    click.echo(f"🔍 Migration Status (refreshing every {refresh_interval}s)")
+                    click.echo(
+                        f"🔍 Migration Status (refreshing every {refresh_interval}s)"
+                    )
                     click.echo("=" * 60)
                     await show_status()
-                    click.echo(f"\n⏰ Last updated: {datetime.now().strftime('%H:%M:%S')}")
+                    click.echo(
+                        f"\n⏰ Last updated: {datetime.now().strftime('%H:%M:%S')}"
+                    )
                     click.echo("Press Ctrl+C to exit")
                     await asyncio.sleep(refresh_interval)
             except KeyboardInterrupt:
@@ -429,8 +513,12 @@ def migration_status(ctx, migration_id, show_progress, show_errors, show_perform
 
 @migration.command()
 @click.option("--checkpoint", "-c", required=True, help="Checkpoint ID to resume from")
-@click.option("--batch-size", "-b", default=1000, type=int, help="Batch size for processing")
-@click.option("--max-concurrent", default=3, type=int, help="Maximum concurrent file processing")
+@click.option(
+    "--batch-size", "-b", default=1000, type=int, help="Batch size for processing"
+)
+@click.option(
+    "--max-concurrent", default=3, type=int, help="Maximum concurrent file processing"
+)
 @click.option("--force", is_flag=True, help="Force resume even with warnings")
 @click.pass_context
 def resume_migration(ctx, checkpoint, batch_size, max_concurrent, force):
@@ -447,7 +535,9 @@ def resume_migration(ctx, checkpoint, batch_size, max_concurrent, force):
             click.echo(f"🔄 Resuming migration from checkpoint: {checkpoint}")
 
             # Resume migration
-            result = await migration_engine.migrate_all_historical_data(resume_from_checkpoint=checkpoint)
+            result = await migration_engine.migrate_all_historical_data(
+                resume_from_checkpoint=checkpoint
+            )
 
             # Display results (similar to migrate_historical)
             if result.success:
@@ -477,10 +567,14 @@ def resume_migration(ctx, checkpoint, batch_size, max_concurrent, force):
 @click.option("--verify-counts", is_flag=True, help="Verify token and record counts")
 @click.option("--check-integrity", is_flag=True, help="Check data integrity")
 @click.option("--sample-size", default=100, type=int, help="Sample size for validation")
-@click.option("--tolerance", default=0.001, type=float, help="Tolerance for count verification")
+@click.option(
+    "--tolerance", default=0.001, type=float, help="Tolerance for count verification"
+)
 @click.option("--output", "-o", help="Output validation report file")
 @click.pass_context
-def validate_migration(ctx, verify_counts, check_integrity, sample_size, tolerance, output):
+def validate_migration(
+    ctx, verify_counts, check_integrity, sample_size, tolerance, output
+):
     """Validate migration data integrity and consistency."""
 
     async def run_validation():
@@ -543,7 +637,9 @@ def validate_migration(ctx, verify_counts, check_integrity, sample_size, toleran
 @migration.command()
 @click.option("--list-checkpoints", is_flag=True, help="List available checkpoints")
 @click.option("--cleanup-old", is_flag=True, help="Clean up old checkpoints and data")
-@click.option("--max-age-days", default=30, type=int, help="Maximum age for cleanup (days)")
+@click.option(
+    "--max-age-days", default=30, type=int, help="Maximum age for cleanup (days)"
+)
 @click.pass_context
 def manage(ctx, list_checkpoints, cleanup_old, max_age_days):
     """Manage migration data and checkpoints."""
@@ -560,9 +656,13 @@ def manage(ctx, list_checkpoints, cleanup_old, max_age_days):
                     click.echo("   No checkpoints found")
                 else:
                     for checkpoint in checkpoints:
-                        age_days = (datetime.now() - datetime.fromisoformat(checkpoint["timestamp"])).days
+                        age_days = (
+                            datetime.now()
+                            - datetime.fromisoformat(checkpoint["timestamp"])
+                        ).days
                         click.echo(
-                            f"   • {checkpoint['checkpoint_id']} " f"({checkpoint['timestamp']}, {age_days}d old)"
+                            f"   • {checkpoint['checkpoint_id']} "
+                            f"({checkpoint['timestamp']}, {age_days}d old)"
                         )
 
             if cleanup_old:

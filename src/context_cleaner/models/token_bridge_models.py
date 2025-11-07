@@ -154,15 +154,21 @@ class SessionTokenMetrics:
     def calculate_accuracy_ratio(self):
         """Calculate and update accuracy ratio."""
         if self.total_reported_tokens > 0:
-            self.accuracy_ratio = self.calculated_total_tokens / self.total_reported_tokens
+            self.accuracy_ratio = (
+                self.calculated_total_tokens / self.total_reported_tokens
+            )
         else:
             self.accuracy_ratio = 0.0
 
     def calculate_undercount_percentage(self):
         """Calculate and update undercount percentage."""
         if self.calculated_total_tokens > 0:
-            missed_tokens = max(0, self.calculated_total_tokens - self.total_reported_tokens)
-            self.undercount_percentage = (missed_tokens / self.calculated_total_tokens) * 100
+            missed_tokens = max(
+                0, self.calculated_total_tokens - self.total_reported_tokens
+            )
+            self.undercount_percentage = (
+                missed_tokens / self.calculated_total_tokens
+            ) * 100
         else:
             self.undercount_percentage = 0.0
 
@@ -207,9 +213,17 @@ class SessionTokenMetrics:
         """
         return {
             "session_id": self.session_id,
-            "timestamp": (self.end_time or self.start_time or datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
-            "start_time": self.start_time.strftime("%Y-%m-%d %H:%M:%S") if self.start_time else None,
-            "end_time": self.end_time.strftime("%Y-%m-%d %H:%M:%S") if self.end_time else None,
+            "timestamp": (self.end_time or self.start_time or datetime.now()).strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+            "start_time": (
+                self.start_time.strftime("%Y-%m-%d %H:%M:%S")
+                if self.start_time
+                else None
+            ),
+            "end_time": (
+                self.end_time.strftime("%Y-%m-%d %H:%M:%S") if self.end_time else None
+            ),
             # Token counts
             "reported_input_tokens": self.reported_input_tokens,
             "reported_output_tokens": self.reported_output_tokens,
@@ -281,9 +295,15 @@ class BridgeHealthStatus:
             "recent_success_rate": self.recent_success_rate,
             "recent_operations_count": self.recent_operations_count,
             "last_successful_operation": (
-                self.last_successful_operation.isoformat() if self.last_successful_operation else None
+                self.last_successful_operation.isoformat()
+                if self.last_successful_operation
+                else None
             ),
-            "last_failed_operation": self.last_failed_operation.isoformat() if self.last_failed_operation else None,
+            "last_failed_operation": (
+                self.last_failed_operation.isoformat()
+                if self.last_failed_operation
+                else None
+            ),
             "average_processing_time_ms": self.average_processing_time_ms,
             "total_sessions_stored": self.total_sessions_stored,
             "total_tokens_stored": self.total_tokens_stored,

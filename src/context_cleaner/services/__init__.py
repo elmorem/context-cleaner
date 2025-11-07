@@ -6,7 +6,13 @@ including dependency management, health monitoring, and graceful shutdown.
 """
 
 try:
-    from .service_orchestrator import ServiceOrchestrator, ServiceStatus, ServiceDefinition, ServiceState
+    from .service_orchestrator import (
+        ServiceOrchestrator,
+        ServiceStatus,
+        ServiceDefinition,
+        ServiceState,
+    )
+
     _ORCHESTRATOR_IMPORT_ERROR = None
 except ModuleNotFoundError as exc:  # pragma: no cover - missing orchestrator path
     ServiceOrchestrator = None  # type: ignore[assignment]
@@ -16,16 +22,20 @@ except ModuleNotFoundError as exc:  # pragma: no cover - missing orchestrator pa
     _ORCHESTRATOR_IMPORT_ERROR = exc
 
 from .api_ui_consistency_checker import APIUIConsistencyChecker, ConsistencyStatus
-from .port_conflict_manager import PortConflictManager, PortConflictStrategy, PortConflictSession
+from .port_conflict_manager import (
+    PortConflictManager,
+    PortConflictStrategy,
+    PortConflictSession,
+)
 
 __all__ = [
-    'ServiceOrchestrator',
-    'ServiceStatus', 
-    'ServiceDefinition',
-    'ServiceState',
-    'APIUIConsistencyChecker',
-    'ConsistencyStatus',
-    'PortConflictManager',
-    'PortConflictStrategy',
-    'PortConflictSession'
+    "ServiceOrchestrator",
+    "ServiceStatus",
+    "ServiceDefinition",
+    "ServiceState",
+    "APIUIConsistencyChecker",
+    "ConsistencyStatus",
+    "PortConflictManager",
+    "PortConflictStrategy",
+    "PortConflictSession",
 ]

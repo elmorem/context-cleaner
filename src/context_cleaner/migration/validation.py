@@ -95,7 +95,12 @@ class ValidationResult:
     @property
     def overall_score(self) -> float:
         """Calculate overall validation score."""
-        return (self.accuracy_score + self.integrity_score + self.consistency_score + self.completeness_score) / 4
+        return (
+            self.accuracy_score
+            + self.integrity_score
+            + self.consistency_score
+            + self.completeness_score
+        ) / 4
 
     def add_issue(self, issue: ValidationIssue):
         """Add a validation issue."""
@@ -227,27 +232,42 @@ class MigrationValidator:
 
             # File integrity checks
             if check_file_integrity:
-                await self._validate_file_integrity(discovery_result.processing_manifest, result)
+                await self._validate_file_integrity(
+                    discovery_result.processing_manifest, result
+                )
 
             # Schema compliance checks
             if check_schema_compliance:
-                await self._validate_schema_compliance(discovery_result.processing_manifest, result)
+                await self._validate_schema_compliance(
+                    discovery_result.processing_manifest, result
+                )
 
             # Access permission checks
             if check_access_permissions:
-                await self._validate_access_permissions(discovery_result.processing_manifest, result)
+                await self._validate_access_permissions(
+                    discovery_result.processing_manifest, result
+                )
 
             # Calculate scores
             result.integrity_score = self._calculate_integrity_score(result)
-            result.completeness_score = self._calculate_completeness_score(discovery_result, result)
+            result.completeness_score = self._calculate_completeness_score(
+                discovery_result, result
+            )
 
             # Determine if validation passed
-            result.validation_passed = result.error_count == 0 and result.integrity_score >= self.integrity_threshold
+            result.validation_passed = (
+                result.error_count == 0
+                and result.integrity_score >= self.integrity_threshold
+            )
 
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
 
-            logger.info(f"Pre-migration validation complete: {'PASSED' if result.validation_passed else 'FAILED'}")
+            logger.info(
+                f"Pre-migration validation complete: {'PASSED' if result.validation_passed else 'FAILED'}"
+            )
             return result
 
         except Exception as e:
@@ -260,7 +280,9 @@ class MigrationValidator:
             )
             result.validation_passed = False
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
             logger.error(f"Pre-migration validation failed: {e}")
             return result
 
@@ -293,7 +315,9 @@ class MigrationValidator:
             end_time=start_time,
         )
 
-        logger.info(f"Starting post-migration validation (sample_size={sample_size}, full={full_validation})...")
+        logger.info(
+            f"Starting post-migration validation (sample_size={sample_size}, full={full_validation})..."
+        )
 
         try:
             # Count verification
@@ -302,7 +326,9 @@ class MigrationValidator:
                 await self._verify_session_counts(result, tolerance)
 
             # Data integrity checks
-            await self._validate_database_integrity(result, sample_size, full_validation)
+            await self._validate_database_integrity(
+                result, sample_size, full_validation
+            )
 
             # Cross-validation with source data
             await self._cross_validate_with_source(result, sample_size)
@@ -315,18 +341,25 @@ class MigrationValidator:
             result.validation_passed = (
                 result.error_count == 0
                 and result.overall_score >= 85.0  # 85% overall score threshold
-                and (result.token_count_variance is None or result.token_count_variance <= tolerance * 100)
+                and (
+                    result.token_count_variance is None
+                    or result.token_count_variance <= tolerance * 100
+                )
             )
 
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
 
             if result.validation_duration_seconds > 0:
                 result.validation_rate_records_per_second = (
                     result.records_validated / result.validation_duration_seconds
                 )
 
-            logger.info(f"Post-migration validation complete: {'PASSED' if result.validation_passed else 'FAILED'}")
+            logger.info(
+                f"Post-migration validation complete: {'PASSED' if result.validation_passed else 'FAILED'}"
+            )
             return result
 
         except Exception as e:
@@ -339,7 +372,9 @@ class MigrationValidator:
             )
             result.validation_passed = False
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
             logger.error(f"Post-migration validation failed: {e}")
             return result
 
@@ -374,7 +409,9 @@ class MigrationValidator:
 
         try:
             # Get enhanced analysis from source
-            source_analysis = await self.enhanced_counter.analyze_comprehensive_token_usage()
+            source_analysis = (
+                await self.enhanced_counter.analyze_comprehensive_token_usage()
+            )
 
             # Get database statistics
             database_stats = await self._get_database_statistics()
@@ -385,7 +422,9 @@ class MigrationValidator:
 
             if result.source_token_count > 0:
                 variance = (
-                    abs(result.database_token_count - result.source_token_count) / result.source_token_count * 100
+                    abs(result.database_token_count - result.source_token_count)
+                    / result.source_token_count
+                    * 100
                 )
                 result.token_count_variance = variance
 
@@ -405,10 +444,15 @@ class MigrationValidator:
 
             # Session-level validation
             if sample_sessions:
-                await self._validate_specific_sessions(sample_sessions, result, deep_validation)
+                await self._validate_specific_sessions(
+                    sample_sessions, result, deep_validation
+                )
             else:
                 await self._validate_random_sessions(
-                    source_analysis, result, sample_size=50, deep_validation=deep_validation
+                    source_analysis,
+                    result,
+                    sample_size=50,
+                    deep_validation=deep_validation,
                 )
 
             # Calculate scores
@@ -416,27 +460,39 @@ class MigrationValidator:
             result.consistency_score = self._calculate_consistency_score(result)
             result.integrity_score = self._calculate_integrity_score(result)
 
-            result.validation_passed = result.error_count == 0 and result.overall_score >= 85.0
+            result.validation_passed = (
+                result.error_count == 0 and result.overall_score >= 85.0
+            )
 
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
 
-            logger.info(f"Cross-validation complete: {'PASSED' if result.validation_passed else 'FAILED'}")
+            logger.info(
+                f"Cross-validation complete: {'PASSED' if result.validation_passed else 'FAILED'}"
+            )
             return result
 
         except Exception as e:
             result.add_issue(
                 ValidationIssue(
-                    severity="error", category="validation_error", description=f"Cross-validation failed: {str(e)}"
+                    severity="error",
+                    category="validation_error",
+                    description=f"Cross-validation failed: {str(e)}",
                 )
             )
             result.validation_passed = False
             result.end_time = datetime.now()
-            result.validation_duration_seconds = (result.end_time - result.start_time).total_seconds()
+            result.validation_duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
             logger.error(f"Cross-validation failed: {e}")
             return result
 
-    async def _validate_file_integrity(self, files: List[JSONLFileInfo], result: ValidationResult):
+    async def _validate_file_integrity(
+        self, files: List[JSONLFileInfo], result: ValidationResult
+    ):
         """Validate file integrity and readability."""
         for file_info in files:
             try:
@@ -485,7 +541,10 @@ class MigrationValidator:
                                 category="file_integrity",
                                 description="File hash mismatch - file may be corrupted",
                                 file_path=file_info.path,
-                                context={"expected_hash": file_info.file_hash, "actual_hash": current_hash},
+                                context={
+                                    "expected_hash": file_info.file_hash,
+                                    "actual_hash": current_hash,
+                                },
                             )
                         )
 
@@ -499,7 +558,9 @@ class MigrationValidator:
                     )
                 )
 
-    async def _validate_schema_compliance(self, files: List[JSONLFileInfo], result: ValidationResult):
+    async def _validate_schema_compliance(
+        self, files: List[JSONLFileInfo], result: ValidationResult
+    ):
         """Validate JSONL schema compliance."""
         for file_info in files[:10]:  # Sample first 10 files
             try:
@@ -530,14 +591,20 @@ class MigrationValidator:
                                     )
 
                                 # Check for required fields (flexible approach)
-                                if not any(key in entry for key in ["type", "message", "content", "data"]):
+                                if not any(
+                                    key in entry
+                                    for key in ["type", "message", "content", "data"]
+                                ):
                                     result.add_issue(
                                         ValidationIssue(
                                             severity="warning",
                                             category="schema_compliance",
                                             description=f"Entry missing common fields at line {line_num}",
                                             file_path=file_info.path,
-                                            context={"line_number": line_num, "available_keys": list(entry.keys())},
+                                            context={
+                                                "line_number": line_num,
+                                                "available_keys": list(entry.keys()),
+                                            },
                                         )
                                     )
 
@@ -564,7 +631,9 @@ class MigrationValidator:
                     )
                 )
 
-    async def _validate_access_permissions(self, files: List[JSONLFileInfo], result: ValidationResult):
+    async def _validate_access_permissions(
+        self, files: List[JSONLFileInfo], result: ValidationResult
+    ):
         """Validate file access permissions."""
         for file_info in files:
             try:
@@ -609,7 +678,9 @@ class MigrationValidator:
         """Verify token counts between source and database."""
         try:
             # Get source token count from enhanced analysis
-            source_analysis = await self.enhanced_counter.analyze_comprehensive_token_usage()
+            source_analysis = (
+                await self.enhanced_counter.analyze_comprehensive_token_usage()
+            )
             result.source_token_count = source_analysis.total_calculated_tokens
 
             # Get database token count
@@ -617,7 +688,10 @@ class MigrationValidator:
             result.database_token_count = database_stats.get("total_tokens", 0)
 
             if result.source_token_count > 0:
-                variance = abs(result.database_token_count - result.source_token_count) / result.source_token_count
+                variance = (
+                    abs(result.database_token_count - result.source_token_count)
+                    / result.source_token_count
+                )
                 result.token_count_variance = variance * 100
 
                 if variance > tolerance:
@@ -634,7 +708,9 @@ class MigrationValidator:
                         )
                     )
                 else:
-                    logger.info(f"Token count verification passed: {variance*100:.3f}% variance")
+                    logger.info(
+                        f"Token count verification passed: {variance*100:.3f}% variance"
+                    )
 
         except Exception as e:
             result.add_issue(
@@ -649,7 +725,9 @@ class MigrationValidator:
         """Verify session counts between source and database."""
         try:
             # Get source session count
-            source_analysis = await self.enhanced_counter.analyze_comprehensive_token_usage()
+            source_analysis = (
+                await self.enhanced_counter.analyze_comprehensive_token_usage()
+            )
             result.source_session_count = source_analysis.total_sessions_analyzed
 
             # Get database session count
@@ -658,7 +736,8 @@ class MigrationValidator:
 
             if result.source_session_count > 0:
                 variance = (
-                    abs(result.database_session_count - result.source_session_count) / result.source_session_count
+                    abs(result.database_session_count - result.source_session_count)
+                    / result.source_session_count
                 )
                 result.session_count_variance = variance * 100
 
@@ -676,7 +755,9 @@ class MigrationValidator:
                         )
                     )
                 else:
-                    logger.info(f"Session count verification passed: {variance*100:.1f}% variance")
+                    logger.info(
+                        f"Session count verification passed: {variance*100:.1f}% variance"
+                    )
 
         except Exception as e:
             result.add_issue(
@@ -687,7 +768,9 @@ class MigrationValidator:
                 )
             )
 
-    async def _validate_database_integrity(self, result: ValidationResult, sample_size: int, full_validation: bool):
+    async def _validate_database_integrity(
+        self, result: ValidationResult, sample_size: int, full_validation: bool
+    ):
         """Validate database data integrity."""
         try:
             # Get sample sessions from database
@@ -757,7 +840,9 @@ class MigrationValidator:
                 )
             )
 
-    async def _cross_validate_with_source(self, result: ValidationResult, sample_size: int):
+    async def _cross_validate_with_source(
+        self, result: ValidationResult, sample_size: int
+    ):
         """Cross-validate a sample of database records with source data."""
         try:
             # This is a placeholder for more detailed cross-validation
@@ -767,7 +852,9 @@ class MigrationValidator:
             # 3. Compare results
 
             # For now, perform basic consistency checks
-            logger.info(f"Cross-validation with source data (sample_size={sample_size})")
+            logger.info(
+                f"Cross-validation with source data (sample_size={sample_size})"
+            )
 
         except Exception as e:
             result.add_issue(
@@ -803,7 +890,10 @@ class MigrationValidator:
                 for error in validation_errors:
                     result.add_issue(
                         ValidationIssue(
-                            severity="error", category="data_validation", description=error, session_id=session_id
+                            severity="error",
+                            category="data_validation",
+                            description=error,
+                            session_id=session_id,
                         )
                     )
 
@@ -820,7 +910,11 @@ class MigrationValidator:
                 )
 
     async def _validate_random_sessions(
-        self, source_analysis, result: ValidationResult, sample_size: int, deep_validation: bool
+        self,
+        source_analysis,
+        result: ValidationResult,
+        sample_size: int,
+        deep_validation: bool,
     ):
         """Validate a random sample of sessions."""
         try:
@@ -831,7 +925,9 @@ class MigrationValidator:
 
                 source_sessions = random.sample(source_sessions, sample_size)
 
-            await self._validate_specific_sessions(source_sessions, result, deep_validation)
+            await self._validate_specific_sessions(
+                source_sessions, result, deep_validation
+            )
 
         except Exception as e:
             result.add_issue(
@@ -895,12 +991,18 @@ class MigrationValidator:
         # Placeholder implementation
         # In a full implementation, this would analyze consistency issues
         consistency_issues = len(
-            [issue for issue in result.issues if issue.category in ["data_consistency", "count_mismatch"]]
+            [
+                issue
+                for issue in result.issues
+                if issue.category in ["data_consistency", "count_mismatch"]
+            ]
         )
         penalty = consistency_issues * 5
         return max(0, 100 - penalty)
 
-    def _calculate_completeness_score(self, discovery_result, validation_result: ValidationResult) -> float:
+    def _calculate_completeness_score(
+        self, discovery_result, validation_result: ValidationResult
+    ) -> float:
         """Calculate completeness score based on data availability."""
         if discovery_result.total_files_found == 0:
             return 0.0
