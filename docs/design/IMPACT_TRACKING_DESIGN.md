@@ -1,5 +1,9 @@
 # Impact Tracking & Evaluation Metrics Design
 
+> **Historical Design Document - Many concepts implemented in v0.2.0-0.3.0**
+>
+> **Status**: This was the original design document. The analytics and effectiveness tracking system has been implemented. See [Analytics Guide](../analytics-guide.md) and [CLI Reference](../cli-reference.md) for current features.
+
 > **Comprehensive system to measure and evaluate whether Context Cleaner interventions actually improve development productivity and code quality**
 
 ## 🎯 Vision Statement

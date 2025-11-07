@@ -6,41 +6,44 @@ Welcome to the comprehensive documentation for Context Cleaner, the privacy-firs
 
 ### **User Guides**
 - [Quick Start Guide](user-guide/quickstart.md) - Get up and running in 5 minutes
-- [Installation Guide](user-guide/installation.md) - Detailed installation and setup
-- [Configuration Guide](user-guide/configuration.md) - Customize settings and behavior
-- [CLI Reference](user-guide/cli-reference.md) - Complete command-line interface documentation
+- [CLI Reference](cli-reference.md) - Complete command-line interface documentation (20+ commands)
+- [Configuration Guide](configuration.md) - Customize settings and behavior
+- [Analytics Guide](analytics-guide.md) - Effectiveness tracking and ROI metrics
+- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
+- [Data Explorer Reference](data_explorer_reference.md) - Query telemetry data with SQL
+
+### **Architecture Documentation**
+- [Architecture Overview](architecture/README.md) - Complete system architecture and design
+- [System Overview](architecture/system-overview.md) - High-level architecture and components
+- [Component Architecture](architecture/components.md) - Detailed component breakdown (25+ components)
+- [Service Orchestration](architecture/orchestration.md) - Service lifecycle and coordination
+- [Data Flow](architecture/data-flow.md) - How data moves through the system
+- [Fallback Mechanisms](architecture/fallback-mechanisms.md) - Resilience and error handling
 
 ### **API Documentation**
 - [Core API](api/core.md) - Main Context Cleaner classes and functions
-- [Analytics API](api/analytics.md) - Productivity analysis and metrics
-- [Dashboard API](api/dashboard.md) - Web dashboard and visualization
-- [Monitoring API](api/monitoring.md) - Performance and health monitoring
-- [Storage API](api/storage.md) - Data persistence and encryption
 
-### **Examples & Tutorials**
-- [Basic Usage Examples](examples/basic-usage.md) - Common use cases and workflows
-- [Advanced Analytics](examples/advanced-analytics.md) - Custom analysis and insights
-- [Integration Examples](examples/integrations.md) - Claude Code and IDE integration
-- [Custom Visualizations](examples/visualizations.md) - Creating custom charts and dashboards
-
-### **Development**
-- [Architecture Overview](development/architecture.md) - System design and components
+### **Development & Design**
 - [Supervisor Architecture](development/supervisor.md) - IPC supervisor, watchdog, and registry integration
-- [Contributing Guide](development/contributing.md) - How to contribute to Context Cleaner
-- [Testing Guide](development/testing.md) - Running and writing tests
-- [Release Process](development/releases.md) - Version management and deployment
+- [Impact Tracking Design](design/IMPACT_TRACKING_DESIGN.md) - Historical design document (implemented in v0.2.0-0.3.0)
+
+### **Archived Documentation**
+- [Archive](archive/README.md) - Historical planning and design documents
 
 ## 🚀 Quick Navigation
 
 | I want to... | Go to... |
 |---------------|----------|
-| **Install Context Cleaner** | [Installation Guide](user-guide/installation.md) |
-| **Start tracking productivity** | [Quick Start Guide](user-guide/quickstart.md) |
-| **Use the CLI commands** | [CLI Reference](user-guide/cli-reference.md) |
-| **Integrate with Claude Code** | [Integration Examples](examples/integrations.md) |
-| **Customize dashboards** | [Dashboard API](api/dashboard.md) |
-| **Troubleshoot issues** | [Troubleshooting Guide](../TROUBLESHOOTING.md) |
-| **Report bugs or contribute** | [Contributing Guide](development/contributing.md) |
+| **Install Context Cleaner** | [Quick Start Guide](user-guide/quickstart.md) |
+| **Start using the dashboard** | Run `context-cleaner run` |
+| **Use the CLI commands** | [CLI Reference](cli-reference.md) |
+| **Configure settings** | [Configuration Guide](configuration.md) |
+| **View analytics & ROI** | [Analytics Guide](analytics-guide.md) |
+| **Query telemetry data** | [Data Explorer Reference](data_explorer_reference.md) |
+| **Troubleshoot issues** | [Troubleshooting Guide](troubleshooting.md) |
+| **Understand architecture** | [Architecture Overview](architecture/README.md) |
+| **Learn how services work** | [Component Architecture](architecture/components.md) |
+| **Understand data flow** | [Data Flow](architecture/data-flow.md) |
 
 ## 🎯 What is Context Cleaner?
 
