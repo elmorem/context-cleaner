@@ -52,9 +52,15 @@ context-cleaner --verbose health-check --detailed
 
 ## 🚀 **Core Commands**
 
-### **`stop`** ⭐ UPDATED
-Gracefully stop all Context Cleaner services. When the supervisor is running,
-the CLI streams shutdown progress updates in real time.
+### **`stop`** ⭐ ENHANCED v0.3.0
+Comprehensive service shutdown with intelligent process discovery and orchestrated cleanup.
+
+**Features:**
+- **Orchestrated Shutdown**: Dependency-aware cleanup with proper signal handling
+- **Live Supervisor Streaming**: Real-time shutdown progress when supervisor is available
+- **Process Discovery**: Automatically finds and stops ALL Context Cleaner processes
+- **Registry Management**: Optional cleanup of process registry entries
+- **Comprehensive Coverage**: Docker, JSONL processing, dashboard, and monitoring services
 
 ```bash
 context-cleaner stop [OPTIONS]
@@ -63,12 +69,12 @@ Options:
   --force                Skip confirmation prompts
   --docker-only          Only stop Docker services
   --processes-only       Only stop background processes
-  --no-discovery         Skip process discovery
+  --no-discovery         Skip process discovery (use basic method)
   --show-discovery       Preview discovered processes before stopping
   --registry-cleanup     Remove stale registry entries after shutdown
-  --use-script           Run stop-context-cleaner.sh instead of supervisor IPC
+  --use-script           Run stop-context-cleaner.sh script for cleanup
   --service SERVICE      Target specific services (repeat for multiple)
-  --no-dependents        Do not automatically stop dependent services when using --service
+  --no-dependents        Don't stop dependent services with --service
   --help                 Show help message
 ```
 
@@ -84,13 +90,40 @@ $ context-cleaner --verbose stop
 If the supervisor can't be reached, the command falls back to the legacy
 orchestrator shutdown and prints the traditional progress messages.
 
-**Targeted shutdown:**
+**Examples:**
+```bash
+# Full orchestrated shutdown (recommended)
+context-cleaner stop
+
+# Preview what will be stopped
+context-cleaner stop --show-discovery
+
+# Force shutdown without confirmations
+context-cleaner stop --force
+
+# Stop only Docker services
+context-cleaner stop --docker-only
+
+# Stop only background processes
+context-cleaner stop --processes-only
+
+# Cleanup with registry maintenance
+context-cleaner stop --registry-cleanup
+
+# Use comprehensive cleanup script
+context-cleaner stop --use-script
 ```
-# Restart only the dashboard + its dependents
+
+**Targeted shutdown:**
+```bash
+# Stop specific service with dependents
 context-cleaner stop --service dashboard
 
-# Stop just the JSONL bridge without touching dependents
+# Stop specific service without dependents
 context-cleaner stop --service jsonl_bridge --no-dependents
+
+# Stop multiple specific services
+context-cleaner stop --service dashboard --service bridge
 ```
 
 ### **`run`** ⭐ UPDATED
@@ -313,6 +346,258 @@ context-cleaner effectiveness --detailed --format json
    • Use Focus mode for complex debugging sessions
    • Consider more frequent optimization for 15% productivity boost
 ```
+
+## 🔮 **Advanced Analytics Commands** ⭐ NEW v0.3.0
+
+### **`analytics`**
+Enterprise-grade analytics with predictive forecasting and business intelligence.
+
+```bash
+context-cleaner analytics [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  forecast          Generate predictive forecasts using ML models
+  content-analysis  Perform semantic content intelligence analysis
+  executive-report  Generate business intelligence summary
+  benchmarks        Industry benchmark comparison report
+  status            Show analytics system status
+  warnings          Check for early warning alerts
+```
+
+**Examples:**
+```bash
+# Generate daily forecast
+context-cleaner analytics forecast --horizon day
+
+# Analyze conversation content
+context-cleaner analytics content-analysis --conversation-id abc123
+
+# Executive summary report
+context-cleaner analytics executive-report
+
+# Industry benchmarks
+context-cleaner analytics benchmarks
+
+# Check system status
+context-cleaner analytics status
+```
+
+## 🔗 **Data Bridge & Token Analysis** ⭐ NEW v0.3.0
+
+### **`bridge`**
+Token Analysis Bridge Service for historical data recovery.
+
+```bash
+context-cleaner bridge [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  backfill      Execute historical data backfill (2.768B tokens)
+  info          Display bridge service information
+  status        Show current bridge service status
+  sync          Start incremental synchronization for new data
+  sync-status   Show synchronization service status
+  validate      Validate end-to-end data flow integrity
+```
+
+**Examples:**
+```bash
+# Check bridge status
+context-cleaner bridge status
+
+# Start backfill process
+context-cleaner bridge backfill
+
+# Start incremental sync
+context-cleaner bridge sync
+
+# Validate data flow
+context-cleaner bridge validate
+
+# View service info
+context-cleaner bridge info
+```
+
+### **`token-analysis`**
+Enhanced token analysis using Anthropic's count-tokens API.
+
+```bash
+context-cleaner token-analysis [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  comprehensive  Run comprehensive analysis (addresses 90% undercount)
+  session        Analyze token usage for specific session
+  dashboard      Test dashboard integration
+```
+
+**Examples:**
+```bash
+# Comprehensive analysis
+context-cleaner token-analysis comprehensive
+
+# Analyze specific session
+context-cleaner token-analysis session --session-id abc123
+
+# Test dashboard
+context-cleaner token-analysis dashboard
+```
+
+### **`migration`**
+Migration commands for historical JSONL data to ClickHouse.
+
+```bash
+context-cleaner migration [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  -v, --verbose  Enable verbose logging
+
+Commands:
+  discover-jsonl      Discover and catalog JSONL files
+  migrate-historical  Migrate historical data to ClickHouse
+  migration-status    Show migration status and progress
+  resume-migration    Resume migration from checkpoint
+  validate-migration  Validate migration data integrity
+  manage              Manage migration data and checkpoints
+```
+
+**Examples:**
+```bash
+# Discover JSONL files
+context-cleaner migration discover-jsonl
+
+# Start migration
+context-cleaner migration migrate-historical --verbose
+
+# Check migration status
+context-cleaner migration migration-status
+
+# Resume interrupted migration
+context-cleaner migration resume-migration
+
+# Validate migrated data
+context-cleaner migration validate-migration
+```
+
+## 📄 **JSONL Processing** ⭐ NEW v0.3.0
+
+### **`jsonl`**
+Process and analyze JSONL content files.
+
+```bash
+context-cleaner jsonl [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  conversation       Get complete conversation for session
+  process-directory  Process all JSONL files in directory
+  process-file       Process single JSONL file
+  search             Search through processed content
+  stats              Get comprehensive statistics
+  status             Check processing system status
+```
+
+**Examples:**
+```bash
+# Process single file
+context-cleaner jsonl process-file --file path/to/session.jsonl
+
+# Process directory
+context-cleaner jsonl process-directory --dir ~/.claude/sessions
+
+# Get conversation
+context-cleaner jsonl conversation --session-id abc123
+
+# Search content
+context-cleaner jsonl search --query "error handling"
+
+# View statistics
+context-cleaner jsonl stats
+
+# Check status
+context-cleaner jsonl status
+```
+
+## 🔧 **Debug & Diagnostics** ⭐ NEW v0.3.0
+
+### **`debug`**
+Debug commands for process registry and service orchestration.
+
+```bash
+context-cleaner debug [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  cleanup-stale      Clean up stale registry entries
+  discover-services  Discover running Context Cleaner processes
+  health-check       Perform health checks on registered processes
+  list-processes     List running processes and metadata
+  process-tree       Show process tree for Context Cleaner
+  processes          List running processes
+  registry-prune     Remove stale registry entries
+  registry-stats     Show registry statistics and health
+  test-registry      Test registry operations (development)
+```
+
+**Examples:**
+```bash
+# List all processes
+context-cleaner debug list-processes
+
+# Show process tree
+context-cleaner debug process-tree
+
+# Health check all services
+context-cleaner debug health-check
+
+# Clean up stale entries
+context-cleaner debug cleanup-stale
+
+# View registry stats
+context-cleaner debug registry-stats
+
+# Discover services
+context-cleaner debug discover-services
+
+# Prune registry
+context-cleaner debug registry-prune --type all
+```
+
+### **`update-data`**
+Diagnose and fix widget data staleness issues.
+
+```bash
+context-cleaner update-data [OPTIONS]
+
+Options:
+  -p, --dashboard-port INTEGER  Dashboard port to check
+  --host TEXT                   Dashboard host
+  --check-only                  Only diagnose, don't fix
+  --clear-cache                 Force cache refresh
+  --output PATH                 Save detailed report to JSON
+  --format [text|json]          Output format
+```
+
+**Examples:**
+```bash
+# Diagnose and fix issues
+context-cleaner update-data
+
+# Check only (no fixes)
+context-cleaner update-data --check-only
+
+# Clear cache and refresh
+context-cleaner update-data --clear-cache
+
+# Save detailed report
+context-cleaner update-data --output diagnostic-report.json
+
+# Check specific port
+context-cleaner update-data --dashboard-port 8110
+```
+
+**Common Issues Detected:**
+- Telemetry services not initialized
+- Docker containers offline
+- Stale widget cache
+- Missing data connections
+- Service health problems
 
 ## 👥 **Session Management**
 
