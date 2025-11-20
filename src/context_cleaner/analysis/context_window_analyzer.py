@@ -343,6 +343,8 @@ class ContextWindowAnalyzer:
                 project_tokens = 0
                 project_sessions = 0
                 project_size = 0
+                project_tool_calls = 0
+                project_file_reads = 0
 
                 for session_file in all_session_files:
                     try:
@@ -356,6 +358,14 @@ class ContextWindowAnalyzer:
                             project_sessions += 1
                             project_size += os.path.getsize(session_file)
 
+                            # Count tool calls and file reads from file_operations
+                            project_tool_calls += len(session_analysis.file_operations)
+                            project_file_reads += sum(
+                                1
+                                for tool in session_analysis.file_operations
+                                if tool.is_file_operation
+                            )
+
                     except Exception as e:
                         logger.debug(f"Error parsing session {session_file}: {e}")
                         continue
@@ -366,6 +376,8 @@ class ContextWindowAnalyzer:
                         "session_count": project_sessions,
                         "total_size_bytes": project_size,
                         "total_size_mb": round(project_size / (1024 * 1024), 2),
+                        "tool_calls": project_tool_calls,
+                        "file_reads": project_file_reads,
                     }
 
                     total_tokens += project_tokens

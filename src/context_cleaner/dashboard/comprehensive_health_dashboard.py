@@ -1693,8 +1693,8 @@ class ComprehensiveHealthDashboard:
                                 "entry_count": stats[
                                     "session_count"
                                 ],  # Show session count
-                                "tool_calls": 0,  # Not tracked in comprehensive stats
-                                "file_reads": 0,  # Not tracked in comprehensive stats
+                                "tool_calls": stats.get("tool_calls", 0),
+                                "file_reads": stats.get("file_reads", 0),
                                 "session_file": f"{stats['session_count']} sessions",
                             }
                         )
@@ -4072,12 +4072,16 @@ if __name__ == "__main__":
 
                         for session in sessions:
                             # Count tokens using our enhanced counter
+                            # Count tokens for this session
+                            session_tokens = 0
                             for message in session.messages:
                                 if hasattr(message, "content") and message.content:
                                     tokens = get_accurate_token_count(
                                         str(message.content)
                                     )
-                                    total_tokens += tokens
+                                    session_tokens += tokens
+
+                            total_tokens += session_tokens
 
                             # Calculate session success (sessions with at least one assistant response)
                             has_assistant_response = any(
@@ -4088,11 +4092,6 @@ if __name__ == "__main__":
                                 successful_sessions += 1
 
                             # Estimate cost (rough calculation: $0.01 per 1000 tokens)
-                            session_tokens = sum(
-                                get_accurate_token_count(str(msg.content))
-                                for msg in session.messages
-                                if hasattr(msg, "content") and msg.content
-                            )
                             total_cost += (session_tokens / 1000) * 0.01
 
                     except Exception as e:
@@ -4198,6 +4197,9 @@ if __name__ == "__main__":
 
         response_data["raw_total_tokens"] = definitive_total
         response_data["total_tokens"] = (
+            f"{definitive_total:,}" if definitive_total else "0"
+        )
+        response_data["total_tokens_analyzed"] = (
             f"{definitive_total:,}" if definitive_total else "0"
         )
 

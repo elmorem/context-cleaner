@@ -71,12 +71,16 @@ class TokenMetrics:
     cache_read_tokens: int = 0
 
     def __post_init__(self):
-        """Calculate total tokens using ccusage methodology with validation."""
+        """Calculate total tokens using Anthropic API methodology with validation."""
         # Validate token counts are non-negative
         self._validate_token_counts()
 
         if self.total_tokens == 0:
-            # Use ccusage's reliable calculation method
+            # Correct calculation per Anthropic API: sum all token fields
+            # input_tokens: new/uncached input
+            # cache_creation_input_tokens: tokens written to cache
+            # cache_read_input_tokens: tokens read from cache
+            # output_tokens: response tokens
             cache_creation = (
                 self.cache_creation_input_tokens or self.cache_creation_tokens
             )

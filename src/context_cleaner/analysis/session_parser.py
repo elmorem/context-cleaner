@@ -23,6 +23,7 @@ from .models import (
     FileType,
 )
 from .summary_parser import ProjectSummaryParser
+from .enhanced_token_counter import get_accurate_token_count
 
 logger = logging.getLogger(__name__)
 
@@ -320,13 +321,16 @@ class SessionCacheParser:
         start_time = min(msg.timestamp for msg in messages)
         end_time = max(msg.timestamp for msg in messages)
 
-        # Calculate metrics using actual token metrics (ccusage approach)
+        # Calculate metrics using actual token metrics when available, estimate otherwise
         total_tokens = 0
         for msg in messages:
             if msg.token_metrics:
-                # Use actual token metrics when available (like ccusage)
+                # Use actual token metrics when available (preferred)
                 total_tokens += msg.token_metrics.total_tokens
-            # Skip messages without actual token metrics to maintain accuracy
+            elif hasattr(msg, "content") and msg.content:
+                # Fall back to estimation for messages without token metrics
+                # This ensures we count all messages, not just those with usage data
+                total_tokens += get_accurate_token_count(str(msg.content))
 
         # Extract file operations
         file_operations = []

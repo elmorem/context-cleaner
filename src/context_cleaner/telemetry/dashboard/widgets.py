@@ -2914,7 +2914,7 @@ class TelemetryWidgetManager:
             ORDER BY total_messages DESC
             """
 
-            context_data = await self.clickhouse_client.execute_query(
+            context_data = await self.telemetry.execute_query(
                 context_effectiveness_query
             )
 
@@ -2946,7 +2946,7 @@ class TelemetryWidgetManager:
             WHERE ts.input_tokens > 0
             """
 
-            token_data = await self.clickhouse_client.execute_query(token_context_query)
+            token_data = await self.telemetry.execute_query(token_context_query)
 
             # Development pattern analysis
             development_patterns_query = """
@@ -2988,7 +2988,7 @@ class TelemetryWidgetManager:
             ORDER BY task_type, has_context
             """
 
-            pattern_data = await self.clickhouse_client.execute_query(
+            pattern_data = await self.telemetry.execute_query(
                 development_patterns_query
             )
 
