@@ -1724,6 +1724,39 @@ class ComprehensiveHealthDashboard:
                 logger.error(f"Context window analysis failed: {e}")
                 return jsonify({"success": False, "error": str(e), "directories": []})
 
+        @self.app.route("/api/tool-usage-details")
+        def get_tool_usage_details():
+            """Get detailed tool usage breakdown for a specific directory."""
+            try:
+                directory = request.args.get("directory", "")
+                if not directory:
+                    return jsonify(
+                        {"success": False, "error": "Directory parameter required"}
+                    )
+
+                if not self.context_analyzer:
+                    return jsonify(
+                        {"success": False, "error": "Context analyzer not available"}
+                    )
+
+                # Get tool usage details for the directory
+                tool_details = self.context_analyzer.get_tool_usage_details(directory)
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "total_calls": tool_details["total_calls"],
+                        "unique_tools": tool_details["unique_tools"],
+                        "file_operations": tool_details["file_operations"],
+                        "tool_breakdown": tool_details["tool_breakdown"],
+                        "context_examples": tool_details["context_examples"],
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Tool usage details failed: {e}")
+                return jsonify({"success": False, "error": str(e)})
+
         @self.app.route("/api/all-sessions-stats")
         def get_all_sessions_stats():
             """Get comprehensive statistics across ALL session files."""

@@ -396,6 +396,109 @@ class ContextWindowAnalyzer:
             "projects": all_stats,
         }
 
+    def get_tool_usage_details(self, directory: str) -> Dict[str, any]:
+        """Get detailed tool usage breakdown for a specific directory."""
+        from collections import Counter
+
+        tool_counter = Counter()
+        file_op_tools = set()
+        context_examples = []
+        total_calls = 0
+
+        try:
+            # Find the project path for this directory
+            project_path = None
+            for path in glob.glob(f"{self.claude_projects_dir}/*"):
+                if os.path.isdir(path):
+                    project_name = os.path.basename(path)
+                    decoded_dir = self._decode_project_path(project_name)
+                    if decoded_dir == directory:
+                        project_path = path
+                        break
+
+            if not project_path:
+                return {
+                    "total_calls": 0,
+                    "unique_tools": 0,
+                    "file_operations": 0,
+                    "tool_breakdown": [],
+                    "context_examples": [],
+                }
+
+            # Get all session files for this project
+            all_session_files = self._get_all_session_files(project_path)
+
+            for session_file in all_session_files:
+                try:
+                    session_path = Path(session_file)
+                    session_analysis = self.session_parser.parse_session_file(
+                        session_path
+                    )
+
+                    if session_analysis:
+                        # Count tool usage
+                        for tool in session_analysis.file_operations:
+                            tool_counter[tool.tool_name] += 1
+                            total_calls += 1
+                            if tool.is_file_operation:
+                                file_op_tools.add(tool.tool_name)
+
+                            # Add context examples (limit to last 10)
+                            if len(context_examples) < 10:
+                                context_examples.append(
+                                    {
+                                        "tool": tool.tool_name,
+                                        "timestamp": (
+                                            tool.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                                            if tool.timestamp
+                                            else "Unknown"
+                                        ),
+                                        "context": (
+                                            tool.file_path[:100]
+                                            if hasattr(tool, "file_path")
+                                            and tool.file_path
+                                            else "No context available"
+                                        ),
+                                    }
+                                )
+
+                except Exception as e:
+                    logger.debug(f"Error parsing session {session_file}: {e}")
+                    continue
+
+            # Create tool breakdown
+            tool_breakdown = []
+            for tool_name, count in tool_counter.most_common():
+                percentage = (
+                    round((count / total_calls * 100), 1) if total_calls > 0 else 0
+                )
+                tool_breakdown.append(
+                    {
+                        "name": tool_name,
+                        "count": count,
+                        "percentage": percentage,
+                        "is_file_op": tool_name in file_op_tools,
+                    }
+                )
+
+            return {
+                "total_calls": total_calls,
+                "unique_tools": len(tool_counter),
+                "file_operations": len(file_op_tools),
+                "tool_breakdown": tool_breakdown,
+                "context_examples": context_examples,
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting tool usage details: {e}")
+            return {
+                "total_calls": 0,
+                "unique_tools": 0,
+                "file_operations": 0,
+                "tool_breakdown": [],
+                "context_examples": [],
+            }
+
     def _get_all_session_files(self, project_path: str) -> List[str]:
         """Get all session files for a project (not just the latest)."""
         try:

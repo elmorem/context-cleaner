@@ -1234,6 +1234,81 @@
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Tool Usage Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            max-width: 900px;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5em;
+            color: #1e293b;
+        }
+
+        .modal-close {
+            color: #64748b;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+            line-height: 1;
+        }
+
+        .modal-close:hover,
+        .modal-close:focus {
+            color: #1e293b;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
 <body>
@@ -1490,7 +1565,7 @@
                                             <td>${dir.size_mb}</td>
                                             <td>${dir.estimated_tokens}</td>
                                             <td>${dir.last_activity}</td>
-                                            <td>${dir.tool_calls}</td>
+                                            <td><a href="#" onclick="event.preventDefault(); openToolUsageModal('${dir.directory}', ${dir.tool_calls}); return false;" style="color: #3b82f6; text-decoration: underline; cursor: pointer;">${dir.tool_calls}</a></td>
                                         `;
                                         tbody.appendChild(row);
                                     });
@@ -6519,6 +6594,123 @@ Active Filters: ${Object.values(filters).filter(v => v && v !== '24h' && v !== '
             
             console.log('Tab navigation functionality loaded!');
         });
+    </script>
+
+    <!-- Tool Usage Modal -->
+    <div id="tool-usage-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>🔧 Tool Usage Analysis</h2>
+                <span class="modal-close" onclick="closeToolUsageModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="tool-usage-directory" style="font-size: 0.9em; color: #64748b; margin-bottom: 1rem;"></div>
+
+                <div class="tool-usage-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="summary-card" style="background: #f8fafc; padding: 1rem; border-radius: 8px;">
+                        <div style="font-size: 0.85em; color: #64748b; margin-bottom: 0.25rem;">Total Tool Calls</div>
+                        <div id="modal-total-calls" style="font-size: 1.5em; font-weight: 600; color: #1e293b;"></div>
+                    </div>
+                    <div class="summary-card" style="background: #f8fafc; padding: 1rem; border-radius: 8px;">
+                        <div style="font-size: 0.85em; color: #64748b; margin-bottom: 0.25rem;">Unique Tools</div>
+                        <div id="modal-unique-tools" style="font-size: 1.5em; font-weight: 600; color: #1e293b;"></div>
+                    </div>
+                    <div class="summary-card" style="background: #f8fafc; padding: 1rem; border-radius: 8px;">
+                        <div style="font-size: 0.85em; color: #64748b; margin-bottom: 0.25rem;">File Operations</div>
+                        <div id="modal-file-ops" style="font-size: 1.5em; font-weight: 600; color: #1e293b;"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 0.75rem; font-size: 1.1em;">Tool Breakdown</h3>
+                    <div class="table-container">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left;">Tool Name</th>
+                                    <th style="text-align: right;">Count</th>
+                                    <th style="text-align: right;">Percentage</th>
+                                    <th style="text-align: left;">Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-tool-breakdown">
+                                <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #64748b;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="margin-bottom: 0.75rem; font-size: 1.1em;">Recent Tool Usage Context</h3>
+                    <div id="modal-tool-context" style="max-height: 300px; overflow-y: auto; background: #f8fafc; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85em;">
+                        <div style="color: #64748b;">Loading context...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openToolUsageModal(directory, toolCalls) {
+            const modal = document.getElementById('tool-usage-modal');
+            document.getElementById('tool-usage-directory').textContent = 'Directory: ' + directory;
+            modal.style.display = 'block';
+
+            // Fetch detailed tool usage data
+            fetch('/api/tool-usage-details?directory=' + encodeURIComponent(directory))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update summary cards
+                        document.getElementById('modal-total-calls').textContent = data.total_calls.toLocaleString();
+                        document.getElementById('modal-unique-tools').textContent = data.unique_tools;
+                        document.getElementById('modal-file-ops').textContent = data.file_operations;
+
+                        // Update tool breakdown table
+                        const tbody = document.getElementById('modal-tool-breakdown');
+                        tbody.innerHTML = '';
+                        data.tool_breakdown.forEach(tool => {
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td style="font-weight: 500;">${tool.name}</td>
+                                <td style="text-align: right;">${tool.count.toLocaleString()}</td>
+                                <td style="text-align: right;">${tool.percentage}%</td>
+                                <td><span style="background: ${tool.is_file_op ? '#dcfce7' : '#dbeafe'}; color: ${tool.is_file_op ? '#166534' : '#1e40af'}; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75em;">${tool.is_file_op ? 'File Op' : 'Other'}</span></td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+
+                        // Update context examples
+                        const contextDiv = document.getElementById('modal-tool-context');
+                        if (data.context_examples && data.context_examples.length > 0) {
+                            contextDiv.innerHTML = data.context_examples.map(ex => `
+                                <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+                                    <div style="color: #475569; margin-bottom: 0.25rem;"><strong>${ex.tool}</strong> - ${ex.timestamp}</div>
+                                    <div style="color: #64748b;">${ex.context}</div>
+                                </div>
+                            `).join('');
+                        } else {
+                            contextDiv.innerHTML = '<div style="color: #64748b;">No context examples available</div>';
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to load tool usage details:', error);
+                    document.getElementById('modal-tool-breakdown').innerHTML = '<tr><td colspan="4" style="text-align: center; color: #ef4444;">Failed to load tool usage data</td></tr>';
+                });
+        }
+
+        function closeToolUsageModal() {
+            document.getElementById('tool-usage-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('tool-usage-modal');
+            if (event.target == modal) {
+                closeToolUsageModal();
+            }
+        }
     </script>
 
 </body>
